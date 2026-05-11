@@ -294,8 +294,16 @@ function renderRegime(r) {
                   + `style="vertical-align:middle;margin-left:8px;font-size:12px">${dir}</span>`;
   const stale = (r.stale_days ?? 0) > 1
     ? ` · <span class="neg">stale ${r.stale_days}d</span>` : "";
+  // as_of is an ISO timestamp ("2026-05-11T14:47:04") when sourced from the
+  // live IBKR tick, or a date-only string ("2026-05-11") when from the daily
+  // Yahoo CSV. Render the time only for live, full date for daily.
+  let asOfStr = r.as_of || "—";
+  if (asOfStr.includes("T")) {
+    asOfStr = asOfStr.slice(0, 10) + " " + asOfStr.slice(11, 16);
+  }
+  const src = r.source ? ` · ${r.source}` : "";
   meta.innerHTML = `SPY ${fmtMoney(r.close)} vs ${r.window}d SMA ${fmtMoney(r.sma)}`
-    + ` &nbsp;·&nbsp; as of ${r.as_of}${stale}`;
+    + ` &nbsp;·&nbsp; ${asOfStr}${src}${stale}`;
 }
 
 function renderTickerStrip(rows) {

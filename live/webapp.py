@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from live import live_config
+from live.regime import current_regime
 
 
 app = Flask(
@@ -108,6 +109,9 @@ def latest_json():
         if frozen is not None:
             frozen["frozen"] = True
             frozen.setdefault("frozen_at", live_config.FREEZE_AT)
+            # Override baked-in regime with the live one so the subheader
+            # tracks the IBKR tick (and the chip + subheader agree).
+            frozen["regime"] = current_regime()
             return jsonify(frozen)
 
     latest_path = Path(live_config.RANKED_DIR) / "latest.json"
@@ -120,9 +124,13 @@ def latest_json():
             "config": None,
             "top_picks": [],
             "ticker": [],
+            "regime": current_regime(),
             "error": "no ranked snapshot found yet — run the fetcher + ranker",
         })
     payload["frozen"] = False
+    # Always re-evaluate regime against the freshest data on disk, so the
+    # subheader matches the SPY chip even if `latest.json` was baked earlier.
+    payload["regime"] = current_regime()
     return jsonify(payload)
 
 
