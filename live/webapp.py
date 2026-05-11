@@ -126,6 +126,19 @@ def latest_json():
     return jsonify(payload)
 
 
+@app.route("/api/spy/latest.json")
+def spy_latest():
+    """Most recent live SPY tick (from local IBKR fetcher). Returns 404
+    with an explanatory body if no fetch has been written yet."""
+    path = Path(live_config.RANKED_DIR) / "spy_intraday.json"
+    payload = _read_json(path)
+    if payload is None:
+        return jsonify({
+            "error": "no SPY intraday snapshot yet — run `python3 -m live.fetch_spy_intraday`",
+        }), 404
+    return jsonify(payload)
+
+
 @app.route("/api/notifications/latest")
 def notifications_latest():
     """Most recent notification payload. Mya can poll this endpoint, or watch

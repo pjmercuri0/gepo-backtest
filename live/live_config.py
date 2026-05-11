@@ -17,7 +17,7 @@ LOGS_DIR          = os.path.join(ROOT_DIR, "logs")
 
 # --- IBKR gateway ---
 IB_HOST       = "127.0.0.1"
-IB_PORT       = 4002             # paper 4002, live 4001
+IB_PORT       = int(os.environ.get("IB_PORT", 4001))  # paper 4002, live 4001 (env-overridable)
 IB_CLIENT_ID  = 11               # avoid collision with test_ib_chain.py (=1)
 IB_MKT_DATA_TYPE = 3             # 3 = delayed; 4 = delayed-frozen. Use 3 for live polling.
 

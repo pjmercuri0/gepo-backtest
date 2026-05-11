@@ -10,6 +10,8 @@
 <div class="subtitle" id="snapshot-meta">loading...</div>
 <div class="subtitle" id="regime-meta"></div>
 
+<div id="spy-live"></div>
+
 <div class="params-row" id="params-row"></div>
 
 <div class="ticker-strip" id="ticker-strip">loading ranked candidates...</div>
@@ -233,6 +235,51 @@ function renderRanked(rows, maxGround, kVal) {
   </tr>`).join("");
 }
 
+async function refreshSpyLive() {
+  try {
+    const r = await fetch("{{ url_for('spy_latest') }}?_=" + Date.now());
+    if (!r.ok) { document.getElementById("spy-live").innerHTML = ""; return; }
+    const d = await r.json();
+    const chgCls = (d.change_pct >= 0) ? "pos" : "neg";
+    const regCls = (d.live_regime === "bull") ? "dir-bull" : "dir-bear";
+    const sign = (n) => n > 0 ? "+" : "";
+    document.getElementById("spy-live").innerHTML = `
+      <div class="week-card" style="padding:14px 18px;margin-bottom:18px">
+        <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:baseline">
+          <div>
+            <div class="week-sub">SPY · ${d.source}</div>
+            <div class="week-title">$${(d.mark ?? d.last ?? 0).toFixed(2)}
+              <span class="${chgCls}" style="font-size:14px;margin-left:6px">
+                ${sign(d.change)}${(d.change ?? 0).toFixed(2)}
+                (${sign(d.change_pct)}${(d.change_pct ?? 0).toFixed(2)}%)
+              </span>
+            </div>
+          </div>
+          <div>
+            <div class="week-sub">bid / ask</div>
+            <div class="week-title" style="font-size:14px">
+              $${(d.bid ?? 0).toFixed(2)} &nbsp;/&nbsp; $${(d.ask ?? 0).toFixed(2)}
+            </div>
+          </div>
+          <div>
+            <div class="week-sub">vs ${d.sma_window}d SMA</div>
+            <div class="week-title ${regCls}" style="font-size:14px">
+              ${sign(d.live_vs_sma)}${(d.live_vs_sma ?? 0).toFixed(2)}
+              (${sign(d.live_vs_sma_pct)}${(d.live_vs_sma_pct ?? 0).toFixed(2)}%)
+              · ${(d.live_regime || "?").toUpperCase()}
+            </div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div class="week-sub">tick</div>
+            <div class="week-sub" style="font-size:11px">${d.snapshot_ts}</div>
+          </div>
+        </div>
+      </div>`;
+  } catch (e) {
+    document.getElementById("spy-live").innerHTML = "";
+  }
+}
+
 function renderRegime(r) {
   const badge = document.getElementById("regime-badge");
   const meta  = document.getElementById("regime-meta");
@@ -292,6 +339,8 @@ async function refresh() {
 }
 
 refresh();
+refreshSpyLive();
 setInterval(refresh, POLL_MS);
+setInterval(refreshSpyLive, POLL_MS);
 </script>
 {% endblock %}
