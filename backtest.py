@@ -19,7 +19,18 @@ import ground
 
 
 def run_backtest(df: pd.DataFrame,
-                 expiry_prices: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+                 expiry_prices: pd.DataFrame,
+                 history: pd.DataFrame,
+                 lookback_days: int,
+                 top_n: int = None,
+                 sizing: str = "kelly",
+                 use_drift: bool = False,
+                 drift_lookup: dict = None,
+                 use_rv_blend: bool = False,
+                 rv_lookup: dict = None,
+                 iv_weight: float = 0.5,
+                 use_skew_adj: bool = False,
+                 skew_alpha: float = 0.5) -> tuple:
     """
     Run the full backtest over all entry dates.
 
@@ -27,14 +38,50 @@ def run_backtest(df: pd.DataFrame,
     ----------
     df            : filtered options DataFrame from data_loader
     expiry_prices : DataFrame with columns [Symbol, ExpirationDate, ExpiryPrice]
+    history       : pre-built historical outcomes (diagnostic only under
+                    the Greek-based estimator)
+    lookback_days : kept for back-compat
+    top_n         : keep best N trades per week by GROUND, or None for all
+    sizing        : 'one'    – flat 1 contract per trade.
+                  : 'dyn10k' – step-function sizing: floor(bankroll/$10k) contracts, min 1.
+                  : 'kelly'  – full-Kelly equal-dollar sizing.
+                  : '1kelly' – alias for 'kelly'.
+                  : '2kelly' – half-Kelly equal-dollar sizing.
+                  : '4kelly' – quarter-Kelly equal-dollar sizing.
+
+                  For Kelly variants, all selected trades that week get
+                  equal dollar exposure:
+                    deploy = (1/k) * mean(w_star) * STARTING_BANKROLL
+                    per_trade_dollars = deploy / n_trades
+                    contracts = round(per_trade_dollars / (max_loss * 100))
+                  Contracts floored at 1, capped at config.MAX_CONTRACTS.
+                  Sizing is against fixed STARTING_BANKROLL (no compounding).
 
     Returns
     -------
-    trades_df  : every individual trade with outcome and P&L
-    weekly_df  : week-by-week bankroll and summary stats
+    trades_df, weekly_df
     """
     entry_dates = sorted(df["DataDate"].unique())
     print(f"\nRunning backtest over {len(entry_dates)} weeks...")
+
+    # Configure ground.py module-level state for this run
+    ground.USE_DRIFT    = use_drift
+    ground.DRIFT_LOOKUP = drift_lookup if drift_lookup is not None else {}
+    ground.USE_RV_BLEND = use_rv_blend
+    ground.RV_LOOKUP    = rv_lookup if rv_lookup is not None else {}
+    ground.IV_WEIGHT    = iv_weight
+    ground.USE_SKEW_ADJ = use_skew_adj
+    ground.SKEW_ALPHA   = skew_alpha
+    if use_skew_adj:
+        print(f"  Using skew-adjusted probabilities (α={skew_alpha})")
+    elif use_rv_blend:
+        print(f"  Using IV-RV blended vol "
+              f"(IV weight={iv_weight}, {len(ground.RV_LOOKUP):,} RV entries"
+              f"{', drift on' if use_drift else ', drift off'})")
+    elif use_drift:
+        print(f"  Using drift-adjusted probabilities ({len(ground.DRIFT_LOOKUP):,} drift entries)")
+    else:
+        print(f"  Using Greek-based probabilities (no drift adjustment)")
 
     all_trades  = []
     weekly_rows = []
@@ -60,10 +107,10 @@ def run_backtest(df: pd.DataFrame,
             continue
 
         # ── 3. Score with GROUND ──────────────────────────────────────────
-        scored = ground.score_candidates(candidates)
+        scored = ground.score_candidates(candidates, history, lookback_days)
 
         # ── 4. Select best trade per ticker ──────────────────────────────
-        selected = ground.select_trades(scored)
+        selected = ground.select_trades(scored, top_n=top_n)
         if selected.empty:
             continue
 
@@ -109,25 +156,81 @@ def run_backtest(df: pd.DataFrame,
             lambda x: "WIN" if x == 1.0 else ("LOSS" if x == -1.0 else "PARTIAL")
         )
 
-        # ── 7. Bankroll allocation ────────────────────────────────────────
-        # Allocate w_star % of bankroll to each trade, normalised
-        # so total allocation ≤ 100% of bankroll
+        # ── 7. Position sizing ───────────────────────────────────────────
+        # Each contract = 100 shares. Dollar P&L per contract = pnl_per_contract * 100.
+        # Dollar at risk per contract = (max_loss + slippage_haircut) * 100,
+        # since slippage is a real cost on entry that adds to total possible loss.
         n = len(trades_this_week)
-        total_w = trades_this_week["w_star"].sum()
+        slip_per_share = 2.0 * float(spreads.SLIPPAGE_CENTS or 0.0)
+        true_max_loss  = trades_this_week["max_loss"] + slip_per_share
 
-        trades_this_week["bankroll_alloc"] = (
-            trades_this_week["w_star"] / total_w * bankroll
-        )
+        # Try integer flat-contract sizing first (e.g. '1', '2', '5')
+        try:
+            flat_n = int(sizing)
+            if flat_n < 1:
+                raise ValueError(f"flat contract count must be >= 1, got {flat_n}")
+            trades_this_week["contracts"]      = flat_n
+            trades_this_week["bankroll_alloc"] = flat_n * true_max_loss * 100
 
-        # Dollar P&L = (allocation / spread_width) * pnl_per_contract
-        # This gives P&L as if we bought floor(allocation/spread_width) contracts
-        trades_this_week["contracts"] = (
-            trades_this_week["bankroll_alloc"] / trades_this_week["spread_width"]
-        ).apply(np.floor)
+        except (ValueError, TypeError):
+            # Not an integer — must be 'one', 'dyn10k', or a Kelly variant
+            if sizing == "one":
+                trades_this_week["contracts"]      = 1
+                trades_this_week["bankroll_alloc"] = true_max_loss * 100
 
+            elif sizing == "dyn10k":
+                # Step-function sizing: 1 contract per $10k of bankroll.
+                # 10k–20k → qty 1, 20k–30k → qty 2, etc. Floor at 1 so the
+                # strategy keeps trading even after a drawdown that pushes
+                # bankroll below the starting $10k.
+                qty = max(1, int(bankroll // 10000))
+                trades_this_week["contracts"]      = qty
+                trades_this_week["bankroll_alloc"] = qty * true_max_loss * 100
+
+            else:
+                # Fractional-Kelly EQUAL-DOLLAR sizing against fixed reference bankroll.
+                # All selected trades get equal dollar exposure that week.
+                kelly_divisors = {"kelly": 1, "1kelly": 1, "2kelly": 2, "4kelly": 4}
+                k = kelly_divisors.get(sizing)
+                if k is None:
+                    raise ValueError(
+                        f"Unknown sizing '{sizing}'. "
+                        f"Use 'one', 'kelly'/'1kelly', '2kelly', '4kelly', "
+                        f"or a positive integer like '1', '2', '5'."
+                    )
+
+                ref_bankroll = config.STARTING_BANKROLL
+                w_avg = trades_this_week["w_star"].mean()
+                if w_avg <= 0 or n == 0:
+                    trades_this_week["contracts"]      = 1
+                    trades_this_week["bankroll_alloc"] = true_max_loss * 100
+                else:
+                    deploy = (1.0 / k) * w_avg * ref_bankroll
+                    per_trade = deploy / n
+
+                    contracts = (per_trade / (true_max_loss * 100)).round().astype(int)
+                    contracts = contracts.clip(lower=1)
+
+                    max_c = getattr(config, "MAX_CONTRACTS", 50)
+                    contracts = contracts.clip(upper=max_c)
+
+                    trades_this_week["contracts"]      = contracts
+                    trades_this_week["bankroll_alloc"] = contracts * true_max_loss * 100
+
+        # Dollar P&L per trade = contracts * pnl_per_contract * 100
+        # Slippage is applied as a flat per-leg, per-contract execution
+        # cost — it never affected selection, only realized P&L. 2 legs
+        # per spread, $100 multiplier per contract.
         trades_this_week["dollar_pnl"] = (
-            trades_this_week["contracts"] * trades_this_week["pnl_per_contract"]
+            trades_this_week["contracts"]
+            * trades_this_week["pnl_per_contract"]
+            * 100
         )
+        slip_per_spread = 2.0 * float(spreads.SLIPPAGE_CENTS or 0.0)
+        if slip_per_spread > 0:
+            trades_this_week["dollar_pnl"] -= (
+                trades_this_week["contracts"] * slip_per_spread * 100
+            )
 
         # ── 8. Update bankroll ────────────────────────────────────────────
         week_pnl    = trades_this_week["dollar_pnl"].sum()
