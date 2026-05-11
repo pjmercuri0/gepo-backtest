@@ -181,7 +181,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           </div>
         </div>
       </div>
-      <table>
+      <div class="table-scroll"><table>
         <thead><tr>
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
           <th>credit ($/sh)</th><th>max-loss ($/sh)</th><th>ratio</th>
@@ -204,7 +204,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${fmtNum(denom(p, kVal), 1)}</td>
           <td class="fw">${groundBar(p.GROUND, maxGround)}${fmtGround(p.GROUND)}</td>
         </tr></tbody>
-      </table>
+      </table></div>
     </div>`;
   });
   return html;

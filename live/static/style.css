@@ -64,9 +64,8 @@ td.fw { font-weight: 600; }
   /* Stack the card head + collapse the right-side stat trio to flow */
   .week-head { flex-direction: column; align-items: stretch; gap: 12px; }
   .week-head > div:last-child { flex-wrap: wrap; gap: 16px !important; }
-  /* Per-card inner table → scroll horizontally */
-  .week-card table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .week-card table thead, .week-card table tbody, .week-card table tr { display: table; width: 100%; min-width: 760px; }
+  /* Inner per-card tables use the same .table-scroll wrapper pattern.
+     Don't touch table display props — that breaks column widths. */
   /* Ticker strip stays a single line but smaller */
   .ticker-strip { font-size: 11px; padding: 8px 12px; }
   .ticker-strip .tick { margin-right: 18px; }
