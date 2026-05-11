@@ -53,6 +53,17 @@ def _download_json(url: str) -> dict:
 
 
 def _payload_to_csv(payload: dict) -> str:
+    """Convert Yahoo chart payload to Stooq-style CSV.
+
+    Crucially, the `Close` column we emit is the *adjusted* close (dividend-
+    and split-adjusted). This means:
+      - The regime filter still works (close vs SMA is invariant to which
+        consistent series you pick).
+      - SPY benchmark Sharpe computed downstream from pct_change(Close) is
+        a TOTAL-RETURN Sharpe, matching what a SPY buy-and-hold investor
+        actually experienced (dividends reinvested). Without this, the SPY
+        Sharpe under-states reality by the dividend yield (~1.5%/yr).
+    """
     res = payload.get("chart", {}).get("result")
     if not res:
         err = payload.get("chart", {}).get("error")
@@ -60,6 +71,7 @@ def _payload_to_csv(payload: dict) -> str:
     r0 = res[0]
     timestamps = r0.get("timestamp") or []
     quote = (r0.get("indicators", {}).get("quote") or [{}])[0]
+    adj_arr = (r0.get("indicators", {}).get("adjclose") or [{}])[0].get("adjclose") or []
     o = quote.get("open")  or []
     h = quote.get("high")  or []
     l = quote.get("low")   or []
@@ -67,18 +79,22 @@ def _payload_to_csv(payload: dict) -> str:
     v = quote.get("volume") or []
 
     n = min(len(timestamps), len(o), len(h), len(l), len(c), len(v))
+    if not adj_arr:
+        # Fall back to raw close with a stderr note.
+        print("  ⚠ adjclose missing from payload; using raw close (no dividend adj)",
+              flush=True)
+        adj_arr = c
     if n == 0:
         raise ValueError("no candles in payload")
 
     out = ["Date,Open,High,Low,Close,Volume"]
     for i in range(n):
-        # Skip rows where any field is None (Yahoo sometimes has nulls on
-        # half-day or shortened sessions).
         if None in (o[i], h[i], l[i], c[i]):
             continue
+        adj = adj_arr[i] if i < len(adj_arr) and adj_arr[i] is not None else c[i]
         d = datetime.fromtimestamp(timestamps[i], tz=timezone.utc).strftime("%Y-%m-%d")
         vol = v[i] if v[i] is not None else 0
-        out.append(f"{d},{o[i]:.4f},{h[i]:.4f},{l[i]:.4f},{c[i]:.4f},{int(vol)}")
+        out.append(f"{d},{o[i]:.4f},{h[i]:.4f},{l[i]:.4f},{adj:.4f},{int(vol)}")
     return "\n".join(out) + "\n"
 
 

@@ -19,8 +19,8 @@
 \title{Empirical Validation of the GROUND Ranking Framework on \\
        SP100 Weekly Credit Spreads (2020--2026)}
 
-\author{P.\,J.~Mercurio}
-\affil{\small \texttt{pjmercurio@gmail.com}}
+\author{Peter J.~Mercurio, PhD}
+\affil{\small \texttt{peter.mercurio@alumni.utoronto.ca}}
 \date{May 2026}
 
 
@@ -37,7 +37,7 @@ $k=20$ on a 2020--2024 in-sample window before scoring any 2025--2026 data.
 On the in-sample window the strategy posts Sharpe 1.79 and a bankroll-independent
 wager yield of 9.9\% at zero slippage; on the strict 2025--2026 holdout (350
 trades, 70 weeks, never used in $k$-selection) it posts Sharpe 2.47 and yield
-14.4\%. SPY buy-and-hold over the same windows posts Sharpe 0.79--1.02. Yield
+14.4\%. SPY buy-and-hold over the same windows posts Sharpe 0.79--1.11. Yield
 degrades to 4.5--5.4\% on the full sample and 8.7\% on the holdout under a
 conservative 3\textcent/leg post-hoc execution haircut. Single-factor baselines
 that rank by Kelly-growth $G$ alone or KL-divergence $D_{\mathrm{KL}}$ alone are
@@ -261,18 +261,16 @@ spanning $k \in [20, 30]$. We chose $k=20$ from the low end of the
 plateau and froze it before scoring any 2025+ data.
 
 \paragraph{Logarithm base.} A credit spread has three discrete
-outcomes (full-win, partial, full-loss); GROUND lives natively in
-log-base-3 (trits), where uniform entropy $H(\mathbf{u}) = \log_3 3 = 1$
-and divergence from uniform satisfies $D_{\mathrm{KL}} \in [0, 1]$. The
-upper bound has direct interpretation: $D_{\mathrm{KL}} = 1$ corresponds
-to a candidate concentrating all probability on a single outcome ---
-``three times more risky than uniform'' in trit units. We compute $G$,
-$D_{\mathrm{KL}}$, and the GROUND denominator $3^{k\,D_{\mathrm{KL}}}$ all
-in base 3, ensuring units cancel in Equation~\ref{eq:ground-v3}. (An
-earlier iteration mixed log-base-3 numerator with natural-base
-denominator $\exp(k\,D_{\mathrm{KL}})$; this is algebraically equivalent
-to base-3 with a re-scaled $k$, but the unit-consistent base-3 form is
-cleaner and is what the codebase now uses.)
+outcomes (full-win, partial, full-loss). GROUND is therefore naturally
+expressed in log-base-3 (trits), under which the uniform-outcome
+entropy is $H(\mathbf{u}) = \log_3 3 = 1$ and divergence from uniform
+satisfies $D_{\mathrm{KL}} \in [0, 1]$. The upper bound has direct
+interpretation: $D_{\mathrm{KL}} = 1$ corresponds to a candidate
+concentrating all probability on a single outcome. We compute $G$,
+$D_{\mathrm{KL}}$, and the GROUND denominator $3^{k\,D_{\mathrm{KL}}}$
+all in base 3, which keeps the exponent dimensionally consistent. Any
+other log base produces an algebraically equivalent ranker at a
+re-scaled $k$, so the choice of base is purely a unit convention.
 
 \subsection{Sizing}
 
@@ -378,82 +376,101 @@ sampling noise plus regime tailwind.
 Sharpe ratio estimates from short samples have wide confidence intervals,
 and we report them here to forestall over-reading of the headline
 numbers. \citet{lo2002} derives the asymptotic distribution of the
-estimated Sharpe ratio under the assumption of i.i.d.\ returns:
+estimated Sharpe ratio under the assumption of i.i.d.\ Gaussian returns:
 \begin{equation}
-\widehat{\mathrm{SR}} \overset{a}{\sim}
-\mathcal{N}\!\left(\mathrm{SR},\;
-\frac{1 + \tfrac{1}{2}\mathrm{SR}^2}{T}\right),
+\widehat{\mathrm{SR}}_w \overset{a}{\sim}
+\mathcal{N}\!\left(\mathrm{SR}_w,\;
+\frac{1 + \tfrac{1}{2}\mathrm{SR}_w^2}{T}\right),
 \label{eq:lo-sharpe}
 \end{equation}
-where $T$ is the number of return observations. For weekly returns
-annualised at $\sqrt{52}$, the standard error of the annualised Sharpe is
+where $T$ is the number of return observations. Credit-spread weekly
+P\&L, however, is mechanically bounded above by the credit collected
+and below by the max-loss, which produces a heavily left-skewed return
+distribution that violates the Gaussian assumption underlying
+\eqref{eq:lo-sharpe}. \citet{mertens2002} provides the
+higher-moment-adjusted variance that is valid under i.i.d.\ but
+non-Gaussian returns (also reproduced in \citet{opdyke2007}):
 \begin{equation}
-\mathrm{SE}(\widehat{\mathrm{SR}}_{\mathrm{ann}})
-  = \sqrt{52} \cdot \sqrt{\frac{1 + \tfrac{1}{2}\mathrm{SR}_w^2}{T}},
-\label{eq:lo-sharpe-ann}
+\mathrm{Var}(\widehat{\mathrm{SR}}_w)
+  = \frac{1 + \tfrac{1}{2}\mathrm{SR}_w^2 \;-\; \gamma_3 \mathrm{SR}_w
+            \;+\; \tfrac{1}{4}\gamma_4 \mathrm{SR}_w^2}{T},
+\label{eq:mertens-sharpe}
 \end{equation}
-with $\mathrm{SR}_w$ the weekly Sharpe and $T$ the number of weekly
-observations. Approximate 95\% confidence intervals are computed as
+where $\gamma_3$ is the sample skewness and $\gamma_4$ the sample
+excess kurtosis of the weekly returns. For the canonical
+short-volatility credit-spread strategy described here, $\gamma_3 < 0$
+(frequent small wins, occasional large losses) and $\gamma_4 > 0$ (fat
+tails). Both terms inflate $\mathrm{Var}(\widehat{\mathrm{SR}})$:
+$-\gamma_3 \mathrm{SR}$ is positive because $\gamma_3$ is negative and
+the Sharpe is positive, and $\gamma_4 \mathrm{SR}^2 / 4$ is positive
+because $\gamma_4$ is positive. Mertens (2002) therefore produces
+\emph{wider} confidence intervals than Lo (2002) on this strategy,
+which is the conservative direction.
+
+Annualised standard errors are obtained by scaling
+\eqref{eq:mertens-sharpe} by $\sqrt{52}$, and 95\% intervals by
 $\widehat{\mathrm{SR}}_{\mathrm{ann}} \pm 1.96 \cdot
-\mathrm{SE}(\widehat{\mathrm{SR}}_{\mathrm{ann}})$.
-Table~\ref{tab:sharpe-ci} reports the resulting intervals.
+\mathrm{SE}(\widehat{\mathrm{SR}}_{\mathrm{ann}})$. Both Lo and Mertens
+intervals are reported in Table~\ref{tab:sharpe-ci}.
 
 \begin{table}[h]
 \centering
-\small
-\begin{tabular}{lrrrr}
+\footnotesize
+\begin{tabular}{lrrrrrrrr}
 \toprule
-window & $T$ (weeks) & Sharpe & SE & 95\% CI \\
+window & $T$ & SR & $\gamma_3$ & $\gamma_4$ & Lo SE & Lo 95\% CI & Mertens SE & Mertens 95\% CI \\
 \midrule
-in-sample 2020--2024     & 260 & 1.79 & 0.45 & $[0.90,\,2.68]$ \\
-holdout 2025--2026       &  70 & 2.47 & 0.89 & $[0.73,\,4.21]$ \\
-extended 2020--2026      & 330 & 1.94 & 0.40 & $[1.15,\,2.73]$ \\
+in-sample 2020--2024 & 260 & 1.79 & $-0.81$ & $+0.64$ & 0.45 & $[0.90,\,2.68]$ & 0.50 & $[0.81,\,2.76]$ \\
+holdout 2025--2026   &  70 & 2.47 & $-0.81$ & $+0.69$ & 0.89 & $[0.73,\,4.21]$ & 1.00 & $[0.50,\,4.44]$ \\
+extended 2020--2026  & 330 & 1.94 & $-0.80$ & $+0.62$ & 0.40 & $[1.15,\,2.73]$ & 0.45 & $[1.06,\,2.81]$ \\
 \midrule
-SPY 2020--2024           & 261 & 0.79 & 0.45 & $[-0.09,\,1.66]$ \\
-SPY 2025--2026           &  71 & 1.02 & 0.86 & $[-0.67,\,2.71]$ \\
-SPY 2020--2026           & 332 & 0.83 & 0.40 & $[0.05,\,1.60]$ \\
+SPY 2020--2024       & 261 & 0.79 & $-0.49$ & $+5.56$ & 0.45 & $[-0.09,\,1.66]$ & 0.46 & $[-0.12,\,1.69]$ \\
+SPY 2025--2026       &  72 & 1.11 & $-0.55$ & $+3.36$ & 0.85 & $[-0.57,\,2.78]$ & 0.90 & $[-0.65,\,2.87]$ \\
+SPY 2020--2026       & 333 & 0.84 & $-0.50$ & $+5.47$ & 0.40 & $[0.07,\,1.62]$ & 0.41 & $[0.04,\,1.65]$ \\
 \bottomrule
 \end{tabular}
-\caption{Annualised Sharpe ratios with Lo (2002) standard errors and
-approximate 95\% confidence intervals. Strategy returns are weekly
-P\&L scaled by the fixed \$10{,}000 starting bankroll; SPY returns are
-daily closes resampled to Friday weekly returns. The intervals are
-wide, particularly on the 70-week holdout. The strategy's lower CI
-bound exceeds SPY's point estimate on every matched window, and the
-strategy's extended-sample lower bound (1.15) sits above SPY's
-extended-sample point estimate (0.83) but below SPY's upper bound
-(1.60); the windows overlap, so the comparison is descriptive rather
-than a formal test of difference.}
+\caption{Annualised Sharpe ratios with iid-Gaussian Lo (2002) standard
+errors and iid-non-Gaussian Mertens (2002) standard errors that
+incorporate sample skewness $\gamma_3$ and excess kurtosis $\gamma_4$.
+Strategy returns are weekly P\&L scaled by the fixed \$10{,}000
+starting bankroll. SPY benchmark returns are weekly (W-Friday) total
+returns derived from Yahoo Finance dividend-adjusted closes. The
+strategy's negative skew (–0.80) widens its CIs by roughly 11\% under
+Mertens; SPY's fatter tails (excess kurtosis 5.5) widen its CIs by
+only 2--6\% because the SPY Sharpe is small enough that the
+$\gamma_4 \mathrm{SR}^2/4$ term is correspondingly small.}
 \label{tab:sharpe-ci}
 \end{table}
 
-The intervals are wide. The holdout's $[0.73,\,4.21]$ is consistent
+The Mertens intervals are the appropriate primary reference under the
+return distribution this strategy actually produces. Three observations
+follow.
+
+First, the holdout's Mertens interval $[0.50,\,4.44]$ is consistent
 with strategies ranging from ``moderately better than SPY'' to
-``implausibly good''; we report the point estimate as the headline
-but note that 70 weekly observations is insufficient to discriminate
-between these hypotheses. The in-sample interval $[0.90,\,2.68]$ is
-tighter and materially exceeds SPY's matched-window interval
-$[-0.09,\,1.66]$, but since $k$ was selected on this window the
-in-sample Sharpe is not a clean estimate of the strategy's true Sharpe.
+``implausibly good.'' We report the 2.47 point estimate as the
+headline but note that 70 weekly observations is insufficient to
+discriminate sharply between these hypotheses. The in-sample interval
+$[0.81,\,2.76]$ is tighter and materially exceeds SPY's matched-window
+interval $[-0.12,\,1.69]$, but since $k$ was selected on this window
+the in-sample Sharpe is not a clean estimate of the strategy's true
+Sharpe.
 
-The extended-sample row is the most defensible single number for
-externally communicating the strategy's risk-adjusted return: it has
-the largest $T$, the tightest confidence interval, and combines the
-$k$-selected window with the holdout. Its 95\% lower bound of 1.15
-exceeds the SPY extended-sample point estimate of 0.83, though SPY's
-upper bound of 1.60 overlaps the strategy's lower bound; the windows
-are not independent, so this comparison is descriptive.
+Second, the extended-sample row is the most defensible single number
+for externally communicating the strategy's risk-adjusted return: it
+has the largest $T$, the tightest confidence interval, and combines
+the $k$-selected window with the holdout. Its Mertens 95\% lower
+bound of 1.06 exceeds SPY's extended-sample point estimate of 0.84,
+though SPY's upper bound 1.65 overlaps the strategy's lower bound; the
+windows are not independent, so this comparison is descriptive rather
+than a formal test of difference.
 
-\paragraph{Caveats on the Lo (2002) intervals.} The intervals
-in Table~\ref{tab:sharpe-ci} assume i.i.d.\ weekly returns. Credit-spread
-P\&L is mechanically bounded above by the credit collected and below by
-the max-loss, which produces a heavily left-skewed weekly return
-distribution; this violates the i.i.d.-Gaussian assumption underlying
-\eqref{eq:lo-sharpe}. The Lo (2002) discussion in §3.2 of the original
-paper notes that non-Gaussian moments widen the intervals further. We
-report the Lo intervals as the standard reference; the practical
-implication is that all reported intervals should be read as lower
-bounds on uncertainty, not upper bounds.
+Third, both Lo and Mertens assume independence of weekly observations.
+Weekly aggregation removes within-week selection correlation but does
+not eliminate autocorrelation across weeks under regime shifts. We do
+not adjust for serial dependence here; the practical implication is
+that all reported intervals should still be read as lower bounds on
+uncertainty.
 
 \subsection{SPY buy-and-hold benchmark}
 
@@ -465,19 +482,19 @@ bounds on uncertainty, not upper bounds.
 window & Sharpe & Total ROI & Max DD \\
 \midrule
 SPY 2020--2024 & 0.79 & 99.1\%  & $-31.8\%$ \\
-SPY 2025--2026 & 1.02 & 24.0\%  & $-16.9\%$ \\
-SPY 2020--2026 & 0.83 & 145.5\% & $-31.8\%$ \\
+SPY 2025--2026 & 1.11 & 26.6\%  & $-16.9\%$ \\
+SPY 2020--2026 & 0.84 & 150.8\% & $-31.8\%$ \\
 \bottomrule
 \end{tabular}
-\caption{SPY buy-and-hold over the matching evaluation windows, computed
-from daily closes resampled to weekly returns. Sharpe is annualised at
-$\sqrt{52}$.}
+\caption{SPY buy-and-hold total return over the matching evaluation
+windows, derived from Yahoo Finance dividend-adjusted closes resampled
+to W-Friday weekly returns. Sharpe is annualised at $\sqrt{52}$.}
 \label{tab:spy-benchmark}
 \end{table}
 
 The strategy's Sharpe exceeds SPY's on every window, with a particularly
 large margin on the in-sample window (1.79 vs.\ 0.79). On the holdout,
-the margin tightens to 2.47 vs.\ 1.02 because SPY's holdout performance
+the margin tightens to 2.47 vs.\ 1.11 because SPY's holdout performance
 is itself unusually strong. Drawdown is $-7$ to $-12$\% for the strategy
 versus $-19$ to $-34$\% for SPY across windows, reflecting the
 short-DTE credit-spread structure: max-loss is bounded per spread.
@@ -618,7 +635,7 @@ Under the intrinsic v3 form $\Gamma = G / 3^{\,k\,D_{\mathrm{KL}}}$
 with $k=20$ in trits (log-base-3), the GROUND ranker yields Sharpe 1.79 on the
 2020--2024 in-sample window and Sharpe 2.47 on the 350-trade,
 70-week strict 2025--2026 holdout, against SPY buy-and-hold Sharpes
-of 0.79 and 1.02 over the same windows. Under a 3\textcent/leg
+of 0.79 and 1.11 over the same windows. Under a 3\textcent/leg
 post-hoc execution haircut, yield falls from 9.9\% to 4.5\% in-sample
 and from 14.4\% to 8.7\% on the holdout. Single-factor baselines that
 strip out either $G$ or $D_{\mathrm{KL}}$ underperform the combined
@@ -823,6 +840,16 @@ J.~Cao, B.~Han, Q.~Tong, and X.~Zhan.
 A.\,W.~Lo.
 \newblock The statistics of Sharpe ratios.
 \newblock \emph{Financial Analysts Journal}, 58(4):36--52, 2002.
+
+\bibitem[Mertens(2002)]{mertens2002}
+E.~Mertens.
+\newblock Comments on variance of the IID estimator in Lo (2002).
+\newblock Unpublished working paper.
+
+\bibitem[Opdyke(2007)]{opdyke2007}
+J.\,D.~Opdyke.
+\newblock Comparing Sharpe ratios: So where are the $p$-values?
+\newblock \emph{Journal of Asset Management}, 8(5):308--336, 2007.
 
 \end{thebibliography}
 

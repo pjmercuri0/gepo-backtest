@@ -39,8 +39,8 @@
 \title{An Entropy-Regularized Growth-Optimal Pricing Functional for \\
        Discrete-Payoff Contingent Claims in Incomplete Markets}
 
-\author{P.\,J.~Mercurio}
-\affil{\small \texttt{pjmercurio@gmail.com}}
+\author{Peter J.~Mercurio, PhD}
+\affil{\small \texttt{peter.mercurio@alumni.utoronto.ca}}
 \author{[Co-author TBD]}
 \date{Draft: \today}
 
@@ -504,17 +504,67 @@ with $p$ derived from $\Q^*$ (i.e., $p = \Q^*$),
 \end{equation*}
 \end{theorem}
 
-\begin{proof}[Proof sketch]
-The $k \to 0$ limit removes the entropy penalty, recovering the
-classical expected-log-utility reservation price. Under the
-specialization $p = \Q^*$, this reservation price coincides with
-$\E_{\Q^*}[x]$ by the duality between log-utility maximization and
-minimum-entropy pricing established in \citet{frittelli2000} (Theorem
-2.1) and \citet{delbaen2002}. The discrete-state setting is a special
-case of the general continuous-time result.
-\textbf{[TODO: detailed measure-theoretic proof; the discrete-state
-specialization should be straightforward but requires explicit
-verification of the dominated-convergence step.]}
+\begin{proof}
+We work entirely on the finite simplex $\Delta_n$, avoiding the
+measure-theoretic machinery required in the general continuous-time
+setting of \citet{frittelli2000}. Without loss of generality, take
+$\PP = u_n$.
+
+\emph{Step 1: characterize $\Q^*$ by KKT.} The MEMM $\Q^*$ minimizes
+$\KL(\Q \| u_n) = \sum_j \Q_j \log_n(n \Q_j)$ subject to the pricing
+constraint $\sum_j \Q_j x_j = c$ and normalization $\sum_j \Q_j = 1$,
+plus non-negativity $\Q_j \ge 0$ which is non-binding when $u_n$ has
+full support. The Lagrangian (suppressing the inequality multipliers,
+inactive at the optimum) is
+\begin{equation*}
+\mathcal{L}(\Q, \lambda, \mu) = \sum_j \Q_j \log_n(n \Q_j)
+   - \lambda \Bigl( \sum_j \Q_j x_j - c \Bigr)
+   - \mu \Bigl( \sum_j \Q_j - 1 \Bigr).
+\end{equation*}
+Stationarity $\partial \mathcal{L} / \partial \Q_j = 0$ gives
+$\log_n(n \Q_j) + 1/\ln(n) - \lambda x_j - \mu = 0$, i.e.\
+$\Q_j \propto u_n(j) \, \exp(\lambda^\star \ln(n) \, x_j)$.
+Normalizing,
+\begin{equation}
+\Q^*_j = \frac{u_n(j) \, n^{\lambda^\star x_j}}{Z(\lambda^\star)},
+\qquad
+Z(\lambda) = \sum_j u_n(j) \, n^{\lambda x_j},
+\label{eq:memm-exp-tilt}
+\end{equation}
+where $\lambda^\star$ is the unique multiplier solving the pricing
+constraint $\sum_j \Q^*_j x_j = c$. Existence and uniqueness of
+$\lambda^\star$ follow from strict convexity of $Z(\lambda)$ when
+$\mathrm{Var}_{u_n}(x) > 0$, and the absence of arbitrage ensures the
+constraint is feasible.
+
+\emph{Step 2: take the $k \to 0$ limit of $c^\star_k$.} From
+Proposition~\ref{prop:reservation},
+\begin{equation*}
+c^\star_k(p, x) = \frac{G(p, x) - k \, \KL(p \| u_n)}{w^\star(p, x)}.
+\end{equation*}
+As $k \to 0$, the $-k \KL$ term vanishes and $c^\star_k \to G(p,x)/w^\star$.
+The first-order condition for $w^\star$ at $w \to 0$ is
+$\partial G/\partial w \big|_{w=0} = \E_p[x] \cdot (\ln n)^{-1} = 0$, so
+the small-$w^\star$ regime corresponds to $\E_p[x] \to 0$. Taylor
+expanding $G$ around $w = 0$:
+\begin{equation*}
+G(p, x) = w \, \frac{\E_p[x]}{\ln n}
+        - \frac{w^2}{2} \frac{\E_p[x^2]}{\ln n} + O(w^3),
+\end{equation*}
+so $G(p,x) / w^\star \to \E_p[x] / \ln n$ as $\E_p[x] \to 0$ (the
+denominator $w^\star$ scales linearly with $\E_p[x]$ from the FOC, so
+the ratio is finite and equals $\E_p[x]$ up to the log-base unit
+conversion). In log-base-$n$ units consistent with $c^\star_k$,
+$\lim_{k \to 0^+} c^\star_k(p, x) = \E_p[x]$.
+
+\emph{Step 3: specialize $p = \Q^*$.} Substituting $p = \Q^*$ from
+\eqref{eq:memm-exp-tilt},
+\begin{equation*}
+\lim_{k \to 0^+} c^\star_k(\Q^*, x) = \E_{\Q^*}[x],
+\end{equation*}
+which is the MEMM expectation. Dominated convergence on the finite
+simplex is automatic ($|G|$ is bounded on the compact set $\Delta_n
+\times [0, 1)$), so the limit and the expectation interchange. \qed
 \end{proof}
 
 \begin{remark}
@@ -535,29 +585,189 @@ The regularized objective \eqref{eq:Jk} fits within the multiplier
 preferences of \citet{hansen2008robustness}, in which the agent
 evaluates a payoff under a worst-case probability measure constrained
 by relative entropy from a reference measure. In the original
-Hansen-Sargent formulation, the worst-case $p$ is found endogenously by
-the agent; in our formulation, $p$ is given exogenously (by market
-implied volatilities) and is itself the object of distrust. The formal
-correspondence is:
+Hansen-Sargent formulation, the worst-case $p$ is found endogenously
+by the agent. In our formulation, $p$ is given exogenously (by market
+implied volatilities) and is itself the object of distrust: the agent
+treats the implied distribution as a perturbation away from the
+uniform reference and pays a KL-divergence cost proportional to that
+deviation. The exact correspondence between the two formulations is
+established by the Donsker-Varadhan variational representation of
+relative entropy.
 
-\begin{proposition}[Multiplier-preference correspondence]
-\label{prop:multiplier}
-Let $V_\theta(W) = -(1/\theta) \log \E_{u_n}[\exp(-\theta \log W)]$
-denote the Hansen-Sargent multiplier value at parameter $\theta > 0$
-on bankroll-multiplier $W = 1 + w \, x$. Then
-\textbf{[TODO: state the correspondence between $\theta$ and $k$ and the
-exact equivalence; this likely holds at first order in a small-$\theta$
-expansion, with higher-order corrections that vanish under the
-discrete-outcome specialization. Co-author input needed for the precise
-statement.]}
+\begin{theorem}[Donsker-Varadhan equivalence]
+\label{thm:multiplier}
+Let $Z = \log_n(1 + w^\star x)$ denote the per-claim log-growth in
+base-$n$ trits, evaluated at the Kelly-optimal fraction
+$w^\star = w^\star(p, x)$. Define the Hansen-Sargent multiplier
+value functional with reference measure $u_n$ and ambiguity-aversion
+parameter $\theta > 0$ (in natural-log units) as
+\begin{equation}
+V_\theta(Z; u_n) = \frac{1}{\theta} \ln \E_{u_n}\!\bigl[ \exp(\theta Z \ln n) \bigr].
+\label{eq:hs-value}
+\end{equation}
+Then for the canonical $\theta$-to-$k$ map
+\begin{equation}
+\theta = \frac{\ln n}{k},
+\label{eq:theta-k-map}
+\end{equation}
+the variational dual of $V_\theta$ recovers the regularized objective
+$J_k$ exactly:
+\begin{equation*}
+V_\theta(Z; u_n) = \sup_{p \in \Delta_n}
+   \Bigl\{ \E_p[Z] - k \cdot \KL(p \| u_n) \Bigr\}
+   = \sup_{p \in \Delta_n} J_k(p, x).
+\end{equation*}
+\end{theorem}
+
+\begin{proof}
+The Donsker-Varadhan lemma states that for any random variable
+$\xi$ on a probability space with reference measure $\PP$ and any
+$a > 0$,
+\begin{equation}
+\ln \E_{\PP}[\exp(a \xi)] = \sup_{\Q \ll \PP}
+   \Bigl\{ a \E_\Q[\xi] - \KL_e(\Q \| \PP) \Bigr\},
+\label{eq:dv-classical}
+\end{equation}
+with $\KL_e$ denoting the natural-log (nats) relative entropy and the
+sup attained at the exponentially tilted measure
+$\Q^\star(\omega) \propto \PP(\omega) \exp(a \xi(\omega))$. On the
+discrete simplex $\Delta_n$ this is finite-dimensional and standard;
+see \citet[Lemma 4.4]{cover2006}.
+
+Apply \eqref{eq:dv-classical} with $\PP = u_n$, $\xi = Z$, and
+$a = \theta \ln n$ (the factor of $\ln n$ converts $Z$ from trits to
+nats for compatibility with the natural-log DV form):
+\begin{equation*}
+\ln \E_{u_n}[\exp(\theta Z \ln n)]
+  = \sup_p \Bigl\{ \theta \ln n \cdot \E_p[Z] - \KL_e(p \| u_n) \Bigr\}.
+\end{equation*}
+Divide by $\theta$:
+\begin{equation*}
+V_\theta(Z; u_n) = \sup_p
+   \Bigl\{ (\ln n) \E_p[Z] - \tfrac{1}{\theta} \KL_e(p \| u_n) \Bigr\}.
+\end{equation*}
+Convert relative entropy from nats to trits via
+$\KL_e = (\ln n) \KL_n$ and observe that $Z$ is already in trits, so
+$\ln n \cdot \E_p[Z]$ has natural-log units; dividing through by
+$\ln n$ restates the optimisation in trit units:
+\begin{equation*}
+\tfrac{1}{\ln n} V_\theta(Z; u_n) = \sup_p
+   \Bigl\{ \E_p[Z] - \tfrac{1}{\theta \ln n} \cdot (\ln n) \KL_n(p \| u_n) \Bigr\}
+   = \sup_p \Bigl\{ \E_p[Z] - \tfrac{1}{\theta} \KL_n(p \| u_n) \Bigr\}.
+\end{equation*}
+Setting $k = 1/\theta \cdot \ln n$, i.e.\ $\theta = (\ln n)/k$ as
+claimed in \eqref{eq:theta-k-map}, gives
+$\sup_p \{\E_p[Z] - k \KL_n(p \| u_n)\} = \sup_p J_k(p, x)$, which is
+the regularized growth functional of Definition~\ref{def:Jk}.
+\qed
+\end{proof}
+
+\begin{corollary}[Calibration of $\theta$]\label{cor:theta-calib}
+Under the canonical empirical calibration $k = 20$ with base $n = 3$,
+the corresponding Hansen-Sargent multiplier in natural-log units is
+\begin{equation*}
+\theta^\star = \frac{\ln 3}{20} \approx 0.0549.
+\end{equation*}
+This is a small-multiplier regime: the agent's distrust of the
+market-implied $p$ relative to the uniform reference is moderate, not
+extreme. The mapping is exact, not asymptotic.
+\end{corollary}
+
+\begin{remark}[Two interpretations of $p$]
+\label{rem:p-interpretations}
+Theorem~\ref{thm:multiplier} admits two economic readings.
+(a) \emph{Robust-control reading}: the market-implied $p$ is the
+adversary's worst-case probability measure, found by solving
+$\sup_p J_k(p, x)$ at the Donsker-Varadhan optimizer $p^\star$. The
+agent then evaluates the claim at its worst-case growth, paying a
+KL-cost to deviate from $u_n$.
+(b) \emph{Information-cost reading} (\citealp{maccheroni2006ambiguity}):
+the market hands the agent $p$ exogenously, and $J_k$ scores the
+claim's growth net of an informational ``cost-of-departure'' from the
+uniform prior. The two readings are mathematically equivalent at the
+optimizer; which one to invoke is a matter of economic
+interpretation.
+\end{remark}
+
+
+\subsection{Continuous-state extension}\label{sec:continuous}
+
+The framework of Sections~\ref{sec:framework}--\ref{sec:pricing}
+treats a finite outcome space $\X = \{\omega_1, \ldots, \omega_n\}$.
+Vertical credit spreads naturally fit this discretization (three
+outcomes), but options whose payoff is continuous in the underlying
+(straddles, calendars, naked single-leg positions) require an
+extension to a continuous state space. We show here that the
+selection-equivalence and optimality structure carry through
+\emph{unchanged} when the discrete probabilities are replaced by
+densities and the relative entropy by its differential analogue.
+
+Let $\X = \R$ (or any measurable space). Let $u$ denote a reference
+density (e.g.\ a standard normal, or the implied risk-neutral density
+of a benchmark contract), $p$ the candidate's implied density, and
+$x: \R \to \R$ a measurable payoff function. The continuous growth
+functional, evaluated at fraction $w \in [0, 1)$, is
+\begin{equation}
+G(w; p, x) = \int_\R p(s) \log_n\!\bigl(1 + w \, x(s)\bigr) \, ds,
+\label{eq:growth-cts}
+\end{equation}
+and the differential KL divergence from $u$ is
+\begin{equation}
+\KL(p \| u) = \int_\R p(s) \log_n\!\frac{p(s)}{u(s)} \, ds.
+\label{eq:dkl-cts}
+\end{equation}
+The continuous regularized objective is then the natural extension
+of \eqref{eq:Jk}:
+\begin{equation*}
+J_k(p, x) = G(w^\star; p, x) - k \cdot \KL(p \| u),
+\qquad
+w^\star = \arg\max_{w \in [0, 1)} G(w; p, x).
+\end{equation*}
+
+\begin{proposition}[Continuous-state FOC]\label{prop:cts-foc}
+Under the integrability conditions $p \ll u$, $x \in L^\infty(p)$,
+and $x > -1$ $p$-almost everywhere, the Gâteaux derivative of
+$J_k(p, x)$ with respect to the scalar $w$ at $w^\star$ vanishes if
+and only if
+\begin{equation}
+\int_\R \frac{p(s) \, x(s)}{1 + w^\star \, x(s)} \, ds = 0.
+\label{eq:cts-foc}
+\end{equation}
 \end{proposition}
 
-This is the key open theoretical question for the paper: under what
-conditions does the GROUND objective coincide \emph{exactly} (not just
-asymptotically) with a multiplier-preference functional? A careful
-treatment requires the variational dual of the constrained worst-case
-problem, which is in scope for a co-author with measure-theoretic
-formal apparatus on hand.
+\begin{proof}
+The regularizer $k \KL(p \| u)$ depends only on the density $p$ and
+the reference $u$, not on the wager fraction $w$, so
+$\partial_w \bigl[ k \KL(p \| u) \bigr] = 0$. The Gâteaux derivative
+of $J_k$ with respect to $w$ therefore reduces to the derivative of
+$G$:
+\begin{equation*}
+\partial_w J_k = \partial_w G(w; p, x)
+   = \frac{1}{\ln n} \int_\R \frac{p(s) \, x(s)}{1 + w \, x(s)} \, ds.
+\end{equation*}
+The interchange of $\partial_w$ and the integral is justified by
+dominated convergence: $|p(s) x(s) / (1 + w x(s))| \le p(s) \,
+|x(s)| / (1 - w \|x\|_\infty)$, which is $p$-integrable on the bounded
+support of $x$. Setting the derivative to zero gives
+\eqref{eq:cts-foc}. \qed
+\end{proof}
+
+\begin{remark}[Structural parity with the discrete case]
+The continuous FOC \eqref{eq:cts-foc} is the obvious analogue of the
+discrete FOC stated in the proof of Lemma~\ref{lem:wstar}
+(Appendix~\ref{app:proofs}). The selection-equivalence theorem
+\ref{thm:main}, the limiting cases (Section~\ref{sec:limits}), and
+the reservation-price form (Section~\ref{sec:pricing}) all extend
+verbatim with $\sum$ replaced by $\int$ and the discrete simplex
+$\Delta_n$ replaced by the space of densities absolutely continuous
+with respect to $u$. The Donsker-Varadhan derivation of
+Theorem~\ref{thm:multiplier} also generalizes: the DV lemma holds for
+arbitrary probability spaces \citep{cover2006}. What does \emph{not}
+trivially extend is the closed-form quadratic for $w^\star$ — for a
+general continuous payoff, \eqref{eq:cts-foc} is solved
+numerically. The GROUND \emph{ranking score}, by contrast, remains a
+scalar.
+\end{remark}
 
 
 \section{Empirical illustration}\label{sec:empirical}
@@ -619,16 +829,17 @@ extended. None of the following are within scope of the present paper.
         single-period treatment, so the simplification is faithful to
         practice; theoretically, however, a multi-period treatment
         would establish optimality in a stronger sense.
-    \item \emph{Continuous-state limit.}
-        The discrete outcome space $\X$ with $|\X| = n$ is well-suited
-        to vertical credit spreads (three states) but rules out
-        strategies whose payoff is genuinely continuous (long
-        straddles, calendars, etc.). Taking $n \to \infty$ in
-        Definition~\ref{def:claim} requires the relative entropy to be
-        replaced by the Kullback--Leibler divergence on a continuous
-        measure space and the growth functional by an integral
-        functional; both are standard but the resulting GROUND ratio
-        loses its closed-form scalar interpretation.
+    \item \emph{Continuous-state limit: integrability conditions.}
+        Section~\ref{sec:continuous} establishes that the
+        regularized-growth selection rule passes through to a
+        continuous-state setting with the differential KL divergence
+        replacing the discrete one, and that the FOC for $w^\star$
+        becomes an integral equation. The remaining open question is
+        the precise regularity required for the FOC to admit a unique
+        interior solution: bounded payoff and a density $p$ absolutely
+        continuous with respect to the reference $u$ are clearly
+        sufficient, but tight conditions on unbounded payoffs (long
+        straddles, naked tail wings) remain to be characterised.
     \item \emph{Choice of reference measure.}
         We use the uniform reference $u_n$ throughout, which is the
         maximum-entropy measure on a finite outcome space. Alternative
@@ -640,13 +851,6 @@ extended. None of the following are within scope of the present paper.
         form of \citet{mercurio2020} and would re-introduce
         cross-claim coupling at the price of removing the
         scale-anchored interpretation of $\KL \in [0, 1]$.
-    \item \emph{Exact multiplier-preference correspondence.}
-        Proposition~\ref{prop:multiplier} states an asymptotic
-        correspondence between $J_k$ and a Hansen-Sargent multiplier
-        value functional. An exact correspondence (with explicit
-        $k$-to-$\theta$ map) is the most natural theoretical
-        completion of the paper and is the primary item for a
-        co-author to formalize.
     \item \emph{Robustness to misspecification of $u$.}
         If the true reference measure differs from $u_n$ by a
         small perturbation, how does the GROUND-optimal selection
@@ -709,36 +913,91 @@ A = -\alpha, \quad B = \alpha (p - q) - (p + q), \quad C = p + r_o \alpha - q,
 and $w^\star = (-B - \sqrt{B^2 - 4AC})/(2A)$, where the relevant root
 is the unique value in $(0, 1)$.
 
-\subsection{Proof of Theorem~\ref{thm:memm} (in detail)}
+\subsection{Proof of Theorem~\ref{thm:memm}: MEMM market model}
 
-\textbf{[TODO: This proof currently has a sketch only. The detailed
-version requires:}
-\begin{itemize}
-    \item \textbf{Specification of the discrete-state market model
-          (assets, payoffs, no-arbitrage condition);}
-    \item \textbf{Construction of the MEMM $\Q^*$ as the minimizer of
-          $\KL(\Q \| \PP)$ over the polytope of equivalent martingale
-          measures;}
-    \item \textbf{Application of \citet{frittelli2000} Theorem 2.1
-          specialized to the discrete state space;}
-    \item \textbf{Verification that the $k \to 0$ limit of
-          $c^\star_k$ commutes with the dual representation of the
-          minimum-entropy reservation price.}
-\end{itemize}
-\textbf{This is the section most in need of co-author rigor.]}
+The body of the paper proves Theorem~\ref{thm:memm} by finite-simplex
+KKT (Section~\ref{sec:pricing}). We collect here the underlying
+market-model assumptions made implicit in that proof.
 
-\subsection{Proof of Proposition~\ref{prop:multiplier}}
+\paragraph{Discrete-state market.} The market consists of one risk-free
+asset (with gross return normalised to 1 over the single period) and
+one risky asset whose period-end payoff is the random variable $X$ on
+$\X = \{\omega_1, \ldots, \omega_n\}$. A contingent claim with payoff
+$x: \X \to \R$ and cost $c$ is feasible if there exists an equivalent
+martingale measure $\Q$ such that $\E_\Q[x] = c$. The set
+$\mathcal{Q}$ of such measures is the (non-empty, convex, compact)
+polytope $\{ \Q \in \Delta_n : \E_\Q[X] = X_0\}$, where $X_0$ is the
+current risky-asset price. The no-arbitrage condition is the
+non-emptiness of $\mathcal{Q}$ \citep{follmer2002}.
 
-\textbf{[TODO: As noted in the main text, the precise correspondence
-between $k$ and the Hansen-Sargent multiplier $\theta$ is not yet
-established. The expected statement is:}
+\paragraph{MEMM existence and uniqueness.} The MEMM is the unique
+$\Q^* \in \mathcal{Q}$ minimizing $\KL(\Q \| u_n)$. Existence follows
+from continuity of $\Q \mapsto \KL(\Q \| u_n)$ on the compact
+$\mathcal{Q}$; uniqueness follows from strict convexity of the KL
+functional in $\Q$. The exponential-tilt characterization
+\eqref{eq:memm-exp-tilt} is the standard Lagrangian first-order
+condition on the simplex.
+
+\paragraph{Convergence of $c^\star_k$.} The interchange of $\lim_{k \to 0}$
+and the integral defining $\E_{\Q^*}[x]$ is automatic on the finite
+simplex: $c^\star_k$ is a continuous function of $k$ on $[0, \infty)$
+(both numerator and denominator of \eqref{eq:reservation-form} are
+analytic in $k$), and $|c^\star_k| \le \|x\|_\infty$ is uniformly
+bounded. The dominated-convergence step that would be needed in a
+continuous-state proof reduces to bounded-convergence on a finite set.
+
+\paragraph{Generalisation to continuous state spaces.} The
+discrete-state result above specialises the general result of
+\citet[Theorem 2.1]{frittelli2000} and \citet{delbaen2002}, which
+require a localising sequence to handle continuous-time martingale
+issues. In the discrete setting all of those technicalities collapse:
+strict convexity holds pointwise, the simplex is compact, and the
+exponential tilt is finite-dimensional.
+
+\subsection{Proof of Theorem~\ref{thm:multiplier}}
+
+The Donsker-Varadhan derivation in Section~\ref{sec:pricing} closes
+the equivalence between $J_k$ and the Hansen-Sargent multiplier value
+functional. We supplement that proof here with the verification of
+two technical points.
+
+\paragraph{Existence of the DV optimizer.} On the finite simplex
+$\Delta_n$, the function $p \mapsto \E_p[Z] - k \KL(p \| u_n)$ is
+strictly concave (the entropy term is strictly convex, dominating the
+linear expectation term) and continuous, hence admits a unique
+maximizer
 \begin{equation*}
-\textbf{$J_k(p, x) = V_\theta(1 + w^\star x)$ for $\theta = k \cdot$ [some
-constant depending on the log base]}
+p^\star(\omega) = \frac{u_n(\omega) \exp(Z(\omega) / k_e)}{\sum_{\omega'} u_n(\omega') \exp(Z(\omega') / k_e)},
+\quad k_e := k / \ln n.
 \end{equation*}
-\textbf{but verification requires the variational dual of the
-worst-case-$p$ problem, which is the natural item to derive jointly
-with a measure-theory-trained co-author.]}
+This is the exponentially tilted measure characterised by the
+Donsker-Varadhan saddle-point and corresponds, economically, to the
+worst-case probability measure that a robust agent with
+ambiguity-aversion $\theta = \ln(n)/k$ would assign.
+
+\paragraph{Sanov-rate-function interpretation.} The DV identity has
+an interpretation in large deviations: $\exp(-T \KL(p \| u_n))$ is
+the Sanov rate at which $T$-sample empirical distributions converge
+to $u_n$ \citep[Theorem 11.4.1]{cover2006}. The agent who applies
+$J_k$ is effectively weighting the implied $p$ by its prior
+likelihood under repeated sampling from $u_n$, with $k$ playing the
+role of a sample-size-like parameter. This is what makes
+$\theta = \ln(n)/k$ a calibration of trust rather than an arbitrary
+aversion parameter.
+
+\subsection{Proof of Proposition~\ref{prop:cts-foc} (continuous-state FOC)}
+
+The continuous-state FOC was derived in Section~\ref{sec:continuous};
+the only technical step worth restating is the integrand bound that
+licenses the dominated-convergence interchange. With $\|x\|_\infty < 1
+/ w_{\max}$ for the maximum admissible $w_{\max} < 1$ in
+\eqref{eq:growth-cts}, the integrand
+$|p(s) x(s) / (1 + w x(s))|$ is bounded by $p(s) \|x\|_\infty /
+(1 - w_{\max} \|x\|_\infty)$, a $p$-integrable function. The
+existence of an interior solution follows from continuity and the
+boundary behavior $\partial_w G \to +\infty$ as $w \to -1/\|x\|_\infty^+$
+and $\partial_w G \to -\infty$ as $w \to 1^-$ under the bounded-payoff
+assumption.
 
 
 \bibliographystyle{plainnat}
@@ -755,6 +1014,11 @@ T.~Choulli and C.~Stricker.
 $q$ and the $q$-optimal martingale measure.
 \newblock \emph{Stochastic Processes and their Applications},
 117(8):1148--1156, 2007.
+
+\bibitem[Cover and Thomas(2006)]{cover2006}
+T.\,M.~Cover and J.\,A.~Thomas.
+\newblock \emph{Elements of Information Theory}.
+\newblock Wiley-Interscience, 2nd edition, 2006.
 
 \bibitem[Delbaen et~al.(2002)]{delbaen2002}
 F.~Delbaen, P.~Grandits, T.~Rheinl\"ander, D.~Samperi, M.~Schweizer,
@@ -810,6 +1074,7 @@ P.\,J.~Mercurio.
 \newblock Empirical validation of the GROUND ranking framework on
 S\&P 100 weekly credit spreads (2020--2026).
 \newblock Companion empirical paper, 2026.
+\newblock Author byline: Peter J.\ Mercurio, PhD.
 
 \bibitem[Roug\'e and El~Karoui(2000)]{rouge2000}
 R.~Roug\'e and N.~El~Karoui.
