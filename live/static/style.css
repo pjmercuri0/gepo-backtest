@@ -44,6 +44,36 @@ td.fw { font-weight: 600; }
                 display: flex; gap: 28px; font-size: 12px; color: #888780; }
 .summary-row strong { color: #e8e8e8; font-weight: 600; }
 
+/* Horizontal scroll wrapper for wide tables on narrow viewports */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll table { min-width: 880px; }
+
+/* ── Mobile breakpoints ─────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  body { padding: 16px 12px; }
+  h1   { font-size: 20px; }
+  .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stat  { padding: 10px 12px; }
+  .stat-value { font-size: 20px; }
+  .charts { grid-template-columns: 1fr; }
+  .params-row { gap: 4px; }
+  .chip { padding: 3px 8px; font-size: 10px; }
+  .week-card { padding: 14px 14px; }
+  .week-title { font-size: 16px; }
+  .week-pnl   { font-size: 18px; }
+  /* Stack the card head + collapse the right-side stat trio to flow */
+  .week-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  .week-head > div:last-child { flex-wrap: wrap; gap: 16px !important; }
+  /* Per-card inner table → scroll horizontally */
+  .week-card table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .week-card table thead, .week-card table tbody, .week-card table tr { display: table; width: 100%; min-width: 760px; }
+  /* Ticker strip stays a single line but smaller */
+  .ticker-strip { font-size: 11px; padding: 8px 12px; }
+  .ticker-strip .tick { margin-right: 18px; }
+  .summary-row { flex-direction: column; gap: 4px; }
+  .nav a { margin-right: 12px; font-size: 12px; }
+}
+
 /* Live-only additions */
 .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
             background: #1D9E75; margin-right: 6px; vertical-align: middle;

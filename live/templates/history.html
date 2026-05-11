@@ -27,6 +27,7 @@
           {{ day.regime.window }}d SMA ${{ "%.2f"|format(day.regime.sma) }}
         </div>
       {% endif %}
+      <div class="table-scroll">
       <table>
         <thead><tr>
           <th>Rank</th><th>Ticker</th><th>Direction</th>
@@ -51,6 +52,7 @@
         {% endfor %}
         </tbody>
       </table>
+      </div>
     </div>
   {% endfor %}
 {% else %}
