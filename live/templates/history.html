@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}GEPO Live — History{% endblock %}
+
+{% block content %}
+<h1>Frozen 15:45 history</h1>
+<div class="subtitle">One snapshot per trading day. Drift columns populate at 16:15 close-snapshot.</div>
+
+{% if entries %}
+  {% for day in entries %}
+    <div class="week-card">
+      <div class="week-head">
+        <div>
+          <div class="week-title">{{ day.date }}</div>
+          <div class="week-sub">frozen {{ day.frozen_at or "—" }} · drift {{ day.drift_at or "pending" }}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="week-pnl">{{ day.top_picks | length }} picks</div>
+        </div>
+      </div>
+      {% if day.regime and day.regime.regime %}
+        <div class="subtitle">
+          regime:
+          <span class="{% if day.regime.regime == 'bull' %}dir-bull{% else %}dir-bear{% endif %}">
+            <strong>{{ day.regime.regime | upper }}</strong>
+          </span>
+          &middot; SPY ${{ "%.2f"|format(day.regime.close) }} vs
+          {{ day.regime.window }}d SMA ${{ "%.2f"|format(day.regime.sma) }}
+        </div>
+      {% endif %}
+      <table>
+        <thead><tr>
+          <th>Rank</th><th>Ticker</th><th>Direction</th>
+          <th>Strikes</th><th>Credit ($/ctr)</th><th>Max-Loss ($/ctr)</th><th>GROUND %</th>
+          <th>Δ short</th><th>DTE</th>
+        </tr></thead>
+        <tbody>
+        {% for p in day.top_picks %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td class="fw">{{ p.ticker }}</td>
+            <td class="{% if p.spread_type == 'bull_put' %}dir-bull{% else %}dir-bear{% endif %}">
+              {{ "bull-put" if p.spread_type == "bull_put" else "bear-call" }}
+            </td>
+            <td>${{ "%.2f"|format(p.short_strike) }} / ${{ "%.2f"|format(p.long_strike) }}</td>
+            <td>${{ "%.0f"|format(p.net_credit * 100) }}</td>
+            <td>${{ "%.0f"|format(p.max_loss * 100) }}</td>
+            <td class="fw">{{ "%.3f"|format(p.GROUND * 100) }}%</td>
+            <td>{{ "%.2f"|format(p.short_delta) }}</td>
+            <td>{{ p.DTE }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="week-card"><div style="color:#888780;padding:8px">no frozen snapshots yet. They appear after the first 15:45 freeze runs.</div></div>
+{% endif %}
+{% endblock %}

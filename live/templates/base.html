@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8">
+  <title>{% block title %}GEPO Live{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head><body>
+
+<div class="nav">
+  <a href="{{ url_for('index') }}">live</a>
+  <a href="{{ url_for('history') }}">history</a>
+  <a href="{{ url_for('latest_json') }}">api</a>
+</div>
+
+{% block content %}{% endblock %}
+
+{% block scripts %}{% endblock %}
+</body></html>

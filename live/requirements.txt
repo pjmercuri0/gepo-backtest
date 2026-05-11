@@ -1,0 +1,7 @@
+# Live tracker dependencies (in addition to the backtest's pandas/numpy).
+# Flask 2.2 is the last line supporting Python 3.7; bump if you upgrade Python.
+flask>=2.2,<3.0
+pyarrow                # for parquet snapshots
+ib_insync>=0.9.86      # ONLY needed for the IBKR fetcher path — webapp + ranker
+                       # + mock work without it. Skip on display-only deploys.
+gunicorn>=21.0; python_version >= "3.8"   # production WSGI server

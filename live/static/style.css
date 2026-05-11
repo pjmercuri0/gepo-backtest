@@ -1,0 +1,63 @@
+/* Reused verbatim from output/weekly_report-qty1.html for visual parity. */
+body { background: #0f0f0f; color: #e8e8e8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+       margin: 0; padding: 32px; }
+h1 { font-size: 24px; font-weight: 600; margin: 0 0 4px; }
+a { color: #378ADD; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.subtitle { color: #888780; font-size: 13px; margin-bottom: 14px; }
+.params-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 28px; }
+.chip { display: inline-flex; align-items: center; gap: 6px;
+         background: #1a1a1a; border: 0.5px solid rgba(255,255,255,0.08);
+         border-radius: 6px; padding: 4px 10px; font-size: 11px; }
+.chip-k { color: #888780; text-transform: lowercase; }
+.chip-v { color: #e8e8e8; font-weight: 500; }
+.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+.stat   { background: #1a1a1a; border: 0.5px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
+.stat-label { font-size: 11px; color: #888780; text-transform: lowercase; }
+.stat-value { font-size: 24px; font-weight: 600; margin-top: 4px; }
+.pos { color: #1D9E75; } .neg { color: #E24B4A; }
+.section-label { font-size: 11px; color: #888780; text-transform: uppercase; letter-spacing: 0.5px; margin: 32px 0 16px; }
+.week-card { background: #1a1a1a; border: 0.5px solid rgba(255,255,255,0.08); border-radius: 12px;
+              margin-bottom: 20px; padding: 20px 24px; }
+.week-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+.week-title { font-size: 18px; font-weight: 600; }
+.week-sub { font-size: 13px; color: #888780; margin-top: 4px; }
+.week-pnl { font-size: 22px; font-weight: 700; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: #888780; font-weight: 500; font-size: 11px;
+      text-transform: lowercase; padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+tr:last-child td { border-bottom: none; }
+td.fw { font-weight: 600; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge-WIN     { background: rgba(29,158,117,0.15); color: #1D9E75; }
+.badge-LOSS    { background: rgba(226,75,74,0.15); color: #E24B4A; }
+.badge-PARTIAL { background: rgba(239,159,39,0.15); color: #EF9F27; }
+.badge-FROZEN  { background: rgba(55,138,221,0.15); color: #378ADD; }
+.badge-LIVE    { background: rgba(29,158,117,0.18); color: #1D9E75; }
+.dir-bull   { color: #1D9E75; }
+.dir-bear   { color: #E24B4A; }
+.ground-bar { display: inline-block; width: 70px; height: 5px; background: rgba(255,255,255,0.08);
+               border-radius: 3px; vertical-align: middle; margin-right: 8px; }
+.ground-bar-fill { display: block; height: 100%; background: #378ADD; border-radius: 3px; }
+.summary-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08);
+                display: flex; gap: 28px; font-size: 12px; color: #888780; }
+.summary-row strong { color: #e8e8e8; font-weight: 600; }
+
+/* Live-only additions */
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            background: #1D9E75; margin-right: 6px; vertical-align: middle;
+            animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.frozen-dot { background: #378ADD; animation: none; }
+.ticker-strip { background: #141414; border: 0.5px solid rgba(255,255,255,0.06);
+                border-radius: 8px; padding: 10px 16px; margin-bottom: 24px;
+                overflow: hidden; white-space: nowrap; font-size: 12px;
+                color: #888780; }
+.ticker-strip .tick { display: inline-block; margin-right: 28px; }
+.ticker-strip .tick strong { color: #e8e8e8; font-weight: 600; margin-right: 6px; }
+.nav { margin-bottom: 18px; font-size: 13px; }
+.nav a { margin-right: 16px; }

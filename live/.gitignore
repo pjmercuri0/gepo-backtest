@@ -1,0 +1,8 @@
+snapshots/
+ranked/
+frozen/
+drift/
+notifications/
+logs/
+*.pyc
+__pycache__/

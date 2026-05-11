@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}GEPO Live — Top 5{% endblock %}
+
+{% block content %}
+<h1>
+  <span id="status-dot" class="live-dot"></span>
+  <span id="status-text">GEPO Live Tracker</span>
+  <span id="regime-badge"></span>
+</h1>
+<div class="subtitle" id="snapshot-meta">loading...</div>
+<div class="subtitle" id="regime-meta"></div>
+
+<div class="params-row" id="params-row"></div>
+
+<div class="ticker-strip" id="ticker-strip">loading ranked candidates...</div>
+
+<div class="section-label" id="top-label">Live top picks (updates every {{ poll_seconds }}s)</div>
+<div id="weekly-totals"></div>
+<div id="top-picks"></div>
+
+<div class="section-label">All ranked candidates</div>
+<div class="week-card">
+  <table id="ranked-table">
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>Ticker</th>
+        <th>Direction</th>
+        <th>Strikes</th>
+        <th>Δ</th>
+        <th>DTE</th>
+        <th>Credit ($/sh)</th>
+        <th>Max-Loss ($/sh)</th>
+        <th>Ratio</th>
+        <th>p / r₀ / q</th>
+        <th>G</th>
+        <th>DKL</th>
+        <th>k·DKL</th>
+        <th>3^(k·DKL)</th>
+        <th>GROUND %</th>
+      </tr>
+    </thead>
+    <tbody id="ranked-tbody"><tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const POLL_MS = {{ poll_seconds * 1000 }};
+
+function fmtNum(v, dec=2) {
+  if (v == null) return "—";
+  return Number(v).toFixed(dec);
+}
+function fmtPct(v, dec=1) {
+  if (v == null) return "—";
+  return (Number(v) * 100).toFixed(dec) + "%";
+}
+function fmtMoney(v, dec=2) {
+  if (v == null) return "—";
+  return "$" + Number(v).toFixed(dec);
+}
+// Per-contract dollars: option payoffs are stored per share; one contract = 100 shares.
+// Use this for credit, max-loss, and any premium-derived dollar figure.
+function fmtContract(v, dec=0) {
+  if (v == null) return "—";
+  return "$" + (Number(v) * 100).toFixed(dec);
+}
+// GROUND score rendered as a percentage. Canonical Γ values live in
+// ~[1e-4, 5e-2] (unitless ratio); rendering as a % puts them in
+// [0.01%, 5%] which is far easier to read. Selection ordering is invariant.
+function fmtGround(v, dec=3) {
+  if (v == null) return "—";
+  return (Number(v) * 100).toFixed(dec) + "%";
+}
+// k·DKL is the exponent under the canonical GROUND ratio Γ = G / 3^(k·DKL).
+// At k=20, this lives in roughly [1, 5] for canonical-shape spreads.
+function kdkl(r, k) {
+  if (r == null || r.DKL == null) return null;
+  return Number(r.DKL) * Number(k);
+}
+function denom(r, k) {
+  const v = kdkl(r, k);
+  if (v == null) return null;
+  return Math.pow(3, v);
+}
+function dirClass(spread_type) {
+  if (spread_type === "bull_put") return "dir-bull";
+  if (spread_type === "bear_call") return "dir-bear";
+  return "";
+}
+function dirLabel(spread_type) {
+  if (spread_type === "bull_put") return "bull-put";
+  if (spread_type === "bear_call") return "bear-call";
+  return spread_type || "—";
+}
+function groundBar(ground, max) {
+  const pct = Math.max(0, Math.min(1, (ground || 0) / (max || 1)));
+  return `<span class="ground-bar"><span class="ground-bar-fill" style="width:${pct * 100}%"></span></span>`;
+}
+
+function renderParams(cfg) {
+  if (!cfg) return "";
+  const chips = [
+    ["DTE",            `${cfg.DTE_MIN}–${cfg.DTE_MAX}d`],
+    ["delta",          `${cfg.DELTA_MIN}–${cfg.DELTA_MAX} (target 0.50)`],
+    ["credit ratio",   `≥ ${cfg.MIN_CREDIT_RATIO}`],
+    ["max_loss",       `≤ $${cfg.MAX_MAX_LOSS}/share`],
+    ["OI",             `≥ ${cfg.MIN_OPEN_INTEREST}`],
+    ["ground",         `≥ ${cfg.GROUND_THRESHOLD}`],
+    ["k",              `${cfg.DKL_K}`],
+    ["α",              `${cfg.ALPHA}`],
+    ["top-N",          `${cfg.TOP_N}`],
+  ];
+  return chips.map(([k, v]) =>
+    `<span class="chip"><span class="chip-k">${k}</span><span class="chip-v">${v}</span></span>`
+  ).join("");
+}
+
+function renderWeeklyTotals(picks) {
+  if (!picks || picks.length === 0) return "";
+  let totCredit = 0, totRisk = 0;
+  picks.forEach(p => {
+    if (p.net_credit != null) totCredit += Number(p.net_credit) * 100;
+    if (p.max_loss   != null) totRisk   += Number(p.max_loss)   * 100;
+  });
+  const decOdds = totRisk > 0 ? (1 + totCredit / totRisk) : 1;
+  return `<div class="week-card" style="background:#0f1a1f">
+    <div style="display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap">
+      <div>
+        <div class="week-sub">this week (top ${picks.length})</div>
+        <div class="week-title">portfolio totals</div>
+      </div>
+      <div style="display:flex;gap:32px;align-items:baseline">
+        <div style="text-align:right">
+          <div class="week-pnl pos">$${totCredit.toFixed(0)}</div>
+          <div class="week-sub">total credit</div>
+        </div>
+        <div style="text-align:right">
+          <div class="week-pnl neg">$${totRisk.toFixed(0)}</div>
+          <div class="week-sub">total risk</div>
+        </div>
+        <div style="text-align:right">
+          <div class="week-pnl">${decOdds.toFixed(2)}</div>
+          <div class="week-sub">decimal odds</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderTopPicks(picks, maxGround, kVal) {
+  if (!picks || picks.length === 0) {
+    return `<div class="week-card"><div style="color:#888780;padding:8px">no qualifying candidates right now</div></div>`;
+  }
+  let html = "";
+  picks.forEach((p, i) => {
+    html += `<div class="week-card">
+      <div class="week-head">
+        <div>
+          <div class="week-title">#${i+1} &nbsp; <strong>${p.ticker}</strong>
+            <span class="${dirClass(p.spread_type)}">${dirLabel(p.spread_type)}</span></div>
+          <div class="week-sub">${fmtMoney(p.short_strike)} / ${fmtMoney(p.long_strike)} &nbsp;·&nbsp;
+            expires ${p.expiry_date} &nbsp;·&nbsp; DTE ${p.DTE} &nbsp;·&nbsp; 1 contract = 100 shares</div>
+        </div>
+        <div style="display:flex;gap:24px;align-items:baseline;text-align:right">
+          <div>
+            <div class="week-pnl pos">${fmtContract(p.net_credit)}</div>
+            <div class="week-sub">credit / contract</div>
+          </div>
+          <div>
+            <div class="week-pnl neg">${fmtContract(p.max_loss)}</div>
+            <div class="week-sub">risk / contract</div>
+          </div>
+          <div>
+            <div class="week-pnl">${(1 + (p.credit_ratio || 0)).toFixed(2)}</div>
+            <div class="week-sub">decimal odds</div>
+          </div>
+        </div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
+          <th>credit ($/sh)</th><th>max-loss ($/sh)</th><th>ratio</th>
+          <th>p</th><th>r₀</th><th>q</th><th>G</th><th>DKL</th><th>k·DKL</th><th>3^(k·DKL)</th><th>GROUND %</th>
+        </tr></thead>
+        <tbody><tr>
+          <td>${fmtMoney(p.entry_price)}</td>
+          <td>${fmtNum(p.short_delta, 3)}</td>
+          <td>${fmtNum(p.long_delta, 3)}</td>
+          <td>${fmtPct(p.IV)}</td>
+          <td class="fw">${fmtMoney(p.net_credit)}</td>
+          <td>${fmtMoney(p.max_loss)}</td>
+          <td>${fmtPct(p.credit_ratio)}</td>
+          <td>${fmtNum(p.p, 3)}</td>
+          <td>${fmtNum(p.ro, 3)}</td>
+          <td>${fmtNum(p.q, 3)}</td>
+          <td>${fmtNum(p.G, 4)}</td>
+          <td>${fmtNum(p.DKL, 4)}</td>
+          <td>${fmtNum(kdkl(p, kVal), 2)}</td>
+          <td>${fmtNum(denom(p, kVal), 1)}</td>
+          <td class="fw">${groundBar(p.GROUND, maxGround)}${fmtGround(p.GROUND)}</td>
+        </tr></tbody>
+      </table>
+    </div>`;
+  });
+  return html;
+}
+
+function renderRanked(rows, maxGround, kVal) {
+  if (!rows || rows.length === 0) {
+    return `<tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
+  }
+  return rows.map((r, i) => `<tr>
+    <td>${i+1}</td>
+    <td class="fw">${r.ticker}</td>
+    <td class="${dirClass(r.spread_type)}">${dirLabel(r.spread_type)}</td>
+    <td>${fmtMoney(r.short_strike)} / ${fmtMoney(r.long_strike)}</td>
+    <td>${fmtNum(r.short_delta, 2)}</td>
+    <td>${r.DTE ?? "—"}</td>
+    <td>${fmtMoney(r.net_credit)}</td>
+    <td>${fmtMoney(r.max_loss)}</td>
+    <td>${fmtPct(r.credit_ratio, 0)}</td>
+    <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}</td>
+    <td>${fmtNum(r.G, 4)}</td>
+    <td>${fmtNum(r.DKL, 3)}</td>
+    <td>${fmtNum(kdkl(r, kVal), 2)}</td>
+    <td>${fmtNum(denom(r, kVal), 1)}</td>
+    <td class="fw">${groundBar(r.GROUND, maxGround)}${fmtGround(r.GROUND)}</td>
+  </tr>`).join("");
+}
+
+function renderRegime(r) {
+  const badge = document.getElementById("regime-badge");
+  const meta  = document.getElementById("regime-meta");
+  if (!r || !r.regime) {
+    badge.innerHTML = "";
+    meta.textContent = "regime: unknown";
+    return;
+  }
+  const cls = r.regime === "bull" ? "dir-bull" : "dir-bear";
+  const dir = r.regime === "bull" ? "BULL — only bull-puts" : "BEAR — only bear-calls";
+  badge.innerHTML = `<span class="badge ${cls === 'dir-bull' ? 'badge-WIN' : 'badge-LOSS'}" `
+                  + `style="vertical-align:middle;margin-left:8px;font-size:12px">${dir}</span>`;
+  const stale = (r.stale_days ?? 0) > 1
+    ? ` · <span class="neg">stale ${r.stale_days}d</span>` : "";
+  meta.innerHTML = `SPY ${fmtMoney(r.close)} vs ${r.window}d SMA ${fmtMoney(r.sma)}`
+    + ` &nbsp;·&nbsp; as of ${r.as_of}${stale}`;
+}
+
+function renderTickerStrip(rows) {
+  if (!rows || rows.length === 0) return "no candidates";
+  return rows.slice(0, 30).map(r =>
+    `<span class="tick"><strong>${r.ticker}</strong>${dirLabel(r.spread_type).slice(0,2)} ${fmtGround(r.GROUND)}</span>`
+  ).join("");
+}
+
+async function refresh() {
+  try {
+    const r = await fetch("{{ url_for('latest_json') }}?_=" + Date.now());
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+
+    const maxG = (data.ticker && data.ticker.length) ? data.ticker[0].GROUND : 1.0;
+    document.getElementById("snapshot-meta").textContent =
+      `snapshot: ${data.snapshot_ts}  ·  ${data.n_candidates} candidates  ·  source: ${data.snapshot_file}`;
+    renderRegime(data.regime);
+    document.getElementById("params-row").innerHTML = renderParams(data.config);
+    document.getElementById("ticker-strip").innerHTML = renderTickerStrip(data.ticker);
+    const kVal = (data.config && data.config.DKL_K) ? data.config.DKL_K : 20;
+    document.getElementById("weekly-totals").innerHTML = renderWeeklyTotals(data.top_picks);
+    document.getElementById("top-picks").innerHTML = renderTopPicks(data.top_picks, maxG, kVal);
+    document.getElementById("ranked-tbody").innerHTML = renderRanked(data.ticker, maxG, kVal);
+
+    // Frozen-state indicator
+    if (data.frozen) {
+      document.getElementById("status-dot").className = "live-dot frozen-dot";
+      document.getElementById("status-text").innerHTML =
+        `GEPO Live Tracker <span class="badge badge-FROZEN" style="vertical-align:middle">FROZEN ${data.frozen_at || ""}</span>`;
+      document.getElementById("top-label").textContent =
+        "Frozen 15:45 picks for today";
+    } else {
+      document.getElementById("status-dot").className = "live-dot";
+      document.getElementById("status-text").textContent = "GEPO Live Tracker";
+    }
+  } catch (e) {
+    document.getElementById("snapshot-meta").textContent = "error: " + e.message;
+  }
+}
+
+refresh();
+setInterval(refresh, POLL_MS);
+</script>
+{% endblock %}
