@@ -32,11 +32,28 @@ fi
 #   no --delete : keep server-side history files even if pruned locally
 RSYNC="rsync -az --partial --timeout=20 -e 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new $SSH_OPTS'"
 
-# Sync the three live directories. Each subdir creates itself remotely.
-for dir in ranked frozen notifications; do
-  if [ -d "live/$dir" ]; then
-    eval "$RSYNC live/$dir/ $MYA_SSH_HOST:$MYA_REMOTE_BASE/$dir/" \
-      && echo "  ✓ uploaded live/$dir/" \
-      || echo "  ✗ rsync failed for live/$dir/"
+# Selective upload — only ship files we generate from real IBKR data.
+# Mya's server generates its own mock latest.json / frozen/*.json on cron
+# until OPRA is live; if we rsync our (stale) mock over hers, the regime
+# banner goes stale.
+#
+# Right now we only have real intraday SPY ticks. Once the option ranker
+# is producing real ranked output, add `live/ranked/latest.json` and the
+# frozen/notifications dirs back to this list.
+UPLOAD_FILES=(
+  "live/ranked/spy_intraday.json"   # always real (IBKR live tick)
+  # "live/ranked/latest.json"       # uncomment when ranker is live
+  # "live/frozen/"                  # uncomment when freezer is wired
+  # "live/notifications/"           # uncomment when notifications fire
+)
+
+for src in "${UPLOAD_FILES[@]}"; do
+  if [ ! -e "$src" ]; then
+    echo "  · skip $src (not present)"
+    continue
   fi
+  dest="$MYA_SSH_HOST:$MYA_REMOTE_BASE/${src#live/}"
+  eval "$RSYNC \"$src\" \"$dest\"" \
+    && echo "  ✓ uploaded $src" \
+    || echo "  ✗ rsync failed for $src"
 done
