@@ -280,6 +280,42 @@ async function refreshSpyLive() {
   }
 }
 
+// ── Market-hours + tick-freshness helpers (status-dot logic) ────────
+// Returns true if it's currently a weekday between 9:30 and 16:00 ET.
+// Browser computes from local clock translated to ET via Intl API.
+function marketOpenNow() {
+  const now = new Date();
+  // Render the current time in America/New_York then parse back the parts
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(now).map(p => [p.type, p.value]));
+  const dow = parts.weekday;                          // Mon, Tue, ... Sun
+  if (dow === "Sat" || dow === "Sun") return false;
+  const h = parseInt(parts.hour, 10);
+  const m = parseInt(parts.minute, 10);
+  const mins = h * 60 + m;
+  return mins >= 9*60 + 30 && mins <= 16*60;          // 9:30 ≤ now ≤ 16:00 ET
+}
+
+// True if the snapshot_ts in either the SPY widget or the regime banner is
+// less than 30 minutes old. Falls back gracefully if neither field exists.
+function tickIsFresh(data) {
+  // Prefer the SPY live tick's timestamp when present (it ages fastest).
+  const candidates = [];
+  if (data && data.regime && data.regime.as_of) candidates.push(data.regime.as_of);
+  if (data && data.snapshot_ts) candidates.push(data.snapshot_ts);
+  for (const ts of candidates) {
+    const dt = new Date(ts);
+    if (!isNaN(dt)) {
+      const ageMin = (Date.now() - dt.getTime()) / 60000;
+      if (ageMin < 30) return true;
+    }
+  }
+  return false;
+}
+
 function renderRegime(r) {
   const badge = document.getElementById("regime-badge");
   const meta  = document.getElementById("regime-meta");
@@ -330,16 +366,22 @@ async function refresh() {
     document.getElementById("top-picks").innerHTML = renderTopPicks(data.top_picks, maxG, kVal);
     document.getElementById("ranked-tbody").innerHTML = renderRanked(data.ticker, maxG, kVal);
 
-    // Frozen-state indicator
+    // ── Status dot ────────────────────────────────────────────────
+    // Green pulse: market is open AND last tick < 30 min ago.
+    // Solid blue: post-15:45 frozen state (official picks of the day).
+    // Solid red : market closed OR last tick > 30 min stale.
+    const dot = document.getElementById("status-dot");
+    const txt = document.getElementById("status-text");
     if (data.frozen) {
-      document.getElementById("status-dot").className = "live-dot frozen-dot";
-      document.getElementById("status-text").innerHTML =
+      dot.className = "live-dot frozen-dot";
+      txt.innerHTML =
         `GEPO Live Tracker <span class="badge badge-FROZEN" style="vertical-align:middle">FROZEN ${data.frozen_at || ""}</span>`;
       document.getElementById("top-label").textContent =
         "Frozen 15:45 picks for today";
     } else {
-      document.getElementById("status-dot").className = "live-dot";
-      document.getElementById("status-text").textContent = "GEPO Live Tracker";
+      const isLive = marketOpenNow() && tickIsFresh(data);
+      dot.className = isLive ? "live-dot" : "live-dot stale-dot";
+      txt.textContent = "GEPO Live Tracker";
     }
   } catch (e) {
     document.getElementById("snapshot-meta").textContent = "error: " + e.message;

@@ -82,6 +82,7 @@ td.fw { font-weight: 600; }
   50% { opacity: 0.3; }
 }
 .frozen-dot { background: #378ADD; animation: none; }
+.stale-dot  { background: #E24B4A; animation: none; }   /* solid red, no pulse — market closed or > 30 min stale */
 .ticker-strip { background: #141414; border: 0.5px solid rgba(255,255,255,0.06);
                 border-radius: 8px; padding: 10px 16px; margin-bottom: 24px;
                 overflow: hidden; white-space: nowrap; font-size: 12px;

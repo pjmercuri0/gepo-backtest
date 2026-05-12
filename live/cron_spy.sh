@@ -8,6 +8,11 @@ mkdir -p live/logs
 # cron environment doesn't inherit interactive-shell exports by default.
 [ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
 
+# Keep the Mac awake for the next 15 minutes (covers this fetch + the
+# headroom until the next cron firing). caffeinate self-terminates after
+# 900 s; if a previous one is still running it's harmless (they stack).
+/usr/bin/caffeinate -i -t 900 &
+
 LOG=live/logs/spy_intraday.log
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
