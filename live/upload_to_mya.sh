@@ -42,9 +42,9 @@ RSYNC="rsync -az --partial --timeout=20 -e 'ssh -o BatchMode=yes -o StrictHostKe
 # frozen/notifications dirs back to this list.
 UPLOAD_FILES=(
   "live/ranked/spy_intraday.json"   # always real (IBKR live tick)
-  # "live/ranked/latest.json"       # uncomment when ranker is live
+  "live/notifications/"             # health alerts and (later) 15:45 freeze payloads
+  # "live/ranked/latest.json"       # uncomment when option ranker is live
   # "live/frozen/"                  # uncomment when freezer is wired
-  # "live/notifications/"           # uncomment when notifications fire
 )
 
 for src in "${UPLOAD_FILES[@]}"; do

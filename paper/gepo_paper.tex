@@ -13,8 +13,10 @@
     citecolor=black,
     urlcolor=blue!50!black,
 }
-\usepackage{microtype}
+\providecommand{\doi}[1]{\href{https://doi.org/#1}{doi:#1}}
+\usepackage[expansion=false]{microtype}
 \usepackage{authblk}
+\usepackage{natbib}
 
 \title{Empirical Validation of the GROUND Ranking Framework on \\
        SP100 Weekly Credit Spreads (2020--2026)}
@@ -32,7 +34,7 @@ We present a six-year backtest of a weekly credit-spread strategy on the SP100
 universe in which the GROUND ranking framework of \citet{mercurio2020}
 selects, at each weekly entry, the top-$N$ candidate spreads from a Greek-filtered
 candidate pool. We adopt a parsimonious intrinsic form of the GROUND ratio
-($\Gamma = G / 3^{\,k\,D_{\mathrm{KL}}}$) and freeze the amplification factor
+($\Gamma = G \cdot 3^{-k\,D_{\mathrm{KL}}}$) and freeze the amplification factor
 $k=20$ on a 2020--2024 in-sample window before scoring any 2025--2026 data.
 On the in-sample window the strategy posts Sharpe 1.79 and a bankroll-independent
 wager yield of 9.9\% at zero slippage; on the strict 2025--2026 holdout (350
@@ -63,13 +65,43 @@ parameter $\alpha$ giving the partial-loss multiple, GROUND combines
         $D_{\mathrm{KL}}(\mathbf{p} \| \mathbf{u})$ from the uniform
         three-outcome distribution.
 \end{itemize}
-The intuition is straightforward: $G$ measures the trade's growth
-\emph{per dollar at risk}, while $D_{\mathrm{KL}}$ measures the
-\emph{informational} departure from a maximally-uncertain reference.
-Trades with high $G$ but very high $D_{\mathrm{KL}}$ are
-``sharp'' bets on a narrow outcome distribution and should be discounted;
-trades with high $G$ and modest $D_{\mathrm{KL}}$ are diversified-edge
-bets and should be preferred.
+The intuition is straightforward: $G$ measures the trade's
+\emph{expected return} (Kelly-optimal log-growth), while
+$D_{\mathrm{KL}}$ measures the trade's \emph{risk}. The use of
+information-theoretic quantities as risk measures in portfolio
+optimization was first proposed in \citet{mercurio2020portfolio},
+where we argued that entropy provides a natural alternative to
+variance for problems in which the return distribution is discrete or
+otherwise ill-suited to mean-variance treatment. We subsequently
+specialized the construction to binary options
+\citep{mercurio2020binary}, showing that $D_{\mathrm{KL}}$ of the
+wager's outcome distribution against a uniform reference is a
+\emph{convex risk measure} in the sense of \citet{follmer2002},
+and that the uniform distribution itself plays the role of the
+minimum-risk wager. The present paper builds directly on those two
+foundations, extending the construction from the two-outcome
+(binary-option) setting to the three-outcome
+(vertical-credit-spread) setting and embedding it inside the GROUND
+return-over-risk ratio. Conventional risk measures --- variance,
+value-at-risk, conditional VaR --- are defined on continuous return
+distributions and become degenerate or ill-conditioned on a small
+finite outcome space, which is exactly the gap
+$D_{\mathrm{KL}}$ fills: it is bounded in $[0, 1]$ (in base-$n$ units
+on an $n$-state outcome space), it is monotone in the concentration
+of the implied distribution, and it inherits its convex risk-measure
+properties from the binary-option case under the natural extension to
+$n$ states.
+
+The strength of GROUND comes from holding these two quantities ---
+return ($G$) and risk ($D_{\mathrm{KL}}$) --- in a single ratio. A
+trade with high $G$ but very high $D_{\mathrm{KL}}$ is a sharp bet on
+a near-certain outcome whose growth comes from informational
+concentration that may not survive estimation noise; such a trade is
+discounted by the denominator. A trade with high $G$ and modest
+$D_{\mathrm{KL}}$ is an information-light, growth-dense bet that the
+ratio rewards. The empirical work that follows will show that this
+return-over-risk reading of the ratio is what does the work in
+practice.
 
 The original paper presented GROUND on synthetic three-outcome problems
 and a closed-form Kelly setting. The work reported here is, to our
@@ -78,13 +110,25 @@ on a real options market, including realistic candidate generation,
 filtering, and execution costs. We also adopt a simplified
 \emph{intrinsic} form of GROUND that drops the per-week
 minimum-divergence reference $R_b$ originally used to normalise the
-denominator (Section~\ref{sec:ground-v3}). The intrinsic form is
+denominator (Section~\ref{sec:ground-v2}). The intrinsic form is
 algebraically simpler, computationally trivial, and empirically
 indistinguishable from the reference-normalised form across our sweep.
 
+The companion theoretical paper \citep{mercurio2026pricing} states the
+intrinsic GROUND ratio in its general $n$-state form
+$\Gamma_k(p, x) = G(p, x) \cdot n^{-k\,D_{\mathrm{KL}}(p \| u_n)}$.
+The present paper specializes that formula to $n = 3$ throughout, where
+the three states correspond to the three possible held-to-expiry
+outcomes of a vertical credit spread: full-win (underlying expires
+outside the short strike), partial (underlying expires between the two
+strikes), and full-loss (underlying expires beyond the long strike).
+Reading the empirical $\Gamma_a = G_a \cdot 3^{-k D_{\mathrm{KL}}^{(a)}}$ as
+the $n = 3$ specialization of the theoretical $\Gamma_k$ is the
+intended link between the two papers.
+
 The paper is organised as follows. Section~\ref{sec:strategy} describes
 the data, candidate generation, filters, sizing, and slippage treatment.
-Section~\ref{sec:ground-v3} states the GROUND v3 formula precisely and
+Section~\ref{sec:ground-v2} states the GROUND v2 formula precisely and
 notes our log-base canon. Section~\ref{sec:results} reports the in-sample
 2020--2024 window, the strict 2025--2026 holdout, the full extended
 2020--2026 sample, an SPY buy-and-hold benchmark, the $k$-sweep table, and
@@ -141,7 +185,7 @@ growth-maximisation objective.
 
 The pair-trading antecedent \citep{mercurio2020} that introduced the GROUND
 formulation used the divergence term in a comparative
-(candidate-against-reference) form. The intrinsic v3 form adopted in the
+(candidate-against-reference) form. The intrinsic v2 form adopted in the
 present work removes the cross-candidate coupling and exposes
 $D_{\mathrm{KL}}$ as a per-candidate regulariser, which is the more natural
 formulation for streaming weekly selection.
@@ -199,19 +243,18 @@ spread and a vertical bear-call spread on each underlying that has a
 Greek-feasible candidate pair, and let GROUND select between them.
 
 Concretely, for each underlying and entry date the candidate generator
-emits all $(K_{\text{short}}, K_{\text{long}})$ pairs satisfying:
-\begin{enumerate}
-    \item Days-to-expiry $\in [3, 8]$;
-    \item Short-leg $|\Delta| \in [0.35, 0.65]$, target $|\Delta| = 0.50$;
-    \item Per-share max-loss cap $\le \$5$;
-    \item Net-credit $> 0$ (no net-debit fills);
-    \item Credit-to-max-loss ratio $\ge 0.30$ (must collect at least
-          30\textcent\ per dollar at risk; rejects under-priced wide-strike
-          spreads with implausibly small credit relative to width);
-    \item Short-leg open interest $\ge 10$ contracts (liquidity gate to
-          screen out illiquid strikes with potentially stale or
-          non-tradable quotes).
-\end{enumerate}
+emits all $(K_{\text{short}}, K_{\text{long}})$ pairs satisfying six
+filters: (i) days-to-expiry between three and eight, capturing the
+near-weekly expiration cycle; (ii) short-leg $|\Delta|$ in
+$[0.35, 0.65]$ with the target at $|\Delta| = 0.50$, so the short
+strike is roughly at-the-money; (iii) a per-share max-loss cap of \$5,
+which controls dollar risk per spread; (iv) a positive net credit, to
+exclude net-debit fills; (v) a credit-to-max-loss ratio of at least
+$0.30$, meaning the spread must collect at least 30~cents per dollar
+at risk, which filters out the under-priced wide-strike spreads whose
+credits are implausibly small relative to their width; and (vi) a
+short-leg open-interest minimum of $10$ contracts, a liquidity gate
+that screens out strikes whose quotes may be stale or non-tradable.
 
 \paragraph{Candidate pool size.}
 Each weekly entry produces a candidate pool that exceeds the top-$N=5$
@@ -232,12 +275,12 @@ were all evaluated and found to be either redundant or
 return-degrading; only the SPY regime gate is kept in the canonical
 configuration.
 
-\subsection{GROUND v3: intrinsic form}\label{sec:ground-v3}
+\subsection{GROUND v2: intrinsic form}\label{sec:ground-v2}
 
 The original GROUND formulation \citep{mercurio2020} ranks candidate
 $a$ against a per-week minimum-divergence reference $R_b$:
 \begin{equation}
-    \Gamma_{a \mid b} \;=\; \frac{G_a - G_b}{1 + D_{\mathrm{KL}}^{(a)} - D_{\mathrm{KL}}^{(b)}}.
+    \Gamma_{a \mid b} \;=\; \frac{G_a - G_b}{D_{\mathrm{KL}}^{(a)} - D_{\mathrm{KL}}^{(b)}}.
     \label{eq:ground-paper}
 \end{equation}
 This denominator regularisation is necessary in the original setting
@@ -245,11 +288,11 @@ This denominator regularisation is necessary in the original setting
 coupling that is awkward in a streaming weekly-selection setting and that
 does not survive the Greek-driven candidate-pool variants we tested.
 
-We instead adopt the \emph{intrinsic} v3 form:
+We instead adopt the \emph{intrinsic} v2 form:
 \begin{equation}
-    \Gamma_a \;=\; \frac{G_a}{3^{\,k\,D_{\mathrm{KL}}^{(a)}}},
+    \Gamma_a \;=\; G_a \cdot 3^{-k\,D_{\mathrm{KL}}^{(a)}},
     \qquad k = 20.
-    \label{eq:ground-v3}
+    \label{eq:ground-v2}
 \end{equation}
 The exponential denominator penalises high-divergence candidates
 multiplicatively rather than additively. The amplification factor
@@ -261,16 +304,17 @@ spanning $k \in [20, 30]$. We chose $k=20$ from the low end of the
 plateau and froze it before scoring any 2025+ data.
 
 \paragraph{Logarithm base.} A credit spread has three discrete
-outcomes (full-win, partial, full-loss). GROUND is therefore naturally
-expressed in log-base-3 (trits), under which the uniform-outcome
-entropy is $H(\mathbf{u}) = \log_3 3 = 1$ and divergence from uniform
-satisfies $D_{\mathrm{KL}} \in [0, 1]$. The upper bound has direct
-interpretation: $D_{\mathrm{KL}} = 1$ corresponds to a candidate
-concentrating all probability on a single outcome. We compute $G$,
-$D_{\mathrm{KL}}$, and the GROUND denominator $3^{k\,D_{\mathrm{KL}}}$
-all in base 3, which keeps the exponent dimensionally consistent. Any
-other log base produces an algebraically equivalent ranker at a
-re-scaled $k$, so the choice of base is purely a unit convention.
+outcomes: full-win, partial, and full-loss. GROUND is therefore
+naturally expressed in log-base-3 (trits), under which the
+uniform-outcome entropy $H(\mathbf{u}) = \log_3 3 = 1$ and the
+divergence from uniform satisfies $D_{\mathrm{KL}} \in [0, 1]$. The
+upper bound has direct interpretation: $D_{\mathrm{KL}} = 1$
+corresponds to a candidate concentrating all probability on a single
+outcome. We compute $G$, $D_{\mathrm{KL}}$, and the multiplicative
+risk discount factor all in base 3, which keeps the exponent
+dimensionally consistent. Any other log base produces an
+algebraically equivalent ranker at a re-scaled $k$, so the choice of
+base is purely a unit convention.
 
 \subsection{Sizing}
 
@@ -287,8 +331,7 @@ floor at $\$0.01$ which is never hit in our runs).
 We treat slippage as a \emph{post-hoc} P\&L haircut, not a
 trade-selection input. Concretely, we run the backtest once at zero
 slippage, recording the canonical trade list, and then apply a per-leg
-haircut $s \in \{0\textcent, 1\textcent, 2\textcent, 3\textcent\}$ to
-each fill. The haircut enters both the realised P\&L and the
+haircut $s \in \{0, 1, 2, 3\}$ cents per leg to each fill. The haircut enters both the realised P\&L and the
 ``wagered'' figure used in the yield calculation (since slippage
 inflates the effective max-loss per share).
 
@@ -308,10 +351,22 @@ flat sizing does not compound. We instead report a sportsbook-style
 \begin{equation}
     \text{yield} \;=\; \frac{\sum_t q_t \cdot \text{pnl}_t \cdot 100}
                           {\sum_t q_t \cdot (\text{max\_loss}_t + 2s) \cdot 100} \;\times\; 100\%,
+\label{eq:yield}
 \end{equation}
-which is invariant to starting bankroll and depends only on per-trade
-economics. We retain conventional final-bankroll, Sharpe, and max
-drawdown statistics for cross-comparability with other backtests.
+where $q_t$ is the number of contracts entered in trade $t$,
+$\text{pnl}_t$ is the realised per-share profit or loss (already net
+of slippage), $\text{max\_loss}_t$ is the mid-mid maximum loss
+per share, $s$ is the per-leg slippage in dollars, and the factor of
+100 converts per-share dollars into per-contract dollars (each option
+contract covers 100 shares). The $+2s$ term in the denominator is the
+slippage-inclusive maximum loss: a credit spread has two legs (a
+short and a long), and slippage of $s$ per leg means the trader
+actually risks an extra $2s$ per share beyond the mid-mid max-loss.
+The yield so defined is the ratio of dollars earned to dollars
+actually put at risk, invariant to starting bankroll and dependent
+only on per-trade economics. We retain conventional final-bankroll,
+Sharpe, and max drawdown statistics for cross-comparability with
+other backtests.
 
 
 \section{Results}\label{sec:results}
@@ -333,7 +388,7 @@ trade is taken), top-$N=5$ per week, and base-3 canon. Reported
 yields are gross of commissions; a commission-inclusive row is added
 in Section~\ref{sec:results-commissions}.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \small
 \begin{tabular}{lrrrrrr}
@@ -347,6 +402,7 @@ extended 2020--2026    & 1{,}650 & \$30{,}729 & 1.94 & $-9.3\%$  & 10.85\% & 5.3
 \midrule
 \multicolumn{7}{l}{\emph{$q=2$ contracts per trade --- selection-identical to $q=1$, P\&L doubled}} \\
 in-sample 2020--2024   & 1{,}300 & \$39{,}946 & 1.79 & $-12.2\%$ & 9.92\%  & 4.52\% \\
+holdout 2025--2026     & 350     & \$21{,}511 & 2.47 & $-11.3\%$ & 14.37\% & 8.67\% \\
 extended 2020--2026    & 1{,}650 & \$51{,}457 & 1.94 & $-12.2\%$ & 10.85\% & 5.39\% \\
 \bottomrule
 \end{tabular}
@@ -383,29 +439,36 @@ estimated Sharpe ratio under the assumption of i.i.d.\ Gaussian returns:
 \frac{1 + \tfrac{1}{2}\mathrm{SR}_w^2}{T}\right),
 \label{eq:lo-sharpe}
 \end{equation}
-where $T$ is the number of return observations. Credit-spread weekly
-P\&L, however, is mechanically bounded above by the credit collected
-and below by the max-loss, which produces a heavily left-skewed return
-distribution that violates the Gaussian assumption underlying
-\eqref{eq:lo-sharpe}. \citet{mertens2002} provides the
-higher-moment-adjusted variance that is valid under i.i.d.\ but
-non-Gaussian returns (also reproduced in \citet{opdyke2007}):
+where $T$ is the number of return observations. There is, however, a
+problem in applying this directly to a credit-spread strategy: weekly
+P\&L is mechanically bounded above by the total credit collected and
+below by the total max-loss, which gives the return distribution a
+sharp left skew and heavy tails. The Gaussian assumption underlying
+\eqref{eq:lo-sharpe} is therefore violated in the very direction that
+matters most for risk reporting.
+
+\citet{mertens2002} (also reproduced in \citet{opdyke2007})
+provides a higher-moment-adjusted variance that remains valid under
+i.i.d.\ but non-Gaussian returns:
 \begin{equation}
 \mathrm{Var}(\widehat{\mathrm{SR}}_w)
   = \frac{1 + \tfrac{1}{2}\mathrm{SR}_w^2 \;-\; \gamma_3 \mathrm{SR}_w
-            \;+\; \tfrac{1}{4}\gamma_4 \mathrm{SR}_w^2}{T},
+            \;+\; \tfrac{1}{4}\gamma_4 \mathrm{SR}_w^2}{T}.
 \label{eq:mertens-sharpe}
 \end{equation}
-where $\gamma_3$ is the sample skewness and $\gamma_4$ the sample
-excess kurtosis of the weekly returns. For the canonical
-short-volatility credit-spread strategy described here, $\gamma_3 < 0$
-(frequent small wins, occasional large losses) and $\gamma_4 > 0$ (fat
-tails). Both terms inflate $\mathrm{Var}(\widehat{\mathrm{SR}})$:
-$-\gamma_3 \mathrm{SR}$ is positive because $\gamma_3$ is negative and
-the Sharpe is positive, and $\gamma_4 \mathrm{SR}^2 / 4$ is positive
-because $\gamma_4$ is positive. Mertens (2002) therefore produces
-\emph{wider} confidence intervals than Lo (2002) on this strategy,
-which is the conservative direction.
+Here $\gamma_3$ is the sample skewness of the weekly returns ---
+negative when there are frequent small wins and occasional large
+losses, as is characteristic of short-volatility strategies --- and
+$\gamma_4$ is the sample excess kurtosis, which is positive when the
+return distribution has fat tails relative to a Gaussian. Both
+quantities show up with signs that \emph{enlarge}
+$\mathrm{Var}(\widehat{\mathrm{SR}})$ in our setting: the
+$-\gamma_3 \mathrm{SR}$ term is positive because both $-\gamma_3$ and
+$\mathrm{SR}$ are positive, and the $\tfrac{1}{4}\gamma_4 \mathrm{SR}^2$
+term is positive because $\gamma_4$ is positive. The net effect is
+that the Mertens intervals are \emph{wider} than the Lo intervals on
+this strategy, which is the conservative direction; reporting the
+wider interval is the honest choice.
 
 Annualised standard errors are obtained by scaling
 \eqref{eq:mertens-sharpe} by $\sqrt{52}$, and 95\% intervals by
@@ -413,7 +476,7 @@ $\widehat{\mathrm{SR}}_{\mathrm{ann}} \pm 1.96 \cdot
 \mathrm{SE}(\widehat{\mathrm{SR}}_{\mathrm{ann}})$. Both Lo and Mertens
 intervals are reported in Table~\ref{tab:sharpe-ci}.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \footnotesize
 \begin{tabular}{lrrrrrrrr}
@@ -474,7 +537,7 @@ uncertainty.
 
 \subsection{SPY buy-and-hold benchmark}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \small
 \begin{tabular}{lrrr}
@@ -506,7 +569,7 @@ On the in-sample window, yield falls from 9.92\% (0\textcent) to 4.52\%
 8.67\% --- a 40\% haircut. The 3\textcent/leg figure is intentionally
 conservative; on liquid SP100 weeklies, 1--2\textcent/leg better
 characterises realised execution. At those midpoint costs, in-sample
-yield holds 8.13\% (1\textcent) and 6.32\% (2\textcent).
+yield holds 8.06\% (1\textcent) and 6.26\% (2\textcent).
 
 \subsection{Commission-inclusive yield}\label{sec:results-commissions}
 
@@ -520,13 +583,13 @@ slippage-equivalent terms, so a reader who wants commission-inclusive
 yields can read the 1\textcent\ slippage column with a small additional
 discount: roughly 8.1\% in-sample, 12.4\% holdout.
 
-\subsection{$k$-sweep on the in-sample window}\label{sec:k-sweep}
+\subsection{\texorpdfstring{$k$}{k}-sweep on the in-sample window}\label{sec:k-sweep}
 
 Table~\ref{tab:k-sweep} reports the ranking-amplification sweep
 $k \in \{10, 15, 20, 25, 30\}$ on the in-sample window, all at $q=1$.
 This was the data on which $k=20$ was selected.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \small
 \begin{tabular}{rrrrrr}
@@ -557,7 +620,7 @@ ignoring $D_{\mathrm{KL}}$), and (ii) $D_{\mathrm{KL}}$-only (rank by
 lowest divergence, ignoring $G$). Both run on the in-sample 2020--2024
 window, $q=1$, with all other configuration unchanged.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \small
 \begin{tabular}{lrrrrr}
@@ -597,7 +660,7 @@ and $D_{\mathrm{KL}}$-only, which ranks by lowest divergence and ignores
 $G$. The full GROUND ranker outperforms both on Sharpe and yield on the
 in-sample window (Table~\ref{tab:baselines}). The two components are
 individually weak signals; their multiplicative combination via
-Equation~\ref{eq:ground-v3} is where the empirical edge appears.
+Equation~\ref{eq:ground-v2} is where the empirical edge appears.
 
 \subsection{Limitations}
 
@@ -631,7 +694,7 @@ Equation~\ref{eq:ground-v3} is where the empirical edge appears.
 
 \subsection{Conclusion}
 
-Under the intrinsic v3 form $\Gamma = G / 3^{\,k\,D_{\mathrm{KL}}}$
+Under the intrinsic v2 form $\Gamma = G \cdot 3^{-k\,D_{\mathrm{KL}}}$
 with $k=20$ in trits (log-base-3), the GROUND ranker yields Sharpe 1.79 on the
 2020--2024 in-sample window and Sharpe 2.47 on the 350-trade,
 70-week strict 2025--2026 holdout, against SPY buy-and-hold Sharpes
@@ -728,7 +791,7 @@ G = p \log_3(1 + w^\star) + r_o \log_3(1 + w^\star \alpha)
     + q \log_3(1 - w^\star),
 \label{eq:G-used}
 \end{equation}
-computed in base 3 as discussed in Section~\ref{sec:ground-v3} so that
+computed in base 3 as discussed in Section~\ref{sec:ground-v2} so that
 $G$ shares units with $D_{\mathrm{KL}}$ in the GROUND ratio.
 
 \paragraph{Boundary cases.}
@@ -755,11 +818,28 @@ absorbs much of the estimator's distributional error.
 \bibliographystyle{plainnat}
 \begin{thebibliography}{9}
 
-\bibitem[Mercurio et~al.(2020)]{mercurio2020}
-P.\,J.~Mercurio, Y.~Wu, and Q.~Xie.
-\newblock An entropic approach for pair trading.
+\bibitem[F\"ollmer and Schied(2002)]{follmer2002}
+H.~F\"ollmer and A.~Schied.
+\newblock Convex measures of risk and trading constraints.
+\newblock \emph{Finance and Stochastics}, 6(4):429--447, 2002.
+
+\bibitem[Mercurio et~al.(2020a)]{mercurio2020portfolio}
+P.\,J.~Mercurio, Y.~Wu, and H.~Xie.
+\newblock An entropy-based approach to portfolio optimization.
+\newblock \emph{Entropy}, 22(3):332, 2020.
+\newblock \doi{10.3390/e22030332}.
+
+\bibitem[Mercurio et~al.(2020b)]{mercurio2020}
+P.\,J.~Mercurio, Y.~Wu, and H.~Xie.
+\newblock Option portfolio selection with generalized entropic portfolio optimization.
 \newblock \emph{Entropy}, 22(8):805, 2020.
 \newblock \doi{10.3390/e22080805}.
+
+\bibitem[Mercurio et~al.(2020c)]{mercurio2020binary}
+P.\,J.~Mercurio, Y.~Wu, and H.~Xie.
+\newblock Portfolio optimization for binary options based on relative entropy.
+\newblock \emph{Entropy}, 22(7):752, 2020.
+\newblock \doi{10.3390/e22070752}.
 
 \bibitem[Kelly(1956)]{kelly1956}
 J.\,L.~Kelly~Jr.
@@ -840,6 +920,13 @@ J.~Cao, B.~Han, Q.~Tong, and X.~Zhan.
 A.\,W.~Lo.
 \newblock The statistics of Sharpe ratios.
 \newblock \emph{Financial Analysts Journal}, 58(4):36--52, 2002.
+
+\bibitem[Mercurio(2026b)]{mercurio2026pricing}
+P.\,J.~Mercurio.
+\newblock An entropy-regularized growth-optimal pricing functional for
+discrete-payoff contingent claims in incomplete markets.
+\newblock Companion theoretical paper, 2026.
+\newblock Author byline: Peter J.\ Mercurio, PhD.
 
 \bibitem[Mertens(2002)]{mertens2002}
 E.~Mertens.
