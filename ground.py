@@ -35,7 +35,7 @@ RV_LOOKUP     = {}   # {(Symbol, Timestamp): rv_annualized}
 IV_WEIGHT     = 0.5  # weight on IV when blending; (1 - IV_WEIGHT) goes to RV
 USE_SKEW_ADJ  = False
 SKEW_ALPHA    = 0.5  # scale factor for the skew adjustment to p
-DKL_K         = 1.0    # GROUND amplification factor: ln(GROUND) = G − DKL_K · DKL
+DKL_K         = 20.0   # GROUND amplification factor: ln(GROUND) = G − DKL_K · DKL
 SCORE_B_CAP   = None   # If set (e.g. 1.0), score uses b = min(b_actual, cap); realized P&L uses b_actual.
 RANKING_MODE  = "GROUND"  # "GROUND" (canonical Kelly-EV-with-DKL-discount) | "G_only" | "DKL_only" | "Jk_legacy" (pre-2026-05-13 J_k)
 
