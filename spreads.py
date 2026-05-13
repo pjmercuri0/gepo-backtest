@@ -231,7 +231,7 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
     credit_ratio = net_credit / max_loss
     if credit_ratio < config.MIN_CREDIT_RATIO:
         return None
-    if credit_ratio >= getattr(config, "MAX_CREDIT_RATIO", float("inf")):
+    if credit_ratio > getattr(config, "MAX_CREDIT_RATIO", float("inf")):
         return None
 
     # Filter: reject spreads where max_loss exceeds cap (large dollar risk
