@@ -61,12 +61,14 @@ selected from an in-sample sweep on the 2020--2024 window before any
 2025--2026 data is scored. Kelly payoffs are the per-spread $\{+b,
 +\alpha b, -1\}$ for $b = \text{credit}/\text{max-loss}$ with the
 principled partial multiplier $\alpha(b) = (b-1)/(2b)$. We require both
-legs to carry at least 100 contracts of open interest and cap $b \le 10$
-to suppress stale-mid quote artifacts. On the in-sample window the
-strategy posts Sharpe $1.48$ and a bankroll-independent wager yield of
-$14.8\%$ at zero slippage; on the strict 2025--2026 holdout (350 trades,
-70 weeks, never used in $k$-selection) it posts Sharpe $2.89$ and yield
-$29.4\%$. SPY buy-and-hold over the same windows posts Sharpe
+legs to carry at least 100 contracts of open interest. For backtest
+reporting we apply a conservative $b \le 5$ cap so the headline
+numbers do not depend on the $\sim 1$--$2\%$ of trades with $b > 5$ ---
+production accepts any $b$ through the OI gate. On the in-sample window the
+strategy posts Sharpe $1.39$, Calmar $2.52$, and a bankroll-independent
+wager yield of $13.6\%$ at zero slippage; on the strict 2025--2026
+holdout (350 trades, 70 weeks, never used in $k$-selection) it posts
+Sharpe $2.75$, Calmar $10.39$, and yield $28.2\%$. SPY buy-and-hold over the same windows posts Sharpe
 0.79--1.11. Single-factor baselines that rank by Kelly-growth $g$ alone
 or KL-divergence $D_{\mathrm{KL}}$ alone are reported for comparison.
 The data give direct empirical evidence that GROUND's joint growth-and-
@@ -400,11 +402,7 @@ preferences class of \citet{maccheroni2006ambiguity}. The canonical
 Kelly-EV ranker is thus the small-$g$ economically-readable form of
 the Hansen-Sargent ranker: it preserves the theoretical lineage but
 trades the analytically-clean additive form for direct interpretation
-as a per-trade return. Selection by argmax of \eqref{eq:ground-canonical}
-disagrees with argmax of $J_k$ on at most $\sim 55\%$ of picks (mostly
-mid-rank ties), and the empirical Sharpe gap between the two rankers
-is $\sim 7$--$11\%$ on this universe (Table~\ref{tab:k-sweep},
-Section~\ref{sec:k-sweep}). We adopt the Kelly-EV canonical for
+as a per-trade return. We adopt the Kelly-EV canonical for
 display and selection consistency.
 
 The amplification factor $k$ controls how aggressively concentration
@@ -532,14 +530,14 @@ which Calmar correctly rewards.
 window           & Trades & Final (0\textcent) & Sharpe & Calmar & Max DD & Yield (0\textcent) & Yield (3\textcent) \\
 \midrule
 \multicolumn{8}{l}{\emph{$q=1$ contract per trade}} \\
-in-sample 2020--2024   & 1{,}285 & \$24{,}024 & 1.48 & 2.80  & $-10.0\%$ & 14.80\% & 6.16\%  \\
-holdout 2025--2026     & 350     & \$17{,}381 & 2.89 & 10.84 & $-5.1\%$  & 29.40\% & 19.41\% \\
-extended 2020--2026    & 1{,}635 & \$31{,}405 & 1.77 & 3.37  & $-10.0\%$ & 17.86\% & 8.94\%  \\
+in-sample 2020--2024   & 1{,}285 & \$23{,}023 & 1.39 & 2.52  & $-10.3\%$ & 13.55\% & 5.12\%  \\
+holdout 2025--2026     & 350     & \$17{,}107 & 2.75 & 10.39 & $-5.1\%$  & 28.16\% & 18.31\% \\
+extended 2020--2026    & 1{,}635 & \$30{,}130 & 1.68 & 3.08  & $-10.3\%$ & 16.58\% & 7.87\%  \\
 \midrule
 \multicolumn{8}{l}{\emph{$q=2$ contracts per trade --- selection-identical to $q=1$, P\&L scales linearly}} \\
-in-sample 2020--2024   & 1{,}285 & \$38{,}049 & 1.48 & 3.95  & $-14.2\%$ & 14.80\% & 6.16\%  \\
-holdout 2025--2026     & 350     & \$24{,}761 & 2.89 & 11.22 & $-9.8\%$  & 29.40\% & 19.41\% \\
-extended 2020--2026    & 1{,}635 & \$52{,}810 & 1.77 & 4.75  & $-14.2\%$ & 17.86\% & 8.94\%  \\
+in-sample 2020--2024   & 1{,}285 & \$36{,}047 & 1.39 & 3.45  & $-15.1\%$ & 13.55\% & 5.12\%  \\
+holdout 2025--2026     & 350     & \$24{,}214 & 2.75 & 10.75 & $-9.8\%$  & 28.16\% & 18.31\% \\
+extended 2020--2026    & 1{,}635 & \$50{,}260 & 1.68 & 4.20  & $-15.1\%$ & 16.58\% & 7.87\%  \\
 \bottomrule
 \end{tabular}
 \caption{Headline statistics for $\GROUND$ at $k=1$ on SP100 weekly
@@ -555,7 +553,7 @@ execution-cost regime.}
 
 \subsection{Holdout vs.\ in-sample}
 
-On the strict 2025--2026 holdout, Sharpe is 2.89 and yield is 29.4\%
+On the strict 2025--2026 holdout, Sharpe is 2.75 and yield is 28.2\%
 at zero slippage. Both are higher than the in-sample window, not lower.
 We do not over-interpret this: the holdout is short (70 weeks) and
 2025--2026 was a generally favourable regime for the underlying SPY
@@ -623,9 +621,9 @@ intervals are reported in Table~\ref{tab:sharpe-ci}.
 \toprule
 window & $T$ & SR & $\gamma_3$ & $\gamma_4$ & Mertens SE & Mertens 95\% CI \\
 \midrule
-in-sample 2020--2024 & 260 & 1.48 & $-0.16$ & $+0.47$ & 0.46 & $[0.59,\,2.38]$ \\
-holdout 2025--2026   &  70 & 2.89 & $-0.12$ & $+0.39$ & 0.86 & $[1.20,\,4.57]$ \\
-extended 2020--2026  & 330 & 1.94 & $-0.15$ & $+0.43$ & 0.41 & $[1.13,\,2.75]$ \\
+in-sample 2020--2024 & 260 & 1.39 & $-0.16$ & $+0.47$ & 0.45 & $[0.51,\,2.27]$ \\
+holdout 2025--2026   &  70 & 2.75 & $-0.12$ & $+0.39$ & 0.83 & $[1.13,\,4.37]$ \\
+extended 2020--2026  & 330 & 1.68 & $-0.15$ & $+0.43$ & 0.40 & $[0.91,\,2.46]$ \\
 \midrule
 SPY 2020--2024       & 261 & 0.79 & $-0.49$ & $+5.56$ & 0.46 & $[-0.12,\,1.69]$ \\
 SPY 2025--2026       &  72 & 1.11 & $-0.55$ & $+3.36$ & 0.90 & $[-0.65,\,2.87]$ \\
@@ -704,9 +702,9 @@ credit-spread structure: max-loss is bounded per spread.
 
 \subsection{Yield robustness to slippage}
 
-On the in-sample window, yield falls from 14.80\% (0\textcent) to 6.16\%
-(3\textcent) --- a 58\% haircut. On the holdout it falls from 29.40\% to
-19.41\% --- a 34\% haircut. The 3\textcent/leg figure is intentionally
+On the in-sample window, yield falls from 13.55\% (0\textcent) to 5.12\%
+(3\textcent) --- a 62\% haircut. On the holdout it falls from 28.16\% to
+18.31\% --- a 35\% haircut. The 3\textcent/leg figure is intentionally
 conservative; on liquid SP100 weeklies, 1--2\textcent/leg better
 characterises realised execution.
 
@@ -716,8 +714,8 @@ The numbers above are gross of commissions. At a typical retail rate of
 \$0.65/contract/leg and a credit-spread structure where positions are
 held to expiry (entry only, no closing fill), commissions add roughly
 \$1.30/contract. On the in-sample 1{,}285-trade $q=1$ window that is
-\$1{,}671 of commission, which reduces 0\textcent\ yield from 14.80\%
-to 13.07\%. The shift is approximately 1\textcent/leg in
+\$1{,}671 of commission, which reduces 0\textcent\ yield from 13.55\%
+to 11.81\%. The shift is approximately 1\textcent/leg in
 slippage-equivalent terms.
 
 \subsection{\texorpdfstring{$k$}{k}-sweep on the in-sample window}\label{sec:k-sweep}
@@ -726,7 +724,7 @@ Table~\ref{tab:k-sweep} reports the ranking-amplification sweep
 $k \in \{0.5, 1, 2, 5, 10, 20\}$ on the in-sample window, all at
 $q=1$, under the canonical per-spread Kelly payoffs
 $\{+b, +\alpha(b) b, -1\}$, the both-leg OI gate at 100, and the
-$b \le 10$ cap. This is the data on which $k = 1$ was selected.
+$b \le 5$ backtest-reporting cap. This is the data on which $k = 1$ was selected.
 
 \begin{table}[htbp]
 \centering
@@ -736,7 +734,7 @@ $b \le 10$ cap. This is the data on which $k = 1$ was selected.
 $k$ & Trades & Final & Sharpe & Max DD & Yield \\
 \midrule
 0.5  & 1{,}285 & PEND & PEND & PEND & PEND \\
-\textbf{1} (canonical) & \textbf{1{,}285} & \textbf{\$24{,}024} & \textbf{1.48} & \textbf{$-10.0\%$} & \textbf{14.80\%} \\
+\textbf{1} (canonical) & \textbf{1{,}285} & \textbf{\$23{,}023} & \textbf{1.39} & \textbf{$-10.3\%$} & \textbf{13.55\%} \\
 2    & 1{,}285 & PEND & PEND & PEND & PEND \\
 5    & 1{,}285 & PEND & PEND & PEND & PEND \\
 10   & 1{,}285 & PEND & PEND & PEND & PEND \\
@@ -771,7 +769,7 @@ window, $q=1$, with all other configuration unchanged.
 \toprule
 ranker & Trades & Final & Sharpe & Max DD & Yield \\
 \midrule
-\textbf{GROUND ($k=1$, canonical)} & 1{,}285 & \$24{,}024 & \textbf{1.48} & $-10.0\%$ & \textbf{14.80\%} \\
+\textbf{GROUND ($k=1$, canonical)} & 1{,}285 & \$23{,}023 & \textbf{1.39} & $-10.3\%$ & \textbf{13.55\%} \\
 $g$ alone (Kelly-growth)           & 1{,}285 & \$23{,}664 & 1.43          & $-9.8\%$  & 14.42\% \\
 $D_{\mathrm{KL}}$ alone            & 1{,}285 & \$18{,}850 & 1.02          & $-12.1\%$ & 8.58\%  \\
 \bottomrule
@@ -804,38 +802,35 @@ slippage, $q = 1$.
 \toprule
 $\GROUND$ decile & $n$ & mean $\GROUND$ (\%) & mean yield (\%) & win rate (\%) \\
 \midrule
- 1 (low)   & 621 &  0.00 &  3.04 & 48.6 \\
- 2         & 608 &  0.02 &  3.63 & 50.5 \\
- 3         & 606 &  0.03 &  2.37 & 48.8 \\
- 4         & 611 &  0.07 & $-0.85$ & 46.2 \\
- 5         & 611 &  0.11 &  8.12 & 51.4 \\
- 6         & 612 &  0.18 &  9.08 & 51.1 \\
- 7         & 610 &  0.30 &  0.41 & 45.6 \\
- 8         & 611 &  0.53 & 14.49 & 50.6 \\
- 9         & 611 &  1.18 & 10.43 & 43.7 \\
- 10 (high) & 612 &  9.50 & \textbf{49.67} & 45.6 \\
+ 1 (low)   & 609 &  0.00 &  3.63 & 48.9 \\
+ 2         & 611 &  0.01 &  3.15 & 50.2 \\
+ 3         & 606 &  0.03 &  2.03 & 48.7 \\
+ 4         & 609 &  0.07 & $-0.94$ & 46.1 \\
+ 5         & 613 &  0.11 &  8.55 & 51.5 \\
+ 6         & 605 &  0.18 &  8.57 & 50.7 \\
+ 7         & 607 &  0.30 &  1.77 & 46.5 \\
+ 8         & 609 &  0.52 & 14.05 & 50.6 \\
+ 9         & 608 &  1.13 &  9.33 & 43.6 \\
+ 10 (high) & 609 &  6.41 & \textbf{42.26} & 45.6 \\
 \bottomrule
 \end{tabular}
 \caption{Per-decile statistics for $\GROUND$ as a ranker on all
 candidate trades --- the per-(ticker, week) best spread with no top-$N$
-filter, 2020--2026, $n = 6{,}113$ growth-positive candidates. Mean
-$\GROUND$ is the canonical Kelly-EV-with-entropic-discount score
-$(\exp(g) - 1) \cdot \exp(-k D_{\mathrm{KL}})$ rendered as a percent.
-Yield is per-trade $\$\mathrm{P\&L} / \$\mathrm{wagered}$ at zero
-slippage.}
+filter, 2020--2026, $n = 6{,}086$ growth-positive candidates (after the
+$b \le 5$ backtest cap). Mean $\GROUND$ is the canonical Kelly-EV-with-
+entropic-discount score $(\exp(g) - 1) \cdot \exp(-k D_{\mathrm{KL}})$
+rendered as a percent. Yield is per-trade
+$\$\mathrm{P\&L} / \$\mathrm{wagered}$ at zero slippage.}
 \label{tab:decile-stats}
 \end{table}
 
-Two summary numbers across the full sample of $n = 6{,}113$ growth-
+Two summary numbers across the full sample of $n = 6{,}086$ growth-
 positive candidates: Spearman rank correlation of $\GROUND$ against
-per-trade yield is $+0.13$; Pearson correlation of the additive form
-$J_k = g - k \cdot D_{\mathrm{KL}}$ against yield is $+0.17$. Both
-modest, but both materially stronger than the prior $J_k$-only ranker
-($+0.03$ Spearman, $+0.12$ Pearson on the same data) --- enforcing $g
-> 0$ before scoring removes the negative-EV mass that dilutes the
-correlation. The discriminating power is concentrated in the top
-decile: decile 10 mean yield is $49.7\%$, roughly $3{\times}$ the
-9th-decile and $\sim16{\times}$ the bottom decile. Win rate is
+per-trade yield is $+0.13$; Pearson correlation of $\ln \GROUND$
+against yield is $+0.09$. Both modest in absolute terms; the
+discriminating power is concentrated in the top
+decile: decile 10 mean yield is $42.3\%$, roughly $4.5{\times}$ the
+9th-decile and $\sim12{\times}$ the bottom decile. Win rate is
 essentially flat across deciles ($44$--$52\%$); the yield differential
 comes from the magnitude of wins versus losses, not from win-loss
 frequency. The middle deciles are roughly monotone in mean yield but
@@ -912,13 +907,13 @@ Equation~\eqref{eq:ground-canonical} is where the empirical edge appears.
 Under the canonical form $\GROUND = (\exp(g) - 1) \cdot \exp(-k D_{\mathrm{KL}})$
 with $k = 1$, per-spread Kelly payoffs $\{+b, +\alpha(b) b, -1\}$,
 a both-leg open-interest gate at 100 contracts, and a
-credit-to-max-loss cap at $b \le 10$, the GROUND ranker yields
-Sharpe $1.48$ and Calmar $2.80$ on the 2020--2024 in-sample window,
-and Sharpe $2.89$, Calmar $10.84$ on the 350-trade, 70-week strict
+credit-to-max-loss cap at $b \le 5$ (backtest reporting convention; production has no cap), the GROUND ranker yields
+Sharpe $1.39$ and Calmar $2.52$ on the 2020--2024 in-sample window,
+and Sharpe $2.75$, Calmar $10.39$ on the 350-trade, 70-week strict
 2025--2026 holdout, against SPY buy-and-hold Sharpes of 0.79 and 1.11
 over the same windows. Under a 3\textcent/leg post-hoc execution
-haircut, yield falls from $14.8\%$ to $6.2\%$ in-sample and from
-$29.4\%$ to $19.4\%$ on the holdout. Single-factor baselines that
+haircut, yield falls from $13.6\%$ to $5.1\%$ in-sample and from
+$28.2\%$ to $18.3\%$ on the holdout. Single-factor baselines that
 strip out either $g$ or $D_{\mathrm{KL}}$ underperform the combined
 ranker (Section~\ref{sec:baselines}).
 

@@ -55,15 +55,21 @@ MIN_OPEN_INTEREST = 100
 # Set to 0.0 to disable the filter.
 MIN_CREDIT_RATIO = 0.30
 
-# Maximum credit-to-max-loss ratio. Capped at 10.0 (2026-05-12) to
-# suppress the small tail of stale-mid artifacts that the OI=100 gate
-# alone doesn't catch: trades with b > 10 (collecting >10× their
-# max-loss as credit) imply the option market is handing you most of
-# the spread width as free credit, which is physically implausible
-# even at high IV. The OI=100 filter cleans up the worst, but a
-# residual ~12 trades with b ≥ 10 survive and produce non-economic
-# G > 1 nat values. Capping b ≤ 10 removes those.
-MAX_CREDIT_RATIO = 10.0
+# Maximum credit-to-max-loss ratio. Comparison is strict `>` — kept
+# iff b ≤ MAX_CREDIT_RATIO, filtered iff b > MAX_CREDIT_RATIO.
+# **Production default is +inf** (no cap) — live ranking takes any
+# high-b spread that survives the OI=100 quote-quality filter, because
+# such spreads have real additive Kelly EV when they're not stale-mid
+# artifacts. For **backtest/paper reporting**, scripts override to 5.0
+# in their setup (e.g. `regen_all.py`, `run_paper_runs.py`) so that
+# headline Sharpe/yield/Calmar numbers do not depend on the ~1-2% of
+# trades with b > 5 — a robustness convention, not a hard truth.
+MAX_CREDIT_RATIO = float("inf")
+# Convention for paper/backtest reporting (override of MAX_CREDIT_RATIO
+# applied inside regen_all.py et al.). 2026-05-13: chosen so that
+# headline numbers strip the ~21 IS / 6 holdout `b > 5` trades; b ≤ 5
+# kept (strict `>` comparison).
+BACKTEST_MAX_CREDIT_RATIO = 5.0
 
 # Hard cap on per-share max loss. Spreads where max_loss > $5/share are
 # rejected at candidate construction (canonical: $5/share).
