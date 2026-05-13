@@ -39,8 +39,8 @@
         <th>G</th>
         <th>DKL</th>
         <th>k·DKL</th>
-        <th>3^(k·DKL)</th>
-        <th>GROUND %</th>
+        <th>exp(k·DKL)</th>
+        <th>Γᵢ</th>
       </tr>
     </thead>
     <tbody id="ranked-tbody"><tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
@@ -71,15 +71,19 @@ function fmtContract(v, dec=0) {
   if (v == null) return "—";
   return "$" + (Number(v) * 100).toFixed(dec);
 }
-// GROUND score rendered as a percentage. Canonical Γ values live in
-// ~[1e-4, 5e-2] (unitless ratio); rendering as a % puts them in
-// [0.01%, 5%] which is far easier to read. Selection ordering is invariant.
+// The JSON `GROUND` field holds the additive form J_k = g − k·DKL
+// (typically negative under the canonical k=1 nats config). Display
+// layer exponentiates to show Γᵢ = exp(J_k) = G / exp(k·DKL), which
+// lives in roughly [0.35, 0.95] for canonical-shape spreads. Γᵢ is a
+// dimensionless ratio (wealth multiplier / risk multiplier), not a
+// percentage — render as a plain number. Selection ordering is
+// invariant under exp.
 function fmtGround(v, dec=3) {
   if (v == null) return "—";
-  return (Number(v) * 100).toFixed(dec) + "%";
+  return Math.exp(Number(v)).toFixed(dec);
 }
-// k·DKL is the exponent under the canonical GROUND ratio Γ = G / 3^(k·DKL).
-// At k=20, this lives in roughly [1, 5] for canonical-shape spreads.
+// k·DKL is the exponent under the canonical Γᵢ = exp(J_k) = G / exp(k·DKL).
+// At k=1, this lives in roughly [0.05, 1.0] for canonical-shape spreads.
 function kdkl(r, k) {
   if (r == null || r.DKL == null) return null;
   return Number(r.DKL) * Number(k);
@@ -87,7 +91,7 @@ function kdkl(r, k) {
 function denom(r, k) {
   const v = kdkl(r, k);
   if (v == null) return null;
-  return Math.pow(3, v);
+  return Math.exp(v);
 }
 function dirClass(spread_type) {
   if (spread_type === "bull_put") return "dir-bull";
@@ -99,8 +103,12 @@ function dirLabel(spread_type) {
   if (spread_type === "bear_call") return "bear-call";
   return spread_type || "—";
 }
-function groundBar(ground, max) {
-  const pct = Math.max(0, Math.min(1, (ground || 0) / (max || 1)));
+// Both inputs are stored J_k values (typically negative); exp() to get
+// the actual Γᵢ ratio used for proportional bar width.
+function groundBar(jk, maxJk) {
+  const gamma    = Math.exp(Number(jk    || 0));
+  const gammaMax = Math.exp(Number(maxJk || 0));
+  const pct = Math.max(0, Math.min(1, gamma / (gammaMax || 1)));
   return `<span class="ground-bar"><span class="ground-bar-fill" style="width:${pct * 100}%"></span></span>`;
 }
 
@@ -109,12 +117,12 @@ function renderParams(cfg) {
   const chips = [
     ["DTE",            `${cfg.DTE_MIN}–${cfg.DTE_MAX}d`],
     ["delta",          `${cfg.DELTA_MIN}–${cfg.DELTA_MAX} (target 0.50)`],
-    ["credit ratio",   `≥ ${cfg.MIN_CREDIT_RATIO}`],
+    ["credit ratio",   `${cfg.MIN_CREDIT_RATIO}–${cfg.MAX_CREDIT_RATIO}`],
     ["max_loss",       `≤ $${cfg.MAX_MAX_LOSS}/share`],
     ["OI",             `≥ ${cfg.MIN_OPEN_INTEREST}`],
-    ["ground",         `≥ ${cfg.GROUND_THRESHOLD}`],
+    ["ground",         cfg.GROUND_THRESHOLD == null ? "rank-only" : `≥ ${cfg.GROUND_THRESHOLD}`],
     ["k",              `${cfg.DKL_K}`],
-    ["α",              `${cfg.ALPHA}`],
+    ["α",              `(b−1)/(2b)`],
     ["top-N",          `${cfg.TOP_N}`],
   ];
   return chips.map(([k, v]) =>
@@ -187,7 +195,7 @@ function renderTopPicks(picks, maxGround, kVal) {
         <thead><tr>
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
           <th>credit ($/sh)</th><th>max-loss ($/sh)</th><th>ratio</th>
-          <th>p</th><th>r₀</th><th>q</th><th>G</th><th>DKL</th><th>k·DKL</th><th>3^(k·DKL)</th><th>GROUND %</th>
+          <th>p</th><th>r₀</th><th>q</th><th>g</th><th>DKL</th><th>k·DKL</th><th>exp(k·DKL)</th><th>Γᵢ</th>
         </tr></thead>
         <tbody><tr>
           <td>${fmtMoney(p.entry_price)}</td>
@@ -361,7 +369,7 @@ async function refresh() {
     renderRegime(data.regime);
     document.getElementById("params-row").innerHTML = renderParams(data.config);
     document.getElementById("ticker-strip").innerHTML = renderTickerStrip(data.ticker);
-    const kVal = (data.config && data.config.DKL_K) ? data.config.DKL_K : 20;
+    const kVal = (data.config && data.config.DKL_K) ? data.config.DKL_K : 1;
     document.getElementById("weekly-totals").innerHTML = renderWeeklyTotals(data.top_picks);
     document.getElementById("top-picks").innerHTML = renderTopPicks(data.top_picks, maxG, kVal);
     document.getElementById("ranked-tbody").innerHTML = renderRanked(data.ticker, maxG, kVal);

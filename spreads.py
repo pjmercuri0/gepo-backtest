@@ -204,6 +204,14 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
         return None
     long_row = long_rows.iloc[0]
 
+    # Liquidity gate at candidate-construction time, applied to both legs.
+    # Preprocess already filtered short-leg OI but kept neighboring strikes
+    # regardless; this re-checks both legs against the current config so
+    # bumping MIN_OPEN_INTEREST doesn't require a parquet rebuild.
+    min_oi = getattr(config, "MIN_OPEN_INTEREST", 0)
+    if short_row["OpenInterest"] < min_oi or long_row["OpenInterest"] < min_oi:
+        return None
+
     # Selection always uses mid-mid pricing. Slippage is applied as a
     # post-hoc P&L haircut in backtest.py, so it does not contaminate
     # filters (credit_ratio, theta_credit_ratio, etc.) or trade selection.
@@ -223,7 +231,7 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
     credit_ratio = net_credit / max_loss
     if credit_ratio < config.MIN_CREDIT_RATIO:
         return None
-    if credit_ratio > getattr(config, "MAX_CREDIT_RATIO", float("inf")):
+    if credit_ratio >= getattr(config, "MAX_CREDIT_RATIO", float("inf")):
         return None
 
     # Filter: reject spreads where max_loss exceeds cap (large dollar risk

@@ -6,6 +6,7 @@ with inline SVG charts and per-trade strike details.
 
 import os
 import math
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -597,19 +598,20 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
     dir_svg = _build_direction_svg(trades_df, weekly_df)
 
     # GROUND bar fill = trade's GROUND as a fraction of the run-wide maximum.
-    # Bar fills 0%-100% relative to the 95th percentile of GROUND in the
-    # run (caps outliers at 100%). Using max() makes most bars look short
-    # because GROUND can have a few extreme outliers — the 95th percentile
-    # gives a more readable visual distribution.
+    # Bar fills 0%-100% based on the display value exp(GROUND), which is
+    # positive and monotone-preserving for both canons (Γ_k → exp(Γ_k) and
+    # J_k → exp(J_k)). The 95th percentile sets the 100% reference so a
+    # few outliers don't squash the bulk of bars.
     if "GROUND" in trades_df.columns and trades_df["GROUND"].notna().any():
-        ground_ref = float(trades_df["GROUND"].quantile(0.95))
-        if ground_ref > 0:
+        disp = np.exp(trades_df["GROUND"].astype(float))
+        disp_min = float(disp.min())
+        disp_ref = float(disp.quantile(0.95))
+        if disp_ref > disp_min:
             trades_df["GROUND_pct"] = (
-                (trades_df["GROUND"].clip(lower=0) / ground_ref * 100)
-                .clip(upper=100)
+                ((disp - disp_min) / (disp_ref - disp_min) * 100).clip(lower=0, upper=100)
             )
         else:
-            trades_df["GROUND_pct"] = 0.0
+            trades_df["GROUND_pct"] = 100.0
     else:
         trades_df["GROUND_pct"] = 0.0
 
@@ -716,6 +718,12 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
         bankroll_mid = max(bankroll_mid + weekly_pnl_mid[d], 0.01)
         bankroll_eow_mid_lookup[d] = bankroll_mid
 
+    # Canonical: Γᵢ (the intrinsic GROUND ratio) := exp(J_k) where
+    # J_k = g − k·DKL is stored in the GROUND column. Display layer
+    # exponentiates to show the ratio itself ("wealth-multiplier /
+    # risk-multiplier").
+    score_label = "Γᵢ"
+
     for entry_date, week_trades in trades_df.groupby("entry_date"):
         week_trades = week_trades.sort_values("GROUND", ascending=False)
         week_row = weekly_df[weekly_df["entry_date"] == entry_date]
@@ -758,7 +766,7 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
   <table>
     <thead><tr>
       <th>ticker</th><th>direction</th><th>short / long</th><th>entry</th>
-      <th>credit</th><th>max loss</th><th style="text-align:right">qty</th><th>GROUND</th><th>expiry</th>
+      <th>credit</th><th>max loss</th><th style="text-align:right">qty</th><th>{score_label}</th><th>expiry</th>
       <th>result</th><th style="text-align:right">P&amp;L</th>
     </tr></thead><tbody>
 ''')
@@ -766,7 +774,7 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
         for _, t in week_trades.iterrows():
             direction = "▲ bull put" if t["decision"] == "bull_put" else "▼ bear call"
             dclass = "dir-bull" if t["decision"] == "bull_put" else "dir-bear"
-            ground = (t["GROUND"] * 100) if pd.notna(t["GROUND"]) else 0
+            ground = math.exp(t["GROUND"]) if pd.notna(t["GROUND"]) else 0
             gpct = t["GROUND_pct"] if pd.notna(t["GROUND_pct"]) else 0
             pnl_t = t["dollar_pnl_mid"]   # at-mid P&L (Option B)
             pcls = 'pos' if pnl_t >= 0 else 'neg'
@@ -780,7 +788,7 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
         <td>${t["net_credit"]:.3f}</td>
         <td>${t["max_loss"]:.3f}</td>
         <td style="text-align:right">{int(t["contracts"]) if pd.notna(t.get("contracts")) else 1}×</td>
-        <td><span class="ground-bar"><span class="ground-bar-fill" style="width:{gpct:.0f}%"></span></span>{ground:.3f}</td>
+        <td><span class="ground-bar"><span class="ground-bar-fill" style="width:{gpct:.0f}%"></span></span>{ground:.4f}</td>
         <td>${t["expiry_price"]:.2f}</td>
         <td><span class="badge badge-{t["result"]}">{t["result"]}</span></td>
         <td class="fw {pcls}" style="text-align:right">{psgn}${pnl_t:,.2f}</td>

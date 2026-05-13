@@ -43,8 +43,11 @@ DELTA_MAX      = 0.65   # eligible range upper bound
 DTE_MIN = 3    # minimum days to expiry
 DTE_MAX = 8    # maximum days to expiry
 
-# Minimum open interest on short leg to filter illiquid strikes
-MIN_OPEN_INTEREST = 10
+# Minimum open interest on both legs to filter illiquid strikes. Applied
+# at runtime in spreads.py to both short and long legs (canonical=100,
+# bumped from 10 on 2026-05-12 to suppress stale-mid artifacts that
+# the actual-b ranker over-rewards).
+MIN_OPEN_INTEREST = 100
 
 # Minimum credit-to-max-loss ratio (filter out under-priced wide-strike spreads).
 # A spread with credit/max_loss < this gets rejected at candidate construction.
@@ -52,13 +55,15 @@ MIN_OPEN_INTEREST = 10
 # Set to 0.0 to disable the filter.
 MIN_CREDIT_RATIO = 0.30
 
-# Maximum credit-to-max-loss ratio (filter out structurally weird spreads).
-# Above ~1.0 typically means deep-ITM short legs, stale/illiquid quotes,
-# or tiny spread widths where max_loss approaches zero. The math explodes:
-# credit_ratio = net_credit / (spread_width - net_credit), so a $2.45 credit
-# on a $2.50 spread yields ratio 49. Disabled by default; set via
-# --max-credit-ratio CLI flag.
-MAX_CREDIT_RATIO = float("inf")
+# Maximum credit-to-max-loss ratio. Capped at 10.0 (2026-05-12) to
+# suppress the small tail of stale-mid artifacts that the OI=100 gate
+# alone doesn't catch: trades with b > 10 (collecting >10× their
+# max-loss as credit) imply the option market is handing you most of
+# the spread width as free credit, which is physically implausible
+# even at high IV. The OI=100 filter cleans up the worst, but a
+# residual ~12 trades with b ≥ 10 survive and produce non-economic
+# G > 1 nat values. Capping b ≤ 10 removes those.
+MAX_CREDIT_RATIO = 10.0
 
 # Hard cap on per-share max loss. Spreads where max_loss > $5/share are
 # rejected at candidate construction (canonical: $5/share).
@@ -68,17 +73,27 @@ MAX_MAX_LOSS = 5.0
 MIN_THETA_CREDIT_RATIO = float("-inf")
 
 # ── GROUND PARAMETERS ────────────────────────────────────────────────────────
-# From Mercurio et al. (2020) eq 28: alpha = mean partial return
+# Canonical scoring uses per-spread payoffs: b = net_credit / max_loss and
+# α(b) = (b−1) / (2b) from uniform-in-strikes linear-payoff geometry, so
+# Kelly outcomes are {+b, +αb, −1}. The legacy constant α = −0.5 corresponds
+# to the b = 1 (binary) special case and is retained only for the b=1
+# reference comparisons in sweep_actual_b.py.
 ALPHA = -0.5
 
-# Base 3 is canonical: a credit spread has 3 states (p, q, r), so
-# uniform entropy = log_3(3) = 1 and DKL from uniform lives in [0, 1].
-# GROUND uses 3 ** (k · DKL) in the denominator to keep units consistent.
-LOG_BASE = 3
+# Natural log is canonical (2026-05-12). Keeps the framework state-space
+# agnostic: same formulas apply to binary, 3-state credit spreads, and
+# continuous outcome spaces without re-deriving. DKL upper bound becomes
+# ln(n) instead of 1 for n-state outcomes (ln 3 ≈ 1.099 for credit
+# spreads); this is purely a unit convention and does not change the
+# selection rule. GROUND uses exp(k · DKL) in the denominator.
+import math as _math
+LOG_BASE = _math.e
 
-# Minimum GROUND score to enter a trade (below this = PASS).
-# Canonical = 0.0 (every selected trade is taken; ranking does the work).
-GROUND_THRESHOLD = 0.0
+# Minimum GROUND score to enter a trade (below this = PASS). Under the
+# canonical J_k formulation the stored GROUND column is J_k = G − k·DKL,
+# which is typically negative. Set to -inf so ranking does all the work;
+# trade quality is judged on rank, not absolute threshold.
+GROUND_THRESHOLD = float("-inf")
 
 # Loss probability factor: q = delta * LOSS_FACTOR
 # Splits the ITM delta probability into full loss vs partial
