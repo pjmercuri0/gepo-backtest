@@ -149,7 +149,12 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "DELTA_MIN":        backtest_config.DELTA_MIN,
             "DELTA_MAX":        backtest_config.DELTA_MAX,
             "MIN_CREDIT_RATIO": backtest_config.MIN_CREDIT_RATIO,
-            "MAX_CREDIT_RATIO": backtest_config.MAX_CREDIT_RATIO,
+            # inf is JSON-invalid (Python emits literal `Infinity`, strict
+            # parsers reject) — serialize as null when no cap.
+            "MAX_CREDIT_RATIO": (
+                None if backtest_config.MAX_CREDIT_RATIO == float("inf")
+                else backtest_config.MAX_CREDIT_RATIO
+            ),
             "MIN_OPEN_INTEREST": backtest_config.MIN_OPEN_INTEREST,
             "MAX_MAX_LOSS":     backtest_config.MAX_MAX_LOSS,
             # -inf canonically means rank-only; emit null so the JSON is
