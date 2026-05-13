@@ -36,7 +36,7 @@ IV_WEIGHT     = 0.5  # weight on IV when blending; (1 - IV_WEIGHT) goes to RV
 USE_SKEW_ADJ  = False
 SKEW_ALPHA    = 0.5  # scale factor for the skew adjustment to p
 DKL_K         = 1.0    # GROUND amplification factor: ln(GROUND) = G − DKL_K · DKL
-RANKING_MODE  = "GROUND"  # "GROUND" | "G_only" | "DKL_only" — for single-factor baselines
+RANKING_MODE  = "GROUND"  # "GROUND" (canonical Kelly-EV-with-DKL-discount) | "G_only" | "DKL_only" | "Jk_legacy" (pre-2026-05-13 J_k)
 
 
 def score_candidates(candidates: pd.DataFrame,
@@ -179,6 +179,10 @@ def _score_row(row: pd.Series) -> pd.Series:
          ro * lg(1.0 + w_star * a * b) +
          q  * lg(1.0 - w_star))
 
+    # EV per dollar wagered (size-independent): linear expected return
+    # under the canonical per-spread payoffs {+b, +αb, -1}.
+    EV = p * b + ro * a * b - q
+
     def h(prob):
         return -prob * lg(prob) if prob > 0 else 0.0
 
@@ -193,6 +197,7 @@ def _score_row(row: pd.Series) -> pd.Series:
         "n_samples": n,
         "w_star":    round(w_star, 4),
         "G":         round(G, 6),
+        "EV":        round(EV, 6),
         "DKL":       round(DKL_chosen, 6),
     })
 
@@ -240,10 +245,26 @@ def _compute_ground_for_week(week_df: pd.DataFrame) -> pd.DataFrame:
         elif RANKING_MODE == "DKL_only":
             # Lower DKL is preferred → store -DKL so the existing "max" selection works.
             score = -DKL_a
-        else:
-            # Canonical GROUND: store the log (J_k = G - k·DKL).
-            # Selection is argmax J_k = argmax exp(J_k) = argmax GROUND.
+        elif RANKING_MODE == "Jk_legacy":
+            # Pre-2026-05-13 canon: J_k = G − k·DKL. Hansen-Sargent multiplier
+            # preferences functional. Retained for paper baselines and the
+            # k-sweep / single-factor tables. Selection by argmax J_k.
             score = G_a - DKL_K * DKL_a
+        else:
+            # Canonical (2026-05-13+): Kelly EV · exp(−k·DKL).
+            # Kelly EV := exp(G) − 1 is the expected wealth gain per trade at
+            # Kelly-optimal sizing (variance-adjusted via the log-utility
+            # expectation inside G). For small G, Kelly EV ≈ G — so this score
+            # is the small-quantity approximation of the Hansen-Sargent J_k
+            # ranker, but reads cleanly as a per-trade % return after the
+            # entropic ambiguity discount exp(−k·DKL).
+            #
+            # Filter G > 0 (Kelly EV > 0) — growth-negative candidates have no
+            # risk-adjusted return and are dropped from ranking (NaN score).
+            if G_a is None or pd.isna(G_a) or G_a <= 0:
+                score = float("nan")
+            else:
+                score = (math.exp(G_a) - 1.0) * math.exp(-DKL_K * DKL_a)
         out.loc[idx, "GROUND"]   = round(score, 6)
         out.loc[idx, "G_ref"]    = G_b
         out.loc[idx, "DKL_ref"]  = DKL_b

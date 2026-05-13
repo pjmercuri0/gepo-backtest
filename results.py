@@ -718,11 +718,12 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
         bankroll_mid = max(bankroll_mid + weekly_pnl_mid[d], 0.01)
         bankroll_eow_mid_lookup[d] = bankroll_mid
 
-    # Canonical: Γᵢ (the intrinsic GROUND ratio) := exp(J_k) where
-    # J_k = g − k·DKL is stored in the GROUND column. Display layer
-    # exponentiates to show the ratio itself ("wealth-multiplier /
-    # risk-multiplier").
-    score_label = "Γᵢ"
+    # Canonical (2026-05-13+): the stored GROUND value IS the score —
+    # Kelly EV · exp(−k·DKL) = (exp(G) − 1) · exp(−k·DKL). Reads as
+    # "per-trade expected wealth gain after entropic ambiguity discount,"
+    # in fractional return units (multiply by 100 for %). No exp/log
+    # transform needed for display.
+    score_label = "Kelly EV"
 
     for entry_date, week_trades in trades_df.groupby("entry_date"):
         week_trades = week_trades.sort_values("GROUND", ascending=False)
@@ -766,7 +767,8 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
   <table>
     <thead><tr>
       <th>ticker</th><th>direction</th><th>short / long</th><th>entry</th>
-      <th>credit</th><th>max loss</th><th style="text-align:right">qty</th><th>{score_label}</th><th>expiry</th>
+      <th>credit</th><th>max loss</th><th style="text-align:right">qty</th><th>{score_label}</th>
+      <th>expiry</th>
       <th>result</th><th style="text-align:right">P&amp;L</th>
     </tr></thead><tbody>
 ''')
@@ -774,8 +776,12 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
         for _, t in week_trades.iterrows():
             direction = "▲ bull put" if t["decision"] == "bull_put" else "▼ bear call"
             dclass = "dir-bull" if t["decision"] == "bull_put" else "dir-bear"
-            ground = math.exp(t["GROUND"]) if pd.notna(t["GROUND"]) else 0
-            gpct = t["GROUND_pct"] if pd.notna(t["GROUND_pct"]) else 0
+            # GROUND column stores Kelly EV · exp(−k·DKL) directly (positive
+            # fractional return). Render as "+X.XX%" — no exp() transform.
+            ground = float(t["GROUND"]) if pd.notna(t["GROUND"]) else 0.0
+            gpct  = t["GROUND_pct"] if pd.notna(t["GROUND_pct"]) else 0
+            g_str = f"{ground*100:+.2f}%"
+            g_cls = "pos" if ground >= 0 else "neg"
             pnl_t = t["dollar_pnl_mid"]   # at-mid P&L (Option B)
             pcls = 'pos' if pnl_t >= 0 else 'neg'
             psgn = '+' if pnl_t >= 0 else ''
@@ -788,7 +794,7 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
         <td>${t["net_credit"]:.3f}</td>
         <td>${t["max_loss"]:.3f}</td>
         <td style="text-align:right">{int(t["contracts"]) if pd.notna(t.get("contracts")) else 1}×</td>
-        <td><span class="ground-bar"><span class="ground-bar-fill" style="width:{gpct:.0f}%"></span></span>{ground:.4f}</td>
+        <td class="{g_cls}"><span class="ground-bar"><span class="ground-bar-fill" style="width:{gpct:.0f}%"></span></span>{g_str}</td>
         <td>${t["expiry_price"]:.2f}</td>
         <td><span class="badge badge-{t["result"]}">{t["result"]}</span></td>
         <td class="fw {pcls}" style="text-align:right">{psgn}${pnl_t:,.2f}</td>

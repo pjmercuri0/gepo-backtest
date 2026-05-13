@@ -37,12 +37,13 @@
         <th>Ratio</th>
         <th>p / r₀ / q</th>
         <th>G</th>
+        <th>Kelly EV</th>
         <th>DKL</th>
         <th>exp(k·DKL)</th>
-        <th>Γᵢ</th>
+        <th>score</th>
       </tr>
     </thead>
-    <tbody id="ranked-tbody"><tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
+    <tbody id="ranked-tbody"><tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
   </table>
   </div>
 </div>
@@ -70,26 +71,33 @@ function fmtContract(v, dec=0) {
   if (v == null) return "—";
   return "$" + (Number(v) * 100).toFixed(dec);
 }
-// The JSON `GROUND` field holds the additive form J_k = g − k·DKL
-// (negative for ~93% of candidates under the canonical k=1 nats config;
-// the top tail crosses zero). Display layer exponentiates to show
-// Γᵢ = exp(J_k) = G / exp(k·DKL), which lives in roughly [0.7, 1.7]
-// for the selected weekly picks (top picks usually > 1, below-median
-// candidates usually < 1). Γᵢ is a dimensionless ratio (wealth
-// multiplier / risk multiplier), not a percentage — render as a plain
-// 4-decimal number to match the weekly-report format. Selection
-// ordering is invariant under exp.
-function fmtGround(v, dec=4) {
+// Canonical (2026-05-13+): the JSON `GROUND` field holds Kelly EV ·
+// exp(−k·DKL) = (exp(G) − 1) · exp(−k·DKL) directly — a positive
+// fractional return ("X% expected wealth gain per trade after
+// entropic ambiguity discount"). Render as +X.XX% with sign + color
+// matching pos/neg. Selection is argmax(score).
+function fmtGround(v, dec=2) {
   if (v == null) return "—";
-  return Math.exp(Number(v)).toFixed(dec);
+  const x = Number(v) * 100;
+  const sign = x >= 0 ? "+" : "";
+  return `${sign}${x.toFixed(dec)}%`;
 }
-// Wealth multiplier G = exp(g), where g (the per-trade Kelly log-growth
-// at w*) is the value stored in the JSON `G` field. Rendering as the
-// multiplier (≥1 for growth-positive bets) makes the row read as the
-// canonical formula G / exp(k·DKL) = Γᵢ directly.
+// Wealth multiplier G = exp(g), where g (per-trade Kelly log-growth at
+// w*) is the value stored in the JSON `G` field. Renders as the
+// multiplier (≥1 for growth-positive bets).
 function fmtMultiplier(g, dec=4) {
   if (g == null) return "—";
   return Math.exp(Number(g)).toFixed(dec);
+}
+// Kelly EV = exp(G) − 1 = expected wealth gain per trade at Kelly
+// sizing (variance-adjusted via the log-utility expectation inside G).
+// Rendered as +X.XX%.
+function fmtKellyEV(g, dec=2) {
+  if (g == null) return "—";
+  const ev = (Math.exp(Number(g)) - 1) * 100;
+  const sign = ev >= 0 ? "+" : "";
+  const cls  = ev >= 0 ? "pos" : "neg";
+  return `<span class="${cls}">${sign}${ev.toFixed(dec)}%</span>`;
 }
 // Entropic risk multiplier denom = exp(k·DKL). At canonical k=1 this
 // equals exp(DKL); kept parametric so a k-sweep can be visualised.
@@ -107,12 +115,13 @@ function dirLabel(spread_type) {
   if (spread_type === "bear_call") return "bear-call";
   return spread_type || "—";
 }
-// Both inputs are stored J_k values (typically negative); exp() to get
-// the actual Γᵢ ratio used for proportional bar width.
-function groundBar(jk, maxJk) {
-  const gamma    = Math.exp(Number(jk    || 0));
-  const gammaMax = Math.exp(Number(maxJk || 0));
-  const pct = Math.max(0, Math.min(1, gamma / (gammaMax || 1)));
+// Both inputs are the stored canonical score (Kelly EV · exp(−k·DKL),
+// a positive fractional return). Bar width is proportional to score
+// over the menu max.
+function groundBar(s, maxS) {
+  const v    = Number(s    || 0);
+  const vMax = Number(maxS || 0);
+  const pct  = Math.max(0, Math.min(1, v / (vMax || 1)));
   return `<span class="ground-bar"><span class="ground-bar-fill" style="width:${pct * 100}%"></span></span>`;
 }
 
@@ -199,7 +208,7 @@ function renderTopPicks(picks, maxGround, kVal) {
         <thead><tr>
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
           <th>credit ($/sh)</th><th>max-loss ($/sh)</th><th>ratio</th>
-          <th>p</th><th>r₀</th><th>q</th><th>G</th><th>DKL</th><th>exp(k·DKL)</th><th>Γᵢ</th>
+          <th>p</th><th>r₀</th><th>q</th><th>G</th><th>Kelly EV</th><th>DKL</th><th>exp(k·DKL)</th><th>score</th>
         </tr></thead>
         <tbody><tr>
           <td>${fmtMoney(p.entry_price)}</td>
@@ -213,6 +222,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${fmtNum(p.ro, 3)}</td>
           <td>${fmtNum(p.q, 3)}</td>
           <td>${fmtMultiplier(p.G)}</td>
+          <td>${fmtKellyEV(p.G)}</td>
           <td>${fmtNum(p.DKL, 4)}</td>
           <td>${fmtNum(denom(p, kVal), 4)}</td>
           <td class="fw">${groundBar(p.GROUND, maxGround)}${fmtGround(p.GROUND)}</td>
@@ -225,7 +235,7 @@ function renderTopPicks(picks, maxGround, kVal) {
 
 function renderRanked(rows, maxGround, kVal) {
   if (!rows || rows.length === 0) {
-    return `<tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
+    return `<tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
   }
   return rows.map((r, i) => `<tr>
     <td>${i+1}</td>
@@ -239,6 +249,7 @@ function renderRanked(rows, maxGround, kVal) {
     <td>${fmtPct(r.credit_ratio, 0)}</td>
     <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}</td>
     <td>${fmtMultiplier(r.G)}</td>
+    <td>${fmtKellyEV(r.G)}</td>
     <td>${fmtNum(r.DKL, 4)}</td>
     <td>${fmtNum(denom(r, kVal), 4)}</td>
     <td class="fw">${groundBar(r.GROUND, maxGround)}${fmtGround(r.GROUND)}</td>

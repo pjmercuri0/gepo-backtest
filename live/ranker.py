@@ -132,6 +132,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "q":                _num(r.get("q")),
             "ro":               _num(r.get("ro")),
             "G":                _num(r.get("G")),
+            "EV":               _num(r.get("EV")),
             "DKL":              _num(r.get("DKL")),
             "GROUND":           _num(r.get("GROUND")),
             "w_star":           _num(r.get("w_star")),
