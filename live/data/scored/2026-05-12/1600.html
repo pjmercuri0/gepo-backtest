@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>chain analysis 2026-05-12 1600</title>
+<style>
+body { background:#0f0f0f; color:#e8e8e8; font:14px/1.4 -apple-system,sans-serif;
+       max-width:1200px; margin:24px auto; padding:0 16px; }
+h1, h2 { color:#fff; font-weight:600; }
+.subtitle { color:#888780; font-size:13px; margin-bottom:24px; }
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px;
+          background:#1a1a1a; border:1px solid #333; padding:16px;
+          border-radius:6px; margin-bottom:24px; }
+.stat-label { color:#888780; font-size:11px; text-transform:uppercase; }
+.stat-value { color:#fff; font-size:20px; font-weight:600; margin-top:4px; }
+table { border-collapse:collapse; width:100%; margin-bottom:24px; }
+th, td { padding:8px 12px; text-align:left; border-bottom:1px solid #2a2a2a; }
+th { color:#888780; font-size:11px; text-transform:uppercase; font-weight:500; }
+td { font-variant-numeric:tabular-nums; }
+.neg { color:#E24B4A; }
+.warn { color:#EF9F27; }
+.pos { color:#1D9E75; }
+.note { color:#888780; font-size:12px; margin-top:8px; }
+</style></head><body>
+
+<h1>chain snapshot · 2026-05-12 1600</h1>
+<div class="subtitle">canonical filters: SP100 / DTE 3-8 / |Δ| 0.35-0.65
+/ both-leg OI ≥ 100 / b ≤ 5.0 (paper)</div>
+
+<h2>summary</h2>
+<div class="stats">
+  <div class="stat"><div class="stat-label">candidates</div><div class="stat-value">59</div></div>
+  <div class="stat"><div class="stat-label">bear-call / bull-put</div><div class="stat-value">27 / 32</div></div>
+  <div class="stat"><div class="stat-label">median b/a half-spread cost</div><div class="stat-value">$0.390<br><span style="font-size:13px;color:#888780">(50.0% of mid credit)</span></div></div>
+  <div class="stat"><div class="stat-label">untradeable at b/a</div><div class="stat-value">11<br><span style="font-size:13px;color:#888780">sell_bid ≤ buy_ask of other leg</span></div></div>
+</div>
+
+<div class="note">ba_halfspread_cost = (mid_credit) − (short_bid − long_ask) = sum of both legs'
+half-spreads. <b>This is a static measure of bid/ask width at one snapshot, NOT drift.</b>
+True drift requires comparing two snapshots — see <code>drift_compare.py</code>.</div>
+
+<h2>top 5 picks (by Γᵢ rank)</h2>
+<table>
+<tr><th>ticker</th><th>direction</th><th>strikes</th><th>DTE</th><th>b</th>
+    <th>mid credit</th><th>cross-b/a credit</th><th>b/a half-sp %</th><th>Γᵢ</th></tr>
+<tr><td>LOW</td><td>bull put</td><td>$225.00 / $222.50</td><td>3d</td><td>2.85</td><td>$1.850</td><td>$0.350</td><td class='neg'>81.1%</td><td>+15.98%</td></tr>
+<tr><td>CSX</td><td>bear call</td><td>$44.00 / $45.00</td><td>3d</td><td>3.00</td><td>$0.750</td><td>$-0.300</td><td class='neg'>140.0%</td><td>+11.42%</td></tr>
+<tr><td>GE</td><td>bear call</td><td>$297.50 / $300.00</td><td>3d</td><td>1.86</td><td>$1.625</td><td>$0.450</td><td class='neg'>72.3%</td><td>+5.62%</td></tr>
+<tr><td>MDT</td><td>bull put</td><td>$77.00 / $76.00</td><td>3d</td><td>1.04</td><td>$0.510</td><td>$0.230</td><td class='neg'>54.9%</td><td>+2.48%</td></tr>
+<tr><td>GE</td><td>bull put</td><td>$297.50 / $295.00</td><td>3d</td><td>1.33</td><td>$1.425</td><td>$0.150</td><td class='neg'>89.5%</td><td>+2.43%</td></tr>
+</table>
+
+<div class="note">top-5 median b/a half-spread cost: <b>81.1% of mid credit</b>.
+   Lower is better. This number is the floor on transaction cost if you must cross b/a;
+   patient limit-order trading can do better.</div>
+
+</body></html>
