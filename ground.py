@@ -36,6 +36,7 @@ IV_WEIGHT     = 0.5  # weight on IV when blending; (1 - IV_WEIGHT) goes to RV
 USE_SKEW_ADJ  = False
 SKEW_ALPHA    = 0.5  # scale factor for the skew adjustment to p
 DKL_K         = 1.0    # GROUND amplification factor: ln(GROUND) = G − DKL_K · DKL
+SCORE_B_CAP   = None   # If set (e.g. 1.0), score uses b = min(b_actual, cap); realized P&L uses b_actual.
 RANKING_MODE  = "GROUND"  # "GROUND" (canonical Kelly-EV-with-DKL-discount) | "G_only" | "DKL_only" | "Jk_legacy" (pre-2026-05-13 J_k)
 
 
@@ -138,7 +139,15 @@ def _score_row(row: pd.Series) -> pd.Series:
             "p": p, "q": q, "ro": ro, "n_samples": n,
             "w_star": None, "G": None, "DKL": None,
         })
-    b = nc / ml
+    b_actual = nc / ml
+    # Optional score-side cap: when SCORE_B_CAP is set (e.g. 1.0), the
+    # scoring quantities (Kelly w*, G, EV, DKL) are computed as if the
+    # spread had b = min(b_actual, SCORE_B_CAP), even though realized
+    # P&L still uses b_actual. The intuition: Kelly's prediction at
+    # very high b is dominated by a rare-but-huge-win regime that
+    # flat-sized trading does not realize, so it shouldn't drive the
+    # ranking. Production has SCORE_B_CAP = None (use actual b).
+    b = b_actual if SCORE_B_CAP is None else min(b_actual, SCORE_B_CAP)
     a = 0.0 if b >= 1.0 else (b - 1.0) / (2.0 * b)
 
     # Kelly FOC with outcomes {+b, +αb, −1} → quadratic Aw² + Bw + C = 0.
