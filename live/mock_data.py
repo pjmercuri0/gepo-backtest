@@ -117,6 +117,12 @@ def _gen_spread(rng: random.Random, ticker: str, spot: float, entry_date: date,
     # Display layer exponentiates to show the ratio exp(J_k) = exp(G)/exp(k·DKL).
     GROUND = round(G - k * DKL, 8)
 
+    # EV per dollar wagered = p·b + r₀·α(b)·b − q  (size-independent linear EV).
+    # Display-only quantity; not used in canonical ranking (which is J_k above).
+    b_mock     = net_credit / max_loss if max_loss > 0 else 0.0
+    alpha_mock = 0.0 if b_mock >= 1.0 else (b_mock - 1.0) / (2.0 * b_mock)
+    EV         = round(p * b_mock + ro * alpha_mock * b_mock - q, 5)
+
     w_star = round(rng.uniform(0.20, 0.65), 4)
 
     return {
@@ -139,6 +145,7 @@ def _gen_spread(rng: random.Random, ticker: str, spot: float, entry_date: date,
         "q":                q,
         "ro":               ro,
         "G":                G,
+        "EV":               EV,
         "DKL":              DKL,
         "GROUND":           GROUND,
         "w_star":           w_star,

@@ -53,37 +53,47 @@
 We present an entropy-regularized growth-maximization framework for
 ranking discrete-payoff contingent claims in incomplete markets,
 indexed by an ambiguity-aversion parameter $k \ge 0$. The framework
-takes the per-trade Kelly log-growth $\G(p, x) := \ln G(p, x)$ as the
-growth signal, where $G$ is the Kelly growth rate (per-trade wealth
-multiplier). Two equivalent forms appear:
-\begin{align*}
-J_k(p, x) &\;=\; \G(p, x) - k \cdot \KL(p \| u), \\
-\GROUND(p, x, k) &\;=\; \exp(J_k(p, x)) \;=\; \frac{G(p, x)}{\exp(k \cdot \KL(p \| u))}.
-\end{align*}
-Part of our contribution is the recognition that the \emph{intrinsic
-GROUND ratio} of \citet{mercurio2020} is exactly the multiplicative
-(exponentiated) form of the additive functional $J_k$ of
-\citet{hansen2008robustness} and \citet{maccheroni2006ambiguity}: not
-an approximation, modification, or analog, but the same object in
-different units. The additive form $J_k$ is convenient for analytic
-manipulation; the multiplicative form $\GROUND$ admits the direct
-economic reading ``per-trade wealth multiplier divided by entropic
-risk multiplier'' and is the practical scalar stored per claim in
-the empirical work. To our knowledge $\KL$ in this role is the first
-formal risk measure proposed for discrete-payoff option strategies,
-where conventional variance- or VaR-based measures are ill-defined.
-We establish three results: (i) ranking by $\GROUND$ is identical
-to ranking by $J_k$, by the construction $\GROUND = \exp(J_k)$;
-(ii) the limiting cases recover pure Kelly growth selection
-($k \to 0$) and maximum-entropy selection ($k \to \infty$); (iii)
-the induced indifference-price functional reduces to the
-minimum-entropy martingale measure expectation as $k \to 0$,
+takes the per-trade \emph{Kelly EV} $E(p, x) := \exp(g(p, x)) - 1$ as
+the growth signal, where $g(p, x) = E_p[\ln(1 + w^\star X)]$ is the
+Kelly log-growth at the optimal sizing fraction $w^\star$. By Jensen's
+inequality on the concave log inside $g$, $E$ is variance-adjusted by
+construction: it is the expected wealth gain per trade at Kelly sizing,
+penalising high-variance payoffs relative to their linear EV. The
+canonical \emph{intrinsic GROUND ratio} is the Kelly EV discounted by
+an entropic ambiguity factor:
+\begin{equation*}
+\GROUND(p, x, k) \;=\; E(p, x) \cdot \exp\!\bigl(-k \cdot \KL(p \| u)\bigr)
+\;=\; \bigl(\exp(g(p, x)) - 1\bigr) \cdot \exp\!\bigl(-k \cdot \KL(p \| u)\bigr).
+\end{equation*}
+The score is dimensionless and reads directly as percent risk-adjusted
+expected return per trade. Part of our contribution is the small-$g$
+connection to the multiplier-preferences literature: for $g$ small,
+$E \approx g$, and
+\[
+\ln \GROUND \;\approx\; g - k \cdot \KL \;=\; J_k(p, x),
+\]
+the Hansen-Sargent multiplier-preferences functional
+\citep{hansen2008robustness} and the variational preferences class of
+\citet{maccheroni2006ambiguity}. The canonical Kelly-EV-with-discount
+ranker is thus the economically-readable form of the Hansen-Sargent
+ranker --- preserving the theoretical lineage while gaining direct
+interpretation as a per-trade return. To our knowledge $\KL$ in this
+role is the first formal risk measure proposed for discrete-payoff
+option strategies, where conventional variance- or VaR-based measures
+are ill-defined. We establish three results: (i) the small-$g$
+approximation $\ln \GROUND \approx J_k$ holds within 5\% across the
+canonical credit-spread regime, so the two rankers agree on selection
+in this regime; (ii) the limiting cases of $J_k$ recover pure Kelly
+growth selection ($k \to 0$) and maximum-entropy selection ($k \to
+\infty$); (iii) the induced indifference-price functional reduces to
+the minimum-entropy martingale measure expectation as $k \to 0$,
 embedding $\GROUND$ in the incomplete-markets pricing-kernel
 literature \citep{frittelli2000,follmer2002}. The criterion is
 empirically validated in companion work on six years of S\&P 100
 weekly credit spreads \citep{mercurio2026empirical}, where it
-produces a Sharpe ratio of $1.60$ on a five-year in-sample window
-and $3.25$ on a strict 70-week holdout.
+produces a Sharpe ratio of $1.48$ and Calmar of $2.81$ on a five-year
+in-sample window, and Sharpe $2.89$, Calmar $10.75$ on a strict
+70-week holdout.
 \end{abstract}
 
 
@@ -120,8 +130,13 @@ We make four contributions.
           and characterize its optimal selection rule
           (Section~\ref{sec:framework}).
     \item We prove that the optimal selection rule coincides with
-          ranking by the \emph{GROUND ratio} $\GROUND = G \, b^{-k\,\KL}$
-          (Theorem~\ref{thm:main}, Section~\ref{sec:main}).
+          ranking by the \emph{GROUND ratio} $\GROUND = E \cdot \exp(-k \KL)$
+          where $E = \exp(g) - 1$ is the Kelly EV (Theorem~\ref{thm:main},
+          Section~\ref{sec:main}). We also establish the small-$g$
+          equivalence $\ln \GROUND \approx J_k = g - k\KL$ to the
+          Hansen-Sargent multiplier-preferences functional, preserving
+          the theoretical lineage while gaining direct interpretation
+          as a per-trade return.
     \item We characterize the limiting behaviour: $k \to 0$ recovers
           pure Kelly growth selection, $k \to \infty$ recovers
           maximum-entropy (uniform-closest) selection, and the
@@ -174,24 +189,29 @@ reference candidate $b$ (taken as the minimum-divergence member of
 the pool). The denominator vanishes when the candidate being scored
 coincides with the reference, so ties at minimum-$\KL$ are handled
 procedurally --- $b$ is excluded from scoring, and any further ties
-at $\KL_b$ are broken by an external rule. This cross-candidate
+at $\KL(p_b \| u)$ are broken by an external rule. This cross-candidate
 coupling is awkward in a streaming weekly-selection setting,
 where the menu changes week-to-week and a per-week reference must be
 recomputed.
 
-The present paper introduces the \emph{intrinsic} GROUND ratio: a
-per-candidate score that requires no reference,
+The present paper introduces the \emph{intrinsic} GROUND ratio in its
+canonical \emph{Kelly-EV-with-entropic-discount} form: a per-candidate
+score that requires no reference,
 \[
-\GROUND(a, k) \;=\; \frac{\exp(\G(p_a, x_a))}{\exp\!\bigl(k \cdot \KL(p_a \| u)\bigr)}
-              \;=\; \frac{G(p_a, x_a)}{\exp\!\bigl(k \cdot \KL(p_a \| u)\bigr)}
-              \;=\; \exp\!\bigl(\G(p_a, x_a) - k \cdot \KL(p_a \| u)\bigr)
-              \;=\; \exp(J_k(a)).
+\GROUND(a, k) \;=\; \bigl(\exp(\G(p_a, x_a)) - 1\bigr) \cdot \exp\!\bigl(-k \cdot \KL(p_a \| u)\bigr),
+\qquad \G(p_a, x_a) > 0.
 \]
-The chain of equalities makes the construction explicit: the
-intrinsic GROUND ratio is the exponentiated form of the additive
-Hansen-Sargent functional $J_k$. The companion empirical paper
-\citep{mercurio2026empirical} reports validation of the intrinsic
-form on six years of S\&P 100 weekly credit spreads.
+The first factor $\exp(\G) - 1$ is the Kelly EV of the candidate
+(variance-adjusted via Jensen on the concave log inside $\G$); the
+second is the entropic ambiguity discount. The product is a
+dimensionless fractional return readable as percent risk-adjusted
+expected return per trade. For small $\G$ (the canonical regime),
+$\exp(\G) - 1 \approx \G$ and hence $\ln \GROUND \approx \G - k \cdot
+\KL = J_k(a)$, the additive Hansen-Sargent functional. The Kelly-EV
+form is the economically-readable small-quantity expression of the HS
+ranker. The companion empirical paper
+\citep{mercurio2026empirical} reports validation on six years of
+S\&P 100 weekly credit spreads.
 
 \paragraph{Relation to entropy-regularized utility.}
 The additive form $J_k = \G - k \cdot \KL$ that arises by taking the
@@ -337,45 +357,46 @@ the scope of this paper.
 
 \section{Main result}\label{sec:main}
 
-\subsection{The additive objective $J_k$}
+\subsection{Kelly EV as the growth signal}
 
-For a contingent claim $\C = (x, p, c)$, let
-$\G(p, x) := \ln G(p, x)$ denote the Kelly log-growth signal, with
-$G$ the per-trade Kelly growth rate from Equation~\eqref{eq:G}. We
-take as our primary functional the additive
-entropy-regularized expected-utility objective of
-\citet{hansen2008robustness} and \citet{maccheroni2006ambiguity}:
+For a contingent claim $\C = (x, p, c)$, let $\G(p, x)$ denote the
+Kelly log-growth at the optimal sizing fraction $w^\star$:
+$\G(p, x) := E_p[\ln(1 + w^\star X)]$, where $X$ is the per-unit-stake
+payoff of $\C$. The \emph{Kelly EV} of $\C$ is the expected wealth
+gain per trade at Kelly-optimal sizing:
 \begin{equation}
-J_k(p, x) \;:=\; \G(p, x) - k \cdot \KL(p \| u_n).
-\label{eq:Jk}
+E(p, x) \;:=\; \exp\!\bigl(\G(p, x)\bigr) - 1.
+\label{eq:kelly-ev}
 \end{equation}
-This is the form we use for all analytic manipulation throughout the
-paper --- derivatives, limits, the Donsker-Varadhan correspondence
-of Section~\ref{sec:pricing} --- and it is the form a reader of the
-multiplier-preferences literature will immediately recognise.
+Because $\G$ is the expectation of a concave (log) function, Jensen's
+inequality implies $\G(p, x) \le \ln(1 + w^\star E_p[X])$, with strict
+inequality whenever $\mathrm{Var}_p[X] > 0$. Equivalently, $E(p, x)$
+is bounded above by the arithmetic Kelly EV and is strictly less
+whenever the payoff distribution has nonzero variance: \emph{Kelly EV
+is variance-adjusted by construction}. This is what distinguishes it
+from the linear EV $E_p[X]$.
 
-\subsection{The intrinsic GROUND ratio $\GROUND(\cdot, k) := \exp(J_k)$}
+We restrict attention throughout to growth-positive claims
+$\G(p, x) > 0$ (equivalently $E(p, x) > 0$). Claims with $\G \le 0$
+have Kelly-optimal fraction $w^\star = 0$ and contribute nothing to
+the menu.
 
-Exponentiating $J_k$ yields the same construction expressed
-multiplicatively. We call this the \emph{intrinsic GROUND ratio} and
-denote it $\GROUND$, with the ambiguity-aversion multiplier $k$
-carried as a parameter:
+\subsection{The intrinsic GROUND ratio}
+
+The canonical intrinsic GROUND ratio is the Kelly EV discounted by an
+entropic ambiguity factor:
 \begin{equation}
-\GROUND(p, x, k) \;:=\; \exp\!\bigl(J_k(p, x)\bigr)
-                  \;=\; \frac{\exp(\G(p, x))}{\exp\!\bigl(k \cdot \KL(p \| u_n)\bigr)}
-                  \;=\; \frac{G(p, x)}{\exp\!\bigl(k \cdot \KL(p \| u_n)\bigr)}.
+\GROUND(p, x, k) \;:=\; E(p, x) \cdot \exp\!\bigl(-k \cdot \KL(p \| u_n)\bigr)
+                  \;=\; \bigl(\exp(\G(p, x)) - 1\bigr) \cdot \exp\!\bigl(-k \cdot \KL(p \| u_n)\bigr),
 \label{eq:ground}
 \end{equation}
-The chain of equalities makes the construction explicit: the
-multiplicative form is the exponentiation of the additive form, and
-since $\exp(\G) = G$ by definition, the numerator collapses to the
-per-trade Kelly growth rate $G$. The denominator $\exp(k \KL)$ is an
-entropic risk multiplier. The ratio is dimensionless and reads
-``per-trade wealth multiplier divided by entropic risk multiplier.''
-Both numerator and denominator are $\ge 1$ for growth-positive
-claims with $\KL \ge 0$, so $\GROUND(p, x, k) \in (0, \infty)$, with
-$\GROUND(p, x, k) = 1$ exactly when $J_k = 0$ (growth signal balances
-divergence penalty).
+for $k \ge 0$. The first factor is the variance-adjusted expected
+wealth gain per trade (Kelly EV). The second factor $\exp(-k \cdot
+\KL) \in (0, 1]$ is the entropic ambiguity discount: $1$ when the
+implied distribution coincides with the uniform reference (zero
+divergence, full credit to the EV) and decaying as the distribution
+becomes more concentrated. The product is dimensionless and reads
+directly as percent risk-adjusted expected return per trade.
 
 The subscript $\mathrm{i}$ stands for ``intrinsic'' (a per-candidate
 score requiring no reference), distinguishing it from the original
@@ -385,31 +406,66 @@ $\Gamma_{a|b} = (\G_a - \G_b) / (\KL(p_a\|u) - \KL(p_b\|u))$. The
 intrinsic $\GROUND$ is the per-candidate evolution of that
 construction and the form used in the empirical work.
 
-\paragraph{Use convention.} We work with $J_k$ analytically throughout
-this paper for simplicity and consistency with the
-multiplier-preferences lineage. The exponentiated $\GROUND$ form
-appears in display contexts (empirical tables, the live tracker, the
-weekly reports of \citet{mercurio2026empirical}) where the positive
-multiplicative-ratio reading is more legible than a negative
-additive log-utility number. The two are the same object: $\GROUND$
-is a name we give to $\exp(J_k)$, not a separate functional.
-
 \begin{definition}[Intrinsic GROUND ratio]\label{def:ground}
-For a contingent claim $\C = (x, p, c)$, the intrinsic GROUND ratio
-at parameter $k \ge 0$ is defined by
-\eqref{eq:ground}, equivalently by $\GROUND = \exp(J_k)$ with
-$J_k$ from \eqref{eq:Jk}.
+For a contingent claim $\C = (x, p, c)$ with $\G(p, x) > 0$, the
+intrinsic GROUND ratio at parameter $k \ge 0$ is defined by
+Equation~\eqref{eq:ground}.
 \end{definition}
 
-The two forms are not approximations of one another: they are the
-same construction expressed additively in log-space and
-multiplicatively in growth-space. Selection by argmax of
-\eqref{eq:Jk} and argmax of \eqref{eq:ground} are trivially
-equivalent via the monotone log.
+\subsection{Small-$\G$ connection to Hansen-Sargent}\label{sec:hs-link}
 
-We assume $G(p, x) > 0$ throughout the main result; the case
-$G \le 0$ corresponds to candidates the agent should not enter at any
-size and is discussed in Remark~\ref{rem:Gneg}.
+The canonical Kelly-EV-with-discount form
+Equation~\eqref{eq:ground} is the economically-readable expression of
+the additive multiplier-preferences functional of
+\citet{hansen2008robustness} and \citet{maccheroni2006ambiguity}. To
+see this, take the log of \eqref{eq:ground}:
+\begin{equation}
+\ln \GROUND(p, x, k) \;=\; \ln\!\bigl(\exp(\G) - 1\bigr) - k \cdot \KL(p \| u_n).
+\label{eq:ln-ground}
+\end{equation}
+For $\G > 0$ small, $\exp(\G) - 1 = \G + \G^2/2 + O(\G^3)$, so
+$\ln(\exp(\G) - 1) = \ln \G + \ln(1 + \G/2 + O(\G^2))
+= \ln \G + \G/2 + O(\G^2)$.
+Two regimes are economically relevant:
+
+\paragraph{Canonical credit-spread regime ($\G \in [0.001, 0.10]$ nats).}
+$\exp(\G) - 1 \approx \G$ to within 5\% across this range, so
+\begin{equation}
+\ln \GROUND(p, x, k) \;\approx\; \G(p, x) - k \cdot \KL(p \| u_n) \;=:\; J_k(p, x),
+\label{eq:Jk}
+\end{equation}
+where $J_k := \G - k \cdot \KL$ is the multiplier-preferences
+functional of \citet{hansen2008robustness}. \emph{The canonical Kelly-EV
+ranker is, to first order in $\G$, the Hansen-Sargent ranker.} The two
+agree on selection in the canonical regime up to $\sim 7$--$11\%$
+relative Sharpe difference empirically (Table 3 of
+\citet{mercurio2026empirical}); we adopt the Kelly-EV form because its
+display value reads directly as a per-trade return, whereas $J_k$ is
+typically negative (a regularized log-utility, not a return).
+
+\paragraph{Large-$\G$ regime.}
+For very-positive-edge candidates ($\G \gtrsim 0.5$, rare in the
+canonical credit-spread universe but possible for some top-of-menu
+spreads), $\exp(\G) - 1$ grows faster than $\G$. In this regime the
+Kelly-EV form weights top picks more aggressively than $J_k$. This
+divergence at the tails is the small-quantity-approximation cost of
+the Kelly-EV form. Empirically it produces a ranker that disagrees
+with $J_k$ on roughly half of selected picks but achieves
+near-identical outcomes (slightly lower Sharpe, slightly higher yield,
+slightly smaller drawdown; see Table 3 of
+\citet{mercurio2026empirical}).
+
+\begin{remark}[Working in $J_k$ for analysis]
+For the limit and pricing-functional theorems of
+Sections~\ref{sec:limits} and \ref{sec:pricing} we work with the
+additive form $J_k = \G - k \cdot \KL$ rather than the multiplicative
+$\GROUND$. This is because the limit analysis as $k \to 0$ (recovering
+MEMM) and as $k \to \infty$ (recovering minimum-divergence selection)
+is cleanest in the additive form, and the two forms agree to first
+order via \eqref{eq:Jk}. All selection-theoretic
+statements about $J_k$ in those sections apply to the canonical
+$\GROUND$ ranker up to the small-$\G$ approximation.
+\end{remark}
 
 \subsection{Selection equivalence}
 

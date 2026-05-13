@@ -85,14 +85,25 @@ ALPHA = -0.5
 # continuous outcome spaces without re-deriving. DKL upper bound becomes
 # ln(n) instead of 1 for n-state outcomes (ln 3 ≈ 1.099 for credit
 # spreads); this is purely a unit convention and does not change the
-# selection rule. GROUND uses exp(k · DKL) in the denominator.
+# selection rule.
 import math as _math
 LOG_BASE = _math.e
 
-# Minimum GROUND score to enter a trade (below this = PASS). Under the
-# canonical J_k formulation the stored GROUND column is J_k = G − k·DKL,
-# which is typically negative. Set to -inf so ranking does all the work;
-# trade quality is judged on rank, not absolute threshold.
+# Canonical GROUND (2026-05-13+): rank by Kelly EV · exp(−k·DKL), where
+# Kelly EV := exp(G) − 1 is the expected wealth gain per trade at Kelly-
+# optimal sizing (variance-adjusted via log-utility) and exp(−k·DKL) is
+# the entropic ambiguity discount. Stored GROUND column is the score
+# itself (positive number in dimensionless return units), so threshold 0
+# is the natural floor — but kept at -inf for rank-only behavior. The
+# G > 0 filter inside ground.py drops growth-negative candidates from
+# the menu before ranking.
+#
+# Small-G connection to Hansen-Sargent: Kelly EV = exp(G) − 1 ≈ G for
+# small G, so this score is the small-quantity approximation of the HS
+# multiplier-preferences functional J_k = G − k·DKL. The two rank ≈
+# equivalently in the canonical regime; Kelly EV is preferred for
+# display because the resulting score is a directly-readable per-trade
+# return after risk adjustment.
 GROUND_THRESHOLD = float("-inf")
 
 # Loss probability factor: q = delta * LOSS_FACTOR
