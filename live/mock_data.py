@@ -113,15 +113,20 @@ def _gen_spread(rng: random.Random, ticker: str, spot: float, entry_date: date,
     # with small p,q tails, DKL sits in [0.05, 0.30].
     DKL  = round(rng.uniform(0.05, 0.28), 5)
     k    = 1.0
-    # Canonical GROUND stores the log form J_k = G − k·DKL (negative).
-    # Display layer exponentiates to show the ratio exp(J_k) = exp(G)/exp(k·DKL).
-    GROUND = round(G - k * DKL, 8)
 
-    # EV per dollar wagered = p·b + r₀·α(b)·b − q  (size-independent linear EV).
-    # Display-only quantity; not used in canonical ranking (which is J_k above).
+    # Canonical GROUND (2026-05-13+): Γᵢ = Kelly EV · exp(−k·DKL) =
+    # (exp(G) − 1) · exp(−k·DKL). Stored directly as positive fractional
+    # return; display layer renders as +X.XX%. Filter G > 0 (always true
+    # for mock data here, but real ranker enforces).
+    import math as _m
+    kelly_ev = _m.exp(G) - 1.0
+    GROUND   = round(kelly_ev * _m.exp(-k * DKL), 8)
+
+    # EV per dollar wagered = p·b + r₀·α(b)·b − q  (linear, variance-blind).
+    # Display-only diagnostic; not used in canonical ranking.
     b_mock     = net_credit / max_loss if max_loss > 0 else 0.0
     alpha_mock = 0.0 if b_mock >= 1.0 else (b_mock - 1.0) / (2.0 * b_mock)
-    EV         = round(p * b_mock + ro * alpha_mock * b_mock - q, 5)
+    EV         = round(p * b_mock + alpha_mock * b_mock * ro - q, 5)
 
     w_star = round(rng.uniform(0.20, 0.65), 4)
 
