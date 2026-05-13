@@ -766,7 +766,9 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
   <table>
     <thead><tr>
       <th>ticker</th><th>direction</th><th>short / long</th><th>entry</th>
-      <th>credit</th><th>max loss</th><th style="text-align:right">qty</th><th>{score_label}</th>
+      <th>credit</th><th>max loss</th><th style="text-align:right">qty</th>
+      <th style="text-align:right">Kelly EV</th><th style="text-align:right">DKL</th>
+      <th>{score_label}</th>
       <th>expiry</th>
       <th>result</th><th style="text-align:right">P&amp;L</th>
     </tr></thead><tbody>
@@ -785,6 +787,22 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
             pcls = 'pos' if pnl_t >= 0 else 'neg'
             psgn = '+' if pnl_t >= 0 else ''
 
+            # Kelly EV = exp(G) − 1 (the variance-adjusted per-trade growth
+            # signal at Kelly-optimal sizing). DKL is the implied-distribution
+            # divergence from uniform; the entropic discount is exp(−k·DKL).
+            # The displayed Γᵢ is Kelly EV · exp(−k·DKL).
+            try:
+                G_t       = float(t["G"])
+                kelly_ev  = math.exp(G_t) - 1.0
+                kev_str   = f"{kelly_ev*100:+.2f}%"
+                kev_cls   = "pos" if kelly_ev >= 0 else "neg"
+            except (ValueError, TypeError, KeyError):
+                kev_str = "—"; kev_cls = ""
+            try:
+                dkl_str = f"{float(t['DKL']):.4f}"
+            except (ValueError, TypeError, KeyError):
+                dkl_str = "—"
+
             parts.append(f'''      <tr>
         <td class="fw">{t["ticker"]}</td>
         <td><span class="{dclass}">{direction}</span></td>
@@ -793,6 +811,8 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
         <td>${t["net_credit"]:.3f}</td>
         <td>${t["max_loss"]:.3f}</td>
         <td style="text-align:right">{int(t["contracts"]) if pd.notna(t.get("contracts")) else 1}×</td>
+        <td class="{kev_cls}" style="text-align:right">{kev_str}</td>
+        <td style="text-align:right">{dkl_str}</td>
         <td class="{g_cls}"><span class="ground-bar"><span class="ground-bar-fill" style="width:{gpct:.0f}%"></span></span>{g_str}</td>
         <td>${t["expiry_price"]:.2f}</td>
         <td><span class="badge badge-{t["result"]}">{t["result"]}</span></td>
