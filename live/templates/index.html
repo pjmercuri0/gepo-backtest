@@ -72,13 +72,15 @@ function fmtContract(v, dec=0) {
   return "$" + (Number(v) * 100).toFixed(dec);
 }
 // The JSON `GROUND` field holds the additive form J_k = g − k·DKL
-// (typically negative under the canonical k=1 nats config). Display
-// layer exponentiates to show Γᵢ = exp(J_k) = G / exp(k·DKL), which
-// lives in roughly [0.35, 0.95] for canonical-shape spreads. Γᵢ is a
-// dimensionless ratio (wealth multiplier / risk multiplier), not a
-// percentage — render as a plain number. Selection ordering is
-// invariant under exp.
-function fmtGround(v, dec=3) {
+// (negative for ~93% of candidates under the canonical k=1 nats config;
+// the top tail crosses zero). Display layer exponentiates to show
+// Γᵢ = exp(J_k) = G / exp(k·DKL), which lives in roughly [0.7, 1.7]
+// for the selected weekly picks (top picks usually > 1, below-median
+// candidates usually < 1). Γᵢ is a dimensionless ratio (wealth
+// multiplier / risk multiplier), not a percentage — render as a plain
+// 4-decimal number to match the weekly-report format. Selection
+// ordering is invariant under exp.
+function fmtGround(v, dec=4) {
   if (v == null) return "—";
   return Math.exp(Number(v)).toFixed(dec);
 }
