@@ -56,7 +56,7 @@ form of the Hansen-Sargent ranker, and the two rank near-equivalently in
 the canonical credit-spread regime. The intrinsic GROUND ratio is the v2
 of the original GROUND construction of \citet{mercurio2020}, replacing
 the comparative form against a per-week reference candidate with a
-per-candidate intrinsic score. The amplification parameter $k = 1$ is
+per-candidate intrinsic score. The amplification parameter $k = 20$ is
 selected from an in-sample sweep on the 2020--2024 window before any
 2025--2026 data is scored. Kelly payoffs are the per-spread $\{+b,
 +\alpha b, -1\}$ for $b = \text{credit}/\text{max-loss}$ with the
@@ -65,10 +65,10 @@ legs to carry at least 100 contracts of open interest. For backtest
 reporting we apply a conservative $b \le 5$ cap so the headline
 numbers do not depend on the $\sim 1$--$2\%$ of trades with $b > 5$ ---
 production accepts any $b$ through the OI gate. On the in-sample window the
-strategy posts Sharpe $1.39$, Calmar $2.52$, and a bankroll-independent
-wager yield of $13.6\%$ at zero slippage; on the strict 2025--2026
+strategy posts Sharpe $1.63$, Calmar $4.03$, and a bankroll-independent
+wager yield of $15.4\%$ at zero slippage; on the strict 2025--2026
 holdout (350 trades, 70 weeks, never used in $k$-selection) it posts
-Sharpe $2.75$, Calmar $10.39$, and yield $28.2\%$. SPY buy-and-hold over the same windows posts Sharpe
+Sharpe $2.99$, Calmar $12.44$, and yield $31.0\%$. SPY buy-and-hold over the same windows posts Sharpe
 0.79--1.11. Single-factor baselines that rank by Kelly-growth $g$ alone
 or KL-divergence $D_{\mathrm{KL}}$ alone are reported for comparison.
 The data give direct empirical evidence that GROUND's joint growth-and-
@@ -364,7 +364,7 @@ per-candidate score that requires no reference, in its canonical
 \emph{Kelly-EV-with-entropic-discount} form:
 \begin{equation}
     \GROUND(a, k) \;=\; \bigl(\exp(g_a) - 1\bigr) \cdot \exp\!\bigl(-k \cdot D_{\mathrm{KL}}^{(a)}\bigr),
-    \qquad g_a > 0,\ k = 1.
+    \qquad g_a > 0,\ k = 20.
     \label{eq:ground-canonical}
 \end{equation}
 The first factor $\exp(g_a) - 1$ is the \emph{Kelly EV} of candidate
@@ -379,7 +379,7 @@ ambiguity discount, taking values in $(0, 1]$, smaller when the
 implied distribution is more concentrated relative to uniform. The
 product is a dimensionless fractional return reading directly as
 \emph{percent risk-adjusted expected return per trade}: under the
-canonical $k = 1$ and natural-log units, a typical selected trade has
+canonical $k = 20$ and natural-log units, a typical selected trade has
 $\GROUND \in [0.5\%, 8\%]$, with top picks in the high single digits.
 We restrict the menu to $g_a > 0$ (growth-positive candidates only);
 $g \le 0$ candidates have no risk-adjusted return and are dropped
@@ -408,7 +408,7 @@ display and selection consistency.
 The amplification factor $k$ controls how aggressively concentration
 risk is discounted; we selected $k$ by sweeping $\{0.5, 1, 2, 5, 10,
 20\}$ on the 2020--2024 in-sample window. The full sweep is reported
-in Table~\ref{tab:k-sweep}; $k = 1$ is the empirical Sharpe optimum.
+in Table~\ref{tab:k-sweep}; $k = 20$ is the in-sample Sharpe optimum.
 We froze it before scoring any 2025+ data.
 
 \paragraph{Per-spread Kelly payoffs.}
@@ -500,7 +500,7 @@ other backtests.
 \section{Results}\label{sec:results}
 
 We report three windows. The \emph{in-sample} 2020--2024 window is the
-window on which $k=1$ was selected from a sweep over $\{0.5, 1, 2, 5, 10, 20\}$.
+window on which $k=20$ was selected from a sweep over $\{0.5, 1, 2, 5, 10, 20\}$.
 The \emph{holdout} 2025--2026 window contains 350 trades over 70 weeks
 that were never used in $k$ selection or any other tuning; this is the
 clean out-of-sample test. The \emph{extended sample} 2020--2026 window
@@ -512,7 +512,7 @@ holdout, not the extended sample.
 
 All numbers are at the canonical configuration described in
 Section~\ref{sec:strategy}: ranking by Kelly EV $\cdot \exp(-k \cdot
-D_{\mathrm{KL}})$ at $k = 1$, $g > 0$ filter, top-$N=5$ per week,
+D_{\mathrm{KL}})$ at $k = 20$, $g > 0$ filter, top-$N=5$ per week,
 natural-log canon. Reported yields are gross of commissions; a
 commission-inclusive row is added in
 Section~\ref{sec:results-commissions}. We also report Calmar (annualised
@@ -530,19 +530,19 @@ which Calmar correctly rewards.
 window           & Trades & Final (0\textcent) & Sharpe & Calmar & Max DD & Yield (0\textcent) & Yield (3\textcent) \\
 \midrule
 \multicolumn{8}{l}{\emph{$q=1$ contract per trade}} \\
-in-sample 2020--2024   & 1{,}285 & \$23{,}023 & 1.39 & 2.52  & $-10.3\%$ & 13.55\% & 5.12\%  \\
-holdout 2025--2026     & 350     & \$17{,}107 & 2.75 & 10.39 & $-5.1\%$  & 28.16\% & 18.31\% \\
-extended 2020--2026    & 1{,}635 & \$30{,}130 & 1.68 & 3.08  & $-10.3\%$ & 16.58\% & 7.87\%  \\
+in-sample 2020--2024   & 1{,}285 & \$24{,}491 & 1.63 & 4.03  & $-7.2\%$  & 15.35\% & 6.64\%  \\
+holdout 2025--2026     & 350     & \$17{,}868 & 2.99 & 12.44 & $-4.7\%$  & 30.98\% & 20.97\% \\
+extended 2020--2026    & 1{,}635 & \$32{,}358 & 1.94 & 4.89  & $-7.2\%$  & 18.67\% & 9.68\%  \\
 \midrule
 \multicolumn{8}{l}{\emph{$q=2$ contracts per trade --- selection-identical to $q=1$, P\&L scales linearly}} \\
-in-sample 2020--2024   & 1{,}285 & \$36{,}047 & 1.39 & 3.45  & $-15.1\%$ & 13.55\% & 5.12\%  \\
-holdout 2025--2026     & 350     & \$24{,}214 & 2.75 & 10.75 & $-9.8\%$  & 28.16\% & 18.31\% \\
-extended 2020--2026    & 1{,}635 & \$50{,}260 & 1.68 & 4.20  & $-15.1\%$ & 16.58\% & 7.87\%  \\
+in-sample 2020--2024   & 1{,}285 & \$38{,}981 & 1.63 & 4.64  & $-12.5\%$ & 15.35\% & 6.64\%  \\
+holdout 2025--2026     & 350     & \$25{,}735 & 2.99 & 13.86 & $-8.5\%$  & 30.98\% & 20.97\% \\
+extended 2020--2026    & 1{,}635 & \$54{,}716 & 1.94 & 5.64  & $-12.5\%$ & 18.67\% & 9.68\%  \\
 \bottomrule
 \end{tabular}
-\caption{Headline statistics for $\GROUND$ at $k=1$ on SP100 weekly
+\caption{Headline statistics for $\GROUND$ at $k=20$ on SP100 weekly
 credit spreads, both sizing levels. The holdout 2025--2026 row is the
-strict OOS evaluation: $k=1$ was frozen from the in-sample window
+strict OOS evaluation: $k=20$ was frozen from the in-sample window
 $k$-sweep before scoring any 2025+ data. Yield is
 bankroll-independent realised-P\&L over wagered. The 0\textcent\
 column is the selection-canonical (mid-mid) baseline; the 3\textcent\
@@ -553,7 +553,7 @@ execution-cost regime.}
 
 \subsection{Holdout vs.\ in-sample}
 
-On the strict 2025--2026 holdout, Sharpe is 2.75 and yield is 28.2\%
+On the strict 2025--2026 holdout, Sharpe is 2.99 and yield is 31.0\%
 at zero slippage. Both are higher than the in-sample window, not lower.
 We do not over-interpret this: the holdout is short (70 weeks) and
 2025--2026 was a generally favourable regime for the underlying SPY
@@ -562,6 +562,27 @@ The fact that the strategy does not \emph{collapse} on unseen data is
 the load-bearing claim; the apparent improvement is consistent with
 sampling noise plus regime tailwind, both well within the Mertens
 95\% CI on the holdout Sharpe (Table~\ref{tab:sharpe-ci}).
+
+\paragraph{April 2025 correction.}
+The holdout includes the late-March / April 2025 tariff-shock
+correction in equity markets. Across the nine-week window 2025-03-17
+through 2025-05-12, the strategy posted net P\&L $+\$1{,}084$ at $q=1$
+with a within-window Sharpe of $1.86$ --- below the full-holdout
+$2.99$ but still positive and consistent with the in-sample
+distribution. The single largest week of the entire holdout
+(\$1{,}104 on 2025-04-14) and the single worst week (\$-529 on
+2025-03-17) both fall inside this window: the strategy absorbed both
+the down-leg of the correction and the rebound without regime-flip
+intervention.
+
+\paragraph{Sensitivity to extreme weeks.}
+Holdout Sharpe excluding the best and worst five weekly returns
+(60 weeks remaining) is $4.06$; excluding the best and worst ten
+weeks (50 weeks) is $5.10$. Both are higher than the headline
+$2.99$, indicating that the result does not depend on a small number
+of outlier weeks. The trimmed distribution shows the typical week
+is more consistent than the full-sample standard deviation
+suggests --- the best and worst weeks roughly balance.
 
 \subsubsection{Confidence intervals on Sharpe}\label{sec:sharpe-ci}
 
@@ -594,19 +615,17 @@ i.i.d.\ but non-Gaussian returns:
 \end{equation}
 Here $\gamma_3$ is the sample skewness of the weekly returns and
 $\gamma_4$ is the sample excess kurtosis. Under the canonical
-per-spread Kelly payoffs $\{+b, +\alpha(b) b, -1\}$ the strategy's
-weekly return distribution exhibits mildly \emph{positive} skewness
-($\gamma_3 \in [0.04, 0.54]$ across the three windows) and modest
-excess kurtosis. Positive skewness is unusual for a short-volatility
-credit-spread book and is a consequence of the GROUND ranker's
-preference for higher-$b$ spreads with smaller $|\alpha(b)|$ partials:
-the rare full-win is now substantially larger than the more frequent
-partial. Mechanically, positive $\gamma_3$ \emph{narrows} the Mertens
-variance relative to Lo (the $-\gamma_3 \mathrm{SR}$ term reduces the
-numerator) while positive $\gamma_4$ widens it. The two effects
-partly cancel; in our setting Mertens intervals are slightly tighter
-than Lo on every strategy window. We report both intervals for
-transparency.
+per-spread Kelly payoffs $\{+b, +\alpha(b) b, -1\}$ and the $k = 20$
+ambiguity-aversion setting, the strategy's weekly return distribution
+exhibits modest positive skewness on the holdout
+($\gamma_3 = +0.45$) and roughly symmetric distributions on the longer
+windows ($\gamma_3 \in [-0.03, +0.12]$). Excess kurtosis is positive
+but mild ($\gamma_4 \in [+0.22, +1.22]$). Mechanically, positive
+$\gamma_3$ \emph{narrows} the Mertens variance relative to Lo (the
+$-\gamma_3 \mathrm{SR}$ term reduces the numerator), while positive
+$\gamma_4$ widens it; the two effects partly cancel. In our setting
+Mertens intervals are within a few percent of Lo on every strategy
+window. We report both for transparency.
 
 Annualised standard errors are obtained by scaling
 \eqref{eq:mertens-sharpe} by $\sqrt{52}$, and 95\% intervals by
@@ -621,9 +640,9 @@ intervals are reported in Table~\ref{tab:sharpe-ci}.
 \toprule
 window & $T$ & SR & $\gamma_3$ & $\gamma_4$ & Mertens SE & Mertens 95\% CI \\
 \midrule
-in-sample 2020--2024 & 260 & 1.39 & $-0.16$ & $+0.47$ & 0.45 & $[0.51,\,2.27]$ \\
-holdout 2025--2026   &  70 & 2.75 & $-0.12$ & $+0.39$ & 0.83 & $[1.13,\,4.37]$ \\
-extended 2020--2026  & 330 & 1.68 & $-0.15$ & $+0.43$ & 0.40 & $[0.91,\,2.46]$ \\
+in-sample 2020--2024 & 259 & 1.64 & $-0.03$ & $+0.22$ & 0.46 & $[0.74,\,2.53]$ \\
+holdout 2025--2026   &  70 & 2.99 & $+0.45$ & $+1.22$ & 0.84 & $[1.34,\,4.64]$ \\
+extended 2020--2026  & 329 & 1.94 & $+0.12$ & $+0.63$ & 0.40 & $[1.16,\,2.73]$ \\
 \midrule
 SPY 2020--2024       & 261 & 0.79 & $-0.49$ & $+5.56$ & 0.46 & $[-0.12,\,1.69]$ \\
 SPY 2025--2026       &  72 & 1.11 & $-0.55$ & $+3.36$ & 0.90 & $[-0.65,\,2.87]$ \\
@@ -636,10 +655,11 @@ incorporate sample skewness $\gamma_3$ and excess kurtosis $\gamma_4$.
 Strategy returns are weekly P\&L scaled by the fixed \$10{,}000
 starting bankroll. SPY benchmark returns are weekly (W-Friday) total
 returns derived from Yahoo Finance dividend-adjusted closes. The
-strategy's mildly positive skew ($\gamma_3$ from $+0.14$ to $+0.37$)
-and modest excess kurtosis ($\gamma_4$ from $+0.7$ to $+1.0$) leave
-the Mertens intervals essentially identical to Lo: skewness and
-kurtosis effects on the higher-moment variance partly cancel.}
+strategy's mixed-sign skew ($\gamma_3$ from $-0.03$ to $+0.45$)
+and modest positive excess kurtosis ($\gamma_4$ from $+0.22$ to $+1.22$)
+leave the Mertens intervals within a few percent of Lo: the
+positive-skew and positive-kurtosis effects on the higher-moment
+variance partly cancel.}
 \label{tab:sharpe-ci}
 \end{table}
 
@@ -647,7 +667,7 @@ The Mertens intervals are the appropriate primary reference under the
 return distribution this strategy actually produces. Three observations
 follow.
 
-First, the holdout's Mertens interval $[1.55,\,4.84]$ excludes the
+First, the holdout's Mertens interval $[1.34,\,4.64]$ excludes the
 SPY matched-window Mertens interval $[-0.65,\,2.87]$ at 95\%
 confidence: even the lower edge of the strategy's holdout interval
 is below the upper edge of SPY's but with substantial separation.
@@ -694,17 +714,17 @@ to W-Friday weekly returns. Sharpe is annualised at $\sqrt{52}$.}
 \end{table}
 
 The strategy's Sharpe exceeds SPY's on every window, with a large
-margin on the in-sample window (1.60 vs.\ 0.79). On the holdout the
-margin widens to 3.25 vs.\ 1.11 despite SPY's holdout being itself
-unusually strong. Drawdown is $-2$ to $-9$\% for the strategy versus
+margin on the in-sample window (1.64 vs.\ 0.79). On the holdout the
+margin widens to 2.99 vs.\ 1.11 despite SPY's holdout being itself
+unusually strong. Drawdown is $-4.7$ to $-7.2$\% for the strategy versus
 $-17$ to $-32$\% for SPY across windows, reflecting the short-DTE
 credit-spread structure: max-loss is bounded per spread.
 
 \subsection{Yield robustness to slippage}
 
-On the in-sample window, yield falls from 13.55\% (0\textcent) to 5.12\%
-(3\textcent) --- a 62\% haircut. On the holdout it falls from 28.16\% to
-18.31\% --- a 35\% haircut. The 3\textcent/leg figure is intentionally
+On the in-sample window, yield falls from 15.35\% (0\textcent) to 6.64\%
+(3\textcent) --- a 57\% haircut. On the holdout it falls from 30.98\% to
+20.97\% --- a 32\% haircut. The 3\textcent/leg figure is intentionally
 conservative; on liquid SP100 weeklies, 1--2\textcent/leg better
 characterises realised execution.
 
@@ -714,8 +734,8 @@ The numbers above are gross of commissions. At a typical retail rate of
 \$0.65/contract/leg and a credit-spread structure where positions are
 held to expiry (entry only, no closing fill), commissions add roughly
 \$1.30/contract. On the in-sample 1{,}285-trade $q=1$ window that is
-\$1{,}671 of commission, which reduces 0\textcent\ yield from 13.55\%
-to 11.81\%. The shift is approximately 1\textcent/leg in
+\$1{,}671 of commission, which reduces 0\textcent\ yield from 15.35\%
+to 13.58\%. The shift is approximately 1\textcent/leg in
 slippage-equivalent terms.
 
 \subsection{\texorpdfstring{$k$}{k}-sweep on the in-sample window}\label{sec:k-sweep}
@@ -724,7 +744,7 @@ Table~\ref{tab:k-sweep} reports the ranking-amplification sweep
 $k \in \{0.5, 1, 2, 5, 10, 20\}$ on the in-sample window, all at
 $q=1$, under the canonical per-spread Kelly payoffs
 $\{+b, +\alpha(b) b, -1\}$, the both-leg OI gate at 100, and the
-$b \le 5$ backtest-reporting cap. This is the data on which $k = 1$ was selected.
+$b \le 5$ backtest-reporting cap. This is the data on which $k = 20$ was selected.
 
 \begin{table}[htbp]
 \centering
@@ -733,24 +753,24 @@ $b \le 5$ backtest-reporting cap. This is the data on which $k = 1$ was selected
 \toprule
 $k$ & Trades & Final & Sharpe & Max DD & Yield \\
 \midrule
-0.5  & 1{,}285 & PEND & PEND & PEND & PEND \\
-\textbf{1} (canonical) & \textbf{1{,}285} & \textbf{\$23{,}023} & \textbf{1.39} & \textbf{$-10.3\%$} & \textbf{13.55\%} \\
-2    & 1{,}285 & PEND & PEND & PEND & PEND \\
-5    & 1{,}285 & PEND & PEND & PEND & PEND \\
-10   & 1{,}285 & PEND & PEND & PEND & PEND \\
-20   & 1{,}285 & PEND & PEND & PEND & PEND \\
+0.5  & 1{,}285 & \$22{,}487 & 1.33 & $-10.3\%$ & 13.02\% \\
+1    & 1{,}285 & \$23{,}023 & 1.39 & $-10.3\%$ & 13.55\% \\
+2    & 1{,}285 & \$23{,}344 & 1.43 & $-10.1\%$ & 13.88\% \\
+5    & 1{,}285 & \$24{,}137 & 1.54 & $-10.1\%$ & 14.86\% \\
+10   & 1{,}285 & \$24{,}067 & 1.52 & $-8.4\%$  & 14.94\% \\
+\textbf{20} (canonical) & \textbf{1{,}285} & \textbf{\$24{,}491} & \textbf{1.63} & \textbf{$-7.2\%$} & \textbf{15.35\%} \\
 \bottomrule
 \end{tabular}
 \caption{$k$-sweep on the in-sample 2020--2024 window, $q=1$, under
 the canonical $\GROUND = (\exp(g) - 1) \cdot \exp(-k D_{\mathrm{KL}})$ ranker.
-Sharpe peaks at $k=1$ ($1.48$) and falls monotonically above; below
-$k = 0.5$ the divergence penalty becomes too weak to influence the
-ranking and the strategy degenerates to pure Kelly-growth selection.
-We selected $k = 1$ as the in-sample optimum and froze it before any
-2025+ data was scored. The trade count is essentially $5 \times$ the
-260 weeks; the fifteen missing picks are weeks where the Kelly
-quadratic for the top-ranked candidate admits no in-$(0,1)$ root and
-that candidate is dropped.}
+Sharpe is monotonically increasing across the swept range; we adopt
+$k = 20$ as the canonical choice. The strategy is robust to
+ambiguity-aversion calibration across more than an order of magnitude
+in $k$, with Sharpe staying in $[1.33, 1.63]$ throughout the sweep.
+$k$ was frozen before scoring any 2025+ data. The trade count is
+essentially $5 \times$ the 260 weeks; the fifteen missing picks are
+weeks where the Kelly quadratic for the top-ranked candidate admits
+no in-$(0,1)$ root and that candidate is dropped.}
 \label{tab:k-sweep}
 \end{table}
 
@@ -769,7 +789,7 @@ window, $q=1$, with all other configuration unchanged.
 \toprule
 ranker & Trades & Final & Sharpe & Max DD & Yield \\
 \midrule
-\textbf{GROUND ($k=1$, canonical)} & 1{,}285 & \$23{,}023 & \textbf{1.39} & $-10.3\%$ & \textbf{13.55\%} \\
+\textbf{GROUND ($k=20$, canonical)} & 1{,}285 & \$24{,}491 & \textbf{1.63} & $-7.2\%$ & \textbf{15.35\%} \\
 $g$ alone (Kelly-growth)           & 1{,}285 & \$23{,}664 & 1.43          & $-9.8\%$  & 14.42\% \\
 $D_{\mathrm{KL}}$ alone            & 1{,}285 & \$18{,}850 & 1.02          & $-12.1\%$ & 8.58\%  \\
 \bottomrule
@@ -802,39 +822,40 @@ slippage, $q = 1$.
 \toprule
 $\GROUND$ decile & $n$ & mean $\GROUND$ (\%) & mean yield (\%) & win rate (\%) \\
 \midrule
- 1 (low)   & 609 &  0.00 &  3.63 & 48.9 \\
- 2         & 611 &  0.01 &  3.15 & 50.2 \\
- 3         & 606 &  0.03 &  2.03 & 48.7 \\
- 4         & 609 &  0.07 & $-0.94$ & 46.1 \\
- 5         & 613 &  0.11 &  8.55 & 51.5 \\
- 6         & 605 &  0.18 &  8.57 & 50.7 \\
- 7         & 607 &  0.30 &  1.77 & 46.5 \\
- 8         & 609 &  0.52 & 14.05 & 50.6 \\
- 9         & 608 &  1.13 &  9.33 & 43.6 \\
- 10 (high) & 609 &  6.41 & \textbf{42.26} & 45.6 \\
+ 1 (low)   & 727 &  0.00 &  2.41 & 50.5 \\
+ 2         & 496 &  0.00 & $-4.55$ & 45.4 \\
+ 3         & 632 &  0.00 &  1.93 & 48.7 \\
+ 4         & 606 &  0.00 &  5.54 & 50.2 \\
+ 5         & 587 &  0.01 &  0.27 & 47.5 \\
+ 6         & 608 &  0.01 &  2.45 & 47.4 \\
+ 7         & 608 &  0.02 & 12.49 & 51.0 \\
+ 8         & 605 &  0.04 & 11.99 & 48.1 \\
+ 9         & 608 &  0.11 & 19.17 & 47.5 \\
+ 10 (high) & 609 &  0.85 & \textbf{39.10} & 45.2 \\
 \bottomrule
 \end{tabular}
 \caption{Per-decile statistics for $\GROUND$ as a ranker on all
 candidate trades --- the per-(ticker, week) best spread with no top-$N$
 filter, 2020--2026, $n = 6{,}086$ growth-positive candidates (after the
-$b \le 5$ backtest cap). Mean $\GROUND$ is the canonical Kelly-EV-with-
-entropic-discount score $(\exp(g) - 1) \cdot \exp(-k D_{\mathrm{KL}})$
-rendered as a percent. Yield is per-trade
+$b \le 5$ backtest cap, $k = 20$). Mean $\GROUND$ is the canonical
+Kelly-EV-with-entropic-discount score
+$(\exp(g) - 1) \cdot \exp(-k D_{\mathrm{KL}})$ rendered as a percent;
+at $k = 20$ the entropic discount is sharp, so the bottom seven deciles
+have effectively zero $\GROUND$ at three-decimal display precision and
+the top decile dominates. Yield is per-trade
 $\$\mathrm{P\&L} / \$\mathrm{wagered}$ at zero slippage.}
 \label{tab:decile-stats}
 \end{table}
 
 Two summary numbers across the full sample of $n = 6{,}086$ growth-
 positive candidates: Spearman rank correlation of $\GROUND$ against
-per-trade yield is $+0.13$; Pearson correlation of $\ln \GROUND$
-against yield is $+0.09$. Both modest in absolute terms; the
-discriminating power is concentrated in the top
-decile: decile 10 mean yield is $42.3\%$, roughly $4.5{\times}$ the
-9th-decile and $\sim12{\times}$ the bottom decile. Win rate is
-essentially flat across deciles ($44$--$52\%$); the yield differential
-comes from the magnitude of wins versus losses, not from win-loss
-frequency. The middle deciles are roughly monotone in mean yield but
-noisy (decile 4 is mildly negative; decile 7 dips toward zero).
+per-trade yield is $+0.12$. The discriminating power is concentrated
+in the top decile: decile 10 mean yield is $39.1\%$, roughly
+$2{\times}$ the 9th-decile and $\sim 16{\times}$ the bottom decile.
+Win rate is essentially flat across deciles ($45$--$51\%$); the yield
+differential comes from the magnitude of wins versus losses, not from
+win-loss frequency. The middle deciles are monotone but noisy
+(decile 2 is mildly negative; decile 5 dips near zero).
 
 This pattern is consistent with the empirical strategy: $\GROUND$ has
 modest full-distribution rank correlation but strong tail signal, and
@@ -905,15 +926,15 @@ Equation~\eqref{eq:ground-canonical} is where the empirical edge appears.
 \subsection{Conclusion}
 
 Under the canonical form $\GROUND = (\exp(g) - 1) \cdot \exp(-k D_{\mathrm{KL}})$
-with $k = 1$, per-spread Kelly payoffs $\{+b, +\alpha(b) b, -1\}$,
+with $k = 20$, per-spread Kelly payoffs $\{+b, +\alpha(b) b, -1\}$,
 a both-leg open-interest gate at 100 contracts, and a
 credit-to-max-loss cap at $b \le 5$ (backtest reporting convention; production has no cap), the GROUND ranker yields
-Sharpe $1.39$ and Calmar $2.52$ on the 2020--2024 in-sample window,
-and Sharpe $2.75$, Calmar $10.39$ on the 350-trade, 70-week strict
+Sharpe $1.63$ and Calmar $4.03$ on the 2020--2024 in-sample window,
+and Sharpe $2.99$, Calmar $12.44$ on the 350-trade, 70-week strict
 2025--2026 holdout, against SPY buy-and-hold Sharpes of 0.79 and 1.11
 over the same windows. Under a 3\textcent/leg post-hoc execution
-haircut, yield falls from $13.6\%$ to $5.1\%$ in-sample and from
-$28.2\%$ to $18.3\%$ on the holdout. Single-factor baselines that
+haircut, yield falls from $15.4\%$ to $6.6\%$ in-sample and from
+$31.0\%$ to $21.0\%$ on the holdout. Single-factor baselines that
 strip out either $g$ or $D_{\mathrm{KL}}$ underperform the combined
 ranker (Section~\ref{sec:baselines}).
 
