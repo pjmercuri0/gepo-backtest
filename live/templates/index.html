@@ -38,12 +38,11 @@
         <th>p / r₀ / q</th>
         <th>G</th>
         <th>DKL</th>
-        <th>k·DKL</th>
         <th>exp(k·DKL)</th>
         <th>Γᵢ</th>
       </tr>
     </thead>
-    <tbody id="ranked-tbody"><tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
+    <tbody id="ranked-tbody"><tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
   </table>
   </div>
 </div>
@@ -84,16 +83,19 @@ function fmtGround(v, dec=4) {
   if (v == null) return "—";
   return Math.exp(Number(v)).toFixed(dec);
 }
-// k·DKL is the exponent under the canonical Γᵢ = exp(J_k) = G / exp(k·DKL).
-// At k=1, this lives in roughly [0.05, 1.0] for canonical-shape spreads.
-function kdkl(r, k) {
-  if (r == null || r.DKL == null) return null;
-  return Number(r.DKL) * Number(k);
+// Wealth multiplier G = exp(g), where g (the per-trade Kelly log-growth
+// at w*) is the value stored in the JSON `G` field. Rendering as the
+// multiplier (≥1 for growth-positive bets) makes the row read as the
+// canonical formula G / exp(k·DKL) = Γᵢ directly.
+function fmtMultiplier(g, dec=4) {
+  if (g == null) return "—";
+  return Math.exp(Number(g)).toFixed(dec);
 }
+// Entropic risk multiplier denom = exp(k·DKL). At canonical k=1 this
+// equals exp(DKL); kept parametric so a k-sweep can be visualised.
 function denom(r, k) {
-  const v = kdkl(r, k);
-  if (v == null) return null;
-  return Math.exp(v);
+  if (r == null || r.DKL == null) return null;
+  return Math.exp(Number(r.DKL) * Number(k));
 }
 function dirClass(spread_type) {
   if (spread_type === "bull_put") return "dir-bull";
@@ -197,7 +199,7 @@ function renderTopPicks(picks, maxGround, kVal) {
         <thead><tr>
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
           <th>credit ($/sh)</th><th>max-loss ($/sh)</th><th>ratio</th>
-          <th>p</th><th>r₀</th><th>q</th><th>g</th><th>DKL</th><th>k·DKL</th><th>exp(k·DKL)</th><th>Γᵢ</th>
+          <th>p</th><th>r₀</th><th>q</th><th>G</th><th>DKL</th><th>exp(k·DKL)</th><th>Γᵢ</th>
         </tr></thead>
         <tbody><tr>
           <td>${fmtMoney(p.entry_price)}</td>
@@ -210,10 +212,9 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${fmtNum(p.p, 3)}</td>
           <td>${fmtNum(p.ro, 3)}</td>
           <td>${fmtNum(p.q, 3)}</td>
-          <td>${fmtNum(p.G, 4)}</td>
+          <td>${fmtMultiplier(p.G)}</td>
           <td>${fmtNum(p.DKL, 4)}</td>
-          <td>${fmtNum(kdkl(p, kVal), 2)}</td>
-          <td>${fmtNum(denom(p, kVal), 1)}</td>
+          <td>${fmtNum(denom(p, kVal), 4)}</td>
           <td class="fw">${groundBar(p.GROUND, maxGround)}${fmtGround(p.GROUND)}</td>
         </tr></tbody>
       </table></div>
@@ -224,7 +225,7 @@ function renderTopPicks(picks, maxGround, kVal) {
 
 function renderRanked(rows, maxGround, kVal) {
   if (!rows || rows.length === 0) {
-    return `<tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
+    return `<tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
   }
   return rows.map((r, i) => `<tr>
     <td>${i+1}</td>
@@ -237,10 +238,9 @@ function renderRanked(rows, maxGround, kVal) {
     <td>${fmtMoney(r.max_loss)}</td>
     <td>${fmtPct(r.credit_ratio, 0)}</td>
     <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}</td>
-    <td>${fmtNum(r.G, 4)}</td>
-    <td>${fmtNum(r.DKL, 3)}</td>
-    <td>${fmtNum(kdkl(r, kVal), 2)}</td>
-    <td>${fmtNum(denom(r, kVal), 1)}</td>
+    <td>${fmtMultiplier(r.G)}</td>
+    <td>${fmtNum(r.DKL, 4)}</td>
+    <td>${fmtNum(denom(r, kVal), 4)}</td>
     <td class="fw">${groundBar(r.GROUND, maxGround)}${fmtGround(r.GROUND)}</td>
   </tr>`).join("");
 }
