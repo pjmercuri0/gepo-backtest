@@ -131,7 +131,7 @@ function renderParams(cfg) {
   const chips = [
     ["DTE",            `${cfg.DTE_MIN}–${cfg.DTE_MAX}d`],
     ["delta",          `${cfg.DELTA_MIN}–${cfg.DELTA_MAX} (target 0.50)`],
-    ["credit ratio",   `${cfg.MIN_CREDIT_RATIO}–${cfg.MAX_CREDIT_RATIO}`],
+    ["credit ratio",   cfg.MAX_CREDIT_RATIO == null ? `≥ ${cfg.MIN_CREDIT_RATIO}` : `${cfg.MIN_CREDIT_RATIO}–${cfg.MAX_CREDIT_RATIO}`],
     ["max_loss",       `≤ $${cfg.MAX_MAX_LOSS}/share`],
     ["OI",             `≥ ${cfg.MIN_OPEN_INTEREST}`],
     ["ground",         cfg.GROUND_THRESHOLD == null ? "rank-only" : `≥ ${cfg.GROUND_THRESHOLD}`],

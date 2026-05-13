@@ -194,7 +194,10 @@ def _build_payload(when: datetime, n_candidates: int = 30, seed: int = 0,
             "DELTA_MIN":         backtest_config.DELTA_MIN,
             "DELTA_MAX":         backtest_config.DELTA_MAX,
             "MIN_CREDIT_RATIO":  backtest_config.MIN_CREDIT_RATIO,
-            "MAX_CREDIT_RATIO":  backtest_config.MAX_CREDIT_RATIO,
+            "MAX_CREDIT_RATIO":  (
+                None if backtest_config.MAX_CREDIT_RATIO == float("inf")
+                else backtest_config.MAX_CREDIT_RATIO
+            ),
             "MIN_OPEN_INTEREST": backtest_config.MIN_OPEN_INTEREST,
             "MAX_MAX_LOSS":      backtest_config.MAX_MAX_LOSS,
             "GROUND_THRESHOLD":  (
