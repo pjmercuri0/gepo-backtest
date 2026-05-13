@@ -718,12 +718,11 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
         bankroll_mid = max(bankroll_mid + weekly_pnl_mid[d], 0.01)
         bankroll_eow_mid_lookup[d] = bankroll_mid
 
-    # Canonical (2026-05-13+): the stored GROUND value IS the score —
-    # Kelly EV · exp(−k·DKL) = (exp(G) − 1) · exp(−k·DKL). Reads as
-    # "per-trade expected wealth gain after entropic ambiguity discount,"
-    # in fractional return units (multiply by 100 for %). No exp/log
-    # transform needed for display.
-    score_label = "Kelly EV"
+    # Canonical (2026-05-13+): stored GROUND value is Γᵢ, the
+    # risk-adjusted Kelly EV = Kelly EV · exp(−k·DKL) =
+    # (exp(g) − 1) · exp(−k·DKL). Reads as "% per-trade expected wealth
+    # gain after entropic ambiguity discount." No exp/log transform.
+    score_label = "Γᵢ"
 
     for entry_date, week_trades in trades_df.groupby("entry_date"):
         week_trades = week_trades.sort_values("GROUND", ascending=False)

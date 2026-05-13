@@ -40,7 +40,7 @@
         <th>Kelly EV</th>
         <th>DKL</th>
         <th>exp(k·DKL)</th>
-        <th>score</th>
+        <th>Γᵢ</th>
       </tr>
     </thead>
     <tbody id="ranked-tbody"><tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
@@ -71,11 +71,12 @@ function fmtContract(v, dec=0) {
   if (v == null) return "—";
   return "$" + (Number(v) * 100).toFixed(dec);
 }
-// Canonical (2026-05-13+): the JSON `GROUND` field holds Kelly EV ·
-// exp(−k·DKL) = (exp(G) − 1) · exp(−k·DKL) directly — a positive
-// fractional return ("X% expected wealth gain per trade after
-// entropic ambiguity discount"). Render as +X.XX% with sign + color
-// matching pos/neg. Selection is argmax(score).
+// Canonical (2026-05-13+): the JSON `GROUND` field holds Γᵢ — the
+// risk-adjusted Kelly EV = Kelly EV · exp(−k·DKL) =
+// (exp(g) − 1) · exp(−k·DKL) — directly as a positive fractional
+// return. Reads as "% per-trade expected wealth gain after entropic
+// ambiguity discount." Render as +X.XX% with sign + color matching
+// pos/neg. Selection is argmax(Γᵢ).
 function fmtGround(v, dec=2) {
   if (v == null) return "—";
   const x = Number(v) * 100;
@@ -208,7 +209,7 @@ function renderTopPicks(picks, maxGround, kVal) {
         <thead><tr>
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
           <th>credit ($/sh)</th><th>max-loss ($/sh)</th><th>ratio</th>
-          <th>p</th><th>r₀</th><th>q</th><th>G</th><th>Kelly EV</th><th>DKL</th><th>exp(k·DKL)</th><th>score</th>
+          <th>p</th><th>r₀</th><th>q</th><th>G</th><th>Kelly EV</th><th>DKL</th><th>exp(k·DKL)</th><th>Γᵢ (risk-adj)</th>
         </tr></thead>
         <tbody><tr>
           <td>${fmtMoney(p.entry_price)}</td>
