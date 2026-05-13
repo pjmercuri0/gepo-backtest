@@ -35,7 +35,7 @@ RV_LOOKUP     = {}   # {(Symbol, Timestamp): rv_annualized}
 IV_WEIGHT     = 0.5  # weight on IV when blending; (1 - IV_WEIGHT) goes to RV
 USE_SKEW_ADJ  = False
 SKEW_ALPHA    = 0.5  # scale factor for the skew adjustment to p
-DKL_K         = 20.0   # GROUND v3 amplification factor: GROUND = G / 3 ** (DKL_K * DKL)
+DKL_K         = 1.0    # GROUND amplification factor: ln(GROUND) = G − DKL_K · DKL
 RANKING_MODE  = "GROUND"  # "GROUND" | "G_only" | "DKL_only" — for single-factor baselines
 
 
@@ -53,7 +53,13 @@ def score_candidates(candidates: pd.DataFrame,
 
 
 def _score_row(row: pd.Series) -> pd.Series:
-    """Compute (p, q, ro), w*, G, DKL for one candidate. GROUND comes later."""
+    """Compute (p, q, ro), w*, G, DKL for one candidate. GROUND comes later.
+
+    Canonical scoring uses per-spread payoffs:
+        b = net_credit / max_loss
+        α(b) = (b-1) / (2b)   (partial = uniform mean between +b and -1)
+    so the Kelly outcomes are {+b, +αb, −1}.
+    """
 
     key = (row["ticker"], pd.Timestamp(row["entry_date"]))
 
@@ -120,24 +126,57 @@ def _score_row(row: pd.Series) -> pd.Series:
             "w_star": None, "G": None, "DKL": None,
         })
 
-    a = config.ALPHA
-    numer_a      = a*p - a*q - p - q
-    discriminant = numer_a**2 + 4*a*(p - q + a - a*p - a*q)
-
-    if discriminant < 0 or a == 0:
+    # Per-spread payoffs from the actual credit/risk geometry:
+    #   b   = net_credit / max_loss
+    #   α(b)= (b-1) / (2b)   from uniform-in-strikes linear-payoff geometry
+    # so partial-zone P&L per unit at risk averages αb = (b-1)/2 between
+    # +b (at K_short) and -1 (at K_long).
+    nc = float(row["net_credit"])
+    ml = float(row["max_loss"])
+    if ml <= 0 or nc <= 0:
         return pd.Series({
             "p": p, "q": q, "ro": ro, "n_samples": n,
             "w_star": None, "G": None, "DKL": None,
         })
+    b = nc / ml
+    a = 0.0 if b >= 1.0 else (b - 1.0) / (2.0 * b)
 
-    w_star = (numer_a + math.sqrt(discriminant)) / (2.0 * a)
+    # Kelly FOC with outcomes {+b, +αb, −1} → quadratic Aw² + Bw + C = 0.
+    A = -a * b * b
+    B = a * b * b * (p + ro) - b * (p + ro * a + q * (1 + a))
+    C = p * b + ro * a * b - q
+
+    if A == 0:
+        if b == 0:
+            return pd.Series({
+                "p": p, "q": q, "ro": ro, "n_samples": n,
+                "w_star": None, "G": None, "DKL": None,
+            })
+        w_star = (p * b - q) / b
+    else:
+        disc = B * B - 4 * A * C
+        if disc < 0:
+            return pd.Series({
+                "p": p, "q": q, "ro": ro, "n_samples": n,
+                "w_star": None, "G": None, "DKL": None,
+            })
+        s = math.sqrt(disc)
+        r1 = (-B - s) / (2 * A)
+        r2 = (-B + s) / (2 * A)
+        cands = [r for r in (r1, r2) if 0 < r < 1]
+        if not cands:
+            return pd.Series({
+                "p": p, "q": q, "ro": ro, "n_samples": n,
+                "w_star": None, "G": None, "DKL": None,
+            })
+        w_star = cands[0]
     w_star = float(np.clip(w_star, 0.01, 0.99))
 
     def lg(x):
         return math.log(max(x, 1e-10), config.LOG_BASE)
 
-    G = (p  * lg(1.0 + w_star) +
-         ro * lg(1.0 + a * w_star) +
+    G = (p  * lg(1.0 + w_star * b) +
+         ro * lg(1.0 + w_star * a * b) +
          q  * lg(1.0 - w_star))
 
     def h(prob):
@@ -183,9 +222,16 @@ def _compute_ground_for_week(week_df: pd.DataFrame) -> pd.DataFrame:
     DKL_b = valid.loc[ref_idx, "DKL"]
     out.loc[ref_idx, "is_ref_Rb"] = True
 
-    # GROUND v3 (intrinsic): each candidate is scored on its own G and DKL
-    # — "growth divided by risk-concentration": GROUND = G / 3 ** (k * DKL).
-    # Module-level DKL_K is overridable for parameter sweeps (default 20).
+    # Canonical GROUND ratio (2026-05-12 revision):
+    #   GROUND = exp(G) / exp(k · DKL) = exp(G − k · DKL)
+    # which is the entropy-regularized expected utility of
+    # Hansen-Sargent / Maccheroni-Marinacci in multiplicative form. The
+    # numerator is the per-trade wealth multiplier, the denominator is
+    # the entropic risk multiplier. We store the log in the GROUND column
+    # (J_k = G − k · DKL, additive form) for ranking convenience; the
+    # display layer exponentiates to show the ratio. Module-level
+    # DKL_K is the amplification factor (default 1, the in-sample
+    # optimum on the 2020-2024 candidate pool).
     for idx in valid.index:
         G_a   = out.loc[idx, "G"]
         DKL_a = out.loc[idx, "DKL"]
@@ -195,10 +241,9 @@ def _compute_ground_for_week(week_df: pd.DataFrame) -> pd.DataFrame:
             # Lower DKL is preferred → store -DKL so the existing "max" selection works.
             score = -DKL_a
         else:
-            # Base-3 canon: 3-state outcome space (p, q, r), DKL in trits ∈ [0, 1].
-            # Denominator is 3 ** (k · DKL) so units match the log base used for G/DKL.
-            denom = 3.0 ** (DKL_K * DKL_a)
-            score = G_a / denom
+            # Canonical GROUND: store the log (J_k = G - k·DKL).
+            # Selection is argmax J_k = argmax exp(J_k) = argmax GROUND.
+            score = G_a - DKL_K * DKL_a
         out.loc[idx, "GROUND"]   = round(score, 6)
         out.loc[idx, "G_ref"]    = G_b
         out.loc[idx, "DKL_ref"]  = DKL_b

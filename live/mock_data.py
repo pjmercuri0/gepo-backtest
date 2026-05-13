@@ -107,14 +107,15 @@ def _gen_spread(rng: random.Random, ticker: str, spot: float, entry_date: date,
     ro = round(itm_mass - q, 3)
     p  = round(1.0 - q - ro, 3)
 
-    # G in trits (base-3). Realistic empirical range under canonical α=-0.5.
+    # G in nats (natural log). Realistic empirical range under canonical per-spread Kelly.
     G    = round(rng.uniform(0.005, 0.045), 5)
     # DKL from uniform: 1 - H_3(p). For roughly balanced 3-state distros
     # with small p,q tails, DKL sits in [0.05, 0.30].
     DKL  = round(rng.uniform(0.05, 0.28), 5)
-    k    = 20.0
-    # GROUND = G * 3^(-k*DKL). The realistic range is ~1e-6 to 0.01.
-    GROUND = round(G * (3.0 ** (-k * DKL)), 8)
+    k    = 1.0
+    # Canonical GROUND stores the log form J_k = G − k·DKL (negative).
+    # Display layer exponentiates to show the ratio exp(J_k) = exp(G)/exp(k·DKL).
+    GROUND = round(G - k * DKL, 8)
 
     w_star = round(rng.uniform(0.20, 0.65), 4)
 
@@ -181,12 +182,16 @@ def _build_payload(when: datetime, n_candidates: int = 30, seed: int = 0,
             "DELTA_MIN":         backtest_config.DELTA_MIN,
             "DELTA_MAX":         backtest_config.DELTA_MAX,
             "MIN_CREDIT_RATIO":  backtest_config.MIN_CREDIT_RATIO,
+            "MAX_CREDIT_RATIO":  backtest_config.MAX_CREDIT_RATIO,
             "MIN_OPEN_INTEREST": backtest_config.MIN_OPEN_INTEREST,
             "MAX_MAX_LOSS":      backtest_config.MAX_MAX_LOSS,
-            "GROUND_THRESHOLD":  backtest_config.GROUND_THRESHOLD,
+            "GROUND_THRESHOLD":  (
+                None if backtest_config.GROUND_THRESHOLD == float("-inf")
+                else backtest_config.GROUND_THRESHOLD
+            ),
             "TOP_N":             live_config.TOP_N_DISPLAY,
-            "DKL_K":             20.0,
-            "ALPHA":             backtest_config.ALPHA,
+            "DKL_K":             1.0,
+            "ALPHA":             "(b-1)/(2b)",
         },
         "regime":    regime_info,
         "top_picks": top_picks,

@@ -63,11 +63,12 @@ def parse_args():
     p.add_argument("--drift-window",       type=int, default=60,
                    help="Trailing window in business days for per-ticker drift "
                         "estimation. Default: 60.")
-    p.add_argument("--ground-k",           type=float, default=20.0,
-                   help="Amplification factor in GROUND v3 = G / 3 ** (k * DKL). "
-                        "Default: 20. Higher k makes the divergence penalty more "
-                        "aggressive; lower k makes GROUND closer to pure G. "
-                        "k is in trits (log-base-3); see config.LOG_BASE.")
+    p.add_argument("--ground-k",           type=float, default=1.0,
+                   help="Amplification factor in GROUND = exp(G − k·DKL). "
+                        "Default: 1 (canonical, selected from the in-sample "
+                        "J_k sweep). Higher k makes the entropy penalty more "
+                        "aggressive. k is dimensionless when G and DKL are "
+                        "both in nats.")
     p.add_argument("--use-rv-blend",       action="store_true",
                    help="Use IV-RV blended vol in the BS d2 probability "
                         "estimator (σ_eff = w*IV + (1-w)*RV). Captures the "

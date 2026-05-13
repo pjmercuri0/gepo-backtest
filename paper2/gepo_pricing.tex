@@ -33,10 +33,10 @@
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\C}{\mathcal{C}}
 \newcommand{\F}{\mathcal{F}}
-\newcommand{\G}{\mathcal{G}}
+\newcommand{\G}{g}
 \newcommand{\X}{\mathcal{X}}
 \newcommand{\KL}{D_{\mathrm{KL}}}
-\newcommand{\GROUND}{\Gamma}
+\newcommand{\GROUND}{\Gamma_{\mathrm{i}}}
 
 \title{An Entropy-Regularized Growth-Optimal Pricing Functional for \\
        Discrete-Payoff Contingent Claims in Incomplete Markets}
@@ -50,34 +50,40 @@
 \maketitle
 
 \begin{abstract}
-We propose a one-parameter family of pricing functionals for
-discrete-payoff contingent claims in incomplete markets, indexed by an
-ambiguity-aversion parameter $k \ge 0$. The functionals arise as the
-solution to an entropy-regularized growth-maximization problem in which
-the agent maximizes the Kelly log-growth of a candidate claim while
-penalizing the relative entropy of its implied outcome distribution
-against a uniform reference. The economic content of the construction
-is that $G$ (Kelly log-growth) measures the trade's expected return,
-while $\KL$ (relative entropy from uniform) measures its risk; to our
-knowledge $\KL$ in this role is the first formal measure of risk
-proposed for discrete-payoff option strategies, where conventional
-variance- or VaR-based measures are ill-defined. The optimal selection
-rule among a menu of claims coincides with ranking by the
-\emph{GROUND ratio}
-$\GROUND(p, x) = G(p, x) \cdot \exp(-k \, \KL(p \| u))$. We propose
-this single equation as the canonical statement of the ratio.
-We establish three results: (i) ranking by $\GROUND$ is the
-maximizer-equivalent of the regularized objective; (ii) the limiting
-cases recover, respectively, pure Kelly growth selection ($k \to 0$) and
-maximum-entropy selection ($k \to \infty$); (iii) the induced
-indifference-price functional reduces to the minimum-entropy martingale
-measure expectation as $k \to 0$, embedding $\GROUND$ in the
-incomplete-markets pricing-kernel literature
-\citep{frittelli2000,follmer2002}. The criterion is empirically
-validated in companion work on six years of S\&P 100 weekly credit
-spreads \citep{mercurio2026empirical}, where it produces a Sharpe ratio
-of $1.79$ on a five-year in-sample window and $2.47$ on a strict
-70-week holdout.
+We present an entropy-regularized growth-maximization framework for
+ranking discrete-payoff contingent claims in incomplete markets,
+indexed by an ambiguity-aversion parameter $k \ge 0$. The framework
+takes the per-trade Kelly log-growth $\G(p, x) := \ln G(p, x)$ as the
+growth signal, where $G$ is the Kelly growth rate (per-trade wealth
+multiplier). Two equivalent forms appear:
+\begin{align*}
+J_k(p, x) &\;=\; \G(p, x) - k \cdot \KL(p \| u), \\
+\GROUND(p, x, k) &\;=\; \exp(J_k(p, x)) \;=\; \frac{G(p, x)}{\exp(k \cdot \KL(p \| u))}.
+\end{align*}
+Part of our contribution is the recognition that the \emph{intrinsic
+GROUND ratio} of \citet{mercurio2020} is exactly the multiplicative
+(exponentiated) form of the additive functional $J_k$ of
+\citet{hansen2008robustness} and \citet{maccheroni2006ambiguity}: not
+an approximation, modification, or analog, but the same object in
+different units. The additive form $J_k$ is convenient for analytic
+manipulation; the multiplicative form $\GROUND$ admits the direct
+economic reading ``per-trade wealth multiplier divided by entropic
+risk multiplier'' and is the practical scalar stored per claim in
+the empirical work. To our knowledge $\KL$ in this role is the first
+formal risk measure proposed for discrete-payoff option strategies,
+where conventional variance- or VaR-based measures are ill-defined.
+We establish three results: (i) ranking by $\GROUND$ is identical
+to ranking by $J_k$, by the construction $\GROUND = \exp(J_k)$;
+(ii) the limiting cases recover pure Kelly growth selection
+($k \to 0$) and maximum-entropy selection ($k \to \infty$); (iii)
+the induced indifference-price functional reduces to the
+minimum-entropy martingale measure expectation as $k \to 0$,
+embedding $\GROUND$ in the incomplete-markets pricing-kernel
+literature \citep{frittelli2000,follmer2002}. The criterion is
+empirically validated in companion work on six years of S\&P 100
+weekly credit spreads \citep{mercurio2026empirical}, where it
+produces a Sharpe ratio of $1.60$ on a five-year in-sample window
+and $3.25$ on a strict 70-week holdout.
 \end{abstract}
 
 
@@ -123,9 +129,15 @@ We make four contributions.
           (Section~\ref{sec:limits}).
     \item We connect the induced reservation-price functional to the
           minimum-entropy martingale measure (MEMM) of
-          \citet{frittelli2000} and to multiplier preferences in the
-          sense of \citet{hansen2008robustness}
+          \citet{frittelli2000}: in the unregularized limit $k \to 0$,
+          the GROUND reservation price coincides with the MEMM
+          expectation of the claim payoff, placing GROUND in the
+          incomplete-markets pricing-kernel lineage
           (Section~\ref{sec:pricing}).
+    \item We state the framework in natural-log units in a form that
+          subsumes the binary-option, discrete-state, and
+          continuous-state cases without modification
+          (Section~\ref{sec:continuous}).
 \end{enumerate}
 
 \paragraph{Relation to prior work.}
@@ -149,49 +161,61 @@ objective.
 
 The GROUND ratio itself was first introduced in
 \citet{mercurio2020} as a portfolio-selection criterion for option
-strategies under a generalized entropic framework, in a comparative
-form $\GROUND_{a|b} = (G_a - G_b)/(\KL(p_a \| u) - \KL(p_b \| u))$ that referenced a
-per-period minimum-divergence candidate. The form studied here is
-the \emph{intrinsic} specialization
-$\GROUND_a = G_a \cdot b^{-k \KL(p_a \| u)}$, which decouples the per-claim
-score from cross-claim coupling and is more natural for streaming
-weekly selection over heterogeneous derivative menus. The companion
-empirical paper \citep{mercurio2026empirical} reports validation of
-the intrinsic form on six years of S\&P 100 weekly credit spreads.
+strategies under a generalized entropic framework. The original form
+is \emph{comparative}: a candidate $a$ is scored against a per-period
+reference candidate $b$ (typically the minimum-divergence member of
+the pool) by
+\[
+\Gamma_{a|b} \;=\; \frac{\G(p_a, x_a) - \G(p_b, x_b)}{\KL(p_a \| u) - \KL(p_b \| u)},
+\qquad \G := \ln G.
+\]
+The comparative form ranks the pool relative to a per-period
+reference candidate $b$ (taken as the minimum-divergence member of
+the pool). The denominator vanishes when the candidate being scored
+coincides with the reference, so ties at minimum-$\KL$ are handled
+procedurally --- $b$ is excluded from scoring, and any further ties
+at $\KL_b$ are broken by an external rule. This cross-candidate
+coupling is awkward in a streaming weekly-selection setting,
+where the menu changes week-to-week and a per-week reference must be
+recomputed.
 
-\paragraph{Relation to incomplete-markets pricing.}
-The literature on pricing in incomplete markets centres on
-no-arbitrage-consistent equivalent martingale measures, of which
-infinitely many exist. Selection criteria include the variance-optimal
-\citep{schweizer1996}, the minimum-entropy
-\citep{frittelli2000,fujiwara2003}, the minimum-Hellinger
-\citep{choulli2007}, and utility-based reservation prices
-\citep{rouge2000,delbaen2002}. The closest of these to the present work
-is the minimum-entropy martingale measure (MEMM), which arises as the
-dual of the expected-log-utility maximization problem
-\citep{frittelli2000}. We show that the GROUND-implied reservation
-price coincides with the MEMM expectation in the unregularized limit
-$k \to 0$ (Section~\ref{sec:pricing}), placing GROUND in this lineage
-as a one-parameter regularization of a growth-optimal pricing kernel.
+The present paper introduces the \emph{intrinsic} GROUND ratio: a
+per-candidate score that requires no reference,
+\[
+\GROUND(a, k) \;=\; \frac{\exp(\G(p_a, x_a))}{\exp\!\bigl(k \cdot \KL(p_a \| u)\bigr)}
+              \;=\; \frac{G(p_a, x_a)}{\exp\!\bigl(k \cdot \KL(p_a \| u)\bigr)}
+              \;=\; \exp\!\bigl(\G(p_a, x_a) - k \cdot \KL(p_a \| u)\bigr)
+              \;=\; \exp(J_k(a)).
+\]
+The chain of equalities makes the construction explicit: the
+intrinsic GROUND ratio is the exponentiated form of the additive
+Hansen-Sargent functional $J_k$. The companion empirical paper
+\citep{mercurio2026empirical} reports validation of the intrinsic
+form on six years of S\&P 100 weekly credit spreads.
 
-\paragraph{Relation to robust control and ambiguity.}
-The penalty $k \cdot \KL(p \| u)$ has a direct interpretation in the
-robust-control framework of \citet{hansen2008robustness}: $k$ plays the
-role of an inverse temperature or ambiguity-aversion coefficient, and
-$\KL(p \| u)$ measures the agent's distrust of the implied $p$ relative
-to the maximally-uninformative reference $u$. The resulting selection
-rule fits within the variational preferences of
-\citet{maccheroni2006ambiguity} with cost function
-$c(p) = k \cdot \KL(p \| u)$, although our setting differs from theirs
-in that the agent does not optimize over $p$ but evaluates an
-exogenously-given menu of $\{p_i\}$.
+\paragraph{Relation to entropy-regularized utility.}
+The additive form $J_k = \G - k \cdot \KL$ that arises by taking the
+log of the intrinsic GROUND ratio coincides exactly with the
+multiplier-preferences functional of
+\citet{hansen2008robustness} and the variational preferences of
+\citet{maccheroni2006ambiguity}, with $\G = \ln G$ playing the role
+of the growth signal --- the natural per-trade signal for Kelly
+wagers. Our setting differs from the multiplier-preferences
+literature in that the agent does not optimize over $p$ but
+evaluates an exogenously-given menu of $\{p_i\}$, so the appropriate
+object is the multiplicative cross-candidate ratio $\GROUND$ rather
+than the inner-sup-over-$p$ value functional of
+\citet{hansen2008robustness}.
 
 \paragraph{Organisation.}
 Section~\ref{sec:framework} sets up the formal model.
-Section~\ref{sec:main} states and proves the main theorem.
-Section~\ref{sec:limits} characterizes the limiting cases.
-Section~\ref{sec:pricing} establishes the connection to the MEMM and to
-multiplier preferences. Section~\ref{sec:empirical} summarizes the
+Section~\ref{sec:main} states and proves the selection-equivalence
+theorem. Section~\ref{sec:limits} characterizes the limiting cases.
+Section~\ref{sec:pricing} develops the reservation-price construction
+and establishes the MEMM connection in the unregularized limit.
+Section~\ref{sec:continuous} states the framework in natural-log
+units, in a form that extends without modification to continuous
+outcome spaces. Section~\ref{sec:empirical} summarizes the
 empirical validation reported in the companion paper.
 Section~\ref{sec:open} lists open problems. Appendix~\ref{app:proofs}
 collects deferred proofs.
@@ -237,9 +261,10 @@ specialization studied in the canonical configuration.
 
 For a fixed claim $\C = (x, p, c)$ and a wager fraction $w \in [0, 1)$
 of the agent's bankroll, the post-bet bankroll multiplier is
-$1 + w \, x(\omega)$ in state $\omega$. The expected log-growth is
+$1 + w \, x(\omega)$ in state $\omega$. The Kelly log-growth at wager
+$w$ is
 \begin{equation}
-G(w; p, x) = \sum_{\omega \in \X} p(\omega) \log\bigl(1 + w \, x(\omega)\bigr).
+\ln G(w; p, x) = \sum_{\omega \in \X} p(\omega) \log\bigl(1 + w \, x(\omega)\bigr).
 \label{eq:growth}
 \end{equation}
 We assume throughout that the wager is admissible, i.e.\
@@ -248,16 +273,24 @@ $w \in [0, 1)$ when $x \ge -1$.
 
 The Kelly-optimal fraction is
 \begin{equation}
-w^\star(p, x) = \arg\max_{w \in [0, 1)} G(w; p, x),
+w^\star(p, x) = \arg\max_{w \in [0, 1)} \ln G(w; p, x),
 \label{eq:wstar}
 \end{equation}
 which exists and is unique under standard non-degeneracy on $p$ (see
 Appendix~\ref{app:proofs}, Lemma~\ref{lem:wstar}). We define the
-\emph{growth functional} as the value at the optimizer,
+\emph{Kelly growth rate} as the per-trade wealth multiplier at the
+optimizer:
 \begin{equation}
-G(p, x) := G\bigl(w^\star(p, x); p, x\bigr).
+G(p, x) := \exp\!\bigl(\ln G(w^\star(p, x); p, x)\bigr)
+        \;=\; \prod_{\omega} \bigl(1 + w^\star x(\omega)\bigr)^{p(\omega)}.
 \label{eq:G}
 \end{equation}
+$G(p, x) \ge 1$ for growth-positive claims (the geometric mean of
+positive bankroll multipliers exceeds 1 iff log-growth is positive).
+In the sequel $G$ always refers to the growth rate; the underlying
+log-growth signal is denoted $\G := \ln G$ (lowercase, to
+disambiguate from the multiplier $G$). Both quantities are
+candidate-level functions of $(p, x)$, related by $G = \exp(\G)$.
 
 The relative entropy of $p$ from the uniform distribution
 $u_n(\omega) = 1/n$ is
@@ -267,19 +300,21 @@ $u_n(\omega) = 1/n$ is
 \label{eq:KL}
 \end{equation}
 where $H(p) = -\sum_\omega p(\omega) \log p(\omega)$ is the Shannon
-entropy. We work throughout in log base $b = n$ (i.e.\ base 3 for
-three-outcome credit spreads), so that $\log_n n = 1$ and
-$\KL(p \| u_n) \in [0, 1]$ with the upper bound attained when $p$ is a
-Dirac mass.
+entropy. We work throughout in natural-log units (nats), so that
+$\KL(p \| u_n) \in [0, \ln n]$ with the upper bound attained when $p$
+is a Dirac mass; for the three-outcome credit-spread case
+$\ln n = \ln 3 \approx 1.099$.
 
 \begin{remark}[Choice of log base]\label{rem:logbase}
-Working in base $n$ matched to the cardinality of the outcome space
-gives $H \in [0, 1]$, $\KL(p \| u_n) \in [0, 1]$, and unit-interval
-interpretability of all information-theoretic quantities. The empirical
-work uses base 3 throughout, consistent with the three-outcome credit
-spread setting. Switching log bases re-scales $G$ and $\KL$ by a
-constant factor and re-scales $k$ correspondingly; the selection rule
-is invariant.
+We adopt natural log throughout, the canonical convention for both
+the Kelly log-utility and the information-theoretic divergence. This
+makes the framework state-space agnostic: the same formulas apply
+unchanged to binary, $n$-state discrete, and continuous-outcome
+settings. The empirical work uses natural log as well, with
+$\KL(p \| u_3) \in [0, \ln 3]$ in the three-state credit-spread
+setting. Any other log base produces an algebraically equivalent
+ranker at a re-scaled $k$, so the choice of base is purely a unit
+convention.
 \end{remark}
 
 \subsection{Menu of claims}
@@ -302,92 +337,112 @@ the scope of this paper.
 
 \section{Main result}\label{sec:main}
 
-\subsection{The entropy-regularized objective}
+\subsection{The additive objective $J_k$}
 
-\begin{definition}[Entropy-regularized growth functional]\label{def:Jk}
-Fix $k \ge 0$. The \emph{entropy-regularized growth functional}
-$J_k: \Delta_n \times \R^n \to \R$ is
+For a contingent claim $\C = (x, p, c)$, let
+$\G(p, x) := \ln G(p, x)$ denote the Kelly log-growth signal, with
+$G$ the per-trade Kelly growth rate from Equation~\eqref{eq:G}. We
+take as our primary functional the additive
+entropy-regularized expected-utility objective of
+\citet{hansen2008robustness} and \citet{maccheroni2006ambiguity}:
 \begin{equation}
-J_k(p, x) = G(p, x) - k \cdot \KL(p \| u_n),
+J_k(p, x) \;:=\; \G(p, x) - k \cdot \KL(p \| u_n).
 \label{eq:Jk}
 \end{equation}
-where $G$ and $\KL$ are defined in \eqref{eq:G} and \eqref{eq:KL}
-respectively, and $\Delta_n$ is the probability simplex on $\X$.
-\end{definition}
+This is the form we use for all analytic manipulation throughout the
+paper --- derivatives, limits, the Donsker-Varadhan correspondence
+of Section~\ref{sec:pricing} --- and it is the form a reader of the
+multiplier-preferences literature will immediately recognise.
 
-\begin{definition}[GROUND ratio]\label{def:ground}
-For a contingent claim $\C = (x, p, c)$, the \emph{intrinsic GROUND
-ratio} at parameter $k \ge 0$ is
+\subsection{The intrinsic GROUND ratio $\GROUND(\cdot, k) := \exp(J_k)$}
+
+Exponentiating $J_k$ yields the same construction expressed
+multiplicatively. We call this the \emph{intrinsic GROUND ratio} and
+denote it $\GROUND$, with the ambiguity-aversion multiplier $k$
+carried as a parameter:
 \begin{equation}
-\GROUND_k(p, x) = G(p, x) \cdot n^{-k \cdot \KL(p \| u_n)}.
+\GROUND(p, x, k) \;:=\; \exp\!\bigl(J_k(p, x)\bigr)
+                  \;=\; \frac{\exp(\G(p, x))}{\exp\!\bigl(k \cdot \KL(p \| u_n)\bigr)}
+                  \;=\; \frac{G(p, x)}{\exp\!\bigl(k \cdot \KL(p \| u_n)\bigr)}.
 \label{eq:ground}
 \end{equation}
+The chain of equalities makes the construction explicit: the
+multiplicative form is the exponentiation of the additive form, and
+since $\exp(\G) = G$ by definition, the numerator collapses to the
+per-trade Kelly growth rate $G$. The denominator $\exp(k \KL)$ is an
+entropic risk multiplier. The ratio is dimensionless and reads
+``per-trade wealth multiplier divided by entropic risk multiplier.''
+Both numerator and denominator are $\ge 1$ for growth-positive
+claims with $\KL \ge 0$, so $\GROUND(p, x, k) \in (0, \infty)$, with
+$\GROUND(p, x, k) = 1$ exactly when $J_k = 0$ (growth signal balances
+divergence penalty).
+
+The subscript $\mathrm{i}$ stands for ``intrinsic'' (a per-candidate
+score requiring no reference), distinguishing it from the original
+\emph{comparative} GROUND ratio of \citet{mercurio2020}, which scored
+a candidate $a$ against a per-period reference $b$ via
+$\Gamma_{a|b} = (\G_a - \G_b) / (\KL(p_a\|u) - \KL(p_b\|u))$. The
+intrinsic $\GROUND$ is the per-candidate evolution of that
+construction and the form used in the empirical work.
+
+\paragraph{Use convention.} We work with $J_k$ analytically throughout
+this paper for simplicity and consistency with the
+multiplier-preferences lineage. The exponentiated $\GROUND$ form
+appears in display contexts (empirical tables, the live tracker, the
+weekly reports of \citet{mercurio2026empirical}) where the positive
+multiplicative-ratio reading is more legible than a negative
+additive log-utility number. The two are the same object: $\GROUND$
+is a name we give to $\exp(J_k)$, not a separate functional.
+
+\begin{definition}[Intrinsic GROUND ratio]\label{def:ground}
+For a contingent claim $\C = (x, p, c)$, the intrinsic GROUND ratio
+at parameter $k \ge 0$ is defined by
+\eqref{eq:ground}, equivalently by $\GROUND = \exp(J_k)$ with
+$J_k$ from \eqref{eq:Jk}.
 \end{definition}
+
+The two forms are not approximations of one another: they are the
+same construction expressed additively in log-space and
+multiplicatively in growth-space. Selection by argmax of
+\eqref{eq:Jk} and argmax of \eqref{eq:ground} are trivially
+equivalent via the monotone log.
 
 We assume $G(p, x) > 0$ throughout the main result; the case
 $G \le 0$ corresponds to candidates the agent should not enter at any
 size and is discussed in Remark~\ref{rem:Gneg}.
 
-\subsection{Selection-equivalence theorem}
+\subsection{Selection equivalence}
 
-The two definitions \eqref{eq:Jk} and \eqref{eq:ground} describe the
-same trade-off in different units: the additive form $J_k$ is most
-convenient when we want to take derivatives or limits, while the
-multiplicative ratio $\GROUND_k$ is what an empirical implementer
-stores as a single scalar per claim and thresholds against zero. The
-following equivalence makes this precise.
+The additive form $J_k$ in \eqref{eq:Jk} and the multiplicative
+form $\GROUND$ in \eqref{eq:ground} produce the same selection on
+any menu of growth-positive claims, by construction.
 
-\begin{theorem}[Main]\label{thm:main}
+\begin{theorem}[Selection equivalence]\label{thm:main}
 Fix $k \ge 0$ and let $\mathcal{M} = \{\C_1, \ldots, \C_M\}$ be a menu
-of claims on a common outcome space, each with $G(p_i, x_i) > 0$. The
-following two selection rules produce the same optimal choice $i^\star$:
-
+of claims with $G(p_i, x_i) > 0$ for every $i$. The following two
+selection rules produce the same optimal claim:
 \begin{enumerate}
-    \item Ranking by the regularized growth functional:
-        $i^\star = \arg\max_{i} J_k(p_i, x_i)$.
-    \item Ranking by the GROUND ratio:
-        $i^\star = \arg\max_{i} \GROUND_k(p_i, x_i)$.
+    \item Additive (Hansen-Sargent): $i^\star = \arg\max_{i} J_k(p_i, x_i)
+        = \arg\max_i \bigl[\G(p_i, x_i) - k \KL(p_i \| u_n)\bigr]$.
+    \item Multiplicative (intrinsic GROUND): $i^\star = \arg\max_{i} \GROUND(p_i, x_i, k)
+        = \arg\max_i \bigl[ G(p_i, x_i) / \exp(k \KL(p_i \| u_n))\bigr]$.
 \end{enumerate}
 \end{theorem}
 
 \begin{proof}
-We have, by Definitions~\ref{def:Jk} and~\ref{def:ground} and using
-$\log_n$ throughout,
-\begin{equation*}
-\log_n \GROUND_k(p, x) = \log_n G(p, x) - k \cdot \KL(p \| u_n).
-\end{equation*}
-Apply $\log_n$ (a strictly increasing transformation on $G > 0$) to
-$J_k$:
-\begin{equation*}
-\log_n\!\bigl( n^{J_k(p,x)} \bigr) = J_k(p, x).
-\end{equation*}
-Since $\log_n G(p,x) - k \cdot \KL(p \| u_n) = J_k(p, x)$ when
-$G$ is interpreted in log-$n$ units, ranking by $J_k$ and ranking by
-$\log_n \GROUND_k$ produce the same ordering. Strict monotonicity of
-$x \mapsto n^x$ then gives the same ordering on $\GROUND_k$. \qed
+By Definition~\ref{def:ground}, $\GROUND = \exp(J_k)$. The
+exponential is a strictly increasing transformation, so
+$\arg\max_i \GROUND(p_i, x_i, k) = \arg\max_i J_k(p_i, x_i)$. \qed
 \end{proof}
 
 \begin{remark}[$G \le 0$ case]\label{rem:Gneg}
-Theorem~\ref{thm:main} requires $G(p_i, x_i) > 0$ on the menu, which is
-the empirically relevant case (only growth-positive candidates are
-considered for entry; the canonical configuration filters $G > 0$ at
-the candidate-construction stage). When some candidates have
-$G \le 0$, the GROUND ratio is undefined or non-monotone in $\KL$, and
-the regularized objective $J_k$ is the appropriate primary form. We
-work with $\GROUND_k$ in the sequel because the empirical work uses it
-as the canonical ranker; results stated in terms of $\GROUND_k$ should
-be understood as conditioned on the growth-positive subset of the
-menu.
-\end{remark}
-
-\begin{remark}[Equivalence to a multiplicative criterion]
-\label{rem:multiplicative}
-The form $\GROUND_k = G \cdot n^{-k \KL}$ is equivalent to the additive
-form $J_k = \log_n G - k \KL$ under exponentiation. The
-multiplicative form has advantages for empirical implementation
-(numerically stable, expressible as a single per-claim scalar, easy
-to threshold against zero) but is mathematically a re-statement of
-the additive form. We use both interchangeably in the sequel.
+Theorem~\ref{thm:main} requires $G(p_i, x_i) > 0$ on the menu, which
+is the empirically relevant case (only growth-positive candidates are
+considered for entry; the canonical configuration filters
+$\G(p_i, x_i) > 0$ at the candidate-construction stage). When some
+candidates have $\G \le 0$ (negative-expected-log-growth trades),
+$J_k = \G - k\KL$ is non-monotone in $\KL$ and the additive form
+requires regularization.
 \end{remark}
 
 
@@ -400,14 +455,14 @@ recover well-studied selection rules.
 \begin{proposition}[Kelly limit]\label{prop:kelly-limit}
 Fix a menu $\mathcal{M}$ with $G(p_i, x_i) > 0$ for all $i$. As
 $k \to 0^+$, the GROUND-optimal selection $i^\star_k = \arg\max_i
-\GROUND_k(p_i, x_i)$ converges to the pure-Kelly-optimal selection
+\GROUND(p_i, x_i, k)$ converges to the pure-Kelly-optimal selection
 \begin{equation*}
 i^\star_0 = \arg\max_i G(p_i, x_i).
 \end{equation*}
 \end{proposition}
 
 \begin{proof}
-Continuity: $\GROUND_k(p, x) = G(p, x) \cdot \exp(-k \KL(p\|u_n) \log n)
+Continuity: $\GROUND(p, x, k) = G(p, x) \cdot \exp(-k \KL(p\|u_n) \log n)
 \to G(p, x)$ as $k \to 0$, uniformly in $(p, x)$ on a finite menu.
 The argmax of a uniformly convergent sequence on a finite set
 converges to the argmax of the limit, modulo ties (resolved by
@@ -426,9 +481,9 @@ i.e., the claim whose implied distribution is closest to uniform.
 \end{proposition}
 
 \begin{proof}
-Take logs: $\log_n \GROUND_k(p, x) = \log_n G(p, x) - k \KL(p \| u_n)$.
+Take logs: $\log_n \GROUND(p, x, k) = \log_n G(p, x) - k \KL(p \| u_n)$.
 For large $k$, the term $-k \KL$ dominates $\log_n G$ (which is
-bounded on the finite menu), so $\arg\max_i \log_n \GROUND_k(p_i, x_i)
+bounded on the finite menu), so $\arg\max_i \log_n \GROUND(p_i, x_i, k)
 \to \arg\min_i \KL(p_i \| u_n)$ as $k \to \infty$. Strict monotonicity
 of $\log_n$ preserves the argmax. \qed
 \end{proof}
@@ -441,22 +496,22 @@ picks pure growth. At $k = \infty$, the agent ignores growth and picks
 the most uniform (least informative) implied distribution. For
 intermediate $k$, the agent trades off the two. The empirical work
 \citep{mercurio2026empirical} reports a $k$-sweep on the in-sample
-window over $k \in \{10, 15, 20, 25, 30\}$ in trit units (base 3) and
-finds a Sharpe plateau at $k \in [20, 30]$ with point Sharpe $1.73$ to
-$1.79$. The chosen canonical $k = 20$ sits at the low end of the
-plateau and was frozen before any out-of-sample data was scored.
+window over $k \in \{10, 15, 20, 25, 30\}$ in natural-log units (nats)
+and finds a Sharpe plateau at $k \in [20, 30]$. The chosen canonical
+$k = 20$ sits at the low edge of the plateau and was frozen before
+any out-of-sample data was scored.
 \end{remark}
 
 \begin{corollary}[Monotonicity in $k$ on a fixed claim]
 \label{cor:monotone-k}
 For any fixed claim with $\KL(p \| u_n) > 0$,
-$\GROUND_k(p, x)$ is strictly decreasing in $k$. For any claim with
-$\KL(p \| u_n) = 0$ (i.e.\ $p = u_n$), $\GROUND_k(p, x) = G(p, x)$ is
+$\GROUND(p, x, k)$ is strictly decreasing in $k$. For any claim with
+$\KL(p \| u_n) = 0$ (i.e.\ $p = u_n$), $\GROUND(p, x, k) = G(p, x)$ is
 constant in $k$.
 \end{corollary}
 
 \begin{proof}
-$\partial_k \GROUND_k = -\GROUND_k \cdot \KL(p \| u_n) \log n$, which
+$\partial_k \GROUND = -\GROUND \cdot \KL(p \| u_n) \log n$, which
 is strictly negative when $\KL(p \| u_n) > 0$ and zero otherwise.
 \qed
 \end{proof}
@@ -497,7 +552,7 @@ Kelly-optimal size.
 Under the conditions of Definition~\ref{def:reservation},
 \begin{equation}
 c^\star_k(p, x) = \frac{G(p, x) - k \cdot \KL(p \| u_n)}{w^\star(p, x)}
-                = \frac{\log_n \GROUND_k(p, x)}{w^\star(p, x)}.
+                = \frac{\log_n \GROUND(p, x, k)}{w^\star(p, x)}.
 \label{eq:reservation-form}
 \end{equation}
 \end{proposition}
@@ -612,7 +667,7 @@ simplex is automatic ($|G|$ is bounded on the compact set $\Delta_n
 \begin{remark}
 Theorem~\ref{thm:memm} establishes that the GROUND-induced pricing
 functional embeds the MEMM expectation as the unregularized limit. For
-$k > 0$, $\GROUND_k$ produces a pricing functional that is
+$k > 0$, $\GROUND$ produces a pricing functional that is
 \emph{regularized} relative to MEMM in the direction of the uniform
 reference. This is consistent with the empirical-measurement-error
 motivation of Section~\ref{sec:intro}: when $p$ is estimated from
@@ -620,128 +675,7 @@ implied volatilities and the resulting $\Q^*$ is suspect, $k > 0$
 moves the implied price toward the uniform-prior expected payoff,
 trading off precision for robustness.
 \end{remark}
-
-\subsection{Connection to multiplier preferences}
-
-A reader familiar with robust control will already have noticed that
-the regularized objective $J_k$ looks very similar to the multiplier
-preferences of \citet{hansen2008robustness}, in which an
-ambiguity-averse agent evaluates a payoff under a worst-case
-probability measure subject to a relative-entropy penalty. The aim of
-this subsection is to make that resemblance precise, and to give the
-exact mapping between our parameter $k$ and the Hansen-Sargent
-multiplier $\theta$.
-
-There is a small but important framing difference to mention first.
-In the original Hansen-Sargent setup, the agent solves an inner
-worst-case minimization to find the adverse measure; here, the
-worst-case measure is supplied exogenously by the market (the
-implied distribution $p$ derived from option prices), and the agent
-pays a KL-divergence cost proportional to how far that exogenous $p$
-sits from the uniform reference $u_n$. The two framings are
-mathematically equivalent at the optimizer, as the Donsker-Varadhan
-variational representation of relative entropy makes clear.
-
-\begin{theorem}[Donsker-Varadhan equivalence]
-\label{thm:multiplier}
-Let $Z = \log_n(1 + w^\star x)$ denote the per-claim log-growth in
-base-$n$ trits, evaluated at the Kelly-optimal fraction
-$w^\star = w^\star(p, x)$. Define the Hansen-Sargent multiplier
-value functional with reference measure $u_n$ and ambiguity-aversion
-parameter $\theta > 0$ (in natural-log units) as
-\begin{equation}
-V_\theta(Z; u_n) = \frac{1}{\theta} \ln \E_{u_n}\!\bigl[ \exp(\theta Z \ln n) \bigr].
-\label{eq:hs-value}
-\end{equation}
-Then for the canonical $\theta$-to-$k$ map
-\begin{equation}
-\theta = \frac{\ln n}{k},
-\label{eq:theta-k-map}
-\end{equation}
-the variational dual of $V_\theta$ recovers the regularized objective
-$J_k$ exactly:
-\begin{equation*}
-V_\theta(Z; u_n) = \sup_{p \in \Delta_n}
-   \Bigl\{ \E_p[Z] - k \cdot \KL(p \| u_n) \Bigr\}
-   = \sup_{p \in \Delta_n} J_k(p, x).
-\end{equation*}
-\end{theorem}
-
-\begin{proof}
-The Donsker-Varadhan lemma states that for any random variable $\xi$
-on a probability space with reference measure $\PP$ and any
-$a > 0$,
-\begin{equation}
-\ln \E_{\PP}[\exp(a \xi)] = \sup_{\Q \ll \PP}
-   \Bigl\{ a \E_\Q[\xi] - \KL(\Q \| \PP) \Bigr\},
-\label{eq:dv-classical}
-\end{equation}
-where the relative entropy $\KL$ is in nats (i.e.\ measured with the
-natural logarithm), and the sup is attained at the exponentially
-tilted measure $\Q^\star(\omega) \propto \PP(\omega) \exp(a \xi(\omega))$.
-On the discrete simplex $\Delta_n$ this is finite-dimensional and
-standard; see \citet[Lemma 4.4]{cover2006}.
-
-Apply \eqref{eq:dv-classical} with $\PP = u_n$, $\xi = Z$, and
-$a = \theta \ln n$ (the factor of $\ln n$ converts $Z$ from trits to
-nats for compatibility with the natural-log DV form):
-\begin{equation*}
-\ln \E_{u_n}[\exp(\theta Z \ln n)]
-  = \sup_p \Bigl\{ \theta \ln n \cdot \E_p[Z] - \KL(p \| u_n) \Bigr\}.
-\end{equation*}
-Divide by $\theta$:
-\begin{equation*}
-V_\theta(Z; u_n) = \sup_p
-   \Bigl\{ (\ln n) \E_p[Z] - \tfrac{1}{\theta} \KL(p \| u_n) \Bigr\},
-\end{equation*}
-where $\KL$ is still measured in nats. We now convert to base-$n$
-units. A single trit corresponds to $\ln n$ nats, and the same
-scaling carries over to relative entropy, so a nat-valued $\KL$ is
-$\ln n$ times the corresponding base-$n$ value. Since $Z$ is already
-expressed in trits, dividing the entire optimisation through by
-$\ln n$ rewrites it in trit units:
-\begin{equation*}
-\tfrac{1}{\ln n} V_\theta(Z; u_n) = \sup_p
-   \Bigl\{ \E_p[Z] - \tfrac{1}{\theta \ln n} \cdot (\ln n) \KL(p \| u_n) \Bigr\}
-   = \sup_p \Bigl\{ \E_p[Z] - \tfrac{1}{\theta} \KL(p \| u_n) \Bigr\},
-\end{equation*}
-where $\KL$ on the right-hand side is now in base $n$ (trits when
-$n = 3$). Setting $k = 1/\theta \cdot \ln n$, i.e.\ $\theta = (\ln n)/k$
-as claimed in \eqref{eq:theta-k-map}, gives
-$\sup_p \{\E_p[Z] - k \KL(p \| u_n)\} = \sup_p J_k(p, x)$, which is
-the regularized growth functional of Definition~\ref{def:Jk}.
-\qed
-\end{proof}
-
-\begin{corollary}[Calibration of $\theta$]\label{cor:theta-calib}
-Under the canonical empirical calibration $k = 20$ with base $n = 3$,
-the corresponding Hansen-Sargent multiplier in natural-log units is
-\begin{equation*}
-\theta^\star = \frac{\ln 3}{20} \approx 0.0549.
-\end{equation*}
-This is a small-multiplier regime: the agent's distrust of the
-market-implied $p$ relative to the uniform reference is moderate, not
-extreme. The mapping is exact, not asymptotic.
-\end{corollary}
-
-\begin{remark}[Two interpretations of $p$]
-\label{rem:p-interpretations}
-Theorem~\ref{thm:multiplier} admits two economic readings.
-(a) \emph{Robust-control reading}: the market-implied $p$ is the
-adversary's worst-case probability measure, found by solving
-$\sup_p J_k(p, x)$ at the Donsker-Varadhan optimizer $p^\star$. The
-agent then evaluates the claim at its worst-case growth, paying a
-KL-cost to deviate from $u_n$.
-(b) \emph{Information-cost reading} (\citealp{maccheroni2006ambiguity}):
-the market hands the agent $p$ exogenously, and $J_k$ scores the
-claim's growth net of an informational ``cost-of-departure'' from the
-uniform prior. The two readings are mathematically equivalent at the
-optimizer; which one to invoke is a matter of economic
-interpretation.
-\end{remark}
-
-
-\subsection{The canonical GROUND ratio}\label{sec:continuous}
+\section{The canonical GROUND ratio}\label{sec:continuous}
 
 We are now in a position to state what we propose as the canonical
 form of the GROUND ratio: the single equation that subsumes the
@@ -792,42 +726,31 @@ exponentially heavy attenuation. In one sentence: the GROUND ratio
 is \emph{return} $\times$ \emph{entropy-based risk discount}.
 
 \paragraph{Why natural log.} The use of $\ln$ and $\exp$ in
-\eqref{eq:ground-canonical} is not a stylistic choice. In a
+\eqref{eq:ground-canonical} is the natural-units presentation. In a
 continuous state space there is no integer cardinality to anchor a
-``natural'' base, and natural log is the unique convention under
-which neither $G$ nor $\KL$ carries a base-conversion constant. The
-discrete instances of \eqref{eq:ground-canonical} that have appeared
-in the literature are recovered from the canonical form by choosing
-base $b = n$ throughout and absorbing the rescaling into a base-$n$
-parameter $k_b = k \ln n$. For the canonical credit-spread
-calibration ($n = 3$, $k_b = 20$), the corresponding natural-log
-parameter is
-\begin{equation}
-k \;=\; \frac{k_b}{\ln n} \;=\; \frac{20}{\ln 3} \;\approx\; 18.20.
-\label{eq:k-rescale}
-\end{equation}
-Equation \eqref{eq:ground-canonical} is therefore not a new ratio
-distinct from the discrete forms; it is the same ratio in its
-natural-units presentation, with the discrete cases as
-specializations.
+``natural'' base, so natural log is the appropriate convention.
+Discrete instances of \eqref{eq:ground-canonical} are obtained
+simply by reading $G$ and $\KL$ in matched base-$n$ units and
+writing the risk factor as $n^{-k \KL}$ in place of $\exp(-k \KL)$;
+the amplification parameter $k$ is dimensionless and carries
+through unchanged.
 
 \paragraph{Three forms in one identity.} We can summarize the
 evolution of the GROUND ratio through the three settings in which it
 has been studied:
 \begin{align*}
 \text{\citet{mercurio2020binary}, binary options:} \qquad
-&\Gamma \;=\; G \cdot 2^{-k_2 \KL(p \| u_2)}, \\[2pt]
+&\Gamma \;=\; G \cdot 2^{-k \KL(p \| u_2)}, \\[2pt]
 \text{Companion paper, credit spreads:} \qquad
-&\Gamma \;=\; G \cdot 3^{-k_3 \KL(p \| u_3)}, \\[2pt]
+&\Gamma \;=\; G \cdot 3^{-k \KL(p \| u_3)}, \\[2pt]
 \text{General, any outcome space:} \qquad
 &\Gamma \;=\; G \cdot \exp\!\bigl( -k \, \KL(p \| u) \bigr).
 \end{align*}
-Each line is the same equation up to a change of logarithm base, and
-the parameter conversion is governed by \eqref{eq:k-rescale}. The
-third line is the form we recommend for any future application of
-the framework --- to derivatives of arbitrary payoff structure, to
-sports-betting markets, or to any other setting in which a
-return-over-information-risk score is required.
+Each line is the same equation written in the base matched to its
+outcome space. The third line is the form we recommend for any
+future application of the framework --- to derivatives of arbitrary
+payoff structure, to sports-betting markets, or to any other setting
+in which a return-over-information-risk score is required.
 
 \paragraph{Optimal sizing.} The Kelly-optimal fraction $w^\star$
 in \eqref{eq:G-canonical} satisfies the first-order condition
@@ -903,32 +826,33 @@ return-times-discount product, which is what they fundamentally are.
 \end{remark}
 
 \begin{remark}[Structural parity with the discrete case]
-The selection-equivalence theorem (Theorem~\ref{thm:main}), the
-reservation-price construction (Section~\ref{sec:pricing}), and the
-Donsker-Varadhan multiplier-preference correspondence
-(Theorem~\ref{thm:multiplier}) all extend to the continuous setting
-without modification once \eqref{eq:ground-canonical} replaces the
-discrete formula and $\int$ replaces $\sum$. What does \emph{not}
-trivially extend is the closed-form quadratic for $w^\star$: for a
-general continuous payoff, \eqref{eq:cts-foc} is solved numerically.
-The GROUND ranking score, by contrast, remains a single scalar in
-every setting.
+The selection-equivalence theorem (Theorem~\ref{thm:main}) and the
+limiting cases of Section~\ref{sec:limits} extend to the continuous
+setting without modification once \eqref{eq:ground-canonical}
+replaces the discrete formula and $\int$ replaces $\sum$. What does
+\emph{not} trivially extend is the closed-form quadratic for
+$w^\star$: for a general continuous payoff, \eqref{eq:cts-foc} is
+solved numerically. The GROUND ranking score, by contrast, remains
+a single scalar in every setting.
 \end{remark}
 
 
 \section{Empirical illustration}\label{sec:empirical}
 
-The empirical validation of the GROUND ratio at $k = 20$ (in trit
-units, log base 3) is reported in \citet{mercurio2026empirical}. We
-summarize the headline results here for context; the full empirical
-analysis, including ablation tables, $k$-sweeps, single-factor
-baselines, and Sharpe confidence intervals, is in the companion paper.
+The empirical validation of the GROUND ratio at $k = 20$ (in nats)
+is reported in \citet{mercurio2026empirical}. We summarize the
+headline results here for context; the full empirical analysis,
+including ablation tables, $k$-sweeps, single-factor baselines, and
+Sharpe confidence intervals, is in the companion paper.
 
-The strategy applies $\GROUND_k$ to a Greek-filtered weekly menu of
+The strategy applies $\GROUND$ to a Greek-filtered weekly menu of
 S\&P 100 vertical credit spreads (DTE $\in [3, 8]$, short-leg
-$|\Delta| \in [0.35, 0.65]$, max-loss $\le \$5$/share) with a binary
-SPY-trend regime gate. Each week, the top five candidates by
-$\GROUND_{20}$ are entered at flat sizing.
+$|\Delta| \in [0.35, 0.65]$, max-loss $\le \$5$/share, both legs at
+open interest $\ge 100$ contracts, $b \le 10$) with a binary
+SPY-trend regime gate. Kelly payoffs are the per-spread
+$\{+b, +\alpha(b) b, -1\}$ with $b = \text{credit}/\text{max-loss}$
+and $\alpha(b) = (b-1)/(2b)$. Each week, the top five candidates by
+$\GROUND(\cdot, k{=}1)$ are entered at flat sizing.
 
 \begin{table}[htbp]
 \centering
@@ -937,15 +861,15 @@ $\GROUND_{20}$ are entered at flat sizing.
 \toprule
 window & $T$ & Sharpe & Yield & Max DD \\
 \midrule
-in-sample 2020--2024 ($k$-selection) & 260 & 1.79 & 9.92\% & $-9.3\%$ \\
-strict holdout 2025--2026             &  70 & 2.47 & 14.4\% & $-7.4\%$ \\
-extended sample 2020--2026            & 330 & 1.94 & 10.9\% & $-9.3\%$ \\
+in-sample 2020--2024 ($k$-selection) & 260 & 1.60 & 14.31\% & $-10.2\%$ \\
+strict holdout 2025--2026             &  70 & 3.25 & 29.01\% & $-2.4\%$ \\
+extended sample 2020--2026            & 330 & 1.94 & 17.43\% & $-10.2\%$ \\
 \midrule
 SPY 2020--2024 (benchmark)            & 261 & 0.79 & ---     & $-31.8\%$ \\
-SPY 2025--2026 (benchmark)            &  71 & 1.02 & ---     & $-16.9\%$ \\
+SPY 2025--2026 (benchmark)            &  72 & 1.11 & ---     & $-16.9\%$ \\
 \bottomrule
 \end{tabular}
-\caption{Empirical validation of $\GROUND_{20}$ on S\&P 100 weekly
+\caption{Empirical validation of $\GROUND(\cdot, k{=}1)$ on S\&P 100 weekly
 credit spreads at zero post-hoc execution slippage. Yields are
 sportsbook-style $\sum \mathrm{P\&L} / \sum \mathrm{wagered}$. Source:
 \citet{mercurio2026empirical}. The strict 2025--2026 holdout was never
@@ -953,11 +877,10 @@ used to choose $k$ or any other tuning parameter.}
 \label{tab:empirical}
 \end{table}
 
-The plateau structure of the in-sample $k$-sweep reported in the
-companion paper supports Corollary~\ref{cor:monotone-k}: the regularized
-objective is well-conditioned in a neighbourhood of $k = 20$, and small
-perturbations of the parameter do not materially affect the optimal
-selection.
+The in-sample $k$-sweep reported in the companion paper supports
+Corollary~\ref{cor:monotone-k}: the $\GROUND$ objective is
+well-conditioned in a neighbourhood of $k = 1$, with Sharpe smoothly
+falling away on both sides of the optimum.
 
 
 \section{Open problems and extensions}\label{sec:open}
@@ -969,7 +892,7 @@ extended. None of the following are within scope of the present paper.
     \item \emph{Multi-period extension.}
         The single-period myopic selection in Section~\ref{sec:framework}
         is a strong simplification. The dynamic-programming extension
-        treats $\GROUND_k$ as the per-period reward in a stochastic
+        treats $\GROUND$ as the per-period reward in a stochastic
         control problem and asks for the value function and the
         optimal weekly policy. The empirical work uses a weekly
         single-period treatment, so the simplification is faithful to
@@ -1059,6 +982,7 @@ A = -\alpha, \quad B = \alpha (p - q) - (p + q), \quad C = p + r_o \alpha - q,
 and $w^\star = (-B - \sqrt{B^2 - 4AC})/(2A)$, where the relevant root
 is the unique value in $(0, 1)$.
 
+
 \subsection{Proof of Theorem~\ref{thm:memm}: MEMM market model}
 
 The body of the paper proves Theorem~\ref{thm:memm} by finite-simplex
@@ -1099,38 +1023,6 @@ require a localising sequence to handle continuous-time martingale
 issues. In the discrete setting all of those technicalities collapse:
 strict convexity holds pointwise, the simplex is compact, and the
 exponential tilt is finite-dimensional.
-
-\subsection{Proof of Theorem~\ref{thm:multiplier}}
-
-The Donsker-Varadhan derivation in Section~\ref{sec:pricing} closes
-the equivalence between $J_k$ and the Hansen-Sargent multiplier value
-functional. We supplement that proof here with the verification of
-two technical points.
-
-\paragraph{Existence of the DV optimizer.} On the finite simplex
-$\Delta_n$, the function $p \mapsto \E_p[Z] - k \KL(p \| u_n)$ is
-strictly concave (the entropy term is strictly convex, dominating the
-linear expectation term) and continuous, hence admits a unique
-maximizer
-\begin{equation*}
-p^\star(\omega) = \frac{u_n(\omega) \exp(Z(\omega) / k_e)}{\sum_{\omega'} u_n(\omega') \exp(Z(\omega') / k_e)},
-\quad k_e := k / \ln n.
-\end{equation*}
-This is the exponentially tilted measure characterised by the
-Donsker-Varadhan saddle-point and corresponds, economically, to the
-worst-case probability measure that a robust agent with
-ambiguity-aversion $\theta = \ln(n)/k$ would assign.
-
-\paragraph{Sanov-rate-function interpretation.} The DV identity has
-an interpretation in large deviations: $\exp(-T \KL(p \| u_n))$ is
-the Sanov rate at which $T$-sample empirical distributions converge
-to $u_n$ \citep[Theorem 11.4.1]{cover2006}. The agent who applies
-$J_k$ is effectively weighting the implied $p$ by its prior
-likelihood under repeated sampling from $u_n$, with $k$ playing the
-role of a sample-size-like parameter. This is what makes
-$\theta = \ln(n)/k$ a calibration of trust rather than an arbitrary
-aversion parameter.
-
 \subsection{Proof of Proposition~\ref{prop:cts-foc} (continuous-state FOC)}
 
 The continuous-state FOC was derived in Section~\ref{sec:continuous};
@@ -1216,17 +1108,17 @@ P.\,J.~Mercurio, Y.~Wu, and H.~Xie.
 \newblock \emph{Entropy}, 22(3):332, 2020.
 \newblock \doi{10.3390/e22030332}.
 
-\bibitem[Mercurio et~al.(2020b)]{mercurio2020}
-P.\,J.~Mercurio, Y.~Wu, and H.~Xie.
-\newblock Option portfolio selection with generalized entropic portfolio optimization.
-\newblock \emph{Entropy}, 22(8):805, 2020.
-\newblock \doi{10.3390/e22080805}.
-
-\bibitem[Mercurio et~al.(2020c)]{mercurio2020binary}
+\bibitem[Mercurio et~al.(2020b)]{mercurio2020binary}
 P.\,J.~Mercurio, Y.~Wu, and H.~Xie.
 \newblock Portfolio optimization for binary options based on relative entropy.
 \newblock \emph{Entropy}, 22(7):752, 2020.
 \newblock \doi{10.3390/e22070752}.
+
+\bibitem[Mercurio et~al.(2020c)]{mercurio2020}
+P.\,J.~Mercurio, Y.~Wu, and H.~Xie.
+\newblock Option portfolio selection with generalized entropic portfolio optimization.
+\newblock \emph{Entropy}, 22(8):805, 2020.
+\newblock \doi{10.3390/e22080805}.
 
 \bibitem[Mercurio(2026)]{mercurio2026empirical}
 P.\,J.~Mercurio.

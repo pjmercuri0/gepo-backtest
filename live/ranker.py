@@ -56,8 +56,8 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
 
-    # Liquidity gate (canonical: MIN_OPEN_INTEREST = 10). Applied here because
-    # historical CSVs were already filtered; live data is not.
+    # Liquidity gate (canonical: MIN_OPEN_INTEREST = 100). Applied here
+    # because historical CSVs were already filtered; live data is not.
     if "OpenInterest" in df.columns:
         before = len(df)
         df = df[df["OpenInterest"] >= backtest_config.MIN_OPEN_INTEREST]
@@ -148,12 +148,19 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "DELTA_MIN":        backtest_config.DELTA_MIN,
             "DELTA_MAX":        backtest_config.DELTA_MAX,
             "MIN_CREDIT_RATIO": backtest_config.MIN_CREDIT_RATIO,
+            "MAX_CREDIT_RATIO": backtest_config.MAX_CREDIT_RATIO,
             "MIN_OPEN_INTEREST": backtest_config.MIN_OPEN_INTEREST,
             "MAX_MAX_LOSS":     backtest_config.MAX_MAX_LOSS,
-            "GROUND_THRESHOLD": backtest_config.GROUND_THRESHOLD,
+            # -inf canonically means rank-only; emit null so the JSON is
+            # strict (Python's allow_nan=True emits literal Infinity which
+            # the browser's JSON.parse rejects).
+            "GROUND_THRESHOLD": (
+                None if backtest_config.GROUND_THRESHOLD == float("-inf")
+                else backtest_config.GROUND_THRESHOLD
+            ),
             "TOP_N":            live_config.TOP_N_DISPLAY,
-            "DKL_K":            getattr(ground, "DKL_K", 20.0),
-            "ALPHA":            backtest_config.ALPHA,
+            "DKL_K":            getattr(ground, "DKL_K", 1.0),
+            "ALPHA":            "(b-1)/(2b)",
         },
         "regime":    current_regime(),
         "top_picks": [row_to_dict(r) for _, r in top.iterrows()],
