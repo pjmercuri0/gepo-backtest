@@ -78,7 +78,8 @@ the Hansen-Sargent multiplier-preferences functional
 ranker is thus the economically-readable form of the Hansen-Sargent
 ranker --- preserving the theoretical lineage while gaining direct
 interpretation as a per-trade return. To our knowledge $\KL$ in this
-role is the first formal risk measure proposed for discrete-payoff
+role --- as the denominator of a regularized growth-optimal selection
+ratio --- is, to our knowledge, the first formal use proposed for discrete-payoff
 option strategies, where conventional variance- or VaR-based measures
 are ill-defined. We establish three results: (i) the small-$g$
 approximation $\ln \GROUND \approx J_k$ holds within 5\% across the
@@ -131,7 +132,7 @@ We make four contributions.
           (Section~\ref{sec:framework}).
     \item We prove that the optimal selection rule coincides with
           ranking by the \emph{GROUND ratio} $\GROUND = E \cdot \exp(-k \KL)$
-          where $E = \exp(g) - 1$ is the Kelly EV (Theorem~\ref{thm:main},
+          where $E = \exp(g) - 1$ is the Kelly EV (Definition~\ref{def:ground},
           Section~\ref{sec:main}). We also establish the small-$g$
           equivalence $\ln \GROUND \approx J_k = g - k\KL$ to the
           Hansen-Sargent multiplier-preferences functional, preserving
@@ -436,24 +437,20 @@ $\exp(\G) - 1 \approx \G$ to within 5\% across this range, so
 \end{equation}
 where $J_k := \G - k \cdot \KL$ is the multiplier-preferences
 functional of \citet{hansen2008robustness}. \emph{The canonical Kelly-EV
-ranker is, to first order in $\G$, the Hansen-Sargent ranker.} The two
-agree on selection in the canonical regime up to $\sim 7$--$11\%$
-relative Sharpe difference empirically (Table 3 of
-\citet{mercurio2026empirical}); we adopt the Kelly-EV form because its
-display value reads directly as a per-trade return, whereas $J_k$ is
-typically negative (a regularized log-utility, not a return).
+ranker is, to first order in $\G$, the Hansen-Sargent ranker.} We
+adopt the Kelly-EV form because its display value reads directly as
+a per-trade return, whereas $J_k$ is typically negative (a
+regularized log-utility, not a return).
 
 \paragraph{Large-$\G$ regime.}
 For very-positive-edge candidates ($\G \gtrsim 0.5$, rare in the
 canonical credit-spread universe but possible for some top-of-menu
 spreads), $\exp(\G) - 1$ grows faster than $\G$. In this regime the
-Kelly-EV form weights top picks more aggressively than $J_k$. This
-divergence at the tails is the small-quantity-approximation cost of
-the Kelly-EV form. Empirically it produces a ranker that disagrees
-with $J_k$ on roughly half of selected picks but achieves
-near-identical outcomes (slightly lower Sharpe, slightly higher yield,
-slightly smaller drawdown; see Table 3 of
-\citet{mercurio2026empirical}).
+Kelly-EV form weights top picks more aggressively than the linear
+$J_k$ approximation. This divergence at the tails is the
+small-quantity-approximation cost of the Kelly-EV form; the empirical
+work \citep{mercurio2026empirical} reports headline results under the
+Kelly-EV ranker.
 
 \begin{remark}[Working in $J_k$ for analysis]
 For the limit and pricing-functional theorems of
@@ -467,32 +464,39 @@ statements about $J_k$ in those sections apply to the canonical
 $\GROUND$ ranker up to the small-$\G$ approximation.
 \end{remark}
 
-\subsection{Selection equivalence}
+\subsection{Approximate selection equivalence in the small-$\G$ regime}
 
-The additive form $J_k$ in \eqref{eq:Jk} and the multiplicative
-form $\GROUND$ in \eqref{eq:ground} produce the same selection on
-any menu of growth-positive claims, by construction.
+The Hansen-Sargent additive form $J_k = \G - k \cdot \KL$ and the
+canonical Kelly-EV-with-discount form $\GROUND = (\exp(\G) - 1) \cdot
+\exp(-k \KL)$ are not selection-identical in general: $\GROUND \ne
+\exp(J_k)$ exactly (the leading factors $\exp(\G) - 1$ and $\exp(\G)$
+differ by one). They are, however, near-equivalent in the empirically
+relevant small-$\G$ regime, as established in
+Section~\ref{sec:hs-link}.
 
-\begin{theorem}[Selection equivalence]\label{thm:main}
+\begin{remark}[Selection equivalence, small-$\G$]\label{thm:main}
 Fix $k \ge 0$ and let $\mathcal{M} = \{\C_1, \ldots, \C_M\}$ be a menu
-of claims with $G(p_i, x_i) > 0$ for every $i$. The following two
-selection rules produce the same optimal claim:
+of claims with $\G(p_i, x_i) > 0$ for every $i$ and
+$\max_i \G(p_i, x_i) \ll 1$. Then $\exp(\G) - 1 = \G + O(\G^2)$, hence
+\[
+\ln \GROUND(p_i, x_i, k) \;=\; J_k(p_i, x_i) \;+\; O(\G^2),
+\]
+and the two selection rules
 \begin{enumerate}
     \item Additive (Hansen-Sargent): $i^\star = \arg\max_{i} J_k(p_i, x_i)
-        = \arg\max_i \bigl[\G(p_i, x_i) - k \KL(p_i \| u_n)\bigr]$.
-    \item Multiplicative (intrinsic GROUND): $i^\star = \arg\max_{i} \GROUND(p_i, x_i, k)
-        = \arg\max_i \bigl[ G(p_i, x_i) / \exp(k \KL(p_i \| u_n))\bigr]$.
+        = \arg\max_i [\G(p_i, x_i) - k \KL(p_i \| u_n)]$.
+    \item Multiplicative (canonical GROUND): $i^\star = \arg\max_{i} \GROUND(p_i, x_i, k)
+        = \arg\max_i [(\exp(\G_i) - 1) \cdot \exp(-k \KL_i)]$.
 \end{enumerate}
-\end{theorem}
-
-\begin{proof}
-By Definition~\ref{def:ground}, $\GROUND = \exp(J_k)$. The
-exponential is a strictly increasing transformation, so
-$\arg\max_i \GROUND(p_i, x_i, k) = \arg\max_i J_k(p_i, x_i)$. \qed
-\end{proof}
+agree up to a tail-dependent fraction of picks of order $O(\G^2)$ in
+the relative ordering. Empirically on the SP100 credit-spread
+universe with $\G \in [0.001, 0.10]$ nats, the two rules agree on
+$\sim 55\%$ of picks with a $\sim 7$--$11\%$ relative Sharpe gap
+between rankers (\citet{mercurio2026empirical}).
+\end{remark}
 
 \begin{remark}[$G \le 0$ case]\label{rem:Gneg}
-Theorem~\ref{thm:main} requires $G(p_i, x_i) > 0$ on the menu, which
+Remark~\ref{thm:main} requires $\G(p_i, x_i) > 0$ on the menu, which
 is the empirically relevant case (only growth-positive candidates are
 considered for entry; the canonical configuration filters
 $\G(p_i, x_i) > 0$ at the candidate-construction stage). When some
@@ -518,7 +522,7 @@ i^\star_0 = \arg\max_i G(p_i, x_i).
 \end{proposition}
 
 \begin{proof}
-Continuity: $\GROUND(p, x, k) = G(p, x) \cdot \exp(-k \KL(p\|u_n) \log n)
+Continuity: $\GROUND(p, x, k) = (\exp(\G(p, x)) - 1) \cdot \exp(-k \KL(p\|u_n))
 \to G(p, x)$ as $k \to 0$, uniformly in $(p, x)$ on a finite menu.
 The argmax of a uniformly convergent sequence on a finite set
 converges to the argmax of the limit, modulo ties (resolved by
@@ -537,11 +541,11 @@ i.e., the claim whose implied distribution is closest to uniform.
 \end{proposition}
 
 \begin{proof}
-Take logs: $\log_n \GROUND(p, x, k) = \log_n G(p, x) - k \KL(p \| u_n)$.
-For large $k$, the term $-k \KL$ dominates $\log_n G$ (which is
-bounded on the finite menu), so $\arg\max_i \log_n \GROUND(p_i, x_i, k)
-\to \arg\min_i \KL(p_i \| u_n)$ as $k \to \infty$. Strict monotonicity
-of $\log_n$ preserves the argmax. \qed
+Take natural logs: $\ln \GROUND(p, x, k) = \ln(\exp(\G(p,x)) - 1) - k \KL(p \| u_n)$.
+For large $k$, the term $-k \KL$ dominates the bounded first term on
+a finite menu, so $\arg\max_i \ln \GROUND(p_i, x_i, k) \to \arg\min_i
+\KL(p_i \| u_n)$ as $k \to \infty$. Strict monotonicity of $\ln$
+preserves the argmax. \qed
 \end{proof}
 
 \begin{remark}[Interpolation]
@@ -567,7 +571,7 @@ constant in $k$.
 \end{corollary}
 
 \begin{proof}
-$\partial_k \GROUND = -\GROUND \cdot \KL(p \| u_n) \log n$, which
+$\partial_k \GROUND = -\GROUND \cdot \KL(p \| u_n)$, which
 is strictly negative when $\KL(p \| u_n) > 0$ and zero otherwise.
 \qed
 \end{proof}
@@ -591,7 +595,7 @@ the maximum cost $c^\star_k$ at which the agent's regularized
 growth from entering $\C$ at the Kelly-optimal fraction equals the
 no-trade baseline:
 \begin{equation}
-c^\star_k(p, x) = \arg\max_{c} \Bigl\{ J_k(p, x) - c \cdot w^\star(p, x)
+c^\star_k(p, x) \;=\; \sup \Bigl\{ c \ge 0 : J_k(p, x) - c \cdot w^\star(p, x)
     \ge 0 \Bigr\}.
 \label{eq:reservation}
 \end{equation}
@@ -607,8 +611,8 @@ Kelly-optimal size.
 \begin{proposition}[Closed form for reservation price]\label{prop:reservation}
 Under the conditions of Definition~\ref{def:reservation},
 \begin{equation}
-c^\star_k(p, x) = \frac{G(p, x) - k \cdot \KL(p \| u_n)}{w^\star(p, x)}
-                = \frac{\log_n \GROUND(p, x, k)}{w^\star(p, x)}.
+c^\star_k(p, x) \;=\; \frac{\G(p, x) - k \cdot \KL(p \| u_n)}{w^\star(p, x)}
+                \;=\; \frac{J_k(p, x)}{w^\star(p, x)}.
 \label{eq:reservation-form}
 \end{equation}
 \end{proposition}
@@ -693,22 +697,20 @@ constraint is feasible.
 \emph{Step 2: take the $k \to 0$ limit of $c^\star_k$.} From
 Proposition~\ref{prop:reservation},
 \begin{equation*}
-c^\star_k(p, x) = \frac{G(p, x) - k \, \KL(p \| u_n)}{w^\star(p, x)}.
+c^\star_k(p, x) = \frac{\G(p, x) - k \, \KL(p \| u_n)}{w^\star(p, x)}.
 \end{equation*}
-As $k \to 0$, the $-k \KL$ term vanishes and $c^\star_k \to G(p,x)/w^\star$.
-The first-order condition for $w^\star$ at $w \to 0$ is
-$\partial G/\partial w \big|_{w=0} = \E_p[x] \cdot (\ln n)^{-1} = 0$, so
-the small-$w^\star$ regime corresponds to $\E_p[x] \to 0$. Taylor
-expanding $G$ around $w = 0$:
+As $k \to 0$, the $-k \KL$ term vanishes and $c^\star_k \to
+\G(p,x)/w^\star$. The first-order condition for $w^\star$ in the small-bet
+regime gives $\E_p[x] \to 0$ as $w^\star \to 0$. Taylor expanding
+$\G(p,x) = \E_p[\ln(1 + w^\star x)]$ in natural-log units:
 \begin{equation*}
-G(p, x) = w \, \frac{\E_p[x]}{\ln n}
-        - \frac{w^2}{2} \frac{\E_p[x^2]}{\ln n} + O(w^3),
+\G(p, x) \;=\; w^\star \, \E_p[x] \;-\; \frac{(w^\star)^2}{2} \, \E_p[x^2] \;+\; O((w^\star)^3),
 \end{equation*}
-so $G(p,x) / w^\star \to \E_p[x] / \ln n$ as $\E_p[x] \to 0$ (the
+so $\G(p, x) / w^\star \to \E_p[x]$ as $\E_p[x] \to 0$ (the
 denominator $w^\star$ scales linearly with $\E_p[x]$ from the FOC, so
-the ratio is finite and equals $\E_p[x]$ up to the log-base unit
-conversion). In log-base-$n$ units consistent with $c^\star_k$,
-$\lim_{k \to 0^+} c^\star_k(p, x) = \E_p[x]$.
+the ratio is finite and limits to $\E_p[x]$). Hence
+$\lim_{k \to 0^+} c^\star_k(p, x) = \E_p[x]$, in natural-log
+(dimensionless) units consistent with the FOC.
 
 \emph{Step 3: specialize $p = \Q^*$.} Substituting $p = \Q^*$ from
 \eqref{eq:memm-exp-tilt},
@@ -750,10 +752,12 @@ claim with payoff function $x: \X \to \R$. Working throughout in
 natural-logarithm units, we define the \emph{Kelly log-growth
 functional}
 \begin{equation}
-G(p, x) \;=\; \sup_{w \in [0, 1)} \E_p\!\bigl[\ln(1 + w \, x)\bigr],
+\G(p, x) \;=\; \sup_{w \in [0, 1)} \E_p\!\bigl[\ln(1 + w \, x)\bigr],
 \label{eq:G-canonical}
 \end{equation}
-and the \emph{relative entropy from the reference}
+the \emph{Kelly EV} $E(p, x) := \exp(\G(p, x)) - 1$ (the
+variance-adjusted expected wealth gain per trade at Kelly-optimal
+sizing), and the \emph{relative entropy from the reference}
 \begin{equation}
 \KL(p \| u) \;=\; \E_p\!\biggl[\ln \frac{p}{u}\biggr],
 \label{eq:KL-canonical}
@@ -764,49 +768,48 @@ following one-line object, which we propose as the central formula
 of this paper:
 \begin{equation}
 \boxed{\;
-\Gamma(p, x) \;=\; G(p, x) \cdot \exp\!\bigl( -k \, \KL(p \| u) \bigr)
+\GROUND(p, x, k) \;=\; \bigl(\exp(\G(p, x)) - 1\bigr) \cdot \exp\!\bigl( -k \, \KL(p \| u) \bigr)
 \;}
 \label{eq:ground-canonical}
 \end{equation}
 The economic content of \eqref{eq:ground-canonical} reads cleanly
-once one separates the two factors. The leading factor $G(p, x)$ is
-the trade's \emph{expected return}, taken at the Kelly-optimal
-sizing fraction. The multiplicative factor $\exp(-k \KL(p \| u))$ is
-a \emph{risk discount}: it shrinks the score in proportion to how
-far the implied distribution $p$ sits from the maximum-uncertainty
-reference $u$, with the elasticity controlled by the single parameter
-$k$. A trade whose implied distribution is uniform (the
-maximally-uninformative baseline) receives no discount; a trade
-whose distribution is sharply concentrated on one outcome receives
-exponentially heavy attenuation. In one sentence: the GROUND ratio
-is \emph{return} $\times$ \emph{entropy-based risk discount}.
+once one separates the two factors. The leading factor
+$\exp(\G(p,x)) - 1$ is the Kelly EV: the trade's expected wealth gain
+per dollar wagered at Kelly-optimal sizing, variance-adjusted via
+Jensen on the concave log inside $\G$. The multiplicative factor
+$\exp(-k \KL(p \| u))$ is a \emph{risk discount}: it shrinks the score
+in proportion to how far the implied distribution $p$ sits from the
+maximum-uncertainty reference $u$, with the elasticity controlled by
+the single parameter $k$. A trade whose implied distribution is
+uniform (the maximally-uninformative baseline) receives no discount; a
+trade whose distribution is sharply concentrated on one outcome
+receives exponentially heavy attenuation. In one sentence: the GROUND
+ratio is \emph{Kelly EV} $\times$ \emph{entropy-based risk discount}.
 
 \paragraph{Why natural log.} The use of $\ln$ and $\exp$ in
 \eqref{eq:ground-canonical} is the natural-units presentation. In a
 continuous state space there is no integer cardinality to anchor a
 ``natural'' base, so natural log is the appropriate convention.
-Discrete instances of \eqref{eq:ground-canonical} are obtained
-simply by reading $G$ and $\KL$ in matched base-$n$ units and
-writing the risk factor as $n^{-k \KL}$ in place of $\exp(-k \KL)$;
-the amplification parameter $k$ is dimensionless and carries
+Discrete instances are obtained by reading $\G$ and $\KL$ in matched
+units; the amplification parameter $k$ is dimensionless and carries
 through unchanged.
 
-\paragraph{Three forms in one identity.} We can summarize the
-evolution of the GROUND ratio through the three settings in which it
-has been studied:
+\paragraph{Three forms in one identity.} We summarize the evolution
+of the GROUND ratio through the three settings in which it has been
+studied, all in natural-log (nats) units:
 \begin{align*}
 \text{\citet{mercurio2020binary}, binary options:} \qquad
-&\Gamma \;=\; G \cdot 2^{-k \KL(p \| u_2)}, \\[2pt]
+&\GROUND \;=\; (\exp(\G) - 1) \cdot \exp(-k \KL(p \| u_2)), \\[2pt]
 \text{Companion paper, credit spreads:} \qquad
-&\Gamma \;=\; G \cdot 3^{-k \KL(p \| u_3)}, \\[2pt]
+&\GROUND \;=\; (\exp(\G) - 1) \cdot \exp(-k \KL(p \| u_3)), \\[2pt]
 \text{General, any outcome space:} \qquad
-&\Gamma \;=\; G \cdot \exp\!\bigl( -k \, \KL(p \| u) \bigr).
+&\GROUND \;=\; (\exp(\G) - 1) \cdot \exp(-k \KL(p \| u)).
 \end{align*}
-Each line is the same equation written in the base matched to its
-outcome space. The third line is the form we recommend for any
-future application of the framework --- to derivatives of arbitrary
-payoff structure, to sports-betting markets, or to any other setting
-in which a return-over-information-risk score is required.
+Each line is the same equation specialized to its outcome space; only
+the reference $u$ changes. The third line is the form we recommend
+for any future application of the framework --- to derivatives of
+arbitrary payoff structure, to sports-betting markets, or to any other
+setting in which a return-over-information-risk score is required.
 
 \paragraph{Optimal sizing.} The Kelly-optimal fraction $w^\star$
 in \eqref{eq:G-canonical} satisfies the first-order condition
@@ -882,7 +885,7 @@ return-times-discount product, which is what they fundamentally are.
 \end{remark}
 
 \begin{remark}[Structural parity with the discrete case]
-The selection-equivalence theorem (Theorem~\ref{thm:main}) and the
+The approximate selection equivalence (Remark~\ref{thm:main}) and the
 limiting cases of Section~\ref{sec:limits} extend to the continuous
 setting without modification once \eqref{eq:ground-canonical}
 replaces the discrete formula and $\int$ replaces $\sum$. What does
@@ -904,11 +907,11 @@ Sharpe confidence intervals, is in the companion paper.
 The strategy applies $\GROUND$ to a Greek-filtered weekly menu of
 S\&P 100 vertical credit spreads (DTE $\in [3, 8]$, short-leg
 $|\Delta| \in [0.35, 0.65]$, max-loss $\le \$5$/share, both legs at
-open interest $\ge 100$ contracts, $b \le 10$) with a binary
-SPY-trend regime gate. Kelly payoffs are the per-spread
+open interest $\ge 100$ contracts, $b \le 5$ for backtest reporting)
+with a binary SPY-trend regime gate. Kelly payoffs are the per-spread
 $\{+b, +\alpha(b) b, -1\}$ with $b = \text{credit}/\text{max-loss}$
 and $\alpha(b) = (b-1)/(2b)$. Each week, the top five candidates by
-$\GROUND(\cdot, k{=}1)$ are entered at flat sizing.
+$\GROUND(\cdot, k{=}20)$ are entered at flat sizing.
 
 \begin{table}[htbp]
 \centering
@@ -917,15 +920,15 @@ $\GROUND(\cdot, k{=}1)$ are entered at flat sizing.
 \toprule
 window & $T$ & Sharpe & Yield & Max DD \\
 \midrule
-in-sample 2020--2024 ($k$-selection) & 260 & 1.60 & 14.31\% & $-10.2\%$ \\
-strict holdout 2025--2026             &  70 & 3.25 & 29.01\% & $-2.4\%$ \\
-extended sample 2020--2026            & 330 & 1.94 & 17.43\% & $-10.2\%$ \\
+in-sample 2020--2024 ($k$-selection) & 260 & 1.63 & 15.35\% & $-7.2\%$  \\
+strict holdout 2025--2026             &  70 & 2.99 & 30.98\% & $-4.7\%$  \\
+extended sample 2020--2026            & 330 & 1.94 & 18.67\% & $-7.2\%$  \\
 \midrule
 SPY 2020--2024 (benchmark)            & 261 & 0.79 & ---     & $-31.8\%$ \\
 SPY 2025--2026 (benchmark)            &  72 & 1.11 & ---     & $-16.9\%$ \\
 \bottomrule
 \end{tabular}
-\caption{Empirical validation of $\GROUND(\cdot, k{=}1)$ on S\&P 100 weekly
+\caption{Empirical validation of $\GROUND(\cdot, k{=}20)$ on S\&P 100 weekly
 credit spreads at zero post-hoc execution slippage. Yields are
 sportsbook-style $\sum \mathrm{P\&L} / \sum \mathrm{wagered}$. Source:
 \citet{mercurio2026empirical}. The strict 2025--2026 holdout was never
@@ -933,10 +936,14 @@ used to choose $k$ or any other tuning parameter.}
 \label{tab:empirical}
 \end{table}
 
-The in-sample $k$-sweep reported in the companion paper supports
-Corollary~\ref{cor:monotone-k}: the $\GROUND$ objective is
-well-conditioned in a neighbourhood of $k = 1$, with Sharpe smoothly
-falling away on both sides of the optimum.
+The in-sample $k$-sweep reported in the companion paper shows Sharpe
+monotonically increasing across the swept range $k \in \{0.5, 1, 2, 5,
+10, 20\}$; $k = 20$ is the in-sample peak and was frozen before any
+holdout scoring. Corollary~\ref{cor:monotone-k} provides the
+theoretical complement: $\GROUND$ is strictly decreasing in $k$ on any
+single claim with $\KL > 0$, so increasing $k$ shifts the ranking
+toward lower-divergence (more uniform) candidates --- empirically the
+direction that pays.
 
 
 \section{Open problems and extensions}\label{sec:open}
