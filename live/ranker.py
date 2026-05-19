@@ -117,6 +117,11 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
 def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
     """Build the JSON payload consumed by the webapp."""
     snap_time = datetime.now()
+
+    # Ensure qualified column exists (fallback if missing from ranker)
+    if "qualified" not in ranked.columns:
+        ranked["qualified"] = ranked["GROUND"] >= backtest_config.GROUND_THRESHOLD
+
     # Top-N picks (canonical)
     top = ranked.head(live_config.TOP_N_DISPLAY)
     ticker_rows = ranked.head(live_config.TICKER_LIMIT)
