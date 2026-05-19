@@ -83,20 +83,30 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if candidates.empty:
         return pd.DataFrame()
 
-    # Score with GROUND. ground.compute_ground returns a per-row Series of
-    # {p, q, ro, w_star, G, DKL, GROUND, ...}. We apply it row-wise.
-    score_cols = candidates.apply(
-        lambda row: ground.compute_ground(row), axis=1
-    )
-    ranked = pd.concat([candidates, score_cols], axis=1)
+    # Score with GROUND. score_candidates adds {p, q, ro, w_star, G, DKL, EV}
+    # per row; the intrinsic GROUND = E · exp(−k·DKL) is computed directly from
+    # G and DKL on each row (no per-week reference needed under canonical form).
+    scored = ground.score_candidates(candidates)
 
-    # Drop rows where GROUND couldn't be computed (e.g. extreme probabilities).
-    ranked = ranked.dropna(subset=["GROUND"])
+    import math
+    def _intrinsic_ground(row):
+        G = row.get("G")
+        DKL = row.get("DKL")
+        if G is None or pd.isna(G) or DKL is None or pd.isna(DKL):
+            return float("nan")
+        return (math.exp(G) - 1.0) * math.exp(-ground.DKL_K * DKL)
 
-    # Threshold filter (canonical: GROUND_THRESHOLD = 0.0).
-    ranked = ranked[ranked["GROUND"] >= backtest_config.GROUND_THRESHOLD]
+    scored["GROUND"] = scored.apply(_intrinsic_ground, axis=1)
 
-    # Sort by GROUND descending.
+    # Drop rows where GROUND couldn't be computed (e.g. extreme probabilities,
+    # growth-negative candidates).
+    ranked = scored.dropna(subset=["GROUND"])
+
+    # Mark qualified vs below-threshold (canonical: GROUND_THRESHOLD = 0.0010 = 0.10%).
+    # Keep all candidates but tag below-threshold for visual de-emphasis in webapp.
+    ranked["qualified"] = ranked["GROUND"] >= backtest_config.GROUND_THRESHOLD
+
+    # Sort by GROUND descending (qualified first, then below-threshold).
     ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
     return ranked
 
@@ -136,6 +146,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "DKL":              _num(r.get("DKL")),
             "GROUND":           _num(r.get("GROUND")),
             "w_star":           _num(r.get("w_star")),
+            "qualified":        bool(r.get("qualified", True)),
         }
 
     return {
@@ -161,11 +172,12 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             # strict (Python's allow_nan=True emits literal Infinity which
             # the browser's JSON.parse rejects).
             "GROUND_THRESHOLD": (
-                None if backtest_config.GROUND_THRESHOLD == float("-inf")
+                None if (backtest_config.GROUND_THRESHOLD is None or
+                         backtest_config.GROUND_THRESHOLD == float("-inf"))
                 else backtest_config.GROUND_THRESHOLD
             ),
             "TOP_N":            live_config.TOP_N_DISPLAY,
-            "DKL_K":            getattr(ground, "DKL_K", 1.0),
+            "DKL_K":            getattr(ground, "DKL_K", 20.0),
             "ALPHA":            "(b-1)/(2b)",
         },
         "regime":    current_regime(),

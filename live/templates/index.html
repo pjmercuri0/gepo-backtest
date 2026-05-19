@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}GEPO Live — Top 5{% endblock %}
+{% block title %}GEPO Live — Threshold-Qualified Candidates{% endblock %}
 
 {% block content %}
 <h1>
@@ -16,7 +16,7 @@
 
 <div class="ticker-strip" id="ticker-strip">loading ranked candidates...</div>
 
-<div class="section-label" id="top-label">Live top picks (updates every {{ poll_seconds }}s)</div>
+<div class="section-label" id="top-label">Threshold-qualified candidates (Γᵢ ≥ 0.10%, updates every {{ poll_seconds }}s)</div>
 <div id="weekly-totals"></div>
 <div id="top-picks"></div>
 
@@ -100,8 +100,8 @@ function fmtKellyEV(g, dec=2) {
   const cls  = ev >= 0 ? "pos" : "neg";
   return `<span class="${cls}">${sign}${ev.toFixed(dec)}%</span>`;
 }
-// Entropic risk multiplier denom = exp(k·DKL). At canonical k=1 this
-// equals exp(DKL); kept parametric so a k-sweep can be visualised.
+// Entropic risk multiplier denom = exp(k·DKL). At canonical k=20 this
+// is exp(20·DKL); kept parametric so a k-sweep can be visualised.
 function denom(r, k) {
   if (r == null || r.DKL == null) return null;
   return Math.exp(Number(r.DKL) * Number(k));
@@ -238,23 +238,26 @@ function renderRanked(rows, maxGround, kVal) {
   if (!rows || rows.length === 0) {
     return `<tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
   }
-  return rows.map((r, i) => `<tr>
-    <td>${i+1}</td>
-    <td class="fw">${r.ticker}</td>
-    <td class="${dirClass(r.spread_type)}">${dirLabel(r.spread_type)}</td>
-    <td>${fmtMoney(r.short_strike)} / ${fmtMoney(r.long_strike)}</td>
-    <td>${fmtNum(r.short_delta, 2)}</td>
-    <td>${r.DTE ?? "—"}</td>
-    <td>${fmtMoney(r.net_credit)}</td>
-    <td>${fmtMoney(r.max_loss)}</td>
-    <td>${fmtPct(r.credit_ratio, 0)}</td>
-    <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}</td>
-    <td>${fmtMultiplier(r.G)}</td>
-    <td>${fmtKellyEV(r.G)}</td>
-    <td>${fmtNum(r.DKL, 4)}</td>
-    <td>${fmtNum(denom(r, kVal), 4)}</td>
-    <td class="fw">${groundBar(r.GROUND, maxGround)}${fmtGround(r.GROUND)}</td>
-  </tr>`).join("");
+  return rows.map((r, i) => {
+    const rowClass = r.qualified ? "" : " unqualified";
+    return `<tr class="ranked-row${rowClass}">
+      <td>${i+1}</td>
+      <td class="fw">${r.ticker}</td>
+      <td class="${dirClass(r.spread_type)}">${dirLabel(r.spread_type)}</td>
+      <td>${fmtMoney(r.short_strike)} / ${fmtMoney(r.long_strike)}</td>
+      <td>${fmtNum(r.short_delta, 2)}</td>
+      <td>${r.DTE ?? "—"}</td>
+      <td>${fmtMoney(r.net_credit)}</td>
+      <td>${fmtMoney(r.max_loss)}</td>
+      <td>${fmtPct(r.credit_ratio, 0)}</td>
+      <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}</td>
+      <td>${fmtMultiplier(r.G)}</td>
+      <td>${fmtKellyEV(r.G)}</td>
+      <td>${fmtNum(r.DKL, 4)}</td>
+      <td>${fmtNum(denom(r, kVal), 4)}</td>
+      <td class="fw">${groundBar(r.GROUND, maxGround)}${fmtGround(r.GROUND)}</td>
+    </tr>`;
+  }).join("");
 }
 
 async function refreshSpyLive() {
@@ -284,7 +287,7 @@ async function refreshSpyLive() {
             </div>
           </div>
           <div>
-            <div class="week-sub">vs ${d.sma_window}d SMA</div>
+            <div class="week-sub">vs ${d.sma_window}d SMA (as of ${d.sma_as_of || "—"})</div>
             <div class="week-title ${regCls}" style="font-size:14px">
               ${sign(d.live_vs_sma)}${(d.live_vs_sma ?? 0).toFixed(2)}
               (${sign(d.live_vs_sma_pct)}${(d.live_vs_sma_pct ?? 0).toFixed(2)}%)
@@ -310,7 +313,7 @@ function marketOpenNow() {
   // Render the current time in America/New_York then parse back the parts
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
-    weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+    weekday: "short", hour: "2-digit", minute: "2-digit", hour12: true,
   });
   const parts = Object.fromEntries(fmt.formatToParts(now).map(p => [p.type, p.value]));
   const dow = parts.weekday;                          // Mon, Tue, ... Sun
@@ -354,10 +357,16 @@ function renderRegime(r) {
     ? ` · <span class="neg">stale ${r.stale_days}d</span>` : "";
   // as_of is an ISO timestamp ("2026-05-11T14:47:04") when sourced from the
   // live IBKR tick, or a date-only string ("2026-05-11") when from the daily
-  // Yahoo CSV. Render the time only for live, full date for daily.
+  // Yahoo CSV. Render the time only for live (12-hour format), full date for daily.
   let asOfStr = r.as_of || "—";
   if (asOfStr.includes("T")) {
-    asOfStr = asOfStr.slice(0, 10) + " " + asOfStr.slice(11, 16);
+    const isoStr = asOfStr.slice(0, 19);  // "2026-05-11T14:47:04"
+    const dt = new Date(isoStr);
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true,
+    });
+    asOfStr = fmt.format(dt);  // e.g., "May 11, 02:47 PM"
   }
   const src = r.source ? ` · ${r.source}` : "";
   meta.innerHTML = `SPY ${fmtMoney(r.close)} vs ${r.window}d SMA ${fmtMoney(r.sma)}`
@@ -383,7 +392,7 @@ async function refresh() {
     renderRegime(data.regime);
     document.getElementById("params-row").innerHTML = renderParams(data.config);
     document.getElementById("ticker-strip").innerHTML = renderTickerStrip(data.ticker);
-    const kVal = (data.config && data.config.DKL_K) ? data.config.DKL_K : 1;
+    const kVal = (data.config && data.config.DKL_K) ? data.config.DKL_K : 20;
     document.getElementById("weekly-totals").innerHTML = renderWeeklyTotals(data.top_picks);
     document.getElementById("top-picks").innerHTML = renderTopPicks(data.top_picks, maxG, kVal);
     document.getElementById("ranked-tbody").innerHTML = renderRanked(data.ticker, maxG, kVal);
