@@ -108,6 +108,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
 
     # Sort by GROUND descending (qualified first, then below-threshold).
     ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
+    print(f"  qualified: {ranked['qualified'].sum()}/{len(ranked)} above {backtest_config.GROUND_THRESHOLD}", flush=True)
     return ranked
 
 
@@ -146,7 +147,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "DKL":              _num(r.get("DKL")),
             "GROUND":           _num(r.get("GROUND")),
             "w_star":           _num(r.get("w_star")),
-            "qualified":        bool(r.get("qualified", True)),
+            "qualified":        bool(r["qualified"]) if "qualified" in r else True,
         }
 
     return {
