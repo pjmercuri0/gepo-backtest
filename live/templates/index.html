@@ -239,7 +239,8 @@ function renderRanked(rows, maxGround, kVal) {
     return `<tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
   }
   return rows.map((r, i) => {
-    const rowClass = r.qualified ? "" : " unqualified";
+    const rowClass = r.qualified === false ? " unqualified" : "";
+    if (i < 3) console.log(`Row ${i}: GROUND=${r.GROUND}, qualified=${r.qualified}, class=${rowClass}`);
     return `<tr class="ranked-row${rowClass}">
       <td>${i+1}</td>
       <td class="fw">${r.ticker}</td>
