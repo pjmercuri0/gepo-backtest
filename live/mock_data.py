@@ -30,6 +30,11 @@ import config as backtest_config
 from live import live_config
 from live.regime import current_regime
 
+# Canonical k mirror. Source of truth is DKL_K but mock_data is
+# kept self-contained (no import of ground) so it runs on hosts that
+# don't have the full backtest dependency tree.
+DKL_K = 20.0
+
 
 # Plausible spot prices for SP100 names (approximate, May 2026 ballpark).
 UNIVERSE = [
@@ -100,35 +105,83 @@ def _gen_spread(rng: random.Random, ticker: str, spot: float, entry_date: date,
     dte = rng.choice([3, 4, 4, 5, 5, 6, 7])
     expiry = entry_date + timedelta(days=dte)
 
-    # Probability triple (p win, ro partial, q loss). Match the canonical
-    # LOSS_FACTOR=0.6 split on the ITM mass.
-    itm_mass = short_delta            # canonical proxy
-    q  = round(itm_mass * backtest_config.LOSS_FACTOR, 3)
-    ro = round(itm_mass - q, 3)
+    import math as _m
+
+    # Probability triple (p win, ro partial, q loss) via the canonical
+    # delta-arithmetic decomposition, matching ground.py / historical_probs.py:
+    #   p  = 1 − |Δ_short|, q = |Δ_long|, ro = |Δ_short| − |Δ_long|.
+    ld = min(long_delta, short_delta)  # guard against quote inversions
+    q  = round(ld, 3)
+    ro = round(max(0.0, short_delta - ld), 3)
     p  = round(1.0 - q - ro, 3)
 
-    # G in nats (natural log). Realistic empirical range under canonical per-spread Kelly.
-    G    = round(rng.uniform(0.005, 0.045), 5)
-    # DKL from uniform: 1 - H_3(p). For roughly balanced 3-state distros
-    # with small p,q tails, DKL sits in [0.05, 0.30].
-    DKL  = round(rng.uniform(0.05, 0.28), 5)
-    k    = 1.0
+    # Per-spread payoffs and Kelly geometry.
+    b_mock     = net_credit / max_loss if max_loss > 0 else 0.0
+    alpha_mock = (b_mock - 1.0) / (2.0 * b_mock) if 0 < b_mock < 1.0 else 0.0
 
-    # Canonical GROUND (2026-05-13+): Γᵢ = Kelly EV · exp(−k·DKL) =
-    # (exp(G) − 1) · exp(−k·DKL). Stored directly as positive fractional
-    # return; display layer renders as +X.XX%. Filter G > 0 (always true
-    # for mock data here, but real ranker enforces).
-    import math as _m
+    # Kelly-optimal sizing w* and log-growth ℓ(w*) from the canonical
+    # quadratic, mirroring ground.py exactly. The quadratic Aw² + Bw + C
+    # = 0 comes from the FOC d/dw E_p[ln(1 + w·X)] = 0 under outcomes
+    # {+b, +αb, -1} with α = α(b). The unique in-(0,1) root is w*.
+    w_star = None
+    G      = None
+    if 0 < b_mock and 0 < p < 1 and 0 < q < 1 and 0 < ro < 1:
+        A = -alpha_mock * b_mock * b_mock
+        B = (alpha_mock * b_mock * b_mock * (p + ro)
+             - b_mock * (p + ro * alpha_mock + q * (1.0 + alpha_mock)))
+        C = p * b_mock + ro * alpha_mock * b_mock - q
+        if A == 0:
+            if b_mock > 0:
+                w_candidate = (p * b_mock - q) / b_mock
+                if 0 < w_candidate < 1:
+                    w_star = w_candidate
+        else:
+            disc = B * B - 4 * A * C
+            if disc >= 0:
+                s = _m.sqrt(disc)
+                roots = [( -B - s) / (2 * A), (-B + s) / (2 * A)]
+                cands = [r for r in roots if 0 < r < 1]
+                if cands:
+                    w_star = cands[0]
+    if w_star is None:
+        # Degenerate candidate (no admissible root). Fall back to a small
+        # plausible w so the row still has finite display values; the
+        # ranker filters it out via G ≤ 0.
+        w_star = 0.05
+        G = 0.0
+    else:
+        w_star = max(0.01, min(0.99, w_star))
+        # ℓ(w*) = E_p[ln(1 + w*·X)] under the three-outcome payoffs.
+        try:
+            G = (p * _m.log(1.0 + w_star * b_mock)
+                 + ro * _m.log(1.0 + w_star * alpha_mock * b_mock)
+                 + q * _m.log(1.0 - w_star))
+        except ValueError:
+            G = 0.0
+    w_star = round(w_star, 4)
+    G      = round(max(G, 0.0), 5)
+
+    # DKL from uniform u_3 = (1/3, 1/3, 1/3) in nats. Computed exactly
+    # from the displayed (p, ro, q) so the live ticker is internally
+    # consistent: a probability triple close to uniform produces a
+    # small DKL, a sharply concentrated triple produces a large DKL.
+    _u = 1.0 / 3.0
+    DKL = round(
+        sum(x * _m.log(x / _u) for x in (p, ro, q) if x > 0),
+        5,
+    )
+    k = DKL_K  # canonical k = 20 in nats
+
+    # Canonical GROUND (2026-05-13+): Γᵢ = Kelly EV · exp(−k·DKL) where
+    # E := exp(ℓ(w*)) − 1. Under Choice B, g := ln E so Γᵢ = exp(g − k·DKL).
+    # Stored directly as positive fractional return; display layer renders
+    # as +X.XX%. Filter G > 0 ensures E > 0.
     kelly_ev = _m.exp(G) - 1.0
     GROUND   = round(kelly_ev * _m.exp(-k * DKL), 8)
 
     # EV per dollar wagered = p·b + r₀·α(b)·b − q  (linear, variance-blind).
     # Display-only diagnostic; not used in canonical ranking.
-    b_mock     = net_credit / max_loss if max_loss > 0 else 0.0
-    alpha_mock = 0.0 if b_mock >= 1.0 else (b_mock - 1.0) / (2.0 * b_mock)
-    EV         = round(p * b_mock + alpha_mock * b_mock * ro - q, 5)
-
-    w_star = round(rng.uniform(0.20, 0.65), 4)
+    EV = round(p * b_mock + alpha_mock * b_mock * ro - q, 5)
 
     return {
         "ticker":           ticker,
@@ -178,8 +231,11 @@ def _build_payload(when: datetime, n_candidates: int = 30, seed: int = 0,
         picks.append(s)
         used.add(ticker)
 
-    # Sort by GROUND descending and renumber for top picks.
+    # Sort by GROUND descending. Mark qualified vs below-threshold.
     picks.sort(key=lambda r: r["GROUND"], reverse=True)
+    threshold = backtest_config.GROUND_THRESHOLD if backtest_config.GROUND_THRESHOLD not in (None, float("-inf")) else 0.0
+    for p in picks:
+        p["qualified"] = p["GROUND"] >= threshold
     top_picks = picks[:live_config.TOP_N_DISPLAY]
     ticker_rows = picks[:live_config.TICKER_LIMIT]
 
@@ -205,7 +261,7 @@ def _build_payload(when: datetime, n_candidates: int = 30, seed: int = 0,
                 else backtest_config.GROUND_THRESHOLD
             ),
             "TOP_N":             live_config.TOP_N_DISPLAY,
-            "DKL_K":             1.0,
+            "DKL_K":             DKL_K,
             "ALPHA":             "(b-1)/(2b)",
         },
         "regime":    regime_info,
