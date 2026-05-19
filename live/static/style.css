@@ -91,3 +91,5 @@ td.fw { font-weight: 600; }
 .ticker-strip .tick strong { color: #e8e8e8; font-weight: 600; margin-right: 6px; }
 .nav { margin-bottom: 18px; font-size: 13px; }
 .nav a { margin-right: 16px; }
+.ranked-row.unqualified { opacity: 0.45; }
+.ranked-row.unqualified td { color: #666660; }

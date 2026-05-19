@@ -71,13 +71,12 @@ def _weekly_expiries_in_dte_window(today: datetime.date) -> list[str]:
 
 
 def _strike_window(spot: float) -> tuple[float, float]:
-    """Generous strike band around spot (heuristic).
+    """Strike band ±7% around spot (maps to 0.35–0.65 delta range).
 
-    The downstream GROUND ranker filters by AbsDelta; here we just want to
-    over-pull to ensure we catch every delta-eligible strike. ±15% is plenty
-    for short-dated options.
+    Tightened from ±15% to kill far OTM junk while capturing all
+    delta-eligible strikes for canonical strategy.
     """
-    return (0.85 * spot, 1.15 * spot)
+    return (0.93 * spot, 1.07 * spot)
 
 
 # ── Tickers ─────────────────────────────────────────────────────────────────
@@ -159,6 +158,9 @@ def _row_from_ticker(c: Option, t, spot: float, today: datetime.date) -> dict | 
     expiry_date = datetime.strptime(c.lastTradeDateOrContractMonth, "%Y%m%d").date()
     dte = (expiry_date - today).days
 
+    oi_val = t.callOpenInterest or t.putOpenInterest
+    oi = int(oi_val) if pd.notna(oi_val) else 0
+
     return {
         "Symbol":            c.symbol,
         "DataDate":          pd.Timestamp(today),
@@ -172,13 +174,16 @@ def _row_from_ticker(c: Option, t, spot: float, today: datetime.date) -> dict | 
         "AbsDelta":          abs(float(greeks.delta)),
         "UnderlyingPrice":   float(spot),
         "ImpliedVolatility": float(greeks.impliedVol) if greeks.impliedVol is not None else 0.0,
-        "OpenInterest":      int(t.callOpenInterest or t.putOpenInterest or 0),
+        "OpenInterest":      oi,
     }
 
 
 # ── Main entry point ────────────────────────────────────────────────────────
 
-def fetch_snapshot(tickers: list[str], dry_run: bool = False) -> pd.DataFrame:
+def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = None) -> pd.DataFrame:
+    if client_id is None:
+        client_id = live_config.IB_CLIENT_ID
+
     today = datetime.now().date()
     expiry_strs = _weekly_expiries_in_dte_window(today)
     if not expiry_strs:
@@ -188,7 +193,7 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False) -> pd.DataFrame:
 
     ib = IB()
     ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-               clientId=live_config.IB_CLIENT_ID)
+               clientId=client_id)
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
 
     rows: list[dict] = []
@@ -256,13 +261,15 @@ def main() -> int:
                         help="Override the SP100 ticker list (for testing)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Connect + qualify only, skip market data")
+    parser.add_argument("--client-id", type=int, default=None,
+                        help="Override IB client ID (for parallel fetches)")
     args = parser.parse_args()
 
     tickers = _tickers_from_arg(args.tickers)
     print(f"Live fetch: {len(tickers)} tickers, DTE [{backtest_config.DTE_MIN}, "
           f"{backtest_config.DTE_MAX}]", flush=True)
 
-    df = fetch_snapshot(tickers, dry_run=args.dry_run)
+    df = fetch_snapshot(tickers, dry_run=args.dry_run, client_id=args.client_id)
     if df.empty:
         print("no rows fetched; nothing to write", flush=True)
         return 1
