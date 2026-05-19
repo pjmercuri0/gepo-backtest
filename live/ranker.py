@@ -147,7 +147,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "DKL":              _num(r.get("DKL")),
             "GROUND":           _num(r.get("GROUND")),
             "w_star":           _num(r.get("w_star")),
-            "qualified":        bool(r["qualified"]) if "qualified" in r else True,
+            "qualified":        bool(r.get("qualified", True)),
         }
 
     return {
