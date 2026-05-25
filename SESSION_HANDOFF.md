@@ -1,6 +1,6 @@
 # GEPO live-ticker session handoff
 
-**Last updated:** 2026-05-25
+**Last updated:** 2026-05-25 (cron schedule updated end-of-session for delayed-data alignment)
 **Purpose:** Brief a new Claude session on everything that's been done on the GEPO live ticker so it can pick up without losing context. Read this first.
 
 ---
@@ -18,18 +18,23 @@
 ## 2. Current cron (Mac, `crontab -l`)
 
 ```
-40 9-16 * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh
+50 9    * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh
+40 10-16 * * 1-5 /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh
 55 15   * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_drift.sh
 30 16   * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_expire.sh
-40 9-16 * * 5    /Users/mercurio/Downloads/gepo-backtest/live/cron_track_expiring.sh
+50 9    * * 5    /Users/mercurio/Downloads/gepo-backtest/live/cron_track_expiring.sh
+40 10-16 * * 5   /Users/mercurio/Downloads/gepo-backtest/live/cron_track_expiring.sh
 ```
 
-**Cadence:** :40 hourly pull, 15:55 drift (pre-close), 16:30 expire settler, Friday-only 16:40 DTE-0 tracker (track_expiring.sh handles picks that expire today and aren't in the [1,7] fetcher window).
+**Cadence:** first firing at 9:50 (to clear pre-market when reading the 15-min delayed feed — at 9:50 wall-clock the delayed feed serves 9:35 quotes, market has been open 5 min). Then :40 hourly 10-16 for the parallel pull. 15:55 drift (pre-close, reliable fetch). 16:30 expire settler. Friday-only track_expiring follows the same 9:50/10-16:40 split (DTE-0 picks not in the [1,7] fetcher window).
+
+**Why the 9:50 split:** at 9:40 wall-clock the IBKR delayed feed (`IB_MKT_DATA_TYPE=3`, 15-min lag) is serving 9:25 quotes — that's pre-market, options not yet trading. At 9:45 you'd see 9:30 quotes (the literal open — sparse and noisy). At 9:50 you see 9:35 quotes (5 minutes of trading, chain populated).
 
 **History of changes this session:**
 - Original: `45 9-16` parallel pull, `0 10-17` cron_health, `30 16` expire. No drift.
 - 2026-05-22 morning: removed `cron_health` (staleness now visible from History "updated …" timestamp). Extended `cron_track_expiring` from 10-16 → 9-16.
 - 2026-05-22 afternoon: added `cron_drift.sh` at `0 16 * * 1-5`. First run failed (post-close IB fetch returned zero option rows). Tried `3 16`, then `55 15`. Also shifted :45 jobs to :40 to align with the 15-min cadence.
+- 2026-05-25 morning: split the first firing out to 9:50 to align with the 15-min delayed feed; rest of the day stays at :40. Applied to both `cron_parallel.sh` and `cron_track_expiring.sh`.
 
 ---
 
