@@ -1,6 +1,6 @@
 # GEPO live-ticker session handoff
 
-**Last updated:** 2026-05-25 (cron schedule updated end-of-session for delayed-data alignment)
+**Last updated:** 2026-05-26 (live data + simplified `:31` hourly cadence; drift cron removed)
 **Purpose:** Brief a new Claude session on everything that's been done on the GEPO live ticker so it can pick up without losing context. Read this first.
 
 ---
@@ -18,23 +18,31 @@
 ## 2. Current cron (Mac, `crontab -l`)
 
 ```
-50 9    * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh
-40 10-16 * * 1-5 /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh
-55 15   * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_drift.sh
+31 9-16 * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh
 30 16   * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_expire.sh
-50 9    * * 5    /Users/mercurio/Downloads/gepo-backtest/live/cron_track_expiring.sh
-40 10-16 * * 5   /Users/mercurio/Downloads/gepo-backtest/live/cron_track_expiring.sh
+31 9-16 * * 5    /Users/mercurio/Downloads/gepo-backtest/live/cron_track_expiring.sh
 ```
 
-**Cadence:** first firing at 9:50 (to clear pre-market when reading the 15-min delayed feed — at 9:50 wall-clock the delayed feed serves 9:35 quotes, market has been open 5 min). Then :40 hourly 10-16 for the parallel pull. 15:55 drift (pre-close, reliable fetch). 16:30 expire settler. Friday-only track_expiring follows the same 9:50/10-16:40 split (DTE-0 picks not in the [1,7] fetcher window).
+**Cadence (live-data version, simplified 2026-05-26 evening):**
+- **9:31 → 16:31** — uniform hourly cron_parallel.sh firings at :31
+- **15:31** — the daily selection freeze happens inside this firing (gated on `hour=15` inside pull_now_parallel.sh)
+- **16:30** — expire settler. Note this fires 1 min before the 16:31 hourly pull. cron_expire takes ~15s (just Stock fetches), so they sequence safely.
+- **Friday DTE-0 tracking:** track_expiring.sh fires hourly at :31 (9-16). Same cadence as the regular pull but uses clientId 202 to avoid collision with cron_parallel's 100-109.
+- **No drift cron.** With live data, signal time = market time. The drift's "second pass to capture fresher prices" rationale no longer applies — selection happens once at 15:31 with current real-time data.
 
-**Why the 9:50 split:** at 9:40 wall-clock the IBKR delayed feed (`IB_MKT_DATA_TYPE=3`, 15-min lag) is serving 9:25 quotes — that's pre-market, options not yet trading. At 9:45 you'd see 9:30 quotes (the literal open — sparse and noisy). At 9:50 you see 9:35 quotes (5 minutes of trading, chain populated).
+**Freeze gate (`pull_now_parallel.sh`):** `hour == 15 && ! -e $FROZEN_OUT`. With only one cron_parallel firing per hour at :31, the hour=15 check unambiguously identifies the 15:31 firing. File-exists guard makes the step idempotent for manual reruns.
+
+**Why this works with live data:** with `IB_MKT_DATA_TYPE = 1` (live, set 2026-05-26 after confirming the user has Snapshot Bundle + OPRA Streaming Add-On), signal time = market time. No more 15-min lag, so the morning cron can fire at 9:31 instead of waiting until 9:50 for delayed-data alignment.
+
+**Removed:** `cron_drift.sh` and `drift_frozen.py` are still on disk for reference but no longer scheduled. `live_config.DRIFT_AT` is set to `None`. If you re-add drift later, restore both the cron entry and `DRIFT_AT`.
 
 **History of changes this session:**
-- Original: `45 9-16` parallel pull, `0 10-17` cron_health, `30 16` expire. No drift.
+- Original: `45 9-16` parallel pull, `0 10-17` cron_health, `30 16` expire. No drift. Delayed data (`IB_MKT_DATA_TYPE=3`).
 - 2026-05-22 morning: removed `cron_health` (staleness now visible from History "updated …" timestamp). Extended `cron_track_expiring` from 10-16 → 9-16.
-- 2026-05-22 afternoon: added `cron_drift.sh` at `0 16 * * 1-5`. First run failed (post-close IB fetch returned zero option rows). Tried `3 16`, then `55 15`. Also shifted :45 jobs to :40 to align with the 15-min cadence.
-- 2026-05-25 morning: split the first firing out to 9:50 to align with the 15-min delayed feed; rest of the day stays at :40. Applied to both `cron_parallel.sh` and `cron_track_expiring.sh`.
+- 2026-05-22 afternoon: added `cron_drift.sh` at `0 16 * * 1-5`. First run failed (post-close IB fetch returned zero option rows). Tried `3 16`, then `55 15`. Also shifted :45 jobs to :40 to align with the 15-min delayed-data cadence.
+- 2026-05-25 morning: split the first firing out to 9:50 to align with the delayed feed; rest of the day stays at :40. Applied to both `cron_parallel.sh` and `cron_track_expiring.sh`.
+- 2026-05-26 afternoon: **freeze double-fire bug discovered** — both 15:40 cron_parallel and 15:55 cron_drift were calling the freeze step (hour=15 gate fired on both), and the 15:55 call clobbered the real 15:40 selection. Patched: added file-exists guard so first writer wins. Also incremented error counter to 39.
+- 2026-05-26 evening: **switched to live data** — verified user has Snapshot Bundle ($10/mo) + OPRA Streaming Add-On ($4.50/mo) subscribed, flipped `IB_MKT_DATA_TYPE` from 3 → 1. Reworked cron schedule around live data: opening 9:31, hourly :30, freeze 15:45, drift 15:55, expire 16:30. Restored `FREEZE_AT` to 15:45. Tightened freeze gate to `hour=15 && minute>=45` so the 15:30 hourly pull doesn't pre-empt the 15:45 freeze.
 
 ---
 
