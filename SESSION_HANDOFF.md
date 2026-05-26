@@ -53,7 +53,7 @@
 ### Crons & wrappers (Mac, `live/`)
 | File | Fires | Does |
 |---|---|---|
-| `cron_parallel.sh` | :40 hourly 9-16 M-F | SPY refresh → `pull_now_parallel.sh` (10 parallel fetchers, clientIds 100-109; freeze at 15:40 only; tracker; Mya upload) |
+| `cron_parallel.sh` | :31 hourly 9-15 + dedicated 15:45 | SPY refresh → `pull_now_parallel.sh` (20 parallel fetchers, clientIds 100-119, bumped from 10 on 2026-05-26 to halve wall-clock; freeze at 15:45 only; tracker; Mya upload). ~1:20 total. |
 | `cron_drift.sh` | 15:55 M-F | SPY refresh → parallel pull → `drift_frozen.py --drift-at 15:55` → tracker (again, so drifted entry_credit feeds the 15:55 mark) → Mya upload |
 | `cron_expire.sh` | 16:30 M-F | `expire_frozen.py` settles any frozen file whose `expiry_date == today` |
 | `cron_track_expiring.sh` | :40 hourly 9-16 Fridays | `track_expiring.py` fetches DTE-0 options directly (clientId 202) — the regular tracker can't see these since fetcher's DTE window is [1,7] |
