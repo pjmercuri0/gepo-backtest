@@ -19,18 +19,19 @@
 
 ```
 31 9-16 * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh
+45 15   * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh
 30 16   * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_expire.sh
 31 9-16 * * 5    /Users/mercurio/Downloads/gepo-backtest/live/cron_track_expiring.sh
 ```
 
 **Cadence (live-data version, simplified 2026-05-26 evening):**
-- **9:31 → 16:31** — uniform hourly cron_parallel.sh firings at :31
-- **15:31** — the daily selection freeze happens inside this firing (gated on `hour=15` inside pull_now_parallel.sh)
-- **16:30** — expire settler. Note this fires 1 min before the 16:31 hourly pull. cron_expire takes ~15s (just Stock fetches), so they sequence safely.
+- **9:31 → 16:31** — uniform hourly cron_parallel.sh firings at :31 (regular pulls + tracker updates)
+- **15:45** — DEDICATED freeze firing (extra cron_parallel.sh entry, separate from the :31 cadence). This is the daily selection moment.
+- **16:30** — expire settler. Fires 1 min before the 16:31 hourly pull. cron_expire takes ~15s (just Stock fetches), so they sequence safely.
 - **Friday DTE-0 tracking:** track_expiring.sh fires hourly at :31 (9-16). Same cadence as the regular pull but uses clientId 202 to avoid collision with cron_parallel's 100-109.
-- **No drift cron.** With live data, signal time = market time. The drift's "second pass to capture fresher prices" rationale no longer applies — selection happens once at 15:31 with current real-time data.
+- **No drift cron.** With live data, signal time = market time. The drift's "second pass to capture fresher prices" rationale no longer applies — selection happens once at 15:45 with current real-time data.
 
-**Freeze gate (`pull_now_parallel.sh`):** `hour == 15 && ! -e $FROZEN_OUT`. With only one cron_parallel firing per hour at :31, the hour=15 check unambiguously identifies the 15:31 firing. File-exists guard makes the step idempotent for manual reruns.
+**Freeze gate (`pull_now_parallel.sh`):** `hour==15 && minute>=45 && ! -e $FROZEN_OUT`. The minute>=45 check is critical because the 15:31 hourly pull also has hour=15 — without minute>=45 it would trigger the freeze with 15:31 data and pre-empt the dedicated 15:45 firing. File-exists guard makes the step idempotent.
 
 **Why this works with live data:** with `IB_MKT_DATA_TYPE = 1` (live, set 2026-05-26 after confirming the user has Snapshot Bundle + OPRA Streaming Add-On), signal time = market time. No more 15-min lag, so the morning cron can fire at 9:31 instead of waiting until 9:50 for delayed-data alignment.
 
