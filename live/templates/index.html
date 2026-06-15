@@ -12,15 +12,18 @@
 
 <div id="spy-live"></div>
 
+<div id="stale-banner"></div>
+
 <div class="params-row" id="params-row"></div>
 
 <div class="ticker-strip" id="ticker-strip">loading ranked candidates...</div>
 
-<div class="section-label" id="top-label">Threshold-qualified candidates (Γᵢ ≥ 0.10%, updates every {{ poll_seconds }}s)</div>
+<div class="section-label" id="top-label">Top 5 by GROUND rank (updates every {{ poll_seconds }}s)</div>
+<div id="vol-gate-banner"></div>
 <div id="weekly-totals"></div>
 <div id="top-picks"></div>
 
-<div class="section-label">All ranked candidates</div>
+<div class="section-label">All ranked candidates (top 5 highlighted)</div>
 <div class="week-card">
   <div class="table-scroll">
   <table id="ranked-table">
@@ -28,22 +31,20 @@
       <tr>
         <th>Rank</th>
         <th>Ticker</th>
-        <th>Direction</th>
+        <th>Spot</th>
         <th>Strikes</th>
         <th>Δ</th>
         <th>DTE</th>
         <th>Credit ($/sh)</th>
         <th>Max-Loss ($/sh)</th>
         <th>Ratio</th>
-        <th>p / r₀ / q</th>
-        <th>G</th>
+        <th title="RV-implied P above (belief — used in G and DKL), IV-implied Q below (market reference)">rv: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">iv below</span></th>
         <th>Kelly EV</th>
-        <th>DKL</th>
         <th>exp(k·DKL)</th>
         <th>Γᵢ</th>
       </tr>
     </thead>
-    <tbody id="ranked-tbody"><tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
+    <tbody id="ranked-tbody"><tr><td colspan="13" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
   </table>
   </div>
 </div>
@@ -53,23 +54,35 @@
 <script>
 const POLL_MS = {{ poll_seconds * 1000 }};
 
+// Half-away-from-zero rounding (NOT toFixed's banker-ish behavior).
+// 172.5 → 173, -172.5 → -173. Use this BEFORE toFixed for any user-visible
+// money/percentage so display matches mental-math expectations.
+function rd(x, dec=0) {
+  if (x == null || isNaN(x)) return x;
+  const m = Math.pow(10, dec);
+  const f = Number(x);
+  return (f >= 0 ? Math.floor(f * m + 0.5) : -Math.floor(-f * m + 0.5)) / m;
+}
 function fmtNum(v, dec=2) {
   if (v == null) return "—";
-  return Number(v).toFixed(dec);
+  const n = Number(v);
+  if (!isFinite(n)) return "∞";
+  if (Math.abs(n) >= 1e6) return n.toExponential(2);  // collapse huge values to compact form
+  return rd(n, dec).toFixed(dec);
 }
 function fmtPct(v, dec=1) {
   if (v == null) return "—";
-  return (Number(v) * 100).toFixed(dec) + "%";
+  return rd(Number(v) * 100, dec).toFixed(dec) + "%";
 }
 function fmtMoney(v, dec=2) {
   if (v == null) return "—";
-  return "$" + Number(v).toFixed(dec);
+  return "$" + rd(v, dec).toFixed(dec);
 }
 // Per-contract dollars: option payoffs are stored per share; one contract = 100 shares.
 // Use this for credit, max-loss, and any premium-derived dollar figure.
 function fmtContract(v, dec=0) {
   if (v == null) return "—";
-  return "$" + (Number(v) * 100).toFixed(dec);
+  return "$" + rd(Number(v) * 100, dec).toFixed(dec);
 }
 // Canonical (2026-05-13+): the JSON `GROUND` field holds Γᵢ — the
 // risk-adjusted Kelly EV = Kelly EV · exp(−k·DKL) =
@@ -79,7 +92,7 @@ function fmtContract(v, dec=0) {
 // pos/neg. Selection is argmax(Γᵢ).
 function fmtGround(v, dec=2) {
   if (v == null) return "—";
-  const x = Number(v) * 100;
+  const x = rd(Number(v) * 100, dec);
   const sign = x >= 0 ? "+" : "";
   return `${sign}${x.toFixed(dec)}%`;
 }
@@ -88,23 +101,30 @@ function fmtGround(v, dec=2) {
 // multiplier (≥1 for growth-positive bets).
 function fmtMultiplier(g, dec=4) {
   if (g == null) return "—";
-  return Math.exp(Number(g)).toFixed(dec);
+  return rd(Math.exp(Number(g)), dec).toFixed(dec);
 }
 // Kelly EV = exp(G) − 1 = expected wealth gain per trade at Kelly
 // sizing (variance-adjusted via the log-utility expectation inside G).
 // Rendered as +X.XX%.
 function fmtKellyEV(g, dec=2) {
   if (g == null) return "—";
-  const ev = (Math.exp(Number(g)) - 1) * 100;
+  const ev = rd((Math.exp(Number(g)) - 1) * 100, dec);
   const sign = ev >= 0 ? "+" : "";
   const cls  = ev >= 0 ? "pos" : "neg";
   return `<span class="${cls}">${sign}${ev.toFixed(dec)}%</span>`;
 }
-// Entropic risk multiplier denom = exp(k·DKL). At canonical k=20 this
-// is exp(20·DKL); kept parametric so a k-sweep can be visualised.
+// Entropic risk multiplier denom = exp(k·DKL). Canonical 2026-06-10:
+// rv_vs_iv DKL (BS d2, 10d RV vs IV), k=10 (growth-optimal canon 2026-06-12), IV-rank-stratified empirical pool.
+// Kept parametric so a k-sweep can be visualised.
 function denom(r, k) {
   if (r == null || r.DKL == null) return null;
   return Math.exp(Number(r.DKL) * Number(k));
+}
+// Soft OI warning: backtest used OI≥100; live IBKR returns NaN intra-day so
+// we can only flag when OI IS reported and is low, or when one leg is missing.
+function oiWarning(p) {
+  // Vol/OI warnings removed 2026-06-05 per user request.
+  return "";
 }
 function dirClass(spread_type) {
   if (spread_type === "bull_put") return "dir-bull";
@@ -134,24 +154,33 @@ function renderParams(cfg) {
     ["credit ratio",   cfg.MAX_CREDIT_RATIO == null ? `≥ ${cfg.MIN_CREDIT_RATIO}` : `${cfg.MIN_CREDIT_RATIO}–${cfg.MAX_CREDIT_RATIO}`],
     ["max_loss",       `≤ $${cfg.MAX_MAX_LOSS}/share`],
     ["OI",             `≥ ${cfg.MIN_OPEN_INTEREST}`],
-    ["ground",         cfg.GROUND_THRESHOLD == null ? "rank-only" : `≥ ${cfg.GROUND_THRESHOLD}`],
     ["k",              `${cfg.DKL_K}`],
     ["α",              `(b−1)/(2b)`],
     ["top-N",          `${cfg.TOP_N}`],
+    ["thr",            `${cfg.GROUND_THRESHOLD ?? "—"} (all days)`],
+    ["DKL ref",        `rv_vs_iv (BS d2, 10d RV vs IV)`],
+    ["regime gate",    `OFF (both directions eligible)`],
   ];
   return chips.map(([k, v]) =>
     `<span class="chip"><span class="chip-k">${k}</span><span class="chip-v">${v}</span></span>`
   ).join("");
 }
 
-function renderWeeklyTotals(picks) {
+// Midmid credit/max_loss: prefer fill_targets[0] (set by webapp from leg bid/ask),
+// fall back to mid net_credit/max_loss when bid/ask isn't yet available.
+function mmCredit(p)  { return (p.fill_targets && p.fill_targets[0]) ? Number(p.fill_targets[0].credit)   : Number(p.net_credit || 0); }
+function mmMaxLoss(p) { return (p.fill_targets && p.fill_targets[0]) ? Number(p.fill_targets[0].max_loss) : Number(p.max_loss   || 0); }
+
+function renderWeeklyTotals(picks, snapshotTs) {
   if (!picks || picks.length === 0) return "";
   let totCredit = 0, totRisk = 0;
   picks.forEach(p => {
-    if (p.net_credit != null) totCredit += Number(p.net_credit) * 100;
-    if (p.max_loss   != null) totRisk   += Number(p.max_loss)   * 100;
+    const qty = p.suggested_qty || 1;
+    totCredit += mmCredit(p)  * 100 * qty;
+    totRisk   += mmMaxLoss(p) * 100 * qty;
   });
-  const decOdds = totRisk > 0 ? (1 + totCredit / totRisk) : 1;
+  const decOdds = totRisk > 0 ? (totCredit / totRisk) : 0;
+  // Format the snapshot timestamp in ET 12-hour format (same as SPY tick).
   return `<div class="week-card" style="background:#0f1a1f">
     <div style="display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap">
       <div>
@@ -160,16 +189,16 @@ function renderWeeklyTotals(picks) {
       </div>
       <div style="display:flex;gap:32px;align-items:baseline">
         <div style="text-align:right">
-          <div class="week-pnl pos">$${totCredit.toFixed(0)}</div>
+          <div class="week-pnl pos">$${rd(totCredit, 0).toFixed(0)}</div>
           <div class="week-sub">total credit</div>
         </div>
         <div style="text-align:right">
-          <div class="week-pnl neg">$${totRisk.toFixed(0)}</div>
+          <div class="week-pnl neg">$${rd(totRisk, 0).toFixed(0)}</div>
           <div class="week-sub">total risk</div>
         </div>
         <div style="text-align:right">
-          <div class="week-pnl">${decOdds.toFixed(2)}</div>
-          <div class="week-sub">decimal odds</div>
+          <div class="week-pnl">${rd(decOdds, 2).toFixed(2)}</div>
+          <div class="week-sub">ratio</div>
         </div>
       </div>
     </div>
@@ -186,22 +215,28 @@ function renderTopPicks(picks, maxGround, kVal) {
       <div class="week-head">
         <div>
           <div class="week-title">#${i+1} &nbsp; <strong>${p.ticker}</strong>
-            <span class="${dirClass(p.spread_type)}">${dirLabel(p.spread_type)}</span></div>
+            <span class="${dirClass(p.spread_type)}">${dirLabel(p.spread_type)}</span>
+            ${oiWarning(p)}</div>
           <div class="week-sub">${fmtMoney(p.short_strike)} / ${fmtMoney(p.long_strike)} &nbsp;·&nbsp;
-            expires ${p.expiry_date} &nbsp;·&nbsp; DTE ${p.DTE} &nbsp;·&nbsp; 1 contract = 100 shares</div>
+            expires ${p.expiry_date} &nbsp;·&nbsp; DTE ${p.DTE} &nbsp;·&nbsp; 1 contract = 100 shares &nbsp;·&nbsp;
+            Vol ${p.short_volume != null ? p.short_volume : "—"} / ${p.long_volume != null ? p.long_volume : "—"}</div>
         </div>
         <div style="display:flex;gap:24px;align-items:baseline;text-align:right">
           <div>
-            <div class="week-pnl pos">${fmtContract(p.net_credit)}</div>
-            <div class="week-sub">credit / contract</div>
+            <div class="week-pnl" style="color:#e8b366">${p.suggested_qty || 1} ×</div>
+            <div class="week-sub">contracts (¹⁄₁₆K)</div>
           </div>
           <div>
-            <div class="week-pnl neg">${fmtContract(p.max_loss)}</div>
-            <div class="week-sub">risk / contract</div>
+            <div class="week-pnl pos">${fmtContract(mmCredit(p) * (p.suggested_qty || 1))}</div>
+            <div class="week-sub">total credit</div>
           </div>
           <div>
-            <div class="week-pnl">${(1 + (p.credit_ratio || 0)).toFixed(2)}</div>
-            <div class="week-sub">decimal odds</div>
+            <div class="week-pnl neg">${fmtContract(mmMaxLoss(p) * (p.suggested_qty || 1))}</div>
+            <div class="week-sub">total risk</div>
+          </div>
+          <div>
+            <div class="week-pnl">${rd(mmMaxLoss(p) > 0 ? mmCredit(p)/mmMaxLoss(p) : 0, 2).toFixed(2)}</div>
+            <div class="week-sub">ratio</div>
           </div>
         </div>
       </div>
@@ -209,19 +244,20 @@ function renderTopPicks(picks, maxGround, kVal) {
         <thead><tr>
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
           <th>credit ($/sh)</th><th>max-loss ($/sh)</th><th>ratio</th>
-          <th>p</th><th>r₀</th><th>q</th><th>G</th><th>Kelly EV</th><th>DKL</th><th>exp(k·DKL)</th><th>Γᵢ (risk-adj)</th>
+          <th title="RV-implied P (belief — used in G and DKL)">rv: p / r₀ / q</th>
+          <th title="IV-implied Q (market reference in DKL)">iv: p̂ / r̂₀ / q̂</th>
+          <th>G</th><th>Kelly EV</th><th>DKL</th><th>exp(k·DKL)</th><th>Γᵢ (risk-adj)</th>
         </tr></thead>
         <tbody><tr>
           <td>${fmtMoney(p.entry_price)}</td>
           <td>${fmtNum(p.short_delta, 3)}</td>
           <td>${fmtNum(p.long_delta, 3)}</td>
           <td>${fmtPct(p.IV)}</td>
-          <td class="fw">${fmtMoney(p.net_credit)}</td>
-          <td>${fmtMoney(p.max_loss)}</td>
-          <td>${fmtPct(p.credit_ratio)}</td>
-          <td>${fmtNum(p.p, 3)}</td>
-          <td>${fmtNum(p.ro, 3)}</td>
-          <td>${fmtNum(p.q, 3)}</td>
+          <td class="fw">${fmtMoney(mmCredit(p))}</td>
+          <td>${fmtMoney(mmMaxLoss(p))}</td>
+          <td>${rd(mmMaxLoss(p) > 0 ? mmCredit(p)/mmMaxLoss(p) : 0, 2).toFixed(2)}</td>
+          <td>${fmtNum(p.p, 2)} / ${fmtNum(p.ro, 2)} / ${fmtNum(p.q, 2)}</td>
+          <td>${p.p_hat != null ? fmtNum(p.p_hat, 2) : "—"} / ${p.ro_hat != null ? fmtNum(p.ro_hat, 2) : "—"} / ${p.q_hat != null ? fmtNum(p.q_hat, 2) : "—"}</td>
           <td>${fmtMultiplier(p.G)}</td>
           <td>${fmtKellyEV(p.G)}</td>
           <td>${fmtNum(p.DKL, 4)}</td>
@@ -236,25 +272,26 @@ function renderTopPicks(picks, maxGround, kVal) {
 
 function renderRanked(rows, maxGround, kVal) {
   if (!rows || rows.length === 0) {
-    return `<tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
+    return `<tr><td colspan="13" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
   }
   return rows.map((r, i) => {
-    const rowClass = r.qualified === false ? " unqualified" : "";
-    if (i < 3) console.log(`Row ${i}: GROUND=${r.GROUND}, qualified=${r.qualified}, class=${rowClass}`);
+    // Bright = top-5 ranked AND qualified (meets per-DOW GROUND threshold).
+    // Dimmed = either rank > 5 OR qualified=false (below per-DOW threshold).
+    const isPrimary = (i < 5) && (r.qualified !== false);
+    const rowClass = isPrimary ? "" : " unqualified";
     return `<tr class="ranked-row${rowClass}">
       <td>${i+1}</td>
-      <td class="fw">${r.ticker}</td>
-      <td class="${dirClass(r.spread_type)}">${dirLabel(r.spread_type)}</td>
+      <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> ${r.ticker}${oiWarning(r)}</td>
+      <td>${r.entry_price != null ? fmtMoney(r.entry_price) : "—"}</td>
       <td>${fmtMoney(r.short_strike)} / ${fmtMoney(r.long_strike)}</td>
       <td>${fmtNum(r.short_delta, 2)}</td>
       <td>${r.DTE ?? "—"}</td>
-      <td>${fmtMoney(r.net_credit)}</td>
-      <td>${fmtMoney(r.max_loss)}</td>
-      <td>${fmtPct(r.credit_ratio, 0)}</td>
-      <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}</td>
-      <td>${fmtMultiplier(r.G)}</td>
+      <td>${fmtMoney(mmCredit(r))}</td>
+      <td>${fmtMoney(mmMaxLoss(r))}</td>
+      <td>${rd(mmMaxLoss(r) > 0 ? mmCredit(r)/mmMaxLoss(r) : 0, 2).toFixed(2)}</td>
+      <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}<br>
+          <span style="opacity:0.7;font-size:11px">${r.p_hat != null ? `iv ${fmtNum(r.p_hat,2)} / ${fmtNum(r.ro_hat,2)} / ${fmtNum(r.q_hat,2)}` : "—"}</span></td>
       <td>${fmtKellyEV(r.G)}</td>
-      <td>${fmtNum(r.DKL, 4)}</td>
       <td>${fmtNum(denom(r, kVal), 4)}</td>
       <td class="fw">${groundBar(r.GROUND, maxGround)}${fmtGround(r.GROUND)}</td>
     </tr>`;
@@ -269,38 +306,76 @@ async function refreshSpyLive() {
     const chgCls = (d.change_pct >= 0) ? "pos" : "neg";
     const regCls = (d.live_regime === "bull") ? "dir-bull" : "dir-bear";
     const sign = (n) => n > 0 ? "+" : "";
+    // Collapsed-by-default summary line; click to expand the full SPY card.
+    const collapsed = localStorage.getItem("spy-card-expanded") !== "1";
+    const arrow = collapsed ? "▸" : "▾";
+    const detailDisplay = collapsed ? "none" : "block";
     document.getElementById("spy-live").innerHTML = `
-      <div class="week-card" style="padding:14px 18px;margin-bottom:18px">
-        <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:baseline">
+      <div class="week-card" style="padding:10px 14px;margin-bottom:18px">
+        <div id="spy-toggle" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px">
           <div>
-            <div class="week-sub">SPY · ${d.source}</div>
-            <div class="week-title">$${(d.mark ?? d.last ?? 0).toFixed(2)}
-              <span class="${chgCls}" style="font-size:14px;margin-left:6px">
-                ${sign(d.change)}${(d.change ?? 0).toFixed(2)}
-                (${sign(d.change_pct)}${(d.change_pct ?? 0).toFixed(2)}%)
-              </span>
-            </div>
+            <span style="opacity:0.7;margin-right:8px">${arrow}</span>
+            <span style="font-weight:600">SPY $${rd(d.mark ?? d.last ?? 0, 2).toFixed(2)}</span>
+            <span class="${chgCls}" style="margin-left:8px">${sign(d.change_pct)}${rd(d.change_pct ?? 0, 2).toFixed(2)}%</span>
+            <span class="${regCls}" style="margin-left:10px;font-weight:600">${(d.live_regime || "?").toUpperCase()}</span>
           </div>
-          <div>
-            <div class="week-sub">bid / ask</div>
-            <div class="week-title" style="font-size:14px">
-              $${(d.bid ?? 0).toFixed(2)} &nbsp;/&nbsp; $${(d.ask ?? 0).toFixed(2)}
+        </div>
+        <div id="spy-detail" style="display:${detailDisplay};margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px">
+          <div style="display:flex;gap:24px;align-items:flex-start">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:14px">
+              <div>
+                <div class="week-sub">SPY · ${d.source}</div>
+                <div class="week-title">$${rd(d.mark ?? d.last ?? 0, 2).toFixed(2)}
+                  <span class="${chgCls}" style="font-size:14px;margin-left:6px">
+                    ${sign(d.change)}${rd(d.change ?? 0, 2).toFixed(2)}
+                    (${sign(d.change_pct)}${rd(d.change_pct ?? 0, 2).toFixed(2)}%)
+                  </span>
+                </div>
+              </div>
+              <div>
+                <div class="week-sub">bid / ask</div>
+                <div class="week-title" style="font-size:14px">
+                  $${rd(d.bid ?? 0, 2).toFixed(2)} &nbsp;/&nbsp; $${rd(d.ask ?? 0, 2).toFixed(2)}
+                </div>
+              </div>
             </div>
-          </div>
-          <div>
-            <div class="week-sub">vs ${d.sma_window}d SMA (as of ${d.sma_as_of || "—"})</div>
-            <div class="week-title ${regCls}" style="font-size:14px">
-              ${sign(d.live_vs_sma)}${(d.live_vs_sma ?? 0).toFixed(2)}
-              (${sign(d.live_vs_sma_pct)}${(d.live_vs_sma_pct ?? 0).toFixed(2)}%)
-              · ${(d.live_regime || "?").toUpperCase()}
+            <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;gap:14px">
+              <div>
+                <div class="week-sub">vs ${d.sma_window}d SMA (as of ${d.sma_as_of || "—"})</div>
+                <div class="week-title ${regCls}" style="font-size:14px">
+                  ${sign(d.live_vs_sma)}${rd(d.live_vs_sma ?? 0, 2).toFixed(2)}
+                  (${sign(d.live_vs_sma_pct)}${rd(d.live_vs_sma_pct ?? 0, 2).toFixed(2)}%)
+                  · ${(d.live_regime || "?").toUpperCase()}
+                </div>
+              </div>
+              <div>
+                <div class="week-sub">tick</div>
+                <div class="week-sub" style="font-size:11px">${(() => {
+                  let ts = d.snapshot_ts || "—";
+                  if (ts.includes("T")) {
+                    const isoStr = ts.slice(0, 19);
+                    const dt = new Date(isoStr);
+                    const fmt = new Intl.DateTimeFormat("en-US", {
+                      timeZone: "America/New_York",
+                      month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true,
+                    });
+                    ts = fmt.format(dt);
+                  }
+                  return ts;
+                })()}</div>
+              </div>
             </div>
-          </div>
-          <div style="margin-left:auto;text-align:right">
-            <div class="week-sub">tick</div>
-            <div class="week-sub" style="font-size:11px">${d.snapshot_ts}</div>
           </div>
         </div>
       </div>`;
+    document.getElementById("spy-toggle").addEventListener("click", () => {
+      const det = document.getElementById("spy-detail");
+      const arr = document.querySelector("#spy-toggle span:first-child");
+      const isHidden = det.style.display === "none";
+      det.style.display = isHidden ? "block" : "none";
+      arr.textContent = isHidden ? "▾" : "▸";
+      localStorage.setItem("spy-card-expanded", isHidden ? "1" : "0");
+    });
   } catch (e) {
     document.getElementById("spy-live").innerHTML = "";
   }
@@ -311,10 +386,12 @@ async function refreshSpyLive() {
 // Browser computes from local clock translated to ET via Intl API.
 function marketOpenNow() {
   const now = new Date();
-  // Render the current time in America/New_York then parse back the parts
+  // Render the current time in America/New_York then parse back the parts.
+  // hour12: false so we get "13" at 1pm, not "01" (which would parse to 1
+  // and mis-classify the afternoon as outside market hours).
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
-    weekday: "short", hour: "2-digit", minute: "2-digit", hour12: true,
+    weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
   });
   const parts = Object.fromEntries(fmt.formatToParts(now).map(p => [p.type, p.value]));
   const dow = parts.weekday;                          // Mon, Tue, ... Sun
@@ -326,7 +403,8 @@ function marketOpenNow() {
 }
 
 // True if the snapshot_ts in either the SPY widget or the regime banner is
-// less than 30 minutes old. Falls back gracefully if neither field exists.
+// less than 75 minutes old. Threshold matches the hourly parallel cron
+// (60 min) plus the 15-min IBKR delayed data lag, plus small buffer.
 function tickIsFresh(data) {
   // Prefer the SPY live tick's timestamp when present (it ages fastest).
   const candidates = [];
@@ -336,7 +414,7 @@ function tickIsFresh(data) {
     const dt = new Date(ts);
     if (!isNaN(dt)) {
       const ageMin = (Date.now() - dt.getTime()) / 60000;
-      if (ageMin < 30) return true;
+      if (ageMin < 75) return true;
     }
   }
   return false;
@@ -351,7 +429,8 @@ function renderRegime(r) {
     return;
   }
   const cls = r.regime === "bull" ? "dir-bull" : "dir-bear";
-  const dir = r.regime === "bull" ? "BULL — only bull-puts" : "BEAR — only bear-calls";
+  // Regime is informational only since 2026-06-05 (gate is OFF; both directions eligible).
+  const dir = r.regime === "bull" ? "BULL regime (gate off)" : "BEAR regime (gate off)";
   badge.innerHTML = `<span class="badge ${cls === 'dir-bull' ? 'badge-WIN' : 'badge-LOSS'}" `
                   + `style="vertical-align:middle;margin-left:8px;font-size:12px">${dir}</span>`;
   const stale = (r.stale_days ?? 0) > 1
@@ -362,12 +441,12 @@ function renderRegime(r) {
   let asOfStr = r.as_of || "—";
   if (asOfStr.includes("T")) {
     const isoStr = asOfStr.slice(0, 19);  // "2026-05-11T14:47:04"
-    const dt = new Date(isoStr);
+    const dt = new Date(isoStr);   // naive local time from Python datetime.now()
     const fmt = new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York",
       month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true,
     });
-    asOfStr = fmt.format(dt);  // e.g., "May 11, 02:47 PM"
+    asOfStr = fmt.format(dt);  // e.g., "May 19, 12:30 PM"
   }
   const src = r.source ? ` · ${r.source}` : "";
   meta.innerHTML = `SPY ${fmtMoney(r.close)} vs ${r.window}d SMA ${fmtMoney(r.sma)}`
@@ -376,7 +455,7 @@ function renderRegime(r) {
 
 function renderTickerStrip(rows) {
   if (!rows || rows.length === 0) return "no candidates";
-  return rows.slice(0, 30).map(r =>
+  return rows.slice(0, 5).map(r =>
     `<span class="tick"><strong>${r.ticker}</strong>${dirLabel(r.spread_type).slice(0,2)} ${fmtGround(r.GROUND)}</span>`
   ).join("");
 }
@@ -390,30 +469,91 @@ async function refresh() {
     const maxG = (data.ticker && data.ticker.length) ? data.ticker[0].GROUND : 1.0;
     document.getElementById("snapshot-meta").textContent =
       `snapshot: ${data.snapshot_ts}  ·  ${data.n_candidates} candidates  ·  source: ${data.snapshot_file}`;
+
+    // Staleness banner: latest.json is only rewritten when a scan produces
+    // option rows. If the newest ranking isn't from today, the picks shown are
+    // stale (e.g. a holiday-shifted expiry that returned no chains) — flag it
+    // so a day-old ranking is never mistaken for live.
+    const staleEl = document.getElementById("stale-banner");
+    if (staleEl) {
+      const todayET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+      const snapDay = (data.snapshot_ts && data.snapshot_ts.length >= 10) ? data.snapshot_ts.slice(0, 10) : null;
+      if (snapDay && snapDay !== todayET) {
+        staleEl.innerHTML = `<div class="week-card" style="background:#3a2a15;border:1px solid #6b5227;padding:14px;margin-bottom:18px">
+          <div style="color:#ffce8a;font-weight:600">&#9888; stale ranking &mdash; last fresh scan was ${snapDay}</div>
+          <div class="week-sub" style="margin-top:4px">No option data has been captured yet today; the picks below are from ${snapDay}, not live.</div></div>`;
+      } else {
+        staleEl.innerHTML = "";
+      }
+    }
     renderRegime(data.regime);
     document.getElementById("params-row").innerHTML = renderParams(data.config);
     document.getElementById("ticker-strip").innerHTML = renderTickerStrip(data.ticker);
-    const kVal = (data.config && data.config.DKL_K) ? data.config.DKL_K : 20;
-    document.getElementById("weekly-totals").innerHTML = renderWeeklyTotals(data.top_picks);
+    const kVal = (data.config && data.config.DKL_K) ? data.config.DKL_K : 12;
+    // Vol-gate banner: shows whether picks are suppressed by the SPY-RV gate.
+    const vg = data.vol_gate;
+    const vgEl = document.getElementById("vol-gate-banner");
+    if (vg && vgEl) {
+      if (vg.gated) {
+        vgEl.innerHTML = `<div class="week-card" style="background:#3a1518;border:1px solid #6b2730;padding:14px;margin-bottom:18px">
+          <div style="color:#ff8a8a;font-weight:600">vol-gate active — Tue-Thu picks suppressed</div>
+          <div class="week-sub" style="margin-top:4px">${vg.reason}</div></div>`;
+      } else if (vg.rv_20 != null) {
+        const statusLbl = vg.threshold == null
+          ? `<span style="color:#888780"><strong>disabled</strong></span>`
+          : (vg.is_monday
+              ? `<span style="color:#888780">Mon &middot; always</span>`
+              : `<span style="color:#7ec99a"><strong>open</strong></span>`);
+        const gateTxt = vg.threshold == null
+          ? `SPY rv_20 ${rd(vg.rv_20, 1).toFixed(1)}% vs gate &mdash;`
+          : `SPY rv_20 ${rd(vg.rv_20, 1).toFixed(1)}% vs gate ${rd(vg.threshold, 0).toFixed(0)}%`;
+        vgEl.innerHTML = `<div class="week-sub" style="margin-bottom:12px">vol gate: ${statusLbl} &middot; ${gateTxt}</div>`;
+      } else {
+        vgEl.innerHTML = "";
+      }
+    }
+    document.getElementById("weekly-totals").innerHTML = renderWeeklyTotals(data.top_picks, data.snapshot_ts);
     document.getElementById("top-picks").innerHTML = renderTopPicks(data.top_picks, maxG, kVal);
-    document.getElementById("ranked-tbody").innerHTML = renderRanked(data.ticker, maxG, kVal);
+    // Render all ranked candidates. Rows past the top 5 are dimmed via
+    // the "unqualified" CSS class so the top 5 stay visually prominent
+    // while still preserving the full ranked list for reference.
+    document.getElementById("ranked-tbody").innerHTML = renderRanked(data.ticker || [], maxG, kVal);
 
     // ── Status dot ────────────────────────────────────────────────
-    // Green pulse: market is open AND last tick < 30 min ago.
-    // Solid blue: post-15:45 frozen state (official picks of the day).
-    // Solid red : market closed OR last tick > 30 min stale.
+    // Green pulse  : market is open AND tick fresh (live trading hours).
+    // Solid blue   : post-15:45 frozen state (official picks of the day).
+    // Solid yellow : IB Gateway alive (tick fresh) but market not yet open
+    //               (e.g. 9:01 ranker run, weekend with recent intraday data).
+    // Solid red    : tick stale → IB connection is down or last ranker run > 75 min.
     const dot = document.getElementById("status-dot");
     const txt = document.getElementById("status-text");
+    // Tick timestamp on the section label (snapshot_ts is naive local time
+    // from the ranker; do NOT append "Z" — see the UTC double-shift bug).
+    let tickStr = "";
+    if (data.snapshot_ts && data.snapshot_ts.includes("T")) {
+      tickStr = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York",
+        hour: "numeric", minute: "2-digit", hour12: true,
+      }).format(new Date(data.snapshot_ts.slice(0, 19)));
+    }
     if (data.frozen) {
       dot.className = "live-dot frozen-dot";
       txt.innerHTML =
         `GEPO Live Tracker <span class="badge badge-FROZEN" style="vertical-align:middle">FROZEN ${data.frozen_at || ""}</span>`;
       document.getElementById("top-label").textContent =
-        "Frozen 15:45 picks for today";
-    } else {
-      const isLive = marketOpenNow() && tickIsFresh(data);
-      dot.className = isLive ? "live-dot" : "live-dot stale-dot";
+        `Frozen 15:01 picks for today${tickStr ? ` · tick ${tickStr} ET` : ""}`;
+    } else if (tickIsFresh(data)) {
+      // IB feed is healthy. Differentiate based on whether market is open.
+      dot.className = marketOpenNow() ? "live-dot" : "live-dot premarket-dot";
       txt.textContent = "GEPO Live Tracker";
+      document.getElementById("top-label").textContent =
+        `Top 5 by GROUND rank${tickStr ? ` · tick ${tickStr} ET` : ""}`;
+    } else {
+      // Tick is stale — IB connection is down or last ranker run > 75 min ago.
+      dot.className = "live-dot stale-dot";
+      txt.textContent = "GEPO Live Tracker";
+      document.getElementById("top-label").textContent =
+        `Top 5 by GROUND rank${tickStr ? ` · stale tick ${tickStr} ET` : ""}`;
     }
   } catch (e) {
     document.getElementById("snapshot-meta").textContent = "error: " + e.message;
