@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}GEPO Snapshots — every scan's qualified picks{% endblock %}
+
+{% block content %}
+<h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">Intraday Snapshot Picks</h1>
+<div class="subtitle">Every :01/:31 scan's threshold-qualified top-5, settled at expiry
+(entry 0.80&times;mid, partial-WIN at 50% intrinsic — same P&amp;L model as the backtest).
+Question under test: does thr=0.07 pick well at any time of day, or only near the close?</div>
+
+<div class="section-label">Performance by scan time of day (settled picks only)</div>
+<div class="week-card">
+  <div class="table-scroll">
+  <table>
+    <thead><tr>
+      <th>scan</th><th>scans</th><th>picks</th><th>settled</th>
+      <th>P&amp;L</th><th>$/trade</th><th>win</th>
+    </tr></thead>
+    <tbody>
+    {% for s in agg %}
+      <tr>
+        <td class="fw">{{ s.hhmm[:2] }}:{{ s.hhmm[2:] }}</td>
+        <td>{{ s.scans }}</td>
+        <td>{{ s.n }}</td>
+        <td>{{ s.settled }}</td>
+        <td class="{{ 'pos' if s.pnl > 0 else ('neg' if s.pnl < 0 else '') }}">
+          {% if s.settled %}${{ '%.0f' % s.pnl }}{% else %}—{% endif %}</td>
+        <td>{% if s.per_trade is not none %}${{ '%.2f' % s.per_trade }}{% else %}—{% endif %}</td>
+        <td>{% if s.win_rate is not none %}{{ s.win_rate }}%{% else %}—{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" style="color:#888780;text-align:center;padding:24px">
+        no snapshot picks captured yet — first capture lands on the next :01/:31 scan</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="section-label">Day by day</div>
+{% for d in days %}
+<div class="week-card">
+  <div class="week-title">{{ d.date }}</div>
+  {% for scan in d.scans|reverse %}
+  <div style="margin-top:10px">
+    <div class="week-sub">scan {{ scan.hhmm[:2] }}:{{ scan.hhmm[2:] }} · {{ scan.picks|length }} qualified</div>
+    {% if scan.picks %}
+    <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th>ticker</th><th>type</th><th>strikes</th><th>mid credit</th>
+        <th>entry (0.80&times;)</th><th>&Gamma;</th><th>expiry</th>
+        <th>expiry px</th><th>outcome</th><th>P&amp;L</th>
+      </tr></thead>
+      <tbody>
+      {% for p in scan.picks %}
+        <tr>
+          <td class="fw"><span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}">{{ '▲' if p.spread_type == 'bull_put' else '▼' }}</span> {{ p.ticker }}</td>
+          <td>{{ 'bull put' if p.spread_type == 'bull_put' else 'bear call' }}</td>
+          <td>${{ '%.2f' % p.short_strike }} / ${{ '%.2f' % p.long_strike }}</td>
+          <td>${{ '%.2f' % p.net_credit }}</td>
+          <td>${{ '%.2f' % p.entry_credit }}</td>
+          <td>{{ '%.4f' % p.GROUND if p.GROUND is not none else '—' }}</td>
+          <td>{{ (p.expiry_date or '')[:10] }}</td>
+          <td>{% if p.expiry_close is not none %}${{ '%.2f' % p.expiry_close }}{% else %}<span style="color:#888780">—</span>{% endif %}</td>
+          <td>{% if p.outcome %}<span class="badge badge-{{ p.outcome }}">{{ p.outcome }}</span>{% else %}<span style="color:#888780">open</span>{% endif %}</td>
+          <td class="{{ 'pos' if p.pnl is not none and p.pnl > 0 else ('neg' if p.pnl is not none and p.pnl < 0 else '') }}">
+            {% if p.pnl is not none %}${{ '%.0f' % p.pnl }}{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="week-sub" style="color:#888780">no qualified picks this scan</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="week-card"><div class="week-sub" style="color:#888780;padding:12px">
+nothing captured yet</div></div>
+{% endfor %}
+{% endblock %}
