@@ -17,6 +17,16 @@ unset DEVELOPER_DIR
 /usr/bin/caffeinate -i -t 600 &
 
 LOG=live/logs/parallel_pull.log
+LOCKDIR=live/logs/cron_parallel.lock
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+  {
+    echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
+    echo "SKIP: cron_parallel already running (lock: $LOCKDIR)"
+  } >> "$LOG" 2>&1
+  exit 0
+fi
+trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
+
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
   echo "[1/2] Parallel option pull (Mya-edits pull + SPY refresh run inside,"
