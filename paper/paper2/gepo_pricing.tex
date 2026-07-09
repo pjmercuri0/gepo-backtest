@@ -52,39 +52,46 @@
 \begin{abstract}
 We present an entropy-regularized growth-maximization framework for
 ranking discrete-payoff contingent claims in incomplete markets,
-indexed by an ambiguity-aversion parameter $k \ge 0$. The framework
-takes the per-trade \emph{Kelly EV} $E(p, x) := \exp(g(p, x)) - 1$ as
-the growth signal, where $g(p, x) = E_p[\ln(1 + w^\star X)]$ is the
-Kelly log-growth at the optimal sizing fraction $w^\star$. By Jensen's
-inequality on the concave log inside $g$, $E$ is variance-adjusted by
-construction: it is the expected wealth gain per trade at Kelly sizing,
-penalising high-variance payoffs relative to their linear EV. The
-canonical \emph{intrinsic GROUND ratio} is the Kelly EV discounted by
-an entropic ambiguity factor:
+indexed by an ambiguity-aversion parameter $k > 0$. The framework
+takes the per-trade \emph{Kelly EV} $E(p, x) := M(p, x) - 1$ as the
+underlying growth quantity, where $M(p, x) = \exp(\ell(w^\star; p, x))$
+is the wealth multiplier at Kelly-optimal sizing $w^\star$ and
+$\ell(w^\star) = E_p[\ln(1 + w^\star X)]$ is the classical Kelly
+log-growth. By Jensen's inequality on the concave log inside
+$\ell(w^\star)$, $E$ is variance-adjusted by construction: it is the
+expected wealth gain per trade at Kelly sizing, penalising
+high-variance payoffs relative to their linear EV. The \emph{growth
+signal} carried through the regularized objective is the log of the
+Kelly EV, $g(p, x) := \ln E(p, x) = \ln(M(p, x) - 1)$. The canonical
+\emph{intrinsic GROUND ratio} is then the Kelly EV discounted by an
+entropic ambiguity factor:
 \begin{equation*}
 \GROUND(p, x, k) \;=\; E(p, x) \cdot \exp\!\bigl(-k \cdot \KL(p \| u)\bigr)
-\;=\; \bigl(\exp(g(p, x)) - 1\bigr) \cdot \exp\!\bigl(-k \cdot \KL(p \| u)\bigr).
+\;=\; \exp(g(p, x)) \cdot \exp\!\bigl(-k \cdot \KL(p \| u)\bigr).
 \end{equation*}
 The score is dimensionless and reads directly as percent risk-adjusted
-expected return per trade. Part of our contribution is the small-$g$
-connection to the multiplier-preferences literature: for $g$ small,
-$E \approx g$, and
+expected return per trade. Taking the log gives the additive
+multiplier-preferences functional exactly:
 \[
-\ln \GROUND \;\approx\; g - k \cdot \KL \;=\; J_k(p, x),
+\ln \GROUND(p, x, k) \;=\; g(p, x) - k \cdot \KL(p \| u) \;=\; J_k(p, x),
 \]
 the Hansen-Sargent multiplier-preferences functional
 \citep{hansen2008robustness} and the variational preferences class of
 \citet{maccheroni2006ambiguity}. The canonical Kelly-EV-with-discount
 ranker is thus the economically-readable form of the Hansen-Sargent
 ranker --- preserving the theoretical lineage while gaining direct
-interpretation as a per-trade return. To our knowledge $\KL$ in this
-role --- as the denominator of a regularized growth-optimal selection
-ratio --- is, to our knowledge, the first formal use proposed for discrete-payoff
-option strategies, where conventional variance- or VaR-based measures
-are ill-defined. We establish three results: (i) the small-$g$
-approximation $\ln \GROUND \approx J_k$ holds within 5\% across the
-canonical credit-spread regime, so the two rankers agree on selection
-in this regime; (ii) the limiting cases of $J_k$ recover pure Kelly
+interpretation as a per-trade return. While $\KL$ has been used as a
+risk measure for discrete-payoff option strategies in our prior work
+\citep{mercurio2020binary,mercurio2020}, to our knowledge the
+$J_k = g - k \cdot \KL$ functional with Kelly-EV growth signal
+$g := \ln E$ --- and equivalently the intrinsic GROUND ratio
+$\GROUND = \exp(J_k)$ --- is the first regularized-growth selection
+criterion proposed for this setting, where conventional variance- or
+VaR-based measures are ill-defined. We establish three results: (i) the selection
+equivalence $\arg\max_i \GROUND(p_i, x_i, k) = \arg\max_i J_k(p_i,
+x_i)$ holds exactly by construction via the identity $\GROUND = \exp(J_k)$,
+so the multiplicative and additive forms produce identical rankings;
+(ii) the limiting cases of $J_k$ recover pure Kelly
 growth selection ($k \to 0$) and maximum-entropy selection ($k \to
 \infty$); (iii) the induced indifference-price functional reduces to
 the minimum-entropy martingale measure expectation as $k \to 0$,
@@ -92,9 +99,9 @@ embedding $\GROUND$ in the incomplete-markets pricing-kernel
 literature \citep{frittelli2000,follmer2002}. The criterion is
 empirically validated in companion work on six years of S\&P 100
 weekly credit spreads \citep{mercurio2026empirical}, where it
-produces a Sharpe ratio of $1.63$ and Calmar of $4.03$ on a five-year
-in-sample window, and Sharpe $2.99$, Calmar $12.44$ on a strict
-70-week holdout.
+produces a Sharpe ratio of $1.63$, Calmar of $4.03$, and max drawdown
+of $-7.2\%$ on a five-year in-sample window, and Sharpe $2.99$, Calmar
+$12.44$, max drawdown $-4.7\%$ on a strict 70-week holdout.
 \end{abstract}
 
 
@@ -132,12 +139,12 @@ We make four contributions.
           (Section~\ref{sec:framework}).
     \item We prove that the optimal selection rule coincides with
           ranking by the \emph{GROUND ratio} $\GROUND = E \cdot \exp(-k \KL)$
-          where $E = \exp(g) - 1$ is the Kelly EV (Definition~\ref{def:ground},
-          Section~\ref{sec:main}). We also establish the small-$g$
-          equivalence $\ln \GROUND \approx J_k = g - k\KL$ to the
-          Hansen-Sargent multiplier-preferences functional, preserving
-          the theoretical lineage while gaining direct interpretation
-          as a per-trade return.
+          where $E = \exp(g) = M - 1$ is the Kelly EV with growth signal
+          $g := \ln E$ (Definition~\ref{def:ground},
+          Section~\ref{sec:main}). The identity $\ln \GROUND = g - k\KL
+          = J_k$ holds exactly by construction, equating selection by the
+          multiplicative GROUND ratio with selection by the additive
+          Hansen-Sargent multiplier-preferences functional.
     \item We characterize the limiting behaviour: $k \to 0$ recovers
           pure Kelly growth selection, $k \to \infty$ recovers
           maximum-entropy (uniform-closest) selection, and the
@@ -182,9 +189,10 @@ is \emph{comparative}: a candidate $a$ is scored against a per-period
 reference candidate $b$ (typically the minimum-divergence member of
 the pool) by
 \[
-\Gamma_{a|b} \;=\; \frac{\G(p_a, x_a) - \G(p_b, x_b)}{\KL(p_a \| u) - \KL(p_b \| u)},
-\qquad \G := \ln G.
+\Gamma_{a|b} \;=\; \frac{\ell(w^\star_a; p_a, x_a) - \ell(w^\star_b; p_b, x_b)}{\KL(p_a \| u) - \KL(p_b \| u)},
 \]
+where $\ell$ denotes the classical Kelly log-growth at each candidate's
+Kelly-optimal sizing fraction.
 The comparative form ranks the pool relative to a per-period
 reference candidate $b$ (taken as the minimum-divergence member of
 the pool). The denominator vanishes when the candidate being scored
@@ -199,18 +207,20 @@ The present paper introduces the \emph{intrinsic} GROUND ratio in its
 canonical \emph{Kelly-EV-with-entropic-discount} form: a per-candidate
 score that requires no reference,
 \[
-\GROUND(a, k) \;=\; \bigl(\exp(\G(p_a, x_a)) - 1\bigr) \cdot \exp\!\bigl(-k \cdot \KL(p_a \| u)\bigr),
-\qquad \G(p_a, x_a) > 0.
+\GROUND(a, k) \;=\; E(p_a, x_a) \cdot \exp\!\bigl(-k \cdot \KL(p_a \| u)\bigr)
+\;=\; \exp(\G(p_a, x_a)) \cdot \exp\!\bigl(-k \cdot \KL(p_a \| u)\bigr),
+\qquad E(p_a, x_a) > 0,
 \]
-The first factor $\exp(\G) - 1$ is the Kelly EV of the candidate
-(variance-adjusted via Jensen on the concave log inside $\G$); the
-second is the entropic ambiguity discount. The product is a
-dimensionless fractional return readable as percent risk-adjusted
-expected return per trade. For small $\G$ (the canonical regime),
-$\exp(\G) - 1 \approx \G$ and hence $\ln \GROUND \approx \G - k \cdot
-\KL = J_k(a)$, the additive Hansen-Sargent functional. The Kelly-EV
-form is the economically-readable small-quantity expression of the HS
-ranker. The companion empirical paper
+with growth signal $\G := \ln E$ defined as the log of the Kelly EV
+$E := M - 1$. The first factor is the Kelly EV of the candidate
+(variance-adjusted via Jensen on the concave log inside the Kelly
+log-growth $\ell(w^\star)$); the second is the entropic ambiguity
+discount. The product is a dimensionless fractional return readable as
+percent risk-adjusted expected return per trade. Taking the log gives
+the additive Hansen-Sargent form exactly: $\ln \GROUND = \G - k \cdot
+\KL = J_k(a)$. The Kelly-EV form is thus the economically-readable
+expression of the HS ranker, identical to it in log-space. The
+companion empirical paper
 \citep{mercurio2026empirical} reports validation on six years of
 S\&P 100 weekly credit spreads.
 
@@ -409,7 +419,8 @@ an entropic ambiguity factor:
 \GROUND(p, x, k) \;:=\; E(p, x) \cdot \exp\!\bigl(-k \cdot \KL(p \| u_n)\bigr),
 \label{eq:ground}
 \end{equation}
-for $k \ge 0$. The first factor is the variance-adjusted expected
+for $k > 0$ (the unregularized case $k = 0$ is treated as a limit in
+Proposition~\ref{prop:kelly-limit}). The first factor is the variance-adjusted expected
 wealth gain per trade (Kelly EV). The second factor $\exp(-k \cdot
 \KL) \in (0, 1]$ is the entropic ambiguity discount: $1$ when the
 implied distribution coincides with the uniform reference (zero
@@ -444,7 +455,7 @@ construction and the form used in the empirical work.
 
 \begin{definition}[Intrinsic GROUND ratio]\label{def:ground}
 For a contingent claim $\C = (x, p, c)$ with $E(p, x) > 0$, the
-intrinsic GROUND ratio at parameter $k \ge 0$ is defined by
+intrinsic GROUND ratio at parameter $k > 0$ is defined by
 Equation~\eqref{eq:ground}; equivalently, by $\GROUND = \exp(J_k)$
 with $J_k$ from \eqref{eq:Jk}.
 \end{definition}
@@ -457,7 +468,7 @@ growth-positive claims, as an exact consequence of
 \eqref{eq:ground-exp-jk}.
 
 \begin{theorem}[Selection equivalence]\label{thm:main}
-Fix $k \ge 0$ and let $\mathcal{M} = \{\C_1, \ldots, \C_M\}$ be a
+Fix $k > 0$ and let $\mathcal{M} = \{\C_1, \ldots, \C_M\}$ be a
 menu of growth-positive claims ($E(p_i, x_i) > 0$ for every $i$).
 The following two selection rules return the same claim:
 \begin{enumerate}
@@ -523,17 +534,19 @@ behaviour of the regularization. Both are economically meaningful and
 recover well-studied selection rules.
 
 \begin{proposition}[Kelly limit]\label{prop:kelly-limit}
-Fix a menu $\mathcal{M}$ with $G(p_i, x_i) > 0$ for all $i$. As
+Fix a menu $\mathcal{M}$ with $E(p_i, x_i) > 0$ for all $i$. As
 $k \to 0^+$, the GROUND-optimal selection $i^\star_k = \arg\max_i
 \GROUND(p_i, x_i, k)$ converges to the pure-Kelly-optimal selection
 \begin{equation*}
-i^\star_0 = \arg\max_i G(p_i, x_i).
+i^\star_0 = \arg\max_i E(p_i, x_i) = \arg\max_i \G(p_i, x_i),
 \end{equation*}
+where the second equality holds because $\G = \ln E$ is a strictly
+increasing transform of $E$.
 \end{proposition}
 
 \begin{proof}
-Continuity: $\GROUND(p, x, k) = (\exp(\G(p, x)) - 1) \cdot \exp(-k \KL(p\|u_n))
-\to G(p, x)$ as $k \to 0$, uniformly in $(p, x)$ on a finite menu.
+Continuity: $\GROUND(p, x, k) = \exp(\G(p, x)) \cdot \exp(-k \KL(p\|u_n))
+\to E(p, x)$ as $k \to 0$, uniformly in $(p, x)$ on a finite menu.
 The argmax of a uniformly convergent sequence on a finite set
 converges to the argmax of the limit, modulo ties (resolved by
 arbitrary rule).
@@ -541,7 +554,7 @@ arbitrary rule).
 \end{proof}
 
 \begin{proposition}[Maximum-entropy limit]\label{prop:maxent-limit}
-Fix a menu $\mathcal{M}$ with $G(p_i, x_i) > 0$ for all $i$. As
+Fix a menu $\mathcal{M}$ with $E(p_i, x_i) > 0$ for all $i$. As
 $k \to \infty$, the GROUND-optimal selection $i^\star_k$ converges to
 the minimum-divergence selection
 \begin{equation*}
@@ -551,11 +564,11 @@ i.e., the claim whose implied distribution is closest to uniform.
 \end{proposition}
 
 \begin{proof}
-Take natural logs: $\ln \GROUND(p, x, k) = \ln(\exp(\G(p,x)) - 1) - k \KL(p \| u_n)$.
-For large $k$, the term $-k \KL$ dominates the bounded first term on
-a finite menu, so $\arg\max_i \ln \GROUND(p_i, x_i, k) \to \arg\min_i
+Take natural logs: $\ln \GROUND(p, x, k) = \G(p, x) - k \KL(p \| u_n) = J_k(p, x)$.
+For large $k$, the term $-k \KL$ dominates the bounded $\G$ term on
+a finite menu, so $\arg\max_i J_k(p_i, x_i) \to \arg\min_i
 \KL(p_i \| u_n)$ as $k \to \infty$. Strict monotonicity of $\ln$
-preserves the argmax. \qed
+(via $\GROUND = \exp(J_k)$) preserves the argmax. \qed
 \end{proof}
 
 \begin{remark}[Interpolation]
@@ -566,17 +579,17 @@ picks pure growth. At $k = \infty$, the agent ignores growth and picks
 the most uniform (least informative) implied distribution. For
 intermediate $k$, the agent trades off the two. The empirical work
 \citep{mercurio2026empirical} reports a $k$-sweep on the in-sample
-window over $k \in \{10, 15, 20, 25, 30\}$ in natural-log units (nats)
-and finds a Sharpe plateau at $k \in [20, 30]$. The chosen canonical
-$k = 20$ sits at the low edge of the plateau and was frozen before
-any out-of-sample data was scored.
+window over $k \in \{0.5, 1, 2, 5, 10, 20\}$ in natural-log units
+(nats) with Sharpe monotonically increasing across the range. The
+chosen canonical $k = 20$ is the in-sample Sharpe optimum and was
+frozen before any out-of-sample data was scored.
 \end{remark}
 
 \begin{corollary}[Monotonicity in $k$ on a fixed claim]
 \label{cor:monotone-k}
 For any fixed claim with $\KL(p \| u_n) > 0$,
 $\GROUND(p, x, k)$ is strictly decreasing in $k$. For any claim with
-$\KL(p \| u_n) = 0$ (i.e.\ $p = u_n$), $\GROUND(p, x, k) = G(p, x)$ is
+$\KL(p \| u_n) = 0$ (i.e.\ $p = u_n$), $\GROUND(p, x, k) = E(p, x)$ is
 constant in $k$.
 \end{corollary}
 
@@ -598,47 +611,64 @@ log-growth objective.
 
 \subsection{Reservation price under regularized growth}
 
+For the reservation price we work with the \emph{classical Kelly
+log-growth} $\ell(w^\star; p, x)$ from \eqref{eq:loggrowth} rather than
+the growth signal $\G = \ln E$ used for selection: the
+utility-indifference price is the standard log-utility object, and
+$\ell$ admits the small-bet Taylor expansion needed for the MEMM
+connection below.
+
 \begin{definition}[$k$-regularized reservation price]\label{def:reservation}
-Fix $k \ge 0$ and a contingent claim $\C = (x, p, c)$ with
-$G(p, x) > 0$. The \emph{$k$-regularized reservation price} of $\C$ is
-the maximum cost $c^\star_k$ at which the agent's regularized
-growth from entering $\C$ at the Kelly-optimal fraction equals the
-no-trade baseline:
+Fix $k > 0$ and a contingent claim $\C = (x, p, c)$ with
+$\ell(w^\star; p, x) > 0$. The \emph{$k$-regularized reservation
+price} of $\C$ is the maximum cost $c^\star_k$ at which the agent's
+regularized log-utility from entering $\C$ at the Kelly-optimal
+fraction equals the no-trade baseline:
 \begin{equation}
-c^\star_k(p, x) \;=\; \sup \Bigl\{ c \ge 0 : J_k(p, x) - c \cdot w^\star(p, x)
-    \ge 0 \Bigr\}.
+c^\star_k(p, x) \;=\; \sup \Bigl\{ c \ge 0 : \ell(w^\star; p, x) - c \cdot w^\star(p, x)
+    - k \cdot \KL(p \| u_n) \ge 0 \Bigr\}.
 \label{eq:reservation}
 \end{equation}
 \end{definition}
 
-This definition specializes the standard utility-indifference price to
-the regularized log-growth utility, with the cost-of-entry term
+This is the standard utility-indifference price specialized to the
+$k$-regularized log-growth utility, with the cost-of-entry term
 deducted linearly in the wager fraction $w^\star$. The economic
-interpretation is the same as the standard one: $c^\star_k$ is the
-highest price at which the agent is willing to take the bet at its
-Kelly-optimal size.
+interpretation is the usual one: $c^\star_k$ is the highest price at
+which the agent is willing to take the bet at its Kelly-optimal size.
 
 \begin{proposition}[Closed form for reservation price]\label{prop:reservation}
 Under the conditions of Definition~\ref{def:reservation},
 \begin{equation}
-c^\star_k(p, x) \;=\; \frac{\G(p, x) - k \cdot \KL(p \| u_n)}{w^\star(p, x)}
-                \;=\; \frac{J_k(p, x)}{w^\star(p, x)}.
+c^\star_k(p, x) \;=\; \frac{\ell(w^\star; p, x) - k \cdot \KL(p \| u_n)}{w^\star(p, x)}.
 \label{eq:reservation-form}
 \end{equation}
 \end{proposition}
 
 \begin{proof}
-Direct from \eqref{eq:Jk} and \eqref{eq:reservation}, solving for $c$
-at equality. \qed
+Solve \eqref{eq:reservation} at equality for $c$. \qed
 \end{proof}
 
+\begin{remark}[Selection vs.\ pricing functionals]\label{rem:two-jk}
+The pricing numerator $J_k^{\mathrm{HS}}(p, x) := \ell(w^\star; p, x)
+- k \cdot \KL(p \| u_n)$ used in \eqref{eq:reservation-form} differs
+from the selection functional $J_k(p, x) = \G(p, x) - k \cdot \KL(p \|
+u_n)$ of \eqref{eq:Jk}: the former uses the classical Kelly log-growth
+$\ell(w^\star)$, the latter uses the growth signal $\G = \ln E = \ln(M
+- 1)$. They are related by $\G = \ln(\exp(\ell(w^\star)) - 1)$. The
+two are appropriate to their respective purposes: $J_k$ produces the
+exact identity $\GROUND = \exp(J_k)$ for selection
+(Theorem~\ref{thm:main}), while $J_k^{\mathrm{HS}}$ is the standard
+Hansen-Sargent indifference-price object, well-defined for small bets
+and limiting cleanly to the MEMM expectation as $k \to 0$
+(Theorem~\ref{thm:memm} below).
+\end{remark}
+
 \begin{remark}
-The denominator $w^\star$ is the Kelly fraction at which the bet is
-sized; it converts a per-unit-bankroll growth quantity into a
-per-unit-stake price. In the unregularized case $k = 0$, this is the
-classical exponential-utility-indifference price specialized to log
-utility, which is the well-studied reservation price under
-expected-log-utility \citep{maclean2011}.
+The denominator $w^\star$ converts a per-unit-bankroll growth quantity
+into a per-unit-stake price. In the unregularized case $k = 0$,
+$c^\star_0 = \ell(w^\star)/w^\star$ is the classical
+log-utility-indifference price \citep{maclean2011}.
 \end{remark}
 
 \subsection{Limit \texorpdfstring{$k \to 0$}{k to 0}: connection to MEMM}
@@ -707,16 +737,17 @@ constraint is feasible.
 \emph{Step 2: take the $k \to 0$ limit of $c^\star_k$.} From
 Proposition~\ref{prop:reservation},
 \begin{equation*}
-c^\star_k(p, x) = \frac{\G(p, x) - k \, \KL(p \| u_n)}{w^\star(p, x)}.
+c^\star_k(p, x) = \frac{\ell(w^\star; p, x) - k \, \KL(p \| u_n)}{w^\star(p, x)}.
 \end{equation*}
 As $k \to 0$, the $-k \KL$ term vanishes and $c^\star_k \to
-\G(p,x)/w^\star$. The first-order condition for $w^\star$ in the small-bet
-regime gives $\E_p[x] \to 0$ as $w^\star \to 0$. Taylor expanding
-$\G(p,x) = \E_p[\ln(1 + w^\star x)]$ in natural-log units:
+\ell(w^\star; p, x)/w^\star$. In the small-bet regime $\E_p[x] \to 0$
+forces $w^\star \to 0$ (from the FOC $\E_p[x/(1 + w^\star x)] = 0$).
+Taylor expanding $\ell(w; p, x) = \E_p[\ln(1 + w x)]$ in $w$ in
+natural-log units:
 \begin{equation*}
-\G(p, x) \;=\; w^\star \, \E_p[x] \;-\; \frac{(w^\star)^2}{2} \, \E_p[x^2] \;+\; O((w^\star)^3),
+\ell(w^\star; p, x) \;=\; w^\star \, \E_p[x] \;-\; \frac{(w^\star)^2}{2} \, \E_p[x^2] \;+\; O((w^\star)^3),
 \end{equation*}
-so $\G(p, x) / w^\star \to \E_p[x]$ as $\E_p[x] \to 0$ (the
+so $\ell(w^\star) / w^\star \to \E_p[x]$ as $\E_p[x] \to 0$ (the
 denominator $w^\star$ scales linearly with $\E_p[x]$ from the FOC, so
 the ratio is finite and limits to $\E_p[x]$). Hence
 $\lim_{k \to 0^+} c^\star_k(p, x) = \E_p[x]$, in natural-log
@@ -728,7 +759,7 @@ $\lim_{k \to 0^+} c^\star_k(p, x) = \E_p[x]$, in natural-log
 \lim_{k \to 0^+} c^\star_k(\Q^*, x) = \E_{\Q^*}[x],
 \end{equation*}
 which is the MEMM expectation. Dominated convergence on the finite
-simplex is automatic ($|G|$ is bounded on the compact set $\Delta_n
+simplex is automatic ($|\ell|$ is bounded on the compact set $\Delta_n
 \times [0, 1)$), so the limit and the expectation interchange. \qed
 \end{proof}
 
@@ -759,15 +790,18 @@ $\X$: the uniform measure when $\X$ is finite, a chosen reference
 density (e.g.\ a benchmark risk-neutral density) when $\X$ is
 continuous. Let $p$ denote the implied distribution of a candidate
 claim with payoff function $x: \X \to \R$. Working throughout in
-natural-logarithm units, we define the \emph{Kelly log-growth
-functional}
+natural-logarithm units, the \emph{Kelly log-growth} at the
+optimal sizing fraction is
 \begin{equation}
-\G(p, x) \;=\; \sup_{w \in [0, 1)} \E_p\!\bigl[\ln(1 + w \, x)\bigr],
-\label{eq:G-canonical}
+\ell(w^\star; p, x) \;=\; \sup_{w \in [0, 1)} \E_p\!\bigl[\ln(1 + w \, x)\bigr],
+\label{eq:ell-canonical}
 \end{equation}
-the \emph{Kelly EV} $E(p, x) := \exp(\G(p, x)) - 1$ (the
-variance-adjusted expected wealth gain per trade at Kelly-optimal
-sizing), and the \emph{relative entropy from the reference}
+the wealth multiplier is $M(p, x) = \exp(\ell(w^\star; p, x))$, the
+\emph{Kelly EV} is $E(p, x) := M(p, x) - 1$ (the variance-adjusted
+expected wealth gain per trade at Kelly-optimal sizing), and the
+\emph{growth signal} carried through the regularized objective is
+$\G(p, x) := \ln E(p, x)$. The \emph{relative entropy from the
+reference} is
 \begin{equation}
 \KL(p \| u) \;=\; \E_p\!\biggl[\ln \frac{p}{u}\biggr],
 \label{eq:KL-canonical}
@@ -778,15 +812,16 @@ following one-line object, which we propose as the central formula
 of this paper:
 \begin{equation}
 \boxed{\;
-\GROUND(p, x, k) \;=\; \bigl(\exp(\G(p, x)) - 1\bigr) \cdot \exp\!\bigl( -k \, \KL(p \| u) \bigr)
+\GROUND(p, x, k) \;=\; \exp(\G(p, x)) \cdot \exp\!\bigl( -k \, \KL(p \| u) \bigr)
+\;=\; E(p, x) \cdot \exp\!\bigl( -k \, \KL(p \| u) \bigr)
 \;}
 \label{eq:ground-canonical}
 \end{equation}
 The economic content of \eqref{eq:ground-canonical} reads cleanly
 once one separates the two factors. The leading factor
-$\exp(\G(p,x)) - 1$ is the Kelly EV: the trade's expected wealth gain
-per dollar wagered at Kelly-optimal sizing, variance-adjusted via
-Jensen on the concave log inside $\G$. The multiplicative factor
+$\exp(\G(p,x)) = E(p, x)$ is the Kelly EV: the trade's expected wealth
+gain per dollar wagered at Kelly-optimal sizing, variance-adjusted via
+Jensen on the concave log inside $\ell(w^\star)$. The multiplicative factor
 $\exp(-k \KL(p \| u))$ is a \emph{risk discount}: it shrinks the score
 in proportion to how far the implied distribution $p$ sits from the
 maximum-uncertainty reference $u$, with the elasticity controlled by
@@ -809,11 +844,11 @@ of the GROUND ratio through the three settings in which it has been
 studied, all in natural-log (nats) units:
 \begin{align*}
 \text{\citet{mercurio2020binary}, binary options:} \qquad
-&\GROUND \;=\; (\exp(\G) - 1) \cdot \exp(-k \KL(p \| u_2)), \\[2pt]
+&\GROUND \;=\; \exp(\G) \cdot \exp(-k \KL(p \| u_2)), \\[2pt]
 \text{Companion paper, credit spreads:} \qquad
-&\GROUND \;=\; (\exp(\G) - 1) \cdot \exp(-k \KL(p \| u_3)), \\[2pt]
+&\GROUND \;=\; \exp(\G) \cdot \exp(-k \KL(p \| u_3)), \\[2pt]
 \text{General, any outcome space:} \qquad
-&\GROUND \;=\; (\exp(\G) - 1) \cdot \exp(-k \KL(p \| u)).
+&\GROUND \;=\; \exp(\G) \cdot \exp(-k \KL(p \| u)).
 \end{align*}
 Each line is the same equation specialized to its outcome space; only
 the reference $u$ changes. The third line is the form we recommend
@@ -822,7 +857,7 @@ arbitrary payoff structure, to sports-betting markets, or to any other
 setting in which a return-over-information-risk score is required.
 
 \paragraph{Optimal sizing.} The Kelly-optimal fraction $w^\star$
-in \eqref{eq:G-canonical} satisfies the first-order condition
+in \eqref{eq:ell-canonical} satisfies the first-order condition
 \begin{equation}
 \E_p\!\biggl[\frac{x}{1 + w^\star \, x}\biggr] \;=\; 0,
 \label{eq:cts-foc}
@@ -835,7 +870,7 @@ empirical paper. The statement and proof are below.
 \begin{proposition}[FOC for Kelly-optimal sizing]\label{prop:cts-foc}
 Let $p$ admit a density with respect to $u$, with
 $x \in L^\infty(p)$ and $x > -1$ $p$-almost everywhere. The Gâteaux
-derivative of $G(w; p, x) = \E_p[\ln(1 + w x)]$ in $w$ vanishes at
+derivative of $\ell(w; p, x) = \E_p[\ln(1 + w x)]$ in $w$ vanishes at
 $w^\star \in (0, 1)$ if and only if
 $\E_p[\,x / (1 + w^\star x)\,] = 0$.
 \end{proposition}
@@ -881,7 +916,7 @@ expressions under \eqref{eq:ground-canonical}. As $k \to 0$ the risk
 discount $\exp(-k \KL) \to 1$ and the ratio collapses to pure Kelly
 growth:
 \begin{equation*}
-\lim_{k \to 0^+} \Gamma(p, x) \;=\; G(p, x).
+\lim_{k \to 0^+} \GROUND(p, x, k) \;=\; E(p, x) \;=\; \exp(\G(p, x)).
 \end{equation*}
 As $k \to \infty$ the discount factor drives each candidate's score
 to zero at a rate set by its own $\KL$, so selection collapses to
@@ -1014,7 +1049,7 @@ extended. None of the following are within scope of the present paper.
 Let $\C = (x, p, c)$ be a contingent claim with
 $\min_\omega x(\omega) = -1$, $\max_\omega x(\omega) = +1$, and
 $p(\omega) > 0$ for all $\omega$ such that $x(\omega) \neq 0$. The
-expected log-growth $G(\cdot; p, x): [0, 1) \to \R$ defined in
+expected log-growth $\ell(\cdot; p, x): [0, 1) \to \R$ defined in
 \eqref{eq:loggrowth} is strictly concave. Moreover, $\ell$ admits a unique
 maximizer $w^\star \in [0, 1)$ if and only if
 $\E_p[x] > 0$, in which case $w^\star \in (0, 1)$.
@@ -1023,7 +1058,7 @@ $\E_p[x] > 0$, in which case $w^\star \in (0, 1)$.
 \begin{proof}
 \emph{Strict concavity.} The function $w \mapsto \log(1 + w x(\omega))$
 is concave for any $x(\omega) > -1$, and strictly concave when
-$x(\omega) \neq 0$. The sum $G$ is therefore concave in $w$ on
+$x(\omega) \neq 0$. The sum $\ell$ is therefore concave in $w$ on
 $[0, 1)$, and strictly concave provided the support of $p$ contains at
 least two outcomes with distinct payoffs (which is the non-degenerate
 case).
@@ -1031,13 +1066,13 @@ case).
 \emph{Existence and characterization of $w^\star$.} The first-order
 condition
 \begin{equation*}
-G'(w; p, x) = \sum_\omega \frac{p(\omega) \, x(\omega)}{1 + w \, x(\omega)} = 0
+\ell'(w; p, x) = \sum_\omega \frac{p(\omega) \, x(\omega)}{1 + w \, x(\omega)} = 0
 \end{equation*}
-must have a solution in $(0, 1)$ iff $G'(0; p, x) = \E_p[x] > 0$ and
-$G'(w; p, x) \to -\infty$ as $w \to 1^-$ (which holds whenever
+must have a solution in $(0, 1)$ iff $\ell'(0; p, x) = \E_p[x] > 0$ and
+$\ell'(w; p, x) \to -\infty$ as $w \to 1^-$ (which holds whenever
 $p(\omega) > 0$ for some $\omega$ with $x(\omega) = -1$). Strict
 concavity then gives uniqueness of the interior optimizer. When
-$\E_p[x] \le 0$, $G'(0) \le 0$ and strict concavity implies $G$ is
+$\E_p[x] \le 0$, $\ell'(0) \le 0$ and strict concavity implies $\ell$ is
 non-increasing on $[0, 1)$, so $w^\star = 0$ is the optimizer.
 \qed
 \end{proof}
@@ -1102,12 +1137,12 @@ The continuous-state FOC was derived in Section~\ref{sec:continuous};
 the only technical step worth restating is the integrand bound that
 licenses the dominated-convergence interchange. With $\|x\|_\infty < 1
 / w_{\max}$ for the maximum admissible $w_{\max} < 1$ in
-\eqref{eq:G-canonical}, the integrand
+\eqref{eq:ell-canonical}, the integrand
 $|p(s) x(s) / (1 + w x(s))|$ is bounded by $p(s) \|x\|_\infty /
 (1 - w_{\max} \|x\|_\infty)$, a $p$-integrable function. The
 existence of an interior solution follows from continuity and the
-boundary behavior $\partial_w G \to +\infty$ as $w \to -1/\|x\|_\infty^+$
-and $\partial_w G \to -\infty$ as $w \to 1^-$ under the bounded-payoff
+boundary behavior $\partial_w \ell \to +\infty$ as $w \to -1/\|x\|_\infty^+$
+and $\partial_w \ell \to -\infty$ as $w \to 1^-$ under the bounded-payoff
 assumption.
 
 

@@ -5,15 +5,199 @@
   <meta name="theme-color" content="#0f0f0f">
   <title>{% block title %}GEPO Live{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    #page-content {
+      will-change: transform;
+      transition: transform 0s;
+    }
+    #ptr-indicator {
+      position: fixed; top: 0; left: 50%;
+      transform: translate(-50%, -100%);
+      background: #1a2a35; color: #e0e0d8;
+      padding: 10px 22px; border-radius: 0 0 18px 18px;
+      font-size: 13px; font-weight: 600; letter-spacing: 0.5px;
+      z-index: 9999; opacity: 0; pointer-events: none;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+  </style>
 </head><body>
 
+<div id="ptr-indicator">↓ pull to refresh</div>
+
 <div class="nav">
-  <a href="{{ url_for('index') }}">live</a>
-  <a href="{{ url_for('history') }}">history</a>
-  <a href="{{ url_for('latest_json') }}">api</a>
+  <a href="{{ url_for('index') }}"    class="{% if request.endpoint == 'index'        %}active{% endif %}">live</a>
+  <a href="{{ url_for('history') }}"  class="{% if request.endpoint == 'history'      %}active{% endif %}">history</a>
+  <a href="{{ url_for('backtest') }}" class="{% if request.endpoint == 'backtest'     %}active{% endif %}">backtest</a>
+  <a href="{{ url_for('oot') }}"      class="{% if request.endpoint == 'oot'          %}active{% endif %}">oot</a>
+  <a href="{{ url_for('snapshots') }}" class="{% if request.endpoint == 'snapshots'    %}active{% endif %}">snapshots</a>
+  <a href="{{ url_for('qr') }}"       class="{% if request.endpoint == 'qr'           %}active{% endif %}">qr</a>
+  <a href="{{ url_for('latest_json') }}" class="{% if request.endpoint == 'latest_json' %}active{% endif %}">api</a>
 </div>
 
+<div id="page-content">
 {% block content %}{% endblock %}
+</div>
+
+<script>
+(function() {
+  // Stop the browser from snapping scrollTop on navigation — interferes
+  // with the slide-in animation on the new page.
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+  // Swipe rotation: only live ↔ history. /api is a JSON endpoint and
+  // only accessible from the nav link, not by swipe.
+  const PAGES = [
+    "{{ url_for('index') }}",
+    "{{ url_for('history') }}",
+    "{{ url_for('backtest') }}",
+    "{{ url_for('oot') }}"
+  ];
+  const PULL_THRESHOLD  = 80;
+  const SWIPE_THRESHOLD = 60;
+  const AXIS_LOCK_PX    = 12;   // first 12px of movement decides h vs v
+
+  const indicator = document.getElementById('ptr-indicator');
+  const page      = document.getElementById('page-content');
+
+  // Prefetch the other page so commit-to-navigate is near-instant.
+  const currentPath = window.location.pathname;
+  const otherPath   = PAGES.find(p => p !== currentPath);
+  if (otherPath) {
+    fetch(otherPath, { credentials: 'same-origin' }).catch(() => {});
+  }
+
+  // DEFENSIVE: every page load starts with a clean transform on the
+  // content container. Previously a slide-IN animation was attempted
+  // here, but on iOS the rAF-chain occasionally failed to reset the
+  // final state to translateX(0), leaving the page stuck off-screen.
+  // Removing the slide-in entirely makes the navigation feel "instant"
+  // rather than animated, but eliminates the stuck-state failure mode.
+  try { sessionStorage.removeItem('gepo_swipe_in'); } catch (e) {}
+  page.style.transition = 'transform 0s';
+  page.style.transform  = '';
+
+  let startX = 0, startY = 0;
+  let axis   = null;     // "h" | "v" | "ptr" | null
+  let ptrArmed = false;
+  let inScrollableTable = false;  // touchstart inside .table-scroll → skip page swipe
+
+  function resetPage(animate) {
+    page.style.transition = animate ? 'transform 0.25s ease-out' : 'transform 0s';
+    page.style.transform  = '';
+  }
+  function resetIndicator(animate) {
+    indicator.style.transition = animate ? 'transform 0.25s ease, opacity 0.25s ease' : '';
+    indicator.style.transform  = 'translate(-50%, -100%)';
+    indicator.style.opacity    = '0';
+    indicator.textContent      = '↓ pull to refresh';
+    indicator.style.background = '#1a2a35';
+  }
+
+  document.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    axis   = null;
+    ptrArmed = false;
+    // If touch begins inside a horizontally-scrollable region (table or
+    // ticker strip), the user wants to pan that content — not navigate
+    // the page.
+    inScrollableTable = !!(e.target && e.target.closest && (
+      e.target.closest('.table-scroll') ||
+      e.target.closest('.ticker-strip')
+    ));
+    page.style.transition = 'transform 0s';
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+
+    // First substantial movement locks the axis.
+    if (axis === null) {
+      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal: page-nav UNLESS the touch started in a scrollable
+        // table, in which case let the table handle its own pan.
+        axis = inScrollableTable ? 'v' : 'h';
+      } else if (dy > 0 && page.scrollTop <= 0) {
+        axis = 'ptr';                  // downward at top of scroll container → pull to refresh
+      } else {
+        axis = 'v';                    // vertical scroll → leave alone
+      }
+    }
+
+    if (axis === 'h') {
+      // Real-time finger-follow. Damping at edges of the rotation.
+      const idx = PAGES.indexOf(window.location.pathname);
+      let drag = dx;
+      if ((dx > 0 && idx === 0) || (dx < 0 && idx === PAGES.length - 1)) {
+        drag = dx * 0.3;               // rubber-band at first/last page
+      }
+      page.style.transform = `translateX(${drag}px)`;
+    } else if (axis === 'ptr') {
+      const slide = Math.min(dy * 0.6, 90);
+      indicator.style.transition = 'transform 0s';
+      indicator.style.transform  = `translate(-50%, ${slide - 50}px)`;
+      indicator.style.opacity    = Math.min(dy / PULL_THRESHOLD, 1);
+      if (dy > PULL_THRESHOLD && !ptrArmed) {
+        ptrArmed = true;
+        indicator.textContent = '↑ release to refresh';
+        indicator.style.background = '#234a5e';
+      } else if (dy <= PULL_THRESHOLD && ptrArmed) {
+        ptrArmed = false;
+        indicator.textContent = '↓ pull to refresh';
+        indicator.style.background = '#1a2a35';
+      }
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+
+    if (axis === 'h') {
+      const idx = PAGES.indexOf(window.location.pathname);
+      if (Math.abs(dx) >= SWIPE_THRESHOLD) {
+        if (dx < 0 && idx < PAGES.length - 1) {
+          // Slide old page off LEFT, then navigate. Browser prefetch
+          // primes the next page's cache so the load is near-instant.
+          page.style.transition = 'transform 0.18s ease-out';
+          page.style.transform  = 'translateX(-100vw)';
+          window.location.href = PAGES[idx + 1];
+          return;
+        } else if (dx > 0 && idx > 0) {
+          page.style.transition = 'transform 0.18s ease-out';
+          page.style.transform  = 'translateX(100vw)';
+          window.location.href = PAGES[idx - 1];
+          return;
+        }
+      }
+      resetPage(true);
+    } else if (axis === 'ptr') {
+      if (dy > PULL_THRESHOLD) {
+        indicator.textContent = 'refreshing…';
+        indicator.style.transition = 'transform 0.15s ease';
+        indicator.style.transform  = 'translate(-50%, 20px)';
+        indicator.style.opacity    = '1';
+        setTimeout(() => location.reload(), 150);
+      } else {
+        resetIndicator(true);
+      }
+    }
+    axis = null;
+  }, { passive: true });
+
+  // touchcancel fires when the OS interrupts the touch (incoming call,
+  // user dragged off-screen, etc.). Reset cleanly so no partial transform
+  // is left applied.
+  document.addEventListener('touchcancel', () => {
+    if (axis === 'h') resetPage(true);
+    else if (axis === 'ptr') resetIndicator(true);
+    axis = null;
+  }, { passive: true });
+})();
+</script>
 
 {% block scripts %}{% endblock %}
 </body></html>

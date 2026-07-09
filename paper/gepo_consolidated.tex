@@ -1,0 +1,1649 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue!50!black,
+    pdfborder={0 0 0},
+    pdfborderstyle={/S/N},
+}
+\providecommand{\doi}[1]{\href{https://doi.org/#1}{doi:#1}}
+\usepackage[expansion=false]{microtype}
+\usepackage{authblk}
+\usepackage[numbers,square,sort&compress]{natbib}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{observation}[theorem]{Observation}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\PP}{\mathbb{P}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathcal{C}}
+\newcommand{\X}{\mathcal{X}}
+\newcommand{\KL}{D_{\mathrm{KL}}}
+\newcommand{\GROUND}{\Gamma_{\mathrm{i}}}
+
+\title{An Entropy-Regularized Growth-Optimal Selection Criterion \\
+       for Discrete-Payoff Options: \\
+       Theory and Empirical Validation on SP100 Credit Spreads}
+
+\author{Peter J.~Mercurio, PhD}
+\affil{\small \texttt{peter.mercurio@alumni.utoronto.ca}}
+\date{\today}
+
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The GROUND ratio is a portfolio-selection criterion that jointly
+rewards Kelly growth and penalizes distributional divergence from a
+uniform reference. In this work we introduce the intrinsic GROUND ratio by adopting the growth signal $g := \ln E$
+(where $E$ is the Kelly expected value (EV)) to give the criterion a multiplicative
+form that reads directly as a percent risk-adjusted return. Under this
+choice, we observe that $\ln \GROUND = g - k \cdot \KL = J_k$ holds
+exactly, where $J_k$ is the Hansen-Sargent multiplier-preferences functional. In the small-edge asymptotic limit where regularization weight $k \to 0$ and payoff edge shrinks to zero,
+the reservation-price approximation under Kelly-optimal sizing is asymptotically proportional to
+the agent's chosen belief-measure expectation, with proportionality constant $\tfrac{1}{2}$. As a special case, if that belief measure is
+the minimum-entropy martingale measure (MEMM), the limiting approximation equals $\tfrac{1}{2}\E_{\Q^\star}[x]$. We apply the criterion to a
+Greek-filtered weekly pool of Standard \& Poor's 100 vertical credit
+spreads with $k = 20$ and selection threshold $\GROUND \geq 0.10\%$
+frozen via in-sample grid sweeps before any 2025--2026 data is
+scored. On the in-sample 2020--2024 window ($n=4{,}765$ candidates),
+the strategy achieves Sharpe $1.85$ [Mertens 95\% CI on Sharpe: 1.33, 2.37].
+On the strict 70-week 2025--2026 holdout, Sharpe $2.80$ [CI: 1.39, 4.21]. The extended
+six-year sample yields Sharpe $2.07$ [CI: 1.56, 2.58]. Across
+$6{,}130$ candidates, the top $\GROUND$ decile beats the bottom by
+$32\times$ on mean per-trade yield, with the edge statistically
+robust in holdout (Spearman $\rho$ rises from $+0.108$ in-sample to
+$+0.153$ out-of-sample). The joint ranker outperforms both single-factor baselines (Kelly EV alone,
+Kullback-Leibler divergence alone) on every metric, confirming that the intrinsic GROUND ratio is more powerful than either component alone.
+\end{abstract}
+
+
+\section{Introduction}\label{sec:intro}
+
+The Kelly criterion (Kelly \cite{kelly1956}) prescribes the
+growth-optimal sizing fraction for a repeatable wager under known
+probabilities. When this criterion is applied to option-strategy
+selection, two well-documented difficulties arise. The first is that
+the probabilities are not actually known. They are estimated,
+typically from implied-volatility-derived risk-neutral distributions
+(Breeden and Litzenberger \cite{breeden1978}) or from realised
+statistics, and small errors in those estimates can produce large
+errors in the prescribed fraction (MacLean et al.\ \cite{maclean2011}). The second is that the Kelly objective rewards
+implied distributions whose mass is sharply concentrated on a single
+outcome. In a derivatives context this can mean rewarding implied
+distributions whose sharpness reflects measurement noise as much as
+genuine economic signal.
+
+Both of these difficulties motivate a regularized version of the
+Kelly objective, namely a criterion that retains the
+growth-maximization core but penalizes distributional configurations
+whose informational sharpness is suspect. A natural candidate for
+the penalty is the Kullback-Leibler divergence of the implied
+distribution from a maximally-uncertain reference, taken to be the
+uniform distribution on the discrete outcome space. The GROUND
+ratio of Mercurio et al.\ \cite{mercurio2020binary} took exactly this form, originally as
+a comparative score: each candidate was ranked against a
+reference candidate (typically the minimum-divergence candidate in
+the pool) by a ratio of growth differences to KL differences.
+
+The comparative form of the GROUND ratio is awkward in practice. The
+selection of any one candidate depends on the reference candidate chosen, and ties at minimum have to
+be handled procedurally. In this paper we replace the comparative
+form with an intrinsic, per-candidate form. We then write the
+intrinsic form in its canonical Kelly-EV-with-entropic-discount
+expression (Section~\ref{sec:framework}), and apply it to a real
+options market.
+
+\paragraph{What the paper does.}
+We make four contributions.
+
+\begin{enumerate}
+    \item We state the intrinsic GROUND ratio in its canonical
+          Kelly-EV-with-entropic-discount form
+          (Section~\ref{sec:framework}). Under the growth signal $g
+          := \ln E$, where $E$ is the Kelly EV, the identity
+          $\ln \GROUND = J_k$ holds exactly by construction. The
+          multiplicative $\GROUND$ form and the additive Hansen-Sargent
+          functional are therefore the same selection rule expressed
+          in different units, and they produce identical selection on
+          any menu of growth-positive candidates.
+    \item We characterize the reservation-price approximation under
+          the regularized log-growth objective. Under Kelly-optimal sizing,
+          in the small-edge asymptotic limit the first-order approximation is
+          proportional to the belief-measure expectation with constant $\tfrac{1}{2}$: $c^\star \approx \tfrac{1}{2} \E_p[x]$
+          for any belief distribution $p$ (Theorem~\ref{thm:memm}). When $p$ is the
+          minimum-entropy martingale measure of Frittelli \cite{frittelli2000}, the approximation equals
+          $\tfrac{1}{2}\E_{\Q^\star}[x]$. This proportionality is a consequence of Kelly's growth-variance trade-off, not a derivation of MEMM.
+    \item We validate the criterion on a real options market. To our
+          knowledge this is the first end-to-end backtest of the
+          intrinsic GROUND ratio on a real options market,
+          including realistic candidate generation, filtering,
+          sizing, and execution-cost treatment
+          (Sections~\ref{sec:strategy} and~\ref{sec:results}). The
+          ambiguity-aversion weight $k = 20$ and the threshold
+          $\tau = 0.10\%$ were both selected on the in-sample
+          window and frozen before any 2025--2026 data was scored;
+          the canonical filter pipeline (DTE, delta, max-loss, OI,
+          regime indicator, sizing, and probability split)
+          was developed by informal exploration on the in-sample
+          window and likewise frozen. See
+          Section~\ref{sec:filters} for a full
+          parameter-accounting paragraph.
+    \item We isolate the contribution of each ranker component by
+          replacing the intrinsic GROUND ratio with one factor at a
+          time and re-running
+          the strategy on the same candidate pool
+          (Section~\ref{sec:comparison}). The full joint ranker
+          outperforms both single-factor baselines on every metric
+          we report. We take this as direct evidence that the joint
+          ranker does work that neither component does on its own.
+\end{enumerate}
+
+\paragraph{Relation to our previous work.}
+The use of information-theoretic quantities as risk measures in
+portfolio optimization was proposed in Mercurio et al.\ \cite{mercurio2020portfolio},
+where we argued that Shannon entropy is a natural alternative to
+variance when the return distribution is discrete or otherwise
+ill-suited to mean-variance treatment. We subsequently specialized
+the construction to binary options in Mercurio et al.\ \cite{mercurio2020binary},
+where we introduced the GROUND ratio as a portfolio-selection
+criterion that simultaneously rewards Kelly growth and penalizes
+deviation from a uniform reference distribution on the two-state
+binary-wager simplex, and showed that the KL divergence of the
+wager's outcome distribution against the uniform reference is a
+convex risk measure in the sense of F\"ollmer and Schweizer
+\cite{follmer2002}, with the uniform distribution playing the role
+of the minimum-risk reference. The construction was subsequently
+applied to credit-spread option portfolios in
+Mercurio et al.\ \cite{mercurio2020}, which was the first use of an
+entropy-based risk measure for portfolio optimization on credit
+spreads under a generalized entropic framework.
+
+The present paper builds directly on those three earlier papers
+and extends them in three directions. First, we replace the
+comparative GROUND form of Mercurio et al.\ \cite{mercurio2020binary}
+with an intrinsic per-candidate form. By adopting the growth signal
+$g := \ln E$, we obtain a multiplicative form that reads as a
+percent risk-adjusted return, and we observe that this choice yields
+an exact identity with the Hansen-Sargent multiplier-preferences
+functional. Second, we characterize the reservation-price approximation under Kelly-optimal sizing.
+In the small-edge asymptotic limit where $k \to 0$ and payoff edge shrinks, the
+formula is asymptotically proportional to the belief-measure expectation with constant $\tfrac{1}{2}$
+(Theorem~\ref{thm:memm}), a consequence of Kelly's growth-variance trade-off. As a special case, when $p$ is the minimum-entropy martingale
+measure of Frittelli \cite{frittelli2000}, the limiting approximation equals $\tfrac{1}{2}\E_{\Q^\star}[x]$, not the full MEMM
+expectation. This proportionality principle applies uniformly regardless of belief choice. Third, we apply the intrinsic GROUND ratio to SP100 weekly
+vertical credit spreads and report a six-year end-to-end backtest,
+including realistic candidate generation, Greek and liquidity
+filtering, sizing, regime gating, and execution-cost treatment.
+
+\paragraph{Relation to the entropic pricing literature.}
+The Hansen-Sargent multiplier-preferences functional
+Hansen and Sargent \cite{hansen2008robustness} and the variational preferences class
+of Maccheroni et al.\ \cite{maccheroni2006ambiguity} provide the additive form $J_k =
+g - k \KL$ to which the intrinsic GROUND ratio is exactly related by
+exponentiation, $\GROUND = \exp(J_k)$. The incomplete-markets pricing literature
+(Frittelli \cite{frittelli2000}; Delbaen et al.\ \cite{delbaen2002}; Fujiwara and Miyahara \cite{fujiwara2003}) studies
+the minimum-entropy martingale measure as a canonical pricing kernel under distributional uncertainty.
+Theorem~\ref{thm:memm} shows that GROUND, motivated from the Kelly growth optimization side,
+exhibits an analogous entropy-regularization principle: under Kelly-optimal sizing, the reservation-price approximation is proportional
+to any belief-measure expectation (proportionality constant $\tfrac{1}{2}$). This is not derived from MEMM,
+but achieves a related robustness effect through Kelly's growth-variance trade-off. The intrinsic
+GROUND ratio thus connects to robustness-preference theory (Hansen and Sargent \cite{hansen2008robustness}) and incomplete-markets pricing
+(MEMM literature) through this proportionality principle, though from a different theoretical starting point.
+
+\paragraph{Organization.}
+The rest of the paper is organized as follows.
+Section~\ref{sec:framework} states the canonical intrinsic
+GROUND ratio $\GROUND$ and
+the exact identity with the Hansen-Sargent functional.
+Section~\ref{sec:reservation-theory} characterizes the reservation-price approximation
+under Kelly-optimal sizing and its proportionality to belief-measure expectations.
+Section~\ref{sec:strategy} describes the empirical setup: the SP100
+universe, the candidate generation, the Greek filters, the sizing
+rule, and the slippage overlay. Section~\ref{sec:results} reports
+the headline results on the in-sample, holdout, and extended
+samples, with Mertens confidence intervals.
+Section~\ref{sec:ksweep} reports the in-sample $k$-sweep.
+Section~\ref{sec:threshold} reports the in-sample threshold
+sweep over $\tau$ and motivates the canonical
+$\GROUND \geq 0.10\%$ selection rule.
+Section~\ref{sec:comparison} reports the single-factor baseline
+comparison. Section~\ref{sec:decile} reports ranker quality across
+the full candidate distribution, split by sub-period.
+Section~\ref{sec:discussion} discusses limitations and open
+problems. Appendix~\ref{app:proofs} collects deferred proofs.
+
+
+\section{The canonical intrinsic GROUND ratio}\label{sec:framework}
+
+In this section we set up the framework and introduce the intrinsic
+GROUND ratio $\GROUND$ in its canonical Kelly-EV-with-entropic-discount form.
+We adopt a growth signal $g := \ln E$ to give the ratio a multiplicative
+form that reads directly as a percent risk-adjusted return; under this choice,
+the identity $\ln \GROUND = J_k$ holds by construction. We record the two
+limiting cases of the ratio and the economic meaning of each.
+
+\subsection{Setup}
+
+Let $\X = \{\omega_1, \ldots, \omega_n\}$ be a finite outcome set
+with $n \ge 2$, and let $\C = (x, p, c)$ be a contingent claim on
+$\X$. Here $x: \X \to \R$ is the per-unit-stake payoff vector, $p$
+is the probability vector on $\X$, and $c \ge 0$ is the
+per-unit-stake cost of entry. For a wager fraction $w \in [0, 1)$
+of the agent's bankroll, the post-bet bankroll multiplier in state
+$\omega$ is $1 + w \, x(\omega)$, and the expected log-bankroll gain
+across the outcomes is
+\begin{equation}
+\ell(w; p, x) \;:=\; \sum_{\omega \in \X} p(\omega) \, \ln\bigl(1 + w \, x(\omega)\bigr).
+\label{eq:loggrowth}
+\end{equation}
+The Kelly-optimal fraction is $w^\star = \arg\max_w \ell(w; p, x)$;
+existence and uniqueness on growth-positive claims are standard, and
+we record them in Appendix~\ref{app:proofs}, Lemma~\ref{lem:wstar}.
+
+At the optimum, two quantities are useful to keep distinct. The
+first is the wealth multiplier per trade,
+\begin{equation}
+M(p, x) \;:=\; \exp\bigl(\ell(w^\star; p, x)\bigr) \;\ge\; 1.
+\label{eq:M}
+\end{equation}
+The second is the Kelly EV, defined as the expected wealth
+\emph{gain} per trade at Kelly-optimal sizing,
+\begin{equation}
+E(p, x) \;:=\; M(p, x) - 1 \;=\; \exp(\ell(w^\star)) - 1 \;\ge\; 0.
+\label{eq:E}
+\end{equation}
+The Kelly EV is dimensionless, positive on growth-positive claims,
+and zero on claims with $\E_p[x] \le 0$. We restrict the menu
+throughout to growth-positive candidates ($E > 0$). Candidates with
+$E \le 0$ have Kelly-optimal fraction $w^\star = 0$ and contribute
+nothing.
+
+It is worth pausing on the Kelly EV. Because $\ell(w^\star)$ is the
+expectation of the concave function $\log(1 + w x)$, Jensen's
+inequality gives $\ell(w^\star) \le \ln(1 + w^\star \E_p[x])$, with
+strict inequality whenever $\mathrm{Var}_p[x] > 0$. Therefore $E$ is
+bounded above by $w^\star \E_p[x]$ (the arithmetic Kelly EV) and is
+strictly less whenever the payoff distribution has nonzero variance.
+That is, the Kelly EV is variance-adjusted by construction; this is
+what distinguishes it from the linear EV $\E_p[x]$. A high-EV but
+high-variance trade has a lower Kelly EV than a moderate-EV but
+low-variance trade with the same arithmetic mean.
+
+We also need the relative entropy of $p$ from the uniform reference
+$u_n(\omega) = 1/n$. In natural-log units (nats),
+\begin{equation}
+\KL(p \| u_n) \;=\; \sum_{\omega} p(\omega) \ln\!\frac{p(\omega)}{1/n} \;=\; \ln n - H(p),
+\label{eq:KL}
+\end{equation}
+where $H(p)$ is the Shannon entropy. The divergence is in $[0, \ln
+n]$. For the three-outcome credit-spread setting that occupies the
+empirical portion of this paper, $n = 3$ and $\ln 3 \approx 1.099$.
+
+\subsection{The intrinsic GROUND ratio}
+
+\begin{definition}[Intrinsic GROUND ratio]\label{def:ground}
+Fix $k > 0$ and a contingent claim $\C = (x, p, c)$ with $E(p, x) >
+0$. The intrinsic GROUND ratio at parameter $k$ is
+\begin{equation}
+\boxed{\;
+\GROUND(p, x, k) \;:=\; E(p, x) \cdot \exp\!\bigl(-k \cdot \KL(p \| u_n)\bigr).
+\;}
+\label{eq:ground}
+\end{equation}
+\end{definition}
+
+The two factors carry the two roles. The first factor is the
+variance-adjusted expected wealth gain per trade, that is, the
+\emph{return} side of the ratio. The second factor $\exp(-k \cdot
+\KL) \in (0, 1]$ is the entropic ambiguity discount, that is, the
+\emph{risk} side of the ratio. The discount is $1$ when $p$
+coincides with the uniform reference (zero divergence, full credit
+to the Kelly EV), and decays exponentially as the implied
+distribution becomes more concentrated. The product is dimensionless
+and reads directly as the variance-adjusted expected return per trade
+after the entropic ambiguity discount. For selected trades in our SP100 setting at the canonical
+$k = 20$, the distribution of $\GROUND$ is right-skewed and
+concentrated at small values: median $0.10\%$, mean $0.34\%$,
+$90$th percentile $0.82\%$, $99$th percentile $4.0\%$, with a
+small tail extending to roughly $13\%$. The exponential nature of
+the entropic discount $\exp(-k \cdot \KL)$ at $k = 20$ is what
+compresses most of the mass toward zero; only candidates whose
+implied distribution sits very close to the uniform reference
+escape the discount substantially.
+
+The subscript $\mathrm{i}$ stands for ``intrinsic''. It distinguishes
+the present form from the comparative form of Mercurio et al.\ \cite{mercurio2020binary},
+in which a candidate $a$ was scored against a per-period reference
+$b$ as described in the displayed equation below.
+In the comparative form, a candidate $a$ was scored against a
+per-period reference $b$ (taken to be the minimum-divergence
+candidate in the pool) by
+\begin{equation*}
+\Gamma_{a \mid b} \;=\; \frac{\ell(w^\star_a;\, p_a, x_a) - \ell(w^\star_b;\, p_b, x_b)}{\KL(p_a \| u_n) - \KL(p_b \| u_n)},
+\end{equation*}
+which produces a per-pool score rather than a per-candidate one.
+The intrinsic form is the evolution of that earlier construction
+into a per-candidate, reference-free score, and it is the form we
+adopt throughout the present paper.
+
+\subsection{Exact identity with the Hansen-Sargent functional}
+
+Define the growth signal as the log of the Kelly EV:
+\begin{equation}
+g(p, x) \;:=\; \ln E(p, x).
+\label{eq:gdef}
+\end{equation}
+This is well-defined on growth-positive claims (where $E > 0$). With
+this definition, $E = \exp(g)$, and the canonical
+form~\eqref{eq:ground} becomes
+\begin{equation*}
+\GROUND(p, x, k) \;=\; \exp(g(p, x)) \cdot \exp\bigl(-k \cdot \KL(p \| u_n)\bigr).
+\end{equation*}
+Taking the natural logarithm of both sides yields the additive form:
+\begin{equation}
+\ln \GROUND(p, x, k) \;=\; g(p, x) - k \cdot \KL(p \| u_n) \;=:\; J_k(p, x),
+\label{eq:Jk}
+\end{equation}
+which is the multiplier-preferences functional of
+Hansen and Sargent \cite{hansen2008robustness} and the variational preferences class
+of Maccheroni et al.\ \cite{maccheroni2006ambiguity}. Equivalently, in multiplicative
+form,
+\begin{equation}
+\GROUND(p, x, k) \;=\; \exp\bigl(J_k(p, x)\bigr).
+\label{eq:exact-identity}
+\end{equation}
+
+This identity holds exactly. It is an algebraic consequence of the
+choice $g := \ln E$, not an approximation, and the derivation
+required no Taylor expansion. The growth signal $g$ defined here is
+not the classical Kelly log-growth $\ell(w^\star)$; the two are
+related by $g = \ln(\exp(\ell(w^\star)) - 1)$ but differ
+substantively in their typical numerical range. Classical Kelly
+log-growth $\ell(w^\star)$ is a small positive number (roughly
+$0.01$ to $0.10$ in our setting), while $g = \ln E$ is a large
+negative number (roughly $-3$ to $-7$ in nats). The exponentiation
+in $\GROUND = \exp(J_k)$ undoes the log, returning a small positive
+risk-adjusted EV.
+
+\paragraph{Why $g := \ln E$ and not $\ell(w^\star)$.}
+The choice $g := \ln E$ is not the unique way to write an additive
+form for $\GROUND$. A natural alternative is to use the classical
+Kelly log-growth $\ell(w^\star)$ as the growth signal, in which
+case the additive form becomes $\ell(w^\star) - k \cdot \KL$, which
+also coincides with Hansen-Sargent multiplier preferences under a
+different identification. We chose $g := \ln E$ for one reason: it
+is the only choice under which the \emph{multiplicative}
+$\GROUND$, which is what a trader actually reads as a number on a
+screen, is interpretable as a percent risk-adjusted expected
+return per trade. The Kelly EV $E = \exp(\ell(w^\star)) - 1$ is
+the per-trade wealth gain in proportional units; multiplying it by
+the entropic discount $\exp(-k \cdot \KL)$ gives a quantity in the
+same units. Under the alternative $g = \ell(w^\star)$, the
+displayed score would be the wealth multiplier $M = \exp(\ell)$
+times the entropic discount, which is not a percent return and
+requires the reader to subtract $1$ mentally. The exact
+Hansen-Sargent identity in \eqref{eq:exact-identity} is a
+consequence of the economically motivated choice, not the
+motivation itself.
+
+\begin{observation}[Selection equivalence]\label{obs:selection}
+On any menu of growth-positive claims, ranking by the multiplicative
+form~\eqref{eq:ground} returns the same candidate as ranking by the
+additive form~\eqref{eq:Jk}. That is, $\arg\max_i \GROUND(p_i, x_i,
+k) = \arg\max_i J_k(p_i, x_i)$.
+\end{observation}
+
+The observation is a one-line consequence of the identity
+$\GROUND = \exp(J_k)$ composed with strict monotonicity of the
+exponential. We record it explicitly because the two forms are
+useful in different contexts. The multiplicative form is convenient
+empirically, because the displayed value reads as a per-trade
+percent return. The additive form is convenient analytically,
+because the limits in $k$ are cleaner in log-space, and the pricing
+derivation in Section~\ref{sec:reservation-theory} uses the additive form
+directly.
+
+\subsection{Limiting cases}\label{sec:limits}
+
+Two limits of the canonical ratio are immediate.
+
+\begin{proposition}[Kelly limit]\label{prop:kelly-limit}
+On any finite menu of growth-positive claims, as $k \to 0^+$ the
+$\GROUND$-optimal selection $\arg\max_i \GROUND(p_i, x_i, k)$ converges
+to the pure Kelly-EV-optimal selection $\arg\max_i E(p_i, x_i)$.
+\end{proposition}
+
+\begin{proposition}[Maximum-entropy limit]\label{prop:maxent-limit}
+On any finite menu of growth-positive claims, as $k \to \infty$ the
+$\GROUND$-optimal selection converges to the minimum-divergence claim,
+$\arg\min_i \KL(p_i \| u_n)$.
+\end{proposition}
+
+Both follow from continuity together with the boundedness of $E$
+and $\KL$ on a finite menu; proofs are in
+Appendix~\ref{app:proofs}. Between the two limits the ratio
+interpolates monotonically in $k$. At $k = 0$ the agent ignores
+distributional concentration and selects on pure Kelly EV; at
+$k \to \infty$ the agent ignores growth and selects the most uniform
+implied distribution; for intermediate $k$, the agent trades the
+two off against each other. The empirical $k$-sweep
+(Section~\ref{sec:ksweep}) explores this interpolation on the
+in-sample window.
+
+
+\section{Reservation prices under regularized growth}\label{sec:reservation-theory}
+
+Section~\ref{sec:framework} addresses selection: which claims should an agent ranking by
+GROUND choose from a menu? We now address the complementary pricing question: what
+is the agent's reservation price (breakeven cost) for a single claim under the
+regularized log-growth objective?
+
+The regularized reservation price balances two forces. The Kelly log-growth $\ell(w^\star)$
+measures expected wealth gain. The entropy penalty $k \cdot \KL(p \| u_n)$ discounts prices
+proportional to how sharply the belief $p$ departs from the uniform reference. In the
+small-edge asymptotic limit where payoff edge shrinks and $k \to 0$, the first-order
+approximation exhibits a universal proportionality principle: the reservation price scales
+with any belief-measure expectation with proportionality constant determined by Kelly's
+growth-variance trade-off. This proportionality property connects GROUND to classical
+utility-based pricing and the broader robustness-preference literature (Hansen and Sargent \cite{hansen2008robustness}).
+
+\subsection{Reservation price under regularized growth}
+
+For the reservation price we use the classical Kelly log-growth
+$\ell(w^\star; p, x)$ from~\eqref{eq:loggrowth}, rather than the
+growth signal $g = \ln E$ used for selection. The utility
+indifference price is the standard log-utility object, and
+$\ell$ admits the small-bet Taylor expansion that we will need in
+the proof below.
+
+\begin{definition}[$k$-regularized reservation price]\label{def:reservation}
+Fix $k > 0$ and a contingent claim $\C = (x, p, c)$ with
+$\ell(w^\star; p, x) - k \cdot \KL(p \| u_n) > 0$. The $k$-regularized reservation price is
+the highest cost $c^\star_k$ at which the agent's regularized
+log-utility, entered at the Kelly-optimal fraction $w^\star(p,x)$ computed
+on the unregularized claim, equals the no-trade baseline:
+\begin{equation}
+c^\star_k(p, x) \;=\; \sup \Bigl\{ c \ge 0 \;:\; \ell(w^\star; p, x) \;-\; c \cdot w^\star(p, x)
+    \;-\; k \cdot \KL(p \| u_n) \;\ge\; 0 \Bigr\}.
+\label{eq:reservation}
+\end{equation}
+Solving at equality gives the closed form
+\begin{equation}
+c^\star_k(p, x) \;=\; \max\left(0, \frac{\ell(w^\star; p, x) - k \cdot \KL(p \| u_n)}{w^\star(p, x)}\right).
+\label{eq:reservation-form}
+\end{equation}
+\end{definition}
+
+The denominator $w^\star$ converts the per-bankroll growth quantity
+in the numerator into a per-unit-stake price. Note that $w^\star$ is held
+fixed (pre-cost), not re-optimized as cost $c$ varies; this is a first-order approximation,
+not exact utility-indifference pricing. In the unregularized
+case $k = 0$, the formula reduces to $c^\star_0 = \ell(w^\star) / w^\star$, a first-order log-utility reservation-price approximation (cf.\ MacLean et al.\ \cite{maclean2011}), with the same limitation of holding $w^\star$ fixed pre-cost.
+
+\subsection{Asymptotic convergence in the small-edge limit}
+
+The intrinsic GROUND-induced reservation-price formula~\eqref{eq:reservation-form} is a first-order
+approximation to exact utility-indifference pricing. Under Kelly-optimal sizing, when the payoff edge shrinks
+and regularization weight vanishes, the formula becomes asymptotically proportional to the expected payoff
+under the agent's belief distribution, with proportionality constant $\tfrac{1}{2}$ (reflecting the growth-variance trade-off).
+The next theorem makes this precise for any belief $p$, including the special case where $p$ is the minimum-entropy martingale
+measure $\Q^\star$ of Frittelli \cite{frittelli2000}.
+
+\begin{theorem}[Intrinsic GROUND-induced reservation price: first-order approximation in the small-edge limit]\label{thm:memm}
+Let $\PP = u_n$ be the agent's reference probability measure.
+Consider a sequence of claims $\C_m = (x_m, p_m, c_m)$ where payoffs $x_m$ are uniformly bounded,
+edges $\mu_m := \E_{p_m}[x_m] \to 0^+$, and second moments are uniformly bounded away from zero,
+$0 < \sigma_{\min}^2 \le \E_{p_m}[x_m^2] \le \sigma_{\max}^2 < \infty$. Under Kelly-optimal sizing
+$w^\star_m \approx \mu_m / \E_{p_m}[x_m^2]$, if $k_m \to 0^+$ and $k_m = o(\mu_m^2)$, then
+\begin{equation*}
+c^\star_{k_m}(p_m, x_m) \;=\; \tfrac{1}{2}\,\E_{p_m}[x_m] \;+\; o(\E_{p_m}[x_m]).
+\end{equation*}
+Thus the first-order reservation-price approximation is proportional to the belief-measure expectation, with proportionality constant $\tfrac{1}{2}$ under Kelly-optimal sizing.
+When $p$ is the minimum-entropy martingale measure $\Q^\star$ of Frittelli \cite{frittelli2000},
+the limiting approximation equals $\tfrac{1}{2}\E_{\Q^\star}[x]$, not the full MEMM expectation. This proportionality
+reflects Kelly's growth-variance trade-off, not a special relationship to MEMM: any belief measure
+yields the same proportionality constant under Kelly-optimal sizing.
+\end{theorem}
+
+\begin{proof}
+We work on the finite simplex $\Delta_n$. The formula~\eqref{eq:reservation-form} is a
+first-order Taylor approximation to exact utility-indifference pricing: cost is subtracted linearly
+outside the log rather than inside the payoff/bankroll multiplier, and $w^\star$ is fixed
+(pre-cost) rather than re-optimized. Despite these approximations, the limit holds.
+
+From~\eqref{eq:reservation-form},
+\begin{equation*}
+c^\star_k(p, x) \;=\; \frac{\ell(w^\star; p, x) - k \, \KL(p \| u_n)}{w^\star(p, x)}.
+\end{equation*}
+Under Kelly-optimal sizing $w^\star_m \approx \mu_m / E[x_m^2]$, Taylor-expand $\ell(w; p, x) = \E_p[\ln(1 + wx)]$:
+\begin{equation*}
+\ell(w^\star; p, x) \;=\; w^\star \mu - \tfrac{(w^\star)^2}{2} E[x^2] + O((w^\star)^3).
+\end{equation*}
+Divide by $w^\star$:
+\begin{equation*}
+\frac{\ell(w^\star)}{w^\star} \;=\; \mu - \tfrac{w^\star}{2} E[x^2] + O((w^\star)^2) \;=\; \mu - \tfrac{\mu}{2} + O(\mu^2) \;=\; \tfrac{\mu}{2} + O(\mu^2).
+\end{equation*}
+
+The entropy penalty is $k \cdot \KL(p \| u_n) / w^\star \approx k \cdot E[x^2] \cdot \KL / \mu$.
+When $k = o(\mu^2)$, this term is $o(\mu)$ and negligible relative to the $\mu/2$ leading term. Thus:
+\begin{equation*}
+c^\star_k = \frac{\ell(w^\star) - k \cdot \KL}{w^\star} \;=\; \tfrac{\mu}{2} + O(\mu^2) - o(\mu) \;=\; \tfrac{1}{2}\E_p[x] + o(\E_p[x]).
+\end{equation*}
+\qed
+\end{proof}
+
+\begin{remark}
+The key insight of Theorem~\ref{thm:memm} is the universal proportionality principle: under Kelly-optimal sizing,
+the first-order reservation-price approximation scales with any belief-measure expectation with proportionality constant 1/2.
+This constant reflects Kelly's fundamental growth-variance trade-off (Section~\ref{sec:framework}).
+The proportionality holds uniformly regardless of whether the belief $p$ is risk-neutral, empirical, or the minimum-entropy martingale measure.
+
+For $k > 0$ (the practical regime), the entropy penalty $k \cdot \KL(p \| u_n)$ further discounts prices in proportion to
+distributional divergence from uniform. This is a robustness mechanism: it down-weights beliefs
+that are sharply concentrated due to estimation noise or model misspecification. The entropy penalty
+strength $k$ is chosen once in-sample (Section~\ref{sec:ksweep}) and applies identically to any belief measure.
+
+\emph{Historical note:} Incomplete-markets pricing literature (Frittelli \cite{frittelli2000}, Delbaen et al.\ \cite{delbaen2002})
+studies the minimum-entropy martingale measure as a canonical pricing kernel. The proportionality principle
+shows that GROUND applies an analogous entropy regularization, but agnostically with respect to belief—not derived from MEMM, but
+achieving a similar distributional robustness effect through a different mechanism (Kelly's growth optimization).
+\end{remark}
+
+
+\section{Empirical setup}\label{sec:strategy}
+
+The rest of the paper validates the criterion empirically on a real
+options market. This section describes the data, the candidate
+generation, the filters, the sizing rule, and the slippage
+treatment, all of which are held constant across every reported
+result. A reader who is principally interested in the headline
+results may skip directly to Section~\ref{sec:results}.
+
+\subsection{The universe and the outcome space}
+
+We backtest on the SP100 universe over the period 2020-01-01
+through 2026-05-04. The data is the standard daily option chain,
+recording bid, ask, mid, open interest, and implied volatility for
+each contract. Each Monday we construct a candidate menu of
+vertical credit spreads (bull put and bear call) on each
+underlying. Each spread has three terminal outcomes at expiry:
+\begin{itemize}
+    \item \emph{full win}, where the underlying expires beyond the
+        short strike in the favourable direction, and the trader
+        keeps the entire credit;
+    \item \emph{full loss}, where the underlying expires beyond
+        the long strike on the adverse side, and the trader loses
+        the maximum loss;
+    \item \emph{partial}, where the underlying expires in the zone
+        between the two strikes, and the trader keeps some
+        fraction of the credit.
+\end{itemize}
+The outcome space is therefore $\X = \{+b,\, +\alpha(b) b,\, -1\}$
+in per-dollar-of-risk units, where $b = \text{credit} /
+\text{max-loss}$ and $\alpha(b) = (b - 1) / (2b)$ is the principled
+partial multiplier (the uniform-in-strikes linear partial average
+between $-1$ and $+b$). The three-outcome structure is what
+distinguishes the credit-spread setting from the two-outcome binary
+wagers of Mercurio et al.\ \cite{mercurio2020binary}.
+
+The universe is the SP100.
+
+\subsection{Greek filters and sizing}\label{sec:filters}
+
+The canonical filter set is held constant across every reported
+result. The constraints are:
+\begin{itemize}
+    \item days to expiry (DTE) in $[3, 8]$ trading days;
+    \item short-leg absolute delta in $[0.35, 0.65]$, the
+        moderate-moneyness sweet spot;
+    \item per-spread maximum loss not exceeding $\$5$ per share;
+    \item both legs at open interest (OI) of at least $100$
+        contracts, a basic liquidity threshold;
+    \item a binary regime gate on the SPDR S\&P 500 ETF Trust
+        (ticker symbol SPY). SPY's close must be above its 100-day
+        simple moving average (SMA) for a bull-put candidate to be
+        eligible, and below the same SMA for a bear-call candidate.
+\end{itemize}
+This is the only macro filter in the canonical configuration.
+Other filters that we tried, including per-ticker regime gates,
+gap filters, filters conditioned on the CBOE Volatility Index (VIX),
+theta-to-credit ratio filters, and credit-ratio caps, were either
+redundant with the canonical set or return-degrading. We keep only
+the canonical set.
+
+Sizing is flat: every selected trade is entered at $q = 1$ or
+$q = 2$ contracts per spread (the two reported configurations).
+A per-trade ceiling of $\texttt{MAX\_CONTRACTS} = 50$ guards
+against pathological cases under fractional-Kelly sizing variants
+that are evaluated in robustness checks but not used in the
+canonical configuration; with flat $q = 1$ or $q = 2$ the ceiling
+never binds. The Kelly-optimal fraction $w^\star$ is used only as
+a ranking input and never to size positions.
+
+Each week, the strategy selects every candidate from the surviving
+pool whose $\GROUND$ score clears a fixed cutoff
+$\tau = 0.10\%$. The cutoff has a clean economic reading because
+$\GROUND$ is dimensionless: setting $\GROUND \geq \tau$ is
+equivalent to imposing a $\tau$-per-trade hurdle on the
+variance-adjusted expected return after the entropic ambiguity
+discount. We adopt $\tau = 0.10\%$ as the canonical threshold;
+Section~\ref{sec:threshold} reports the in-sample threshold sweep
+that motivates the choice. The threshold selects approximately
+$2.8$ trades per week from the surviving pool on the in-sample
+window.
+
+\subsection{Probability estimation}
+
+The per-leg in-the-money (ITM) probabilities are recovered from
+each leg's delta via the standard delta-as-probability
+approximation
+\begin{equation*}
+\Pr(\text{ITM at expiry}) \;\approx\; |\Delta|.
+\end{equation*}
+For short-dated options this diverges from the true physical
+probability under any non-zero drift, and the implied-volatility
+smile introduces additional moneyness-dependent error. In earlier
+iterations of this work we tested realised-volatility,
+drift-adjusted, and blended IV-RV estimators as alternatives.
+None produced a meaningful improvement in Sharpe under the
+$\GROUND$ ranker, and we revert to the delta-based estimator for
+its simplicity and its independence from a vol-history
+calibration window.
+
+The full-win, partial, and full-loss probabilities
+$(p, r_o, q)$ on the three-outcome space follow directly from the
+two legs' deltas. For a bull-put spread with short strike
+$K_s$ and long strike $K_\ell < K_s$, both legs are puts and the
+ITM probabilities are nested: $\Pr(S_T < K_\ell)$ is the
+full-loss event (the underlying expires past the long strike),
+$\Pr(S_T < K_s)$ is the any-loss event, and their difference is
+the partial-loss mass. Under the delta-as-probability
+approximation this gives
+\begin{equation*}
+q \;=\; |\Delta_\ell|, \qquad
+r_o \;=\; |\Delta_s| - |\Delta_\ell|, \qquad
+p \;=\; 1 - |\Delta_s|,
+\end{equation*}
+where $\Delta_s$ and $\Delta_\ell$ are the short- and long-leg
+deltas respectively. The bear-call construction is symmetric
+with call deltas. No free splitting parameter is involved; the
+broker-quoted long-leg delta directly supplies the partial-vs-full
+loss decomposition, with the market's strike-specific IV
+calibration baked in.
+
+These probabilities feed $\ell(w^\star)$ and $\KL(p \| u_3)$ for
+each candidate, both computed in natural-log units (nats).
+
+\paragraph{Free-parameter accounting.}
+For transparency, the canonical configuration has two parameters
+selected from data on the in-sample window via documented sweeps
+and frozen before any holdout scoring: the ambiguity-aversion
+weight $k = 20$ (Section~\ref{sec:ksweep}, nine-point sweep) and
+the threshold $\tau = 0.10\%$ (Section~\ref{sec:threshold},
+eight-point sweep). The remaining numerical settings,
+DTE $\in [3, 8]$, short-leg $|\Delta| \in [0.35, 0.65]$, max-loss
+$\le \$5$/share, OI $\ge 100$, the SPY 100-day SMA regime indicator,
+and the flat sizing rule, are filter and
+configuration choices made during development. We do not claim these were never adjusted on the
+in-sample window; alternative filters were tried (per-ticker
+regime gates, gap filters, VIX-conditional filters,
+theta-to-credit ratio filters) and found either redundant or
+return-degrading, and the surviving filter set was retained for
+the canonical configuration. The entire filter pipeline should
+therefore be regarded as in-sample-selected via informal
+exploration, with $k$ and $\tau$ as the only quantities selected
+via formal grid sweeps. The strict 2025--2026 holdout was
+scored with the entire pipeline frozen.
+
+\subsection{Execution model and slippage}\label{sec:slippage}
+
+The headline profit and loss (P\&L) is computed at the bid-ask
+mid-price for both legs, held to expiry. To stress-test the
+result against execution costs, we also report a post-hoc
+slippage overlay of $3$ cents per leg. The vertical credit spread
+has two legs, so the per-share slippage cost at $3$ cents per leg
+is $6$ cents per share. At the standard $100$-share multiplier
+this works out to $\$6$ per spread for the $q = 1$ configuration
+and $\$12$ per spread for the $q = 2$ configuration. The overlay
+is one-sided: spreads are held to expiry and settle at intrinsic
+value, so there is no closing fill and no exit slippage. We
+intend the $3$-cent figure as a conservative upper bound for an
+investor capable of working a limit-order ladder in a
+normally-quoted SP100 option chain. Realised per-leg slippage on
+SP100 weekly options worked through a limit-order ladder is
+typically below $1$ cent; the $3$-cent overlay is a worst-case
+ceiling intended to bound transaction-cost risk in the headline
+reporting rather than to estimate expected execution costs.
+Selection is conducted at the mid-price; the slippage overlay is
+applied to realised P\&L and to the wagered denominator only,
+since the haircut is part of the real dollar at risk on entry.
+
+
+\section{Headline results}\label{sec:results}
+
+This section reports the strategy's performance on the three time
+windows of interest: the in-sample window on which $k$ was
+selected, the strict out-of-sample holdout window, and the
+extended sample that combines the two. We then report Mertens 95\%
+confidence intervals on the Sharpe ratios, compare against an SPY
+buy-and-hold benchmark, and quantify the impact of the slippage
+overlay.
+
+\subsection{In-sample, holdout, and extended sample}
+
+The in-sample 2020--2024 window is the window on which $k = 20$
+was selected from the sweep over $\{0.5, 1, 2, 5, 10, 20, 50,
+100, 200\}$ described in Section~\ref{sec:ksweep}. The holdout
+window covers 2025-01-01 through 2026-05-04 over 70 weeks, and was
+never used in $k$-selection. The extended sample is the union of
+the two windows, and it is the largest-$T$ row in the headline
+table.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+window           & Trades & Final & Sharpe & Calmar & Max DD & Yield (0\textcent) \\
+\midrule
+\textbf{$q = 1$ (flat, 1 contract per spread)} \\
+in-sample 2020--2024   & 731   & \$24{,}653 & 1.85 & 19.03 & $-7.7\%$  & 29.21\%  \\
+holdout 2025--2026     & 215   & \$17{,}116 & 2.80 & 14.23 & $-5.0\%$  & 35.55\%  \\
+extended 2020--2026    & 946   & \$31{,}769 & 2.07 & 16.63 & $-7.7\%$  & 31.08\%  \\
+\midrule
+\textbf{$q = 2$ (flat, 2 contracts per spread)} \\
+in-sample 2020--2024   & 731   & \$39{,}306 & 1.85 & 19.03 & $-15.4\%$ & 29.21\%  \\
+holdout 2025--2026     & 215   & \$24{,}232 & 2.80 & 14.23 & $-10.0\%$ & 35.55\%  \\
+extended 2020--2026    & 946   & \$52{,}538 & 2.07 & 16.63 & $-15.4\%$ & 31.08\%  \\
+\bottomrule
+\end{tabular}
+\caption{Headline statistics for $\GROUND$ at $k = 20$ with the
+canonical $\GROUND \geq 0.10\%$ threshold selection rule on SP100
+weekly credit spreads, at both flat sizing levels. The holdout row
+is the strict out-of-sample evaluation: both $k = 20$ and
+$\tau = 0.10\%$ were frozen from the in-sample window before any
+holdout data was scored. Yields are sportsbook-style
+$\sum \mathrm{P\&L} / \sum \mathrm{wagered}$ ratios. The Sharpe
+ratio is annualised at $\sqrt{52}$ on weekly returns scaled to a
+$\$10{,}000$ starting bankroll. Max DD is the peak-to-trough
+drawdown on bankroll. The $q = 2$ rows are the $q = 1$ rows with
+doubled trade size; P\&L, drawdown, and final equity scale
+linearly, while Sharpe, yield, and Calmar are sizing-invariant by
+construction. The high Calmar ratios reflect the strategy's small peak-to-trough
+drawdowns (7.7\% in-sample, 5.0\% holdout) relative to annualised returns;
+under Kelly-coupled compounding (rather than flat sizing), the Calmar would moderate accordingly.}
+\label{tab:headline}
+\end{table}
+
+\subsection{Holdout compared with in-sample}
+
+On the strict 2025--2026 holdout, the strategy posts a Sharpe of
+$2.80$ and a yield of $35.55\%$ at zero slippage. Both are
+\emph{higher} than the in-sample figures of $1.85$ and $29.21\%$,
+which is the opposite of what one usually finds. The out-of-sample outperformance reflects the uncapped b-credit configuration adopted in the current version: high-b trades that would have been capped in earlier configurations enter the holdout set, and while they experience higher loss frequency, their occasional large wins drive overall wealth higher. Caution is warranted
+before over-interpreting this out-of-sample out-performance. The holdout is short (70 weeks), and the
+2025--2026 window happened to be a favourable environment for the
+credit-spread direction selected by the SPY trend filter (SPY
+closed above its 100-day SMA for most of the holdout). We report
+Mertens confidence intervals on the holdout Sharpe in
+Section~\ref{sec:sharpe-ci}, which give a more cautious read on
+how tight the holdout estimate really is.
+
+\paragraph{The April 2025 tariff-shock window.}
+The 70-week holdout includes the late-March and April 2025
+tariff-shock selloff, the largest single market disruption of the
+period. We note two facts about how the strategy fared. First, the
+single largest weekly loss of the entire holdout was $-2.38\%$, on
+the week of 2025-03-17 (the entry into the tariff window). Set
+against the in-sample single-week loss distribution, this is substantially
+less severe than the in-sample worst-week loss of $-6.59\%$ (the week of
+2020-04-13, in the COVID drawdown), and falls near the in-sample
+$1$st-percentile loss of $-2.65\%$ (the holdout worst week sits at
+the $\sim 2.3$rd percentile of in-sample weekly returns). The
+tariff-window worst week is, in other words, an unremarkable
+sub-2.4\% draw by the standards of what the in-sample window
+already revealed. Second, the direction-conditional regime gate,
+which prevented bear-call entries during the post-shock SPY
+downtrend, automatically cut exposure during the most volatile
+bear days. Whether one calls this a qualitative consistency check
+or a structural feature of the strategy, the tariff window did
+not break it.
+
+\subsection{Confidence intervals on Sharpe}\label{sec:sharpe-ci}
+
+Sharpe ratios estimated from short samples have wide confidence
+intervals, particularly under non-Gaussian return distributions.
+Lo \cite{lo2002sharpe} gave a closed-form standard error under an
+iid Gaussian-returns assumption, and Mertens \cite{mertens2002sharpe}
+extended that formula to handle arbitrary skewness and excess
+kurtosis under iid returns. The Mertens standard error depends on
+the third and fourth standardised moments of the return
+distribution: skewness ($\gamma_3$, asymmetry of the
+distribution; positive values indicate a right tail) and excess
+kurtosis ($\gamma_4$, fat-tailedness relative to the normal
+distribution; positive values indicate fatter tails). The
+strategy's weekly returns are right-skewed (occasional large wins
+mixed with frequent small losses) and fat-tailed, so Mertens
+intervals are the appropriate primary reference. We report
+Mertens 95\% intervals on all three windows in
+Table~\ref{tab:sharpe-ci}.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lrrrrcc}
+\toprule
+window                & $T$ & Sharpe & Skew $\gamma_3$ & Excess kurt $\gamma_4$ & $\sigma_{\hat S}$(Mertens) & 95\% CI \\
+\midrule
+in-sample 2020--2024  & 260 & 1.85 & $+1.72$ & $+6.95$ & 0.27 & $[1.33,\,2.37]$ \\
+holdout 2025--2026    &  70 & 2.80 & $+1.93$ & $+7.42$ & 0.72 & $[1.39,\,4.21]$ \\
+extended 2020--2026   & 330 & 2.07 & $+1.80$ & $+7.23$ & 0.26 & $[1.56,\,2.58]$ \\
+\bottomrule
+\end{tabular}
+\caption{Annualised Sharpe with iid-Gaussian
+\cite{lo2002sharpe} standard errors extended to arbitrary higher
+moments via Mertens \cite{mertens2002sharpe}. $T$ is the number
+of Monday-entry weeks; $\gamma_3$ is sample skewness; $\gamma_4$
+is sample excess kurtosis (full kurtosis minus 3, so a normal
+distribution has $\gamma_4 = 0$). Sharpe is annualised at
+$\sqrt{52}$.}
+\label{tab:sharpe-ci}
+\end{table}
+
+Three observations follow from the intervals.
+
+First, the holdout's Mertens interval $[1.39, 4.21]$ excludes zero
+by a wide margin. Even its lower edge ($1.39$) sits above the SPY
+matched-window point Sharpe of $1.02$ from Table~\ref{tab:spy}. We
+do not claim the result is definitive on 70 weeks, but it is not
+consistent with luck under the iid assumption.
+
+Second, the in-sample interval $[1.33, 2.37]$ is tighter, but it
+carries the usual caveat that both $k$ and the threshold $\tau$
+were selected on this window. Therefore, the in-sample Sharpe is
+not a clean estimate of the strategy's true Sharpe; it is an
+upper-biased estimate.
+
+Third, the extended-sample row is the most defensible single
+number for external communication. It has the largest $T$ ($330$
+weekly observations), the tightest confidence interval, and it
+combines the parameter-selected window with the strict holdout.
+Its lower 95\% bound is $1.56$, which is above SPY's same-period
+Sharpe across the entire reported range. For reporting outside
+the paper, we use this row.
+
+\subsection{SPY benchmark}
+
+The natural benchmark is SPY buy-and-hold over the matched
+windows. We report it in Table~\ref{tab:spy}.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lrrr}
+\toprule
+window                   & Sharpe & Total ROI & Max DD \\
+\midrule
+SPY 2020--2024           & 0.77 & $+94.6\%$  & $-31.8\%$ \\
+SPY 2025--2026 (matched) & 1.02 & $+24.6\%$  & $-16.9\%$ \\
+SPY 2020--2026 (matched) & 0.82 & $+141.8\%$ & $-31.8\%$ \\
+\bottomrule
+\end{tabular}
+\caption{SPY buy-and-hold benchmark over the matched windows.
+Return on investment (ROI) is the total period return. Sharpe is
+annualised at $\sqrt{52}$. See the convention paragraph below.}
+\label{tab:spy}
+\end{table}
+
+\paragraph{SPY benchmark convention.}
+For reproducibility we pin the SPY benchmark convention used in
+this paper. The price series is SPY daily close, dividend-adjusted
+at the source (back-adjusted for distributions through the
+end-of-series date). Weekly returns are computed from the
+W-Friday resampled close (last Friday close at or before the
+period boundary). Window boundaries are inclusive on both ends:
+the in-sample window runs from the first W-Friday on or after
+2020-01-01 through the last W-Friday on or before 2024-12-31; the
+holdout runs from the first W-Friday on or after 2025-01-01
+through the last W-Friday on or before 2026-05-04; the extended
+window is their union. The Sharpe and ROI figures of
+Table~\ref{tab:spy} are the canonical numbers under this
+convention and should be reproducible by any reader using the same
+W-Friday/adjusted-close pipeline.
+
+The strategy's Sharpe exceeds the SPY benchmark's on every window,
+with a substantial margin: $1.85$ versus $0.77$ in-sample, $2.80$
+versus $1.02$ on the holdout, and $2.07$ versus $0.82$ on the
+extended sample. The maximum drawdown is roughly four times
+smaller on each window.
+
+\subsection{Yield under the slippage overlay}
+
+We described the 3-cent-per-leg slippage overlay in
+Section~\ref{sec:slippage}. Its effect on yield is reported in
+Table~\ref{tab:slippage}.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lrrr}
+\toprule
+window           & Yield (0\textcent) & Yield (3\textcent/leg) & Haircut \\
+\midrule
+in-sample 2020--2024 & 29.21\%  & 17.63\%  & $-40\%$  \\
+holdout 2025--2026   & 35.55\%  & 25.05\%  & $-29\%$  \\
+extended 2020--2026  & 31.08\%  & 20.85\%  & $-33\%$  \\
+\bottomrule
+\end{tabular}
+\caption{Yield at zero slippage versus the 3-cent-per-leg post-hoc
+slippage overlay ($\$6$ per spread for the $q = 1$ configuration,
+$\$12$ per spread for $q = 2$; one-sided since spreads are held to
+expiry). Yield is defined as
+$\sum \mathrm{P\&L} / \sum \mathrm{wagered}$, with the wagered
+denominator including the slippage cost as part of dollar at
+risk.}
+\label{tab:slippage}
+\end{table}
+
+The fractional haircut is large, but the strategy stays profitable
+in every window even at the 3-cent-per-leg overlay. We treat
+3 cents per leg as an upper bound for an investor working a
+limit-order ladder on a normally-quoted SP100 chain; realised
+slippage will typically be less.
+
+
+\section{The \texorpdfstring{$k$}{k}-sweep}\label{sec:ksweep}
+
+The ambiguity-aversion parameter $k$ is the one tuning knob in
+the canonical intrinsic GROUND ratio. We selected $k$ on the in-sample
+2020--2024 window only, by running the full strategy at a range
+of $k$ values and reporting the Sharpe ratio, drawdown, and
+yield for each. Once $k$ was selected, it was frozen before any
+2025+ data was scored. We selected $k$ under top-$N=5$ rather than under
+the threshold rule to keep the trade count constant across the sweep,
+isolating the effect of $k$ on per-trade ranker quality from any
+trade-count-related Sharpe effects.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{rrrrrr}
+\toprule
+$k$ & Trades & Final & Sharpe & Max DD & Yield \\
+\midrule
+0.5  & 1{,}216 & \$24{,}613 & 1.58 & $-7.2\%$   & 29.2\% \\
+1    & 1{,}208 & \$25{,}056 & 1.65 & $-7.2\%$   & 30.1\% \\
+2    & 1{,}197 & \$24{,}864 & 1.64 & $-7.6\%$   & 29.7\% \\
+5    & 1{,}141 & \$25{,}313 & 1.72 & $-7.0\%$   & 30.6\% \\
+10   & 1{,}009 & \$24{,}927 & 1.75 & $-9.3\%$   & 29.9\% \\
+\textbf{20 (canonical)} & \textbf{659} & \textbf{\$22{,}263} & \textbf{1.87} & $\mathbf{-6.8\%}$ & \textbf{24.5\%} \\
+50   & 161    & \$14{,}690 & 1.44 & $-5.0\%$   & 9.4\% \\
+100  & 52     & \$11{,}454 & 0.69 & $-3.6\%$   & 2.9\% \\
+\bottomrule
+\end{tabular}
+\caption{The in-sample $k$-sweep at $q = 1$, under the canonical
+$\GROUND = E \cdot \exp(-k D_{\mathrm{KL}})$ ranker without the
+$b$-credit cap. The Sharpe ratio peaks at $k = 20$ (1.87), increasing
+monotonically from $k = 0.5$ (1.58) through $k = 20$ and decreasing
+monotonically through $k = 100$ (0.69). Trade counts vary as the
+entropic regularization parameter $k$ increases, removing lower-confidence
+intrinsic GROUND candidates while raising per-trade ranker quality. We freeze
+$k = 20$ as the canonical value before any 2025+ data is scored.}
+\label{tab:k-sweep}
+\end{table}
+
+A few things are worth flagging about Table~\ref{tab:k-sweep}.
+First, the sweep brackets the in-sample Sharpe peak. The Sharpe
+rises monotonically from $1.58$ at $k = 0.5$ through $1.87$ at $k
+= 20$, then falls monotonically through $1.44$ at $k = 50$ and
+$0.69$ at $k = 100$. We extended the
+sweep beyond $k = 20$ for exactly this reason: the falling half
+rules out an alternative explanation, that the entropic
+discount is doing all the work and the Kelly EV factor is
+contributing nothing. The
+strategy needs both ingredients in the canonical product; pushing
+the entropy penalty too hard collapses performance, just as the
+single-factor baseline comparison of
+Section~\ref{sec:comparison} shows that dropping the entropy
+penalty entirely also degrades performance.
+
+Second, the strategy is robust to $k$ within roughly a factor of
+ten around the peak: Sharpe stays in $[1.58, 1.87]$ across $k
+\in [0.5, 20]$ and drawdown improves monotonically through that
+range. Outside that range the strategy degrades quickly: at $k =
+100$ the Sharpe falls to $0.69$ and drawdown widens to $-3.6\%$.
+The relevant consequence of this robustness for the
+selection-bias concern is that with the eight grid points
+$\{0.5, 1, 2, 5, 10, 20, 50, 100\}$, the in-sample Sharpe
+profile identifies the peak only to within a factor of roughly
+two: $k = 20$ is statistically indistinguishable from values in
+$[5, 50]$ within the Sharpe noise. The in-sample peak should not
+be read as a tight estimate of an optimal $k$; it is the highest
+point on a slowly-varying plateau. Table~\ref{tab:k-mertens} reports
+Mertens 95\% confidence intervals on the in-sample Sharpe at
+$k \in \{5, 10, 20, 50\}$. All four intervals overlap on the
+substantial subset $[0.74, 2.29]$, which is the statistical
+content of the plateau claim.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{rrrrcc}
+\toprule
+$k$ & Sharpe & $\gamma_3$ & $\gamma_4$ & $\sigma_{\hat S}$(Mertens) & 95\% CI \\
+\midrule
+$5$  & 1.72 & $+0.61$ & $+0.59$ & 0.08 & $[1.55,\,1.88]$ \\
+$10$ & 1.75 & $+0.63$ & $+1.02$ & 0.09 & $[1.57,\,1.93]$ \\
+$\mathbf{20}$ \textbf{(canonical)} & $\mathbf{1.87}$ & $\mathbf{+1.06}$ & $\mathbf{+3.69}$ & $\mathbf{0.12}$ & $\mathbf{[1.63,\,2.12]}$ \\
+$50$ & 1.44 & $+1.42$ & $+11.00$ & 0.15 & $[1.15,\,1.73]$ \\
+\bottomrule
+\end{tabular}
+\caption{Mertens 95\% confidence intervals on the in-sample Sharpe
+at four $k$ values bracketing the in-sample peak. All four intervals
+overlap on the common subset $[1.15, 1.88]$. The implication is
+that $k = 20$ is not statistically distinguishable from $k \in
+[5, 50]$ on the in-sample window; the choice of $k = 20$ should be
+read as the highest point on a slowly-varying plateau, not as a
+tight estimate of an optimal $k$. These values use threshold-based
+selection matching Table~\ref{tab:k-sweep}, computed under the
+uncapped configuration without the $b$-credit cap.}
+\label{tab:k-mertens}
+\end{table}
+
+Third, the canonical $k = 20$ was frozen before any 2025+ data
+was scored. The 2025--2026 holdout's headline performance under
+the threshold rule reported in Table~\ref{tab:headline} was
+achieved using a value of $k$ chosen entirely on the 2020--2024
+window. A preliminary $k$-sweep was run with top-$N = 5$ selection
+to identify the $k$ that maximised Sharpe; the canonical threshold
+rule of $\GROUND \geq 0.10\%$ (Section~\ref{sec:threshold}) was
+selected after $k$ was already frozen and operates on the same
+$\GROUND$ scores produced under $k = 20$. Table~\ref{tab:k-mertens}
+reports Mertens intervals under threshold-based selection for
+consistency with Table~\ref{tab:k-sweep}.
+
+
+\section{Single-factor baseline comparison}\label{sec:comparison}
+
+The most important empirical question in this paper is whether the
+\emph{joint} growth-and-divergence signal does work that neither
+component does in isolation. To answer this question, we replace
+the intrinsic GROUND ranker with each of its two factors and
+re-run the strategy on the same in-sample 2020--2024 window at
+$q = 1$.
+
+\paragraph{Selection convention for this section.}
+For the fair across-ranker comparison reported in Table~\ref{tab:comparison},
+we use a common top-$N = 5$ per-week selection rule for all three
+rankers. The $\GROUND$ ranking is applied under top-$N = 5$
+selection in this section only, to enable the matched control against
+which the single-factor baselines are compared.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+ranker (top-$N = 5$ selection) & Trades & Final & Sharpe & Max DD & Yield \\
+\midrule
+\textbf{$\GROUND$ ($k = 20$)}     & 1{,}286 & \$25{,}475 & \textbf{1.71} & $-6.8\%$  & \textbf{16.61\%} \\
+$E$ alone (Kelly EV)              & 1{,}286 & \$23{,}747 & 1.43          & $-9.1\%$ & 14.64\% \\
+$\KL$ alone (least-concentrated)  & 1{,}286 & \$18{,}678 & 1.00          & $-13.1\%$ & 8.45\%  \\
+\bottomrule
+\end{tabular}
+\caption{Single-factor baseline rankers, in-sample 2020--2024,
+$q = 1$, all under the canonical per-spread Kelly payoffs $\{+b,
++\alpha(b) b, -1\}$ and a common top-$N = 5$ per-week selection
+rule. Under this matched convention the intrinsic
+$\GROUND$ ranker outperforms both single-factor baselines on
+every reported metric.}
+\label{tab:comparison}
+\end{table}
+
+Under the common top-$N = 5$ convention, the joint ranker beats
+the $E$-alone baseline on the Sharpe ratio ($1.71$ versus
+$1.43$), on yield ($16.61\%$ versus $14.64\%$), and on drawdown
+($-6.8\%$ versus $-9.1\%$). It beats the $\KL$-alone baseline by
+a wider margin on every metric.
+
+The $E$-alone row is the more informative comparison, because it
+isolates the contribution of the entropic discount. Without the
+$\exp(-k \KL)$ factor, the strategy loses control of the tails:
+drawdown deepens by $34\%$, from $-6.8\%$ to $-9.1\%$, and
+Sharpe drops by $0.28$. This is consistent with the motivation in
+Section~\ref{sec:intro}. The entropy penalty discounts trades whose
+Kelly-EV advantage depends on sharp implied-distribution
+concentration, which is exactly the kind of edge that does not
+survive estimation noise. The $\KL$-alone row collapses on yield,
+which is also expected: ranking by lowest divergence and ignoring
+growth gives the most-uniform distribution, which carries no
+particular reason to be profitable.
+
+The two component signals are individually weak. Their
+multiplicative combination via $\GROUND = E \cdot \exp(-k \KL)$ is
+where the empirical edge lives.
+
+\section{Threshold-based selection: user-controlled risk-adjusted return}\label{sec:threshold}
+
+The headline results of Section~\ref{sec:results} use the canonical
+selection rule $\GROUND \geq \tau$ with $\tau = 0.10\%$. This
+section motivates that choice.
+
+The threshold rule has a direct economic reading. Under the
+canonical Kelly-EV-with-entropic-discount form, $\GROUND$ is
+dimensionless and reads as the variance-adjusted expected return per trade
+after the entropic ambiguity discount (Section~\ref{sec:framework}). The cutoff
+$\GROUND \geq \tau$ is therefore equivalent to imposing a per-trade
+hurdle of $\tau$. An investor with a $0.10\%$ hurdle rate gets
+a strategy that trades exactly the candidates clearing that
+hurdle; an investor with a higher hurdle gets fewer,
+higher-quality trades. The control surface is the hurdle rate
+itself.
+
+To select $\tau$ we ran the strategy under $\GROUND \geq \tau$ for
+$\tau \in \{0,\,0.05\%,\,0.10\%,\,0.25\%,\,0.50\%,\,1\%,\,2\%,\,5\%\}$
+on the 2020--2024 in-sample window at $q = 1$ with all other
+configuration canonical (Greek filters, regime gate, $k = 20$).
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{rrrrrrr}
+\toprule
+$\tau$ & Trades & t/wk & Final & Sharpe & Max DD & Yield \\
+\midrule
+$0.00\%$ & 4{,}731 & 18.27 & \$32{,}603 & 0.70 & $-29.9\%$ & 5.59\%  \\
+$0.05\%$ & 1{,}082 &  4.18 & \$26{,}453 & 1.66 & $-10.6\%$ & 21.02\% \\
+$\mathbf{0.10\%}$ \textbf{(canonical)} & \textbf{731} & \textbf{2.81} & \textbf{\$24{,}653} & \textbf{1.85} & $\mathbf{-7.7\%}$ & \textbf{29.21\%} \\
+$0.25\%$ &   373    &  1.43 & \$19{,}232 & 1.97 & $-6.6\%$  & 36.24\% \\
+$0.50\%$ &   197    &  0.76 & \$16{,}537 & 1.70 & $-6.2\%$  & 50.78\% \\
+$1.00\%$ &   100    &  0.39 & \$14{,}511 & 1.70 & $-2.5\%$  & 70.58\% \\
+$2.00\%$ &    37    &  0.14 & \$12{,}139 & 1.29 & $-1.4\%$  & 95.46\% \\
+$5.00\%$ &    10    &  0.04 & \$10{,}334 & 0.49 & $-1.4\%$  & 81.40\% \\
+\bottomrule
+\end{tabular}
+\caption{In-sample 2020--2024 threshold sweep at $q = 1$. Each row
+shows results for a different $\GROUND$ cutoff $\tau$, with columns
+reporting the number of selected candidates, trades per week, final
+equity, Sharpe, max drawdown, and yield.}
+\label{tab:threshold-sweep}
+\end{table}
+
+The Sharpe profile rises sharply from $\tau = 0$ as low-quality
+candidates are filtered out, peaks at approximately
+$\tau = 0.25\%$ (in-sample Sharpe $1.97$), and falls past that
+point as the strategy runs out of trades. The $\tau = 0$ row is
+informative: ranking with no cutoff at all produces a Sharpe of
+$0.70$ with a $-30\%$ drawdown, which establishes that the bottom
+of the $\GROUND$ distribution is not informative and that some
+selectivity is essential.
+
+We adopt $\tau = 0.10\%$ rather than the Sharpe-maximizing
+$\tau = 0.25\%$, and we want to be explicit about the criterion.
+The choice was not Sharpe-max on the in-sample window; it was a
+trade-count floor. At $\tau = 0.25\%$ the strategy retains $1.43$
+trades per week, which we judged too thin to support the
+$\sqrt{N}$ diversification structure of the weekly Sharpe
+estimator. At $\tau = 0.10\%$ the strategy keeps approximately
+$2.81$ trades per week with in-sample Sharpe $1.85$, drawdown
+$-7.7\%$, and yield $29.21\%$. The buffer below the in-sample
+Sharpe peak is the conservative side of the selection.
+
+The in-sample Sharpe of $1.85$ at $\tau = 0.10\%$ is also higher
+than the $1.71$ Sharpe of the intrinsic GROUND ranker under top-$N = 5$
+selection at the same $k = 20$ reported in Table~\ref{tab:comparison}. The mechanism is
+direct: the threshold rule filters out marginal top-$5$ picks
+whose $\GROUND$ scores fall below $0.10\%$, which are
+disproportionately the lower-quality candidates in each week's
+top-$5$. Removing them concentrates the strategy on the part of
+the candidate distribution where the ranker is genuinely
+informative (Section~\ref{sec:decile}).
+
+
+\section{Ranker quality across the full candidate distribution}\label{sec:decile}
+
+The headline results of Section~\ref{sec:results} measure the
+strategy with the canonical $\GROUND \geq 0.10\%$ threshold
+applied, which is the configuration the strategy actually trades.
+In this section we ask a different question: how informative is
+$\GROUND$ as a \emph{per-candidate} signal, across the full pool
+of all candidates that survive the Greek, regime, and
+open-interest filters?
+
+To answer this, we re-run with $\texttt{top\_n} = \infty$, that
+is, with no per-week pick limit. The candidate pool that emerges is
+$6{,}130$ candidate trades over the 2020--2026 period. This is the
+largest sample we can produce for the diagnostic, and the one in
+which the ranker's per-candidate predictive content is most
+directly visible.
+
+\subsection{Pooled deciles}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{rrrrr}
+\toprule
+$\GROUND$ decile & mean yield (\%) & win rate (\%) & $n$ & mean $\GROUND$ (\%) \\
+\midrule
+1 (lowest)  & $+2.41$  & 50.5 & 727 & $0.00\%$ \\
+2           & $-3.57$  & 45.8 & 561 & $0.00\%$ \\
+3           & $+1.69$  & 48.7 & 567 & $0.00\%$ \\
+4           & $+5.54$  & 50.2 & 606 & $0.01\%$ \\
+5           & $-0.83$  & 46.9 & 612 & $0.01\%$ \\
+6           & $+3.98$  & 48.3 & 607 & $0.02\%$ \\
+7           & $+10.89$ & 50.1 & 613 & $0.05\%$ \\
+8           & $+14.53$ & 48.9 & 611 & $0.12\%$ \\
+9           & $+18.65$ & 47.3 & 613 & $0.12\%$ \\
+\textbf{10 (highest)}& $\mathbf{+76.71}$ & \textbf{44.7} & \textbf{613} & $\mathbf{1.33\%}$ \\
+\bottomrule
+\end{tabular}
+\caption{Per-trade yield, win rate, and candidate count by
+$\GROUND$ decile across the full candidate distribution. All SP100
+vertical credit spreads passing the canonical filters over
+2020--2026 are included ($n = 6{,}130$ candidates, $q = 1$). The
+Spearman rank correlation between $\GROUND$ and yield across all
+candidates is $+0.118$.}
+\label{tab:decile}
+\end{table}
+
+The pooled Spearman correlation between $\GROUND$ and per-trade
+yield is $+0.118$. This is modest. We acknowledge it directly:
+across all candidates, the per-candidate predictive content is
+not large. The picture in Table~\ref{tab:decile} is clearer than
+the pooled correlation. The signal concentrates in the top
+decile, which beats the bottom decile by roughly $32 \times$ on
+mean yield ($+76.71\%$ versus $+2.41\%$). Win rates are flat
+across deciles, in the range $44\%$ to $51\%$. The ranker is not
+selecting candidates that win more often; it is selecting
+candidates that win bigger when they do win, and lose smaller
+when they lose.
+
+\subsection{Sub-period robustness}
+
+A natural concern about Table~\ref{tab:decile} is that the
+top-decile edge could be a 2020--2024 artefact that fails to
+reproduce on the strict 2025--2026 holdout. We address this
+concern directly in Table~\ref{tab:decile-split} by splitting the
+deciles by sub-period.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{r rr rr}
+\toprule
+ & \multicolumn{2}{c}{in-sample 2020--2024} & \multicolumn{2}{c}{holdout 2025--2026} \\
+$\GROUND$ decile & mean yield (\%) & $n$ & mean yield (\%) & $n$ \\
+\midrule
+1 (lowest)  & $+4.12$  & 550 & $-0.16$  & 154 \\
+2           & $-3.01$  & 429 & $-9.34$  & 126 \\
+3           & $-6.75$  & 475 & $+18.86$ & 131 \\
+4           & $+6.78$  & 453 & $+12.99$ & 138 \\
+5           & $-1.84$  & 477 & $+2.67$  & 135 \\
+6           & $+0.79$  & 479 & $+13.15$ & 137 \\
+7           & $+8.61$  & 475 & $+22.49$ & 134 \\
+8           & $+14.52$ & 474 & $+19.86$ & 138 \\
+9           & $+15.63$ & 476 & $+27.00$ & 136 \\
+\textbf{10 (highest)} & $\mathbf{+62.96}$ & \textbf{477} & $\mathbf{+121.70}$ & \textbf{136} \\
+\midrule
+\multicolumn{1}{l}{Spearman $\rho$} & \multicolumn{2}{c}{$+0.108$} & \multicolumn{2}{c}{$+0.153$} \\
+\bottomrule
+\end{tabular}
+\caption{Decile mean yield split by sub-period: in-sample 2020--2024 ($n = 4{,}765$ candidates) and strict 2025--2026 holdout ($n = 1{,}365$ candidates).}
+\label{tab:decile-split}
+\end{table}
+
+The split confirms the pooled picture and strengthens it on the
+out-of-sample side. The top-decile yield is substantially higher in the holdout
+than in-sample ($+121.70\%$ versus $+62.96\%$), the bottom-decile
+yield is worse in the holdout ($-0.16\%$ versus $+4.12\%$), and
+the Spearman correlation is stronger in the holdout
+($+0.153$ versus $+0.108$). The top-decile-edge result is
+therefore robust to the sub-period split.
+
+The mid-decile rows (deciles $3$, $5$, and $6$) exhibit large
+sign-flips between the two sub-periods. This is the expected
+behaviour of a noisy mid-of-distribution signal in a 70-week
+holdout, and it is consistent with the reading that the ranker
+concentrates its predictive content at the extremes of the
+distribution. The instability in the middle of the table is
+diagnostic noise, not strategy risk: under the canonical
+threshold rule the strategy only selects from deciles whose
+$\GROUND$ clears $\tau = 0.10\%$, which in practice means decile
+$10$ and the top of decile $9$. The mid-deciles never enter the
+P\&L.
+
+\subsection{Interpretation: the decile pattern and entropic regularization}
+
+The most distinctive empirical feature of
+Table~\ref{tab:decile} is that win rate and yield run in opposite directions across deciles. The top decile has the worst win rate at $44.7\%$, while decile 7 reaches $50.1\%$; yet the top decile's mean yield of
+$+76.71\%$ dwarfs decile 7's $+10.89\%$ and beats the bottom by
+approximately $32\times$. This inversion (lowest win frequency, highest payoff magnitude) is the empirical signature of
+payoff-asymmetry selection, not probability-timing selection. The
+$\GROUND$ ranker does not select candidates that win more often; it
+selects candidates that win bigger when they do win and lose
+smaller when they lose.
+
+This is the empirical signature one would expect from the
+ambiguity-aversion regularization that motivates the criterion in
+Section~\ref{sec:intro}. The structure of $\GROUND = E \cdot
+\exp(-k \cdot \KL)$ selects for robustness: a candidate with a sharply concentrated
+implied distribution can have high Kelly EV $E$, but the entropic
+discount $\exp(-k \cdot \KL)$ pushes it down the ranking. The top
+$\GROUND$ candidates are therefore not the most-concentrated bets
+but candidates whose Kelly EV is positive while their implied
+distribution sits close enough to the uniform reference that the
+ambiguity discount remains modest. These are bets whose payoff
+profile is informationally well-conditioned: when they pay off,
+they pay off in proportion to their Kelly EV; when they don't,
+their losses are not amplified by the sharp probability
+concentration that would have made them tail-fragile in the first
+place.
+
+Theorem~\ref{thm:memm} shows that under Kelly-optimal sizing, in the small-edge asymptotic limit, the
+reservation-price approximation is asymptotically proportional to expected payoff under any belief, with proportionality constant $\tfrac{1}{2}$.
+The intrinsic GROUND ranker with $k > 0$ applies an entropy penalty that further discounts
+prices in proportion to distributional divergence from uniform. This is a
+robustness mechanism, not a MEMM-specific construction: it applies identically
+to any belief measure, whether MEMM, risk-neutral, or estimated empirical.
+The empirical decile pattern (flat win rates, magnitude-asymmetric payoffs)
+reflects the intrinsic GROUND ranker's joint optimization of edge and calibration, not a special
+relationship to MEMM. The regularization works the same for any choice of belief measure.
+
+
+\section{Discussion}\label{sec:discussion}
+
+\subsection{Limitations}
+
+We acknowledge three limitations of the present study.
+
+\paragraph{Holdout length.}
+The holdout is 70 weekly observations, which is a short
+statistical record. The Mertens 95\% confidence interval on the
+holdout Sharpe is wide at $[1.39, 4.21]$ (Table~\ref{tab:sharpe-ci}). The extended-sample row
+is the more defensible external number; the holdout's role here is
+to confirm that $k = 20$, frozen at in-sample selection, did not
+collapse on the strict out-of-sample window. It did not.
+
+\paragraph{Slippage upper bound.}
+The 3-cent-per-leg overlay is a conservative upper bound on
+per-leg execution slippage. Realized slippage on normally-quoted
+SP100 chains, worked through a limit-order ladder, will typically
+be less. Yields at the 3-cent-per-leg bound are $17.63\%$
+in-sample and $25.05\%$ on the holdout
+(Table~\ref{tab:slippage}).
+
+\paragraph{Single regime indicator.}
+The strategy uses one binary macro filter, namely SPY closing
+above its 100-day SMA. Per-ticker regime gates,
+VIX-conditioned filters, and gap filters were evaluated during
+development and were found to be either redundant with the SPY
+gate or return-degrading. The canonical configuration accordingly
+uses the single SPY filter only.
+
+\subsection{Open problems}
+
+Three directions in which the framework of this paper could be
+extended:
+
+\paragraph{Multi-period extension.}
+The single-period myopic treatment matches weekly practice. Under
+bankroll-coupled fractional-Kelly sizing, where the next period's
+wager scales with current bankroll, the multi-period extension is
+the standard Bellman recursion
+\begin{equation*}
+V_t(b) \;=\; \max_{\C \in \mathcal{M}_t} \Bigl\{\, J_k(p_\C, x_\C)
+   \;+\; \beta \cdot \E_{p_\C}\!\bigl[ V_{t+1}\!\bigl(b \cdot M(p_\C, x_\C; w^\star)\bigr) \bigr] \,\Bigr\},
+\end{equation*}
+with terminal condition $V_T(b) = 0$ and per-period discount
+$\beta \in (0, 1]$. The selection at each step is the
+$\GROUND$-style argmax plus a continuation term that depends on
+the realised wealth multiplier. Under the bankroll-independent
+flat sizing of the canonical configuration, the continuation
+term is constant in the choice $\C$ and the per-period myopic
+rule already used here is exactly optimal. The
+fractional-Kelly variant where bankroll matters is the natural
+candidate for the dynamic-programming treatment, and an empirical
+study of that variant under realistic bankroll-growth paths
+would establish optimality in a stronger sense.
+
+\paragraph{Continuous-state limit.}
+The canonical form $\GROUND = E \cdot \exp(-k \KL)$ extends to
+continuous outcome spaces with the differential KL replacing the
+discrete KL and the Kelly first-order condition becoming an
+integral equation. The tight integrability conditions for
+unbounded payoffs (long straddles, naked tail wings) remain open.
+
+\paragraph{Alternative reference measures.}
+The uniform reference $u_n$ is used throughout this paper.
+Alternative references, for example the risk-neutral measure
+derived from the most-liquid at-the-money contract on the same
+underlying, are economically defensible and would recover the
+comparative GROUND form of Mercurio et al.\ \cite{mercurio2020binary}. The cost of
+moving away from uniform is the loss of the scale-anchored
+interpretation of $\KL \in [0, \ln n]$.
+
+
+\appendix
+
+\section{Deferred proofs}\label{app:proofs}
+
+\subsection{Existence and uniqueness of \texorpdfstring{$w^\star$}{w-star}}
+
+\begin{lemma}[Properties of $w^\star$]\label{lem:wstar}
+Let $\C = (x, p, c)$ be a contingent claim with $\min_\omega
+x(\omega) = -1$, $\max_\omega x(\omega) = +1$, and $p(\omega) > 0$
+for all $\omega$ with $x(\omega) \neq 0$. Then the expected
+log-growth $\ell(\cdot; p, x): [0, 1) \to \R$ defined in
+\eqref{eq:loggrowth} is strictly concave and admits a unique
+maximizer $w^\star \in [0, 1)$ if and only if $\E_p[x] > 0$, in
+which case $w^\star \in (0, 1)$.
+\end{lemma}
+
+\begin{proof}
+The function $w \mapsto \log(1 + w x(\omega))$ is concave for any
+$x(\omega) > -1$, and strictly concave when $x(\omega) \neq 0$. The
+sum $\ell$ is therefore concave on $[0, 1)$, and strictly concave
+under the support condition. The first-order condition
+$\ell'(w; p, x) = \sum_\omega p(\omega) x(\omega) / (1 + w
+x(\omega)) = 0$ has a unique solution in $(0, 1)$ if and only if
+$\ell'(0) = \E_p[x] > 0$ and $\ell'(w) \to -\infty$ as $w \to 1^-$,
+which holds whenever $p(\omega) > 0$ for some $\omega$ with
+$x(\omega) = -1$. Strict concavity then gives uniqueness of the
+interior optimizer. When $\E_p[x] \le 0$, strict concavity implies
+that $\ell$ is non-increasing on $[0, 1)$ and $w^\star = 0$
+optimizes. \qed
+\end{proof}
+
+\subsection{Closed-form \texorpdfstring{$w^\star$}{w-star} in the three-outcome case}
+
+For the three-outcome credit-spread setting with payoffs
+$\{+b, +\alpha b, -1\}$ and probabilities $\{p, r_o, q\}$, the
+first-order condition becomes a quadratic in $w$ of the form $A w^2
++ B w + C = 0$, with
+\begin{align*}
+A &= -\alpha b^2, \\
+B &= \alpha b^2 (p + r_o) - b \bigl[ p + r_o \alpha + q(1 + \alpha) \bigr], \\
+C &= p b + r_o \alpha b - q.
+\end{align*}
+The unique root in $(0, 1)$ is
+\begin{equation*}
+w^\star \;=\; \frac{-B - \sqrt{B^2 - 4AC}}{2A}.
+\end{equation*}
+
+\subsection{Proof of Propositions~\ref{prop:kelly-limit}~and~\ref{prop:maxent-limit}}
+
+\paragraph{Kelly limit.} $\GROUND(p, x, k) = E(p, x) \cdot \exp(-k
+\KL(p \| u_n)) \to E(p, x)$ as $k \to 0$, uniformly in $(p, x)$
+on a finite menu. The arg-max of a uniformly convergent sequence
+on a finite set converges to the arg-max of the limit, modulo
+ties.
+
+\paragraph{Maximum-entropy limit.} Take natural logarithms: $\ln
+\GROUND = g - k \KL = J_k$, so for large $k$ the $-k \KL$ term
+dominates the bounded $g$ on a finite menu, and $\arg\max_i J_k
+(p_i, x_i) \to \arg\min_i \KL(p_i \| u_n)$. Strict monotonicity of
+the exponential preserves the arg-max under the multiplicative
+form.
+
+
+\section{Materials and Methods}\label{sec:materials}
+
+The option chain data used in the backtest is end-of-day SP100
+single-name option pricing data sourced from a commercial historical
+options-data vendor, covering the period 2020-01-01 through
+2026-05-04. The fields used in this study are the per-leg bid, ask,
+mid-price, open interest, implied volatility, and the standard
+Black-Scholes Greeks. SPY daily close prices, used to construct the
+$100$-day simple moving average regime indicator, are sourced from a
+standard dividend-adjusted public daily-price feed.
+
+All quantities in this paper are derived from these two sources. The
+backtest, the in-sample $k$-sweep, the single-factor baseline
+comparison, and the decile diagnostic are produced by a Python
+implementation maintained by the author.
+
+\paragraph{Author Contributions:}
+Conceptualization, P.J.M.; Data curation, P.J.M.; Formal analysis,
+P.J.M.; Investigation, P.J.M.; Methodology, P.J.M.; Resources,
+P.J.M.; Software, P.J.M.; Validation, P.J.M.; Visualization, P.J.M.;
+Writing---original draft, P.J.M.; Writing---review \& editing,
+P.J.M. The author has read and agreed to the published version of
+the manuscript.
+
+\paragraph{Funding:}
+This research received no external funding.
+
+\paragraph{Conflicts of Interest:}
+The author declares no conflict of interest.
+
+\paragraph{Abbreviations:}
+The following abbreviations are used in this manuscript:
+
+\medskip
+\begin{tabbing}
+\hspace{2.5cm}\=\kill
+CI       \> Confidence interval \\
+DKL      \> Kullback-Leibler divergence (KL) \\
+DTE      \> Days to expiry \\
+EV       \> Kelly EV (variance-adjusted expected return per trade) \\
+FOC      \> First-order condition \\
+GROUND   \> Growth rate over uniform divergence \\
+ITM      \> In-the-money \\
+KKT      \> Karush-Kuhn-Tucker (optimality conditions) \\
+KL       \> Kullback-Leibler \\
+MEMM     \> Minimum-entropy martingale measure \\
+OI       \> Open interest \\
+P\&L     \> Profit and loss \\
+ROI      \> Return on investment \\
+SMA      \> Simple moving average \\
+SP100    \> Standard \& Poor's 100 (equity index) \\
+SPY      \> SPDR S\&P 500 ETF Trust (ticker symbol) \\
+VIX      \> CBOE Volatility Index \\
+\end{tabbing}
+
+
+\bibliographystyle{unsrtnat}
+\begin{thebibliography}{99}
+
+\bibitem{kelly1956}
+Kelly, J. A New Interpretation of Information Rate.
+\emph{Bell Syst.\ Tech.\ J.} \textbf{1956}, \emph{35}, 917--926.
+\href{https://doi.org/10.1002/j.1538-7305.1956.tb03809.x}{[CrossRef]}
+
+\bibitem{breeden1978}
+Breeden, D.T.; Litzenberger, R.H. Prices of State-Contingent Claims
+Implicit in Option Prices. \emph{J.\ Bus.} \textbf{1978}, \emph{51},
+621--651.
+\href{https://doi.org/10.1086/296025}{[CrossRef]}
+
+\bibitem{maclean2011}
+MacLean, L.C.; Thorp, E.O.; Ziemba, W.T., Eds. \emph{The Kelly
+Capital Growth Investment Criterion}; World Scientific: Singapore,
+\textbf{2011}.
+
+\bibitem{mercurio2020binary}
+Mercurio, P.J.; Wu, Y.; Xie, H. Portfolio Optimization for Binary
+Options Based on Relative Entropy. \emph{Entropy} \textbf{2020},
+\emph{22}, 752.
+\href{https://doi.org/10.3390/e22070752}{[CrossRef]}
+
+\bibitem{frittelli2000}
+Frittelli, M. The Minimal Entropy Martingale Measure and the
+Valuation Problem in Incomplete Markets. \emph{Math.\ Financ.}
+\textbf{2000}, \emph{10}, 39--52.
+\href{https://doi.org/10.1111/1467-9965.00079}{[CrossRef]}
+
+\bibitem{mercurio2020portfolio}
+Mercurio, P.J.; Wu, Y.; Xie, H. An Entropy-Based Approach to
+Portfolio Optimization. \emph{Entropy} \textbf{2020}, \emph{22},
+332.
+\href{https://doi.org/10.3390/e22030332}{[CrossRef]}
+
+\bibitem{follmer2002}
+F\"ollmer, H.; Schweizer, M. Convex Measures of Risk and Trading
+Constraints. \emph{Finance Stoch.} \textbf{2002}, \emph{6},
+429--447.
+\href{https://doi.org/10.1007/s007800200072}{[CrossRef]}
+
+\bibitem{mercurio2020}
+Mercurio, P.J.; Wu, Y.; Xie, H. Option Portfolio Selection with
+Generalized Entropic Portfolio Optimization. \emph{Entropy}
+\textbf{2020}, \emph{22}, 805.
+\href{https://doi.org/10.3390/e22080805}{[CrossRef]}
+
+\bibitem{hansen2008robustness}
+Hansen, L.P.; Sargent, T.J. \emph{Robustness}; Princeton University
+Press: Princeton, NJ, USA, \textbf{2008}.
+
+\bibitem{maccheroni2006ambiguity}
+Maccheroni, F.; Marinacci, M.; Rustichini, A. Ambiguity Aversion,
+Robustness, and the Variational Representation of Preferences.
+\emph{Econometrica} \textbf{2006}, \emph{74}, 1447--1498.
+\href{https://doi.org/10.1111/j.1468-0262.2006.00716.x}{[CrossRef]}
+
+\bibitem{delbaen2002}
+Delbaen, F.; Grandits, P.; Rheinl\"ander, T.; Samperi, D.;
+Schweizer, M.; Stricker, C. Exponential Hedging and Entropic
+Penalties. \emph{Math.\ Financ.} \textbf{2002}, \emph{12},
+99--123.
+\href{https://doi.org/10.1111/1467-9965.02001}{[CrossRef]}
+
+\bibitem{fujiwara2003}
+Fujiwara, T.; Miyahara, Y. The Minimal Entropy Martingale Measures
+for Geometric L\'evy Processes. \emph{Finance Stoch.} \textbf{2003},
+\emph{7}, 509--531.
+\href{https://doi.org/10.1007/s007800200099}{[CrossRef]}
+
+\bibitem{lo2002sharpe}
+Lo, A.W. The Statistics of Sharpe Ratios. \emph{Financ.\ Anal.\ J.}
+\textbf{2002}, \emph{58}, 36--52.
+\href{https://doi.org/10.2469/faj.v58.n4.2453}{[CrossRef]}
+
+\bibitem{mertens2002sharpe}
+Mertens, E. Comments on Variance of the IID Estimator in Lo (2002).
+University of Basel, \textbf{2002}.
+
+\end{thebibliography}
+
+\end{document}

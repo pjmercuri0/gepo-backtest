@@ -50,27 +50,47 @@ except ImportError as e:
 OUT_PATH = Path(live_config.RANKED_DIR) / "spy_intraday.json"
 
 
-def _sma_context() -> dict:
-    """Latest SPY close + 100-day SMA from the daily CSV.
+def _sma_context_from_ib(ib, stock) -> dict:
+    """Pull last 150 daily SPY bars from IBKR and compute the 100d SMA.
 
-    Used to compute the live tick's regime offset (current price vs SMA).
-    Falls back to empty dict if the CSV isn't available.
+    Replaces the prior Stooq CSV dependency so the regime is always current
+    without needing manual file refreshes. 150d gives us a buffer above the
+    100-day window in case of holidays/half-days.
     """
-    csv = Path(backtest_config.DATA_DIR) / "spy_us_d.csv"
-    if not csv.exists():
+    window = int(backtest_config.REGIME_WINDOW)
+    try:
+        bars = ib.reqHistoricalData(
+            stock, endDateTime="",
+            durationStr=f"{window + 50} D",
+            barSizeSetting="1 day",
+            whatToShow="TRADES",
+            useRTH=True,
+        )
+    except Exception as e:
+        print(f"  ✗ SPY historical fetch failed: {e}", flush=True)
         return {}
-    df = pd.read_csv(csv, parse_dates=["Date"]).sort_values("Date")
-    df["SMA"] = df["Close"].rolling(window=backtest_config.REGIME_WINDOW,
-                                    min_periods=backtest_config.REGIME_WINDOW).mean()
-    df = df.dropna(subset=["SMA"])
-    if df.empty:
+    if not bars or len(bars) < window:
+        print(f"  ✗ SPY historical returned {len(bars) if bars else 0} bars (need ≥{window})", flush=True)
         return {}
-    last = df.iloc[-1]
+    closes = [float(b.close) for b in bars[-window:]]
+    sma = sum(closes) / len(closes)
+    # 20-day realized vol (annualized %, from log returns). Used by the
+    # vol-gate in ranker.py: high RV → skip non-Monday entries.
+    rv_window = 20
+    rv_20 = None
+    if len(bars) >= rv_window + 1:
+        recent = [float(b.close) for b in bars[-(rv_window + 1):]]
+        rets = [(recent[i] / recent[i-1] - 1) for i in range(1, len(recent))]
+        mean_r = sum(rets) / len(rets)
+        var_r = sum((r - mean_r) ** 2 for r in rets) / (len(rets) - 1)
+        rv_20 = round((var_r ** 0.5) * (252 ** 0.5) * 100, 2)
+    last = bars[-1]
     return {
-        "sma_as_of": last["Date"].date().isoformat(),
-        "sma_close": round(float(last["Close"]), 2),
-        "sma_100":   round(float(last["SMA"]), 2),
-        "sma_window": int(backtest_config.REGIME_WINDOW),
+        "sma_as_of": last.date.isoformat() if hasattr(last.date, "isoformat") else str(last.date),
+        "sma_close": round(float(last.close), 2),
+        "sma_100":   round(sma, 2),
+        "sma_window": window,
+        "rv_20":     rv_20,
     }
 
 
@@ -93,10 +113,12 @@ def fetch() -> dict:
         mark = float(t.marketPrice()) if not pd.isna(t.marketPrice()) else None
 
         mid = ((bid + ask) / 2) if (bid is not None and ask is not None) else None
+        # Fetch daily history INSIDE the IB connection so we can compute SMA
+        # fresh from IBKR data (no more stale Stooq CSV dependency).
+        ctx = _sma_context_from_ib(ib, stock)
     finally:
         ib.disconnect()
 
-    ctx = _sma_context()
     snap = {
         "snapshot_ts": datetime.now().isoformat(timespec="seconds"),
         "ticker":      "SPY",
@@ -111,7 +133,8 @@ def fetch() -> dict:
         "change_pct":  round((mark - close) / close * 100, 2) if (mark and close) else None,
         **ctx,
     }
-    # Live regime: compare live mark to the 100d SMA from yesterday's close
+    # Live regime: compare live intraday mark to the 100d SMA from the daily CSV.
+    # SMA is the mean of the last 100 closing prices ending on sma_as_of.
     if snap.get("mark") and snap.get("sma_100"):
         snap["live_regime"]     = "bull" if snap["mark"] > snap["sma_100"] else "bear"
         snap["live_vs_sma"]     = round(snap["mark"] - snap["sma_100"], 2)
@@ -138,10 +161,18 @@ def main() -> int:
                         help="Pretty-print the snapshot to stdout (in addition to writing)")
     args = parser.parse_args()
 
-    try:
-        snap = fetch()
-    except Exception as e:
-        print(f"  ✗ fetch failed: {e}", flush=True)
+    snap = None
+    for attempt in (1, 2):
+        try:
+            snap = fetch()
+            break
+        except Exception as e:
+            print(f"  ✗ fetch attempt {attempt} failed: {e}", flush=True)
+            if attempt == 1:
+                import time
+                time.sleep(5)  # brief pause before retry; IBKR usually recovers
+    if snap is None:
+        print(f"  ✗ both attempts failed; preserving previous snapshot", flush=True)
         return 1
 
     _atomic_write_json(OUT_PATH, snap)

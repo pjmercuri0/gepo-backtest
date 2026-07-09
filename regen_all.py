@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Regenerate all canonical weekly reports under today's canon.
 
@@ -59,9 +60,7 @@ def setup_filters():
     spreads.LOW_VIX_BULLPUT_FILTER = False
     spreads.VIX_LOOKUP             = {}
     spreads.SLIPPAGE_CENTS         = 0.0
-    # Paper/backtest convention: cap b ≤ 5 so headline numbers don't
-    # depend on the ~1-2% of trades with b > 5. Production lets these
-    # through (config.MAX_CREDIT_RATIO = inf default).
+    # Apply canonical MAX_CREDIT_RATIO (no cap on b).
     config.MAX_CREDIT_RATIO        = config.BACKTEST_MAX_CREDIT_RATIO
 
 
@@ -79,7 +78,7 @@ def run_variant(suffix, start, end, sizing, df_full, expiry_prices):
 
     trades_df, weekly_df = backtest.run_backtest(
         df, expiry_prices, pd.DataFrame(), 0,
-        top_n=5, sizing=sizing,
+        top_n=config.TOP_N, sizing=sizing,
         use_drift=False, drift_lookup=None,
     )
     if trades_df.empty:

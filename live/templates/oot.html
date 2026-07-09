@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}GEPO OOT 2026{% endblock %}
+{% block content %}
+
+{% if data %}
+  {% set s = data.summary %}
+  {% set c = data.config %}
+
+  <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">GEPO 2026 Out-of-Time</h1>
+  <div class="subtitle">Frozen canon (adopted 2026-06-10 on 2020-25 data) applied to 2026 — zero 2026 tuning · G_rv · rv_vs_iv DKL · raw-mid credit · k=10 · thr=0.05 · fills 0.80×mid · top-5/day · qty=2</div>
+
+  <div class="params-row">
+    <span class="chip"><span class="chip-k">range</span><span class="chip-v">{{ s.window_start }} → {{ s.window_end }}</span></span>
+    <span class="chip"><span class="chip-k">years</span><span class="chip-v">{{ s.years }}</span></span>
+    <span class="chip"><span class="chip-k">weeks</span><span class="chip-v">{{ data.weeks|length }}</span></span>
+    <span class="chip"><span class="chip-k">trades</span><span class="chip-v">{{ s.n_trades }}</span></span>
+    <span class="chip"><span class="chip-k">universe</span><span class="chip-v">{{ c.universe }}</span></span>
+    <span class="chip"><span class="chip-k">days</span><span class="chip-v">{{ c.days }}</span></span>
+    <span class="chip"><span class="chip-k">expiry</span><span class="chip-v">{{ c.expiry }}</span></span>
+    <span class="chip"><span class="chip-k">selection</span><span class="chip-v">{{ c.selection }}</span></span>
+    <span class="chip"><span class="chip-k">fill</span><span class="chip-v">{{ c.fill_basis }}</span></span>
+    <span class="chip"><span class="chip-k">regime</span><span class="chip-v">{{ c.regime }}</span></span>
+    <span class="chip"><span class="chip-k">sizing</span><span class="chip-v">{{ c.sizing }}</span></span>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">starting bankroll</div>
+      <div class="stat-value">${{ '{:,.0f}'.format(c.starting_bankroll) }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">final bankroll</div>
+      <div class="stat-value {{ 'pos' if s.strategy_final >= c.starting_bankroll else 'neg' }}">${{ '{:,.0f}'.format(s.strategy_final) }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">total return</div>
+      <div class="stat-value {{ 'pos' if s.strategy_total_return >= 0 else 'neg' }}">{% if s.strategy_total_return >= 0 %}+{% endif %}{{ s.strategy_total_return }}%</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">CAGR</div>
+      <div class="stat-value {{ 'pos' if s.strategy_cagr >= 0 else 'neg' }}">{% if s.strategy_cagr >= 0 %}+{% endif %}{{ s.strategy_cagr }}%</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">yield (P&amp;L / wagered)</div>
+      <div class="stat-value {{ 'pos' if s.strategy_yield >= 0 else 'neg' }}">{% if s.strategy_yield >= 0 %}+{% endif %}{{ s.strategy_yield }}%</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Sharpe (weekly)</div>
+      <div class="stat-value">{{ '%+.2f'|format(s.strategy_sharpe_weekly) }}</div>
+      <div class="subtitle">daily {{ '%+.2f'|format(s.strategy_sharpe) }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">max drawdown</div>
+      <div class="stat-value neg">{{ s.strategy_max_dd }}%</div>
+    </div>
+  </div>
+
+  <div class="params-row" style="margin-bottom:10px">
+    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 final</span><span class="chip-v">${{ '{:,.0f}'.format(s.qty1_final) }}</span></span>
+    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 return</span><span class="chip-v {{ 'pos' if s.qty1_total_return >= 0 else 'neg' }}">{% if s.qty1_total_return >= 0 %}+{% endif %}{{ s.qty1_total_return }}%</span></span>
+    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 yield</span><span class="chip-v {{ 'pos' if s.qty1_yield >= 0 else 'neg' }}">{% if s.qty1_yield >= 0 %}+{% endif %}{{ s.qty1_yield }}%</span></span>
+    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 Sharpe (wk)</span><span class="chip-v">{{ '%+.2f'|format(s.qty1_sharpe_weekly) }}</span></span>
+    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly final</span><span class="chip-v">${{ '{:,.0f}'.format(s.sixteenk_final) }}</span></span>
+    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly return</span><span class="chip-v {{ 'pos' if s.sixteenk_total_return >= 0 else 'neg' }}">{% if s.sixteenk_total_return >= 0 %}+{% endif %}{{ s.sixteenk_total_return }}%</span></span>
+    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly yield</span><span class="chip-v {{ 'pos' if s.sixteenk_yield >= 0 else 'neg' }}">{% if s.sixteenk_yield >= 0 %}+{% endif %}{{ s.sixteenk_yield }}%</span></span>
+    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly Sharpe (wk)</span><span class="chip-v">{{ '%+.2f'|format(s.sixteenk_sharpe_weekly) }}</span></span>
+  </div>
+  <div class="params-row" style="margin-bottom:22px">
+    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY final</span><span class="chip-v">${{ '{:,.0f}'.format(s.spy_final) }}</span></span>
+    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY return</span><span class="chip-v {{ 'pos' if s.spy_total_return >= 0 else 'neg' }}">{% if s.spy_total_return >= 0 %}+{% endif %}{{ s.spy_total_return }}%</span></span>
+    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY CAGR</span><span class="chip-v {{ 'pos' if s.spy_cagr >= 0 else 'neg' }}">{% if s.spy_cagr >= 0 %}+{% endif %}{{ s.spy_cagr }}%</span></span>
+    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY Sharpe (wk)</span><span class="chip-v">{{ '%+.2f'|format(s.spy_sharpe_weekly) }}</span></span>
+    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY max DD</span><span class="chip-v neg">{{ s.spy_max_dd }}%</span></span>
+  </div>
+
+  <div class="charts">
+    <div class="chart-card">
+      <div class="chart-label">Equity curve</div>
+      <div style="position:relative;height:340px"><canvas id="equity-chart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Weekly P&amp;L</div>
+      <div style="position:relative;height:340px"><canvas id="pnl-chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:32px">
+    <div class="chart-label">Net direction · positive = bull-put surplus, negative = bear-call surplus</div>
+    <div style="position:relative;height:160px"><canvas id="direction-chart"></canvas></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    const points  = {{ data.points | tojson }};
+    const weeks   = {{ data.weeks  | tojson }};
+
+    // ── Equity curve ────────────────────────────────────────
+    const eqCtx = document.getElementById('equity-chart').getContext('2d');
+    new Chart(eqCtx, {
+      type: 'line',
+      data: {
+        labels: points.map(p => p.date),
+        datasets: [
+          { label: 'qty=2 (canonical)', data: points.map(p => p.strategy), borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.2, pointRadius: 0, fill: true,  tension: 0.05 },
+          { label: 'qty=1',             data: points.map(p => p.qty1),     borderColor: '#378ADD', borderWidth: 1.6, pointRadius: 0, fill: false, tension: 0.05 },
+          { label: '¹⁄₁₆ Kelly (cap=5)',data: points.map(p => p.sixteenk), borderColor: '#EF9F27', borderWidth: 1.6, pointRadius: 0, fill: false, tension: 0.05 },
+          { label: 'SPY',               data: points.map(p => p.spy),      borderColor: '#888780', borderWidth: 1.5, pointRadius: 0, fill: false, borderDash: [4, 3], tension: 0.05 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend:  { labels: { color: '#e0e0d8', font: { size: 12 } } },
+          tooltip: { backgroundColor: '#1a1a1a', borderColor: '#3a3a3a', borderWidth: 1, titleColor: '#e0e0d8', bodyColor: '#e0e0d8',
+            callbacks: { label: c => `${c.dataset.label}: $${Number(c.parsed.y).toLocaleString(undefined, {maximumFractionDigits:0})}` } }
+        },
+        scales: {
+          x: { ticks: { color: '#888780', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: 'rgba(80,80,80,0.2)' } },
+          y: { ticks: { color: '#888780', callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(80,80,80,0.2)' } }
+        }
+      }
+    });
+
+    // ── Weekly P&L bars ─────────────────────────────────────
+    const pnlCtx = document.getElementById('pnl-chart').getContext('2d');
+    new Chart(pnlCtx, {
+      type: 'bar',
+      data: {
+        labels: weeks.map(w => w.start),
+        datasets: [{
+          label: 'P&L',
+          data: weeks.map(w => w.pnl),
+          backgroundColor: weeks.map(w => w.pnl >= 0 ? 'rgba(29,158,117,0.85)' : 'rgba(226,75,74,0.85)'),
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: '#1a1a1a', borderColor: '#3a3a3a', borderWidth: 1, titleColor: '#e0e0d8', bodyColor: '#e0e0d8',
+            callbacks: { label: c => `$${Number(c.parsed.y).toLocaleString(undefined,{maximumFractionDigits:0})}` } }
+        },
+        scales: {
+          x: { ticks: { color: '#888780', maxTicksLimit: 8, maxRotation: 0 }, grid: { display: false } },
+          y: { ticks: { color: '#888780', callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(80,80,80,0.2)' } }
+        }
+      }
+    });
+
+    // ── Net direction bars ──────────────────────────────────
+    const dirCtx = document.getElementById('direction-chart').getContext('2d');
+    new Chart(dirCtx, {
+      type: 'bar',
+      data: {
+        labels: weeks.map(w => w.start),
+        datasets: [{
+          label: 'net direction',
+          data: weeks.map(w => w.direction),
+          backgroundColor: weeks.map(w => w.direction >= 0 ? 'rgba(29,158,117,0.85)' : 'rgba(226,75,74,0.85)'),
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: '#1a1a1a', borderColor: '#3a3a3a', borderWidth: 1, titleColor: '#e0e0d8', bodyColor: '#e0e0d8',
+            callbacks: { label: c => {
+              const w = weeks[c.dataIndex];
+              return `${w.n_bull_put} bull put · ${w.n_bear_call} bear call`;
+            } } }
+        },
+        scales: {
+          x: { ticks: { color: '#888780', maxTicksLimit: 12, maxRotation: 0 }, grid: { display: false } },
+          y: { ticks: { color: '#888780', stepSize: 1 }, grid: { color: 'rgba(80,80,80,0.2)' } }
+        }
+      }
+    });
+  </script>
+
+  {% if data.weeks %}
+  <div class="section-label">Week-by-week trades · {{ data.weeks|length }} weeks · {{ data.trades|length }} trades</div>
+  {% for w in data.weeks|reverse %}
+  <div class="week-card">
+    <div class="week-head">
+      <div>
+        <div class="week-title">{{ w.label }}</div>
+        <div class="week-sub">{{ w.n_trades }} trade{{ 's' if w.n_trades != 1 else '' }} · ${{ '{:,.2f}'.format(w.pre_bank) }} → ${{ '{:,.2f}'.format(w.post_bank) }}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="week-pnl {{ 'pos' if w.pnl > 0 else ('neg' if w.pnl < 0 else '') }}">{% if w.pnl >= 0 %}+{% endif %}${{ '{:,.2f}'.format(w.pnl) }}</div>
+        <div class="week-sub" style="margin-top:2px">${{ '{:,.0f}'.format(w.risk) }} at risk · <span class="{{ 'pos' if w.pnl > 0 else ('neg' if w.pnl < 0 else '') }}">{% if w.risk > 0 %}{% if w.pnl >= 0 %}+{% endif %}{{ '%.1f'|format(100.0 * w.pnl / w.risk) }}%{% else %}—{% endif %}</span></div>
+      </div>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr>
+        <th>entry</th><th>dow</th><th>ticker</th><th>direction</th>
+        <th>short / long</th><th>credit</th><th>max loss</th>
+        <th style="text-align:right">qty</th>
+        <th style="text-align:right">Kelly EV</th>
+        <th style="text-align:right">DKL</th>
+        <th>Γᵢ</th>
+        <th>spot@exp</th>
+        <th>result</th>
+        <th style="text-align:right">P&amp;L</th>
+      </tr></thead>
+      <tbody>
+        {% for t in w.trades %}
+        <tr>
+          <td>{{ t.entry }}</td>
+          <td style="color:#888780">{{ t.dow }}</td>
+          <td class="fw">{{ t.ticker }}</td>
+          <td><span class="{{ 'dir-bull' if t.type == 'bull_put' else 'dir-bear' }}">{{ '▲ bull put' if t.type == 'bull_put' else '▼ bear call' }}</span></td>
+          <td>${{ '%.2f'|format(t.k_s) }} / ${{ '%.2f'|format(t.k_l) }}</td>
+          <td>${{ '%.3f'|format(t.credit) }}</td>
+          <td>${{ '%.3f'|format(t.max_loss) }}</td>
+          <td style="text-align:right">{{ t.qty }}×</td>
+          <td class="{{ 'pos' if (t.kelly_ev or 0) >= 0 else 'neg' }}" style="text-align:right">{% if t.kelly_ev is not none %}{% if t.kelly_ev >= 0 %}+{% endif %}{{ '%.2f'|format(t.kelly_ev) }}%{% else %}—{% endif %}</td>
+          <td style="text-align:right">{% if t.dkl is not none %}{{ '%.4f'|format(t.dkl) }}{% else %}—{% endif %}</td>
+          <td class="pos">
+            <span class="ground-bar"><span class="ground-bar-fill" style="width:{{ (100.0 * t.ground / w.max_g)|round(0) if w.max_g > 0 else 0 }}%"></span></span>
+            +{{ '%.2f'|format(100.0 * t.ground) }}%
+          </td>
+          <td>${{ '%.2f'|format(t.spot) }}</td>
+          <td><span class="badge badge-{{ t.outcome }}">{{ t.outcome }}</span></td>
+          <td class="fw {{ 'pos' if t.pnl > 0 else ('neg' if t.pnl < 0 else '') }}" style="text-align:right">{% if t.pnl >= 0 %}+{% endif %}${{ '%.2f'|format(t.pnl) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    <div class="summary-row">
+      <span>credit collected: <strong>${{ '{:,.0f}'.format(w.credit) }}</strong></span>
+      <span>at risk: <strong>${{ '{:,.0f}'.format(w.risk) }}</strong></span>
+      <span>P&amp;L: <strong class="{{ 'pos' if w.pnl > 0 else ('neg' if w.pnl < 0 else '') }}">{% if w.pnl >= 0 %}+{% endif %}${{ '{:,.2f}'.format(w.pnl) }}</strong></span>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+{% else %}
+  <h2 style="margin:18px 0">Backtest</h2>
+  <div class="week-card" style="padding:16px">
+    <p>Equity curve data not generated yet. Run:</p>
+    <pre style="background:#0a0a0a;padding:10px;border-radius:6px;overflow-x:auto">python3 report_three_sizings.py</pre>
+  </div>
+{% endif %}
+{% endblock %}

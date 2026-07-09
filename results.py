@@ -597,21 +597,20 @@ def _generate_weekly_html(trades_df: pd.DataFrame,
     pnl_svg = _build_weekly_pnl_svg(weekly_df)
     dir_svg = _build_direction_svg(trades_df, weekly_df)
 
-    # GROUND bar fill = trade's GROUND as a fraction of the run-wide maximum.
-    # Bar fills 0%-100% based on the display value exp(GROUND), which is
-    # positive and monotone-preserving for both canons (Γ_k → exp(Γ_k) and
-    # J_k → exp(J_k)). The 95th percentile sets the 100% reference so a
-    # few outliers don't squash the bulk of bars.
+    # GROUND bar fill = trade's Γᵢ as a fraction of the PER-WEEK maximum.
+    # Each week's top-ranked pick fills the bar to 100%; the rest of the
+    # week's picks scale down linearly relative to that week's max. This
+    # matches the live ticker semantics: the live ticker shows one week
+    # of candidates at a time and normalizes within that menu. Without
+    # the per-week normalization, weeks with a small top-Γᵢ would render
+    # as all-near-zero bars and weeks with a large top-Γᵢ would dominate
+    # the visual scale across the whole report.
     if "GROUND" in trades_df.columns and trades_df["GROUND"].notna().any():
-        disp = np.exp(trades_df["GROUND"].astype(float))
-        disp_min = float(disp.min())
-        disp_ref = float(disp.quantile(0.95))
-        if disp_ref > disp_min:
-            trades_df["GROUND_pct"] = (
-                ((disp - disp_min) / (disp_ref - disp_min) * 100).clip(lower=0, upper=100)
-            )
-        else:
-            trades_df["GROUND_pct"] = 100.0
+        disp = trades_df["GROUND"].astype(float).clip(lower=0)
+        per_week_max = disp.groupby(trades_df["entry_date"]).transform("max")
+        # Avoid divide-by-zero on weeks where every pick has Γᵢ = 0
+        safe_max = per_week_max.where(per_week_max > 0, other=1.0)
+        trades_df["GROUND_pct"] = (disp / safe_max * 100).clip(lower=0, upper=100)
     else:
         trades_df["GROUND_pct"] = 0.0
 

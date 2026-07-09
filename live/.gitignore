@@ -2,7 +2,10 @@ snapshots/
 ranked/
 frozen/
 drift/
+intraday_picks/
 notifications/
 logs/
+data/chain_*.csv
+data/chain_*.html
 *.pyc
 __pycache__/

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}GEPO Live — QR{% endblock %}
+
+{% block content %}
+<h1>Mobile QR</h1>
+<div class="subtitle">Scan this from your phone to open the live GEPO site.</div>
+
+<div class="week-card" style="max-width:420px;text-align:center;margin:24px auto;padding:24px">
+  <img
+    alt="QR code for {{ site_url }}"
+    src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&amp;margin=18&amp;data={{ site_url | urlencode }}"
+    style="width:100%;max-width:320px;background:#fff;border-radius:16px;padding:12px;box-sizing:border-box"
+  >
+  <div style="margin-top:16px;font-size:13px;word-break:break-all">
+    <a href="{{ site_url }}">{{ site_url }}</a>
+  </div>
+</div>
+{% endblock %}

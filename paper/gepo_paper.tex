@@ -39,21 +39,29 @@ SP100 universe in which a Greek-filtered candidate pool is ranked each week
 by the intrinsic GROUND ratio in its \emph{Kelly-EV-with-entropic-discount}
 form:
 \[
-\GROUND(p, x, k) \;=\; \bigl(\exp(g(p, x)) - 1\bigr) \cdot \exp\!\bigl(-k \cdot D_{\mathrm{KL}}(p \| u)\bigr),
+\GROUND(p, x, k) \;=\; E(p, x) \cdot \exp\!\bigl(-k \cdot D_{\mathrm{KL}}(p \| u)\bigr),
 \]
-where $g(p, x) = E_p[\ln(1 + w^\star X)]$ is the per-trade Kelly
-log-growth at the optimal sizing fraction $w^\star$, so $\exp(g) - 1$ is
-the \emph{Kelly EV} --- the variance-adjusted expected wealth gain per
-trade at Kelly sizing --- and $\exp(-k \cdot D_{\mathrm{KL}})$ is an
-entropic ambiguity discount in $(0, 1]$. The score is dimensionless and
-reads directly as \emph{percent risk-adjusted expected return per
-trade}. We restrict the menu to growth-positive candidates ($g > 0$).
-For small $g$, $\exp(g) - 1 \approx g$, so $\ln \GROUND \approx g - k
-\cdot D_{\mathrm{KL}} = J_k$, the multiplier-preferences functional of
-\citet{hansen2008robustness} and \citet{maccheroni2006ambiguity}: the
-canonical Kelly-EV ranker is the small-quantity, economically-readable
-form of the Hansen-Sargent ranker, and the two rank near-equivalently in
-the canonical credit-spread regime. The intrinsic GROUND ratio is the v2
+where $E(p, x) := M(p, x) - 1$ is the \emph{Kelly EV}, $M(p, x) =
+\exp(\ell(w^\star; p, x))$ is the wealth multiplier at Kelly-optimal
+sizing $w^\star$, and $\ell(w^\star) = E_p[\ln(1 + w^\star X)]$ is the
+classical Kelly log-growth. The first factor $E$ is the
+variance-adjusted expected wealth gain per trade at Kelly sizing
+(log-utility expectation bakes in variance via Jensen); the second
+factor $\exp(-k \cdot D_{\mathrm{KL}})$ is the entropic ambiguity
+discount in $(0, 1]$. The score is dimensionless and reads directly as
+\emph{percent risk-adjusted expected return per trade}. We restrict the
+menu to growth-positive candidates ($E > 0$). Defining the growth
+signal $g(p, x) := \ln E(p, x)$, the canonical Kelly-EV ratio admits the
+exact additive identity
+\[
+\ln \GROUND(p, x, k) \;=\; g(p, x) - k \cdot D_{\mathrm{KL}}(p \| u) \;=\; J_k(p, x),
+\]
+where $J_k$ is the multiplier-preferences functional of
+\citet{hansen2008robustness} and \citet{maccheroni2006ambiguity}. The
+canonical Kelly-EV ranker is thus the economically-readable
+multiplicative form of the Hansen-Sargent ranker --- identical in
+selection (one is the exponential of the other), with the
+multiplicative form reading as a per-trade return. The intrinsic GROUND ratio is the v2
 of the original GROUND construction of \citet{mercurio2020}, replacing
 the comparative form against a per-week reference candidate with a
 per-candidate intrinsic score. The amplification parameter $k = 20$ is
@@ -69,7 +77,7 @@ strategy posts Sharpe $1.63$, Calmar $4.03$, and a bankroll-independent
 wager yield of $15.4\%$ at zero slippage; on the strict 2025--2026
 holdout (350 trades, 70 weeks, never used in $k$-selection) it posts
 Sharpe $2.99$, Calmar $12.44$, and yield $31.0\%$. SPY buy-and-hold over the same windows posts Sharpe
-0.79--1.11. Single-factor baselines that rank by Kelly-growth $g$ alone
+0.79--1.11. Single-factor baselines that rank by Kelly EV $E$ alone
 or KL-divergence $D_{\mathrm{KL}}$ alone are reported for comparison.
 The data give direct empirical evidence that GROUND's joint growth-and-
 divergence penalty produces a useful trade-selection signal in a real
@@ -85,38 +93,40 @@ deviation from a uniform reference distribution. In this paper we adopt
 the intrinsic v2 form in its \emph{Kelly-EV-with-entropic-discount}
 canonical (Section~\ref{sec:ground-v2}):
 \begin{equation*}
-\GROUND(p, x, k) \;=\; \bigl(\exp(g(p, x)) - 1\bigr) \cdot \exp\!\bigl(-k \cdot D_{\mathrm{KL}}(p \| u)\bigr),
+\GROUND(p, x, k) \;=\; E(p, x) \cdot \exp\!\bigl(-k \cdot D_{\mathrm{KL}}(p \| u)\bigr),
 \end{equation*}
-where $g(p, x) = E_p[\ln(1 + w^\star X)]$ is the per-trade Kelly
-log-growth at the optimal sizing fraction $w^\star$ on the per-spread
-payoffs $\{+b, +\alpha b, -1\}$. The first factor $\exp(g) - 1$ is the
-\emph{Kelly EV}: the variance-adjusted expected wealth gain per trade at
-Kelly sizing (log-utility expectation bakes in variance via Jensen). The
+where $E(p, x) := M(p, x) - 1$ is the Kelly EV at Kelly-optimal sizing
+$w^\star$ on the per-spread payoffs $\{+b, +\alpha b, -1\}$, with wealth
+multiplier $M = \exp(\ell(w^\star))$ and classical Kelly log-growth
+$\ell(w^\star; p, x) = E_p[\ln(1 + w^\star X)]$. The first factor $E$
+is the variance-adjusted expected wealth gain per trade at Kelly
+sizing (log-utility expectation bakes in variance via Jensen); the
 second factor $\exp(-k \cdot D_{\mathrm{KL}})$ is the entropic ambiguity
 discount in $(0, 1]$. Their product is dimensionless and reads as
 percent risk-adjusted expected return per trade.
 
 \paragraph{Connection to Hansen-Sargent.}
-Taylor-expanding the first factor, $\exp(g) - 1 \approx g$ for small
-$g$. Hence
+Define the \emph{growth signal} $g(p, x) := \ln E(p, x)$. Taking the
+natural log of the canonical equation:
 \begin{equation*}
-\ln \GROUND(p, x, k) \;=\; \ln\!\bigl(\exp(g) - 1\bigr) - k \cdot D_{\mathrm{KL}}
-\;\approx\; g - k \cdot D_{\mathrm{KL}}
-\;=\; J_k(p, x)
+\ln \GROUND(p, x, k) \;=\; \ln E(p, x) - k \cdot D_{\mathrm{KL}}
+\;=\; g(p, x) - k \cdot D_{\mathrm{KL}}
+\;=\; J_k(p, x),
 \end{equation*}
-in the canonical regime where $g$ is small (per-trade log-growth at
-Kelly sizing typically sits in $[0.001, 0.10]$ nats on this universe).
-$J_k$ is the multiplier-preferences functional of
-\citet{hansen2008robustness} and the variational preferences class of
-\citet{maccheroni2006ambiguity}. The canonical Kelly-EV ranker is thus
-the \emph{economically-readable small-quantity approximation} of the
-Hansen-Sargent ranker, gaining direct interpretation as a per-trade
-risk-adjusted return while preserving the theoretical lineage. Concretely,
+exactly by construction. $J_k$ is the multiplier-preferences functional
+of \citet{hansen2008robustness} and the variational preferences class
+of \citet{maccheroni2006ambiguity}. Equivalently, $\GROUND = \exp(J_k)$
+on every growth-positive candidate; the multiplicative GROUND form and
+the additive Hansen-Sargent form produce identical selection by exp
+monotonicity. The Kelly-EV form is the \emph{economically-readable
+multiplicative form} of the Hansen-Sargent ranker, gaining direct
+interpretation as a per-trade risk-adjusted return while preserving the
+theoretical lineage. Concretely,
 for a candidate trade with three discrete outcomes (full-win, partial,
 full-loss) under empirical probabilities $(p, r_o, q)$ and an alpha
 parameter $\alpha$ giving the partial-loss multiple, GROUND combines
 \begin{itemize}
-    \item the Kelly-optimal growth rate $G(p, q, r_o; \alpha)$, the
+    \item the Kelly EV $E(p, q, r_o; \alpha) = M - 1$, where $M$ is the
         per-trade wealth multiplier computed at the closed-form
         $w^\star$ solving the standard Kelly-with-partials first-order
         condition;
@@ -124,8 +134,8 @@ parameter $\alpha$ giving the partial-loss multiple, GROUND combines
         $D_{\mathrm{KL}}(\mathbf{p} \| \mathbf{u})$ from the uniform
         three-outcome distribution.
 \end{itemize}
-The intuition is straightforward: $G$ measures the trade's
-\emph{expected return} (the Kelly-optimal per-trade growth), while
+The intuition is straightforward: $E$ measures the trade's
+\emph{expected return} (the Kelly-optimal per-trade wealth gain), while
 $D_{\mathrm{KL}}$ measures the trade's \emph{risk}. The use of
 information-theoretic quantities as risk measures in portfolio
 optimization was first proposed in \citet{mercurio2020portfolio},
@@ -152,13 +162,13 @@ properties from the binary-option case under the natural extension to
 $n$ states.
 
 The strength of GROUND comes from holding these two quantities ---
-return ($G$) and risk ($D_{\mathrm{KL}}$) --- in a single ratio. A
-trade with high $G$ but very high $D_{\mathrm{KL}}$ is a sharp bet on
+return ($E$) and risk ($D_{\mathrm{KL}}$) --- in a single product. A
+trade with high $E$ but very high $D_{\mathrm{KL}}$ is a sharp bet on
 a near-certain outcome whose growth comes from informational
 concentration that may not survive estimation noise; such a trade is
-discounted by the denominator. A trade with high $G$ and modest
+discounted by the entropic factor. A trade with high $E$ and modest
 $D_{\mathrm{KL}}$ is an information-light, growth-dense bet that the
-ratio rewards. The empirical work that follows will show that this
+score rewards. The empirical work that follows will show that this
 return-over-risk reading of the ratio is what does the work in
 practice.
 
@@ -175,13 +185,14 @@ indistinguishable from the reference-normalised form across our sweep.
 
 The intrinsic GROUND ratio in natural-log units, valid for any
 (finite or continuous) outcome space, is
-$\Gamma_k(p, x) = G(p, x) / \exp(k \cdot D_{\mathrm{KL}}(p \| u))$.
+$\GROUND(p, x, k) = E(p, x) \cdot \exp(-k \cdot D_{\mathrm{KL}}(p \| u))$.
 The present paper applies this to a three-outcome credit-spread
 outcome space — the three states being full-win (underlying expires
 outside the short strike), partial (underlying expires between the
 two strikes), and full-loss (underlying expires beyond the long
 strike) — with the uniform reference $u$ over those three states.
-Both $G$ and $D_{\mathrm{KL}}$ are computed in nats (natural log);
+Both $\ell(w^\star)$ (and hence $E$) and $D_{\mathrm{KL}}$ are computed
+in nats (natural log);
 the only $n = 3$
 appearance is the dimension of the outcome distribution
 $(p, r_o, q)$.
@@ -192,7 +203,7 @@ Section~\ref{sec:ground-v2} states the GROUND v2 formula precisely and
 notes our log-base canon. Section~\ref{sec:results} reports the in-sample
 2020--2024 window, the strict 2025--2026 holdout, the full extended
 2020--2026 sample, an SPY buy-and-hold benchmark, the $k$-sweep table, and
-single-factor baselines that strip GROUND down to its $G$ and
+single-factor baselines that strip GROUND down to its Kelly-EV and
 $D_{\mathrm{KL}}$ components. Section~\ref{sec:discussion} discusses
 limitations.
 
@@ -217,16 +228,18 @@ directly; credit spreads, with their bounded per-spread maximum loss, fall
 naturally into this regime.
 
 The GROUND framework extends this lineage in two ways. First, the closed-form
-$w^\star$ used in the Kelly-growth term $G$ solves the first-order condition
-for a three-outcome bet (full-win, partial, full-loss), which matches the
-realised P\&L distribution of a held-to-expiry credit spread more faithfully
-than a binary win/loss formulation. Second, single-factor ranking by $G$
-alone is empirically unstable when probability estimates are noisy; the
-GROUND ratio addresses this by penalising the divergence of the candidate's
-outcome distribution from uniform, effectively discounting candidates whose
-growth advantage relies on a sharp probability concentration. We report
-$G$-only and $D_{\mathrm{KL}}$-only baselines in
-Section~\ref{sec:baselines} as direct evidence.
+$w^\star$ used to compute the Kelly log-growth $\ell(w^\star)$ solves the
+first-order condition for a three-outcome bet (full-win, partial,
+full-loss), which matches the realised P\&L distribution of a
+held-to-expiry credit spread more faithfully than a binary win/loss
+formulation. Second, single-factor ranking by $\ell$ (equivalently by
+Kelly EV $E$) alone is empirically unstable when probability estimates
+are noisy; the GROUND ratio addresses this by penalising the divergence
+of the candidate's outcome distribution from uniform, effectively
+discounting candidates whose growth advantage relies on a sharp
+probability concentration. We report Kelly-EV-only and
+$D_{\mathrm{KL}}$-only baselines in Section~\ref{sec:baselines} as
+direct evidence.
 
 \subsection{Information-theoretic portfolio selection}
 
@@ -351,59 +364,61 @@ per-week reference candidate $b$ (typically the minimum-divergence
 member of the pool) by the ratio of their log-growth difference to
 their KL-divergence difference:
 \begin{equation}
-    \Gamma_{a \mid b} \;=\; \frac{g_a - g_b}{D_{\mathrm{KL}}^{(a)} - D_{\mathrm{KL}}^{(b)}},
-    \qquad g := \ln G.
+    \Gamma_{a \mid b} \;=\; \frac{\ell_a - \ell_b}{D_{\mathrm{KL}}^{(a)} - D_{\mathrm{KL}}^{(b)}},
     \label{eq:ground-paper}
 \end{equation}
-This comparative form introduces a cross-candidate coupling (the
-selection of $a$ depends on the reference $b$) that is awkward in a
-streaming weekly-selection setting.
+where $\ell$ denotes the Kelly log-growth. This comparative form
+introduces a cross-candidate coupling (the selection of $a$ depends on
+the reference $b$) that is awkward in a streaming weekly-selection
+setting.
 
 This paper introduces the \emph{intrinsic} GROUND ratio, a
 per-candidate score that requires no reference, in its canonical
 \emph{Kelly-EV-with-entropic-discount} form:
 \begin{equation}
-    \GROUND(a, k) \;=\; \bigl(\exp(g_a) - 1\bigr) \cdot \exp\!\bigl(-k \cdot D_{\mathrm{KL}}^{(a)}\bigr),
-    \qquad g_a > 0,\ k = 20.
+    \GROUND(a, k) \;=\; E_a \cdot \exp\!\bigl(-k \cdot D_{\mathrm{KL}}^{(a)}\bigr),
+    \qquad E_a > 0,\ k = 20,
     \label{eq:ground-canonical}
 \end{equation}
-The first factor $\exp(g_a) - 1$ is the \emph{Kelly EV} of candidate
-$a$: the expected wealth gain per trade at Kelly-optimal sizing.
-Because $g_a = E_{p_a}[\ln(1 + w^\star X)]$ is the expectation of a
-concave (log) function, Jensen's inequality bakes a variance penalty
-into $g_a$ for free, so $\exp(g_a) - 1$ is variance-adjusted by
-construction --- a high-EV high-variance trade has lower $g$ than a
-moderate-EV low-variance trade with the same arithmetic EV. The
-second factor $\exp(-k \cdot D_{\mathrm{KL}})$ is the entropic
-ambiguity discount, taking values in $(0, 1]$, smaller when the
-implied distribution is more concentrated relative to uniform. The
-product is a dimensionless fractional return reading directly as
+where $E_a := M_a - 1$ is the Kelly EV of candidate $a$ with wealth
+multiplier $M_a = \exp(\ell(w^\star_a; p_a, x_a))$ at Kelly-optimal
+sizing $w^\star_a$ and classical Kelly log-growth $\ell(w^\star_a) =
+E_{p_a}[\ln(1 + w^\star_a X)]$. The first factor $E_a$ is the
+expected wealth gain per trade at Kelly-optimal sizing: because
+$\ell(w^\star_a)$ is the expectation of a concave (log) function,
+Jensen's inequality bakes a variance penalty into $\ell$ for free, so
+$E_a$ is variance-adjusted by construction --- a high-EV high-variance
+trade has lower $E$ than a moderate-EV low-variance trade with the
+same arithmetic EV. The second factor $\exp(-k \cdot D_{\mathrm{KL}})$
+is the entropic ambiguity discount, taking values in $(0, 1]$, smaller
+when the implied distribution is more concentrated relative to uniform.
+The product is a dimensionless fractional return reading directly as
 \emph{percent risk-adjusted expected return per trade}: under the
 canonical $k = 20$ and natural-log units, a typical selected trade has
 $\GROUND \in [0.5\%, 8\%]$, with top picks in the high single digits.
-We restrict the menu to $g_a > 0$ (growth-positive candidates only);
-$g \le 0$ candidates have no risk-adjusted return and are dropped
+We restrict the menu to $E_a > 0$ (growth-positive candidates only);
+$E \le 0$ candidates have no risk-adjusted return and are dropped
 before ranking.
 
-\paragraph{Small-$g$ connection to Hansen-Sargent multiplier preferences.}
-Taylor-expanding the first factor, $\exp(g) - 1 = g + g^2/2 + O(g^3)$.
-In the canonical credit-spread regime $g \in [0.001, 0.10]$ nats, so
-$\exp(g) - 1 \approx g$ to within 5\% across the entire selected
-range. Taking the log of \eqref{eq:ground-canonical},
+\paragraph{Exact connection to Hansen-Sargent multiplier preferences.}
+Define the \emph{growth signal} $g(a) := \ln E_a$, the log of the
+Kelly EV. Taking the log of \eqref{eq:ground-canonical},
 \begin{equation}
-    \ln \GROUND(a, k) \;=\; \ln\!\bigl(\exp(g_a) - 1\bigr) - k \cdot D_{\mathrm{KL}}^{(a)}
-    \;\approx\; g_a - k \cdot D_{\mathrm{KL}}^{(a)}
+    \ln \GROUND(a, k) \;=\; \ln E_a - k \cdot D_{\mathrm{KL}}^{(a)}
+    \;=\; g(a) - k \cdot D_{\mathrm{KL}}^{(a)}
     \;=\; J_k(a),
     \label{eq:ground-hs-link}
 \end{equation}
-where $J_k = g - k \cdot D_{\mathrm{KL}}$ is the multiplier-preferences
-functional of \citet{hansen2008robustness} and the variational
-preferences class of \citet{maccheroni2006ambiguity}. The canonical
-Kelly-EV ranker is thus the small-$g$ economically-readable form of
-the Hansen-Sargent ranker: it preserves the theoretical lineage but
-trades the analytically-clean additive form for direct interpretation
-as a per-trade return. We adopt the Kelly-EV canonical for
-display and selection consistency.
+exactly by construction. $J_k = g - k \cdot D_{\mathrm{KL}}$ is the
+multiplier-preferences functional of \citet{hansen2008robustness} and
+the variational preferences class of
+\citet{maccheroni2006ambiguity}. Equivalently $\GROUND = \exp(J_k)$, so
+the multiplicative GROUND form and the additive Hansen-Sargent form
+produce identical selection by exp monotonicity. The Kelly-EV form is
+the economically-readable multiplicative expression of the
+Hansen-Sargent ranker, gaining direct interpretation as a per-trade
+return while preserving the theoretical lineage. We adopt the Kelly-EV
+form as canonical for display and selection.
 
 The amplification factor $k$ controls how aggressively concentration
 risk is discounted; we selected $k$ by sweeping $\{0.5, 1, 2, 5, 10,
@@ -434,8 +449,8 @@ $\{+b, +\alpha b, -1\}$ is a quadratic in $w$ which we solve in
 closed form; details in Appendix~A.
 
 \paragraph{Logarithm base.} A credit spread has three discrete
-outcomes: full-win, partial, and full-loss. We compute $G$ and
-$D_{\mathrm{KL}}$ in natural-log units (nats), the canonical base for
+outcomes: full-win, partial, and full-loss. We compute $\ell(w^\star)$
+(and hence $E$) and $D_{\mathrm{KL}}$ in natural-log units (nats), the canonical base for
 Kelly log-utility and for information-theoretic divergence. The
 uniform-outcome entropy is $H(\mathbf{u}) = \ln 3 \approx 1.099$ and
 $D_{\mathrm{KL}} \in [0, \ln 3]$. Any other log base produces an
@@ -762,7 +777,7 @@ $k$ & Trades & Final & Sharpe & Max DD & Yield \\
 \bottomrule
 \end{tabular}
 \caption{$k$-sweep on the in-sample 2020--2024 window, $q=1$, under
-the canonical $\GROUND = (\exp(g) - 1) \cdot \exp(-k D_{\mathrm{KL}})$ ranker.
+the canonical $\GROUND = E \cdot \exp(-k D_{\mathrm{KL}})$ ranker.
 Sharpe is monotonically increasing across the swept range; we adopt
 $k = 20$ as the canonical choice. The strategy is robust to
 ambiguity-aversion calibration across more than an order of magnitude
@@ -777,9 +792,9 @@ no in-$(0,1)$ root and that candidate is dropped.}
 \subsection{Single-factor baselines}\label{sec:baselines}
 
 To test whether GROUND adds value over its components, we re-rank with
-two stripped-down rankers: (i) $G$-only (rank by Kelly-growth alone,
+two stripped-down rankers: (i) Kelly-EV-only (rank by $E$ alone,
 ignoring $D_{\mathrm{KL}}$), and (ii) $D_{\mathrm{KL}}$-only (rank by
-lowest divergence, ignoring $G$). Both run on the in-sample 2020--2024
+lowest divergence, ignoring $E$). Both run on the in-sample 2020--2024
 window, $q=1$, with all other configuration unchanged.
 
 \begin{table}[htbp]
@@ -790,14 +805,14 @@ window, $q=1$, with all other configuration unchanged.
 ranker & Trades & Final & Sharpe & Max DD & Yield \\
 \midrule
 \textbf{GROUND ($k=20$, canonical)} & 1{,}285 & \$24{,}491 & \textbf{1.63} & $-7.2\%$ & \textbf{15.35\%} \\
-$g$ alone (Kelly-growth)           & 1{,}285 & \$23{,}664 & 1.43          & $-9.8\%$  & 14.42\% \\
+$E$ alone (Kelly-EV)               & 1{,}285 & \$23{,}664 & 1.43          & $-9.8\%$  & 14.42\% \\
 $D_{\mathrm{KL}}$ alone            & 1{,}285 & \$18{,}850 & 1.02          & $-12.1\%$ & 8.58\%  \\
 \bottomrule
 \end{tabular}
 \caption{Single-factor baselines, in-sample 2020--2024, $q=1$, all
 under the canonical per-spread Kelly payoffs $\{+b, +\alpha(b) b, -1\}$.
-$G$-only ranks by Kelly-growth and ignores $D_{\mathrm{KL}}$;
-$D_{\mathrm{KL}}$-only ranks by lowest divergence and ignores $G$.
+$E$-only ranks by Kelly EV and ignores $D_{\mathrm{KL}}$;
+$D_{\mathrm{KL}}$-only ranks by lowest divergence and ignores $E$.
 Both underperform the joint GROUND ranker on Sharpe and yield,
 consistent with the intuition that neither pure growth nor pure
 flatness controls the joint signal that GROUND captures.}
@@ -839,7 +854,7 @@ candidate trades --- the per-(ticker, week) best spread with no top-$N$
 filter, 2020--2026, $n = 6{,}086$ growth-positive candidates (after the
 $b \le 5$ backtest cap, $k = 20$). Mean $\GROUND$ is the canonical
 Kelly-EV-with-entropic-discount score
-$(\exp(g) - 1) \cdot \exp(-k D_{\mathrm{KL}})$ rendered as a percent;
+$E \cdot \exp(-k D_{\mathrm{KL}})$ rendered as a percent;
 at $k = 20$ the entropic discount is sharp, so the bottom seven deciles
 have effectively zero $\GROUND$ at three-decimal display precision and
 the top decile dominates. Yield is per-trade
@@ -886,9 +901,9 @@ while yield, Sharpe, and drawdown are sizing-invariant by construction.
 \subsection{Why GROUND vs.\ simpler rankers}
 
 We compare GROUND against two single-factor baselines (Section~\ref{sec:baselines}):
-$G$-only, which ranks by Kelly-growth and ignores $D_{\mathrm{KL}}$,
+Kelly-EV-only, which ranks by $E$ alone and ignores $D_{\mathrm{KL}}$,
 and $D_{\mathrm{KL}}$-only, which ranks by lowest divergence and ignores
-$G$. The full GROUND ranker outperforms both on Sharpe and yield on the
+$E$. The full GROUND ranker outperforms both on Sharpe and yield on the
 in-sample window (Table~\ref{tab:baselines}). The two components are
 individually weak signals; their multiplicative combination via
 Equation~\eqref{eq:ground-canonical} is where the empirical edge appears.
@@ -925,7 +940,7 @@ Equation~\eqref{eq:ground-canonical} is where the empirical edge appears.
 
 \subsection{Conclusion}
 
-Under the canonical form $\GROUND = (\exp(g) - 1) \cdot \exp(-k D_{\mathrm{KL}})$
+Under the canonical form $\GROUND = E \cdot \exp(-k D_{\mathrm{KL}})$
 with $k = 20$, per-spread Kelly payoffs $\{+b, +\alpha(b) b, -1\}$,
 a both-leg open-interest gate at 100 contracts, and a
 credit-to-max-loss cap at $b \le 5$ (backtest reporting convention; production has no cap), the GROUND ranker yields
@@ -944,15 +959,17 @@ ranker (Section~\ref{sec:baselines}).
 \section{Closed-form Kelly-growth score with a partial outcome}
 \label{app:kelly-foc}
 
-Section~\ref{sec:strategy} references the Kelly-growth score $G$ used as
-the numerator of the GROUND ratio, computed at a closed-form
+Section~\ref{sec:strategy} references the Kelly log-growth
+$\ell(w^\star)$ and the Kelly EV $E = \exp(\ell(w^\star)) - 1$ used as
+the leading factor of the GROUND ratio, computed at a closed-form
 $w^\star$. We derive that fraction here.
 
 \paragraph{Score, not sizing.}
-The Kelly-growth $G$ used in this work is a \emph{ranking score}, not a
-prescription for how many contracts to trade. The actual sizing rule is
-flat ($q=1$ or $q=2$ contracts per spread, capped at
-\texttt{MAX\_CONTRACTS}); $w^\star$ never enters portfolio construction.
+The Kelly log-growth $\ell(w^\star)$ used in this work is a
+\emph{ranking score} (via $E = \exp(\ell) - 1$), not a prescription for
+how many contracts to trade. The actual sizing rule is flat ($q=1$ or
+$q=2$ contracts per spread, capped at \texttt{MAX\_CONTRACTS});
+$w^\star$ never enters portfolio construction.
 The canonical scoring uses the actual per-spread three-outcome
 payoffs $\{+b, +\alpha(b) b, -1\}$ where $b = c/m$ is the
 credit-to-max-loss ratio and $\alpha(b) = (b-1)/(2b)$ is the
@@ -987,17 +1004,18 @@ splitting the ITM mass between full-loss and partial outcomes.
 \paragraph{Growth function.}
 If a fraction $w \in [0, 1]$ of the (notional) bankroll is wagered, the
 bankroll multiplier in each outcome is $1 + w$, $1 + w\alpha$, and
-$1 - w$ respectively. The Kelly growth rate $G$ is the geometric mean
-of these multipliers under the probabilities $(p, r_o, q)$, equivalently
-the exponential of the expected log-multiplier:
+$1 - w$ respectively. The Kelly log-growth $\ell(w)$ is the expected
+log-multiplier under $(p, r_o, q)$, and the wealth multiplier $M$ is
+its exponential:
 \begin{equation}
-\ln G(w; p, r_o, q, \alpha)
+\ell(w; p, r_o, q, \alpha)
   = p \log(1 + w) + r_o \log(1 + w\alpha) + q \log(1 - w),
 \qquad
-G = \exp\bigl(\ln G\bigr).
+M = \exp(\ell(w)).
 \label{eq:growth}
 \end{equation}
-The Kelly criterion maximises $\ln G$ (equivalently $G$) over $w$.
+The Kelly criterion maximises $\ell$ (equivalently $M$, or the Kelly EV
+$E = M - 1$) over $w$.
 
 Differentiating with respect to $w$ and setting the derivative to zero
 gives the first-order condition
@@ -1031,19 +1049,20 @@ w^\star = \frac{-B - \sqrt{B^2 - 4AC}}{2A}.
 For the canonical $\alpha = -0.5$, $A > 0$ and the in-unit root is
 uniquely $w^\star$ above. The clearing of the $(1+w\alpha)$ factor
 introduces a spurious second root outside $(0, 1)$ which is discarded.
-The Kelly growth rate $G$ used in the GROUND ratio is then
+The Kelly log-growth $\ell(w^\star)$ and the Kelly EV $E$ used in
+the GROUND ratio are then
 \begin{equation}
-\ln G = p \ln(1 + w^\star) + r_o \ln(1 + w^\star \alpha)
+\ell(w^\star) = p \ln(1 + w^\star) + r_o \ln(1 + w^\star \alpha)
       + q \ln(1 - w^\star),
 \qquad
-G = \exp(\ln G),
+E = \exp(\ell(w^\star)) - 1,
 \label{eq:G-used}
 \end{equation}
-the per-trade wealth multiplier evaluated at the Kelly-optimal sizing
-fraction. The internal computation is in log space (nats), where
-$\ln G$ and $D_{\mathrm{KL}}$ share units, and exponentiated to
-obtain the growth rate $G$ used in
-\eqref{eq:ground-canonical}.
+the per-trade wealth gain at Kelly-optimal sizing. The internal
+computation is in log space (nats), where $\ell(w^\star)$ and
+$D_{\mathrm{KL}}$ share units; exponentiation then yields the wealth
+multiplier $M = \exp(\ell(w^\star))$ and the Kelly EV $E = M - 1$ used
+in \eqref{eq:ground-canonical}.
 
 \paragraph{Boundary cases.}
 When $\alpha = -1$ the partial outcome is indistinguishable from a full
@@ -1060,7 +1079,7 @@ normalised $\{+1, +\alpha, -1\}$. Replacing the win payoff $+1$ with $+b$
 and the partial payoff $+\alpha$ with $+\alpha b$, the log-growth
 becomes
 \begin{equation}
-\ln G(w; p, r_o, q, b, \alpha)
+\ell(w; p, r_o, q, b, \alpha)
   = p \log(1 + w b) + r_o \log(1 + w\alpha b) + q \log(1 - w).
 \label{eq:growth-b}
 \end{equation}
@@ -1078,8 +1097,8 @@ partial payoff between $K_{\text{long}}$ and $K_{\text{short}}$
 (Section~\ref{sec:ground-v2}). At $b = 1$ this collapses to the
 binary case above; at smaller $b$ the partial is heavily penalised,
 which is appropriate for thin-credit, wide-strike spreads where the
-partial zone is large relative to the credit. The Kelly growth rate $G$
-used in the GROUND ratio is $\exp(\ln G)$ with \eqref{eq:growth-b}
+partial zone is large relative to the credit. The Kelly EV $E$ used in
+the GROUND ratio is $\exp(\ell(w^\star)) - 1$ with \eqref{eq:growth-b}
 evaluated at $w^\star$.
 
 \paragraph{Empirical probability estimation.}

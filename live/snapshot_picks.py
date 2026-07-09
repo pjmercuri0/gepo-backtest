@@ -85,8 +85,50 @@ def _expiry_close(ticker: str, expiry: str):
     return float(row["close"].iloc[0])
 
 
-def settle() -> None:
+def _connect_ib():
+    """Open an IB connection for same-evening close lookups, or None if
+    ib_insync/IB Gateway is unavailable. Distinct clientId so it never
+    collides with the fetcher (11), daily-bars (13) or expire_frozen (201)."""
+    try:
+        from ib_insync import IB
+    except ImportError:
+        print("[snapshot_picks] ib_insync unavailable — cannot fetch live close")
+        return None
+    ib = IB()
+    try:
+        ib.connect(live_config.IB_HOST, live_config.IB_PORT,
+                   clientId=live_config.IB_CLIENT_ID + 10)
+    except Exception as e:
+        print(f"[snapshot_picks] IB connect failed: {e}")
+        return None
+    ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
+    return ib
+
+
+def settle(post_close=False) -> None:
+    """Settle expired snapshot picks.
+
+    Default (intraday calls from pull_now_parallel): Yahoo daily-bar close,
+    only for picks whose expiry is strictly before today ("settle the morning
+    after"), since the same-day Yahoo EOD bar isn't reliably final intraday.
+
+    post_close=True (cron_daily_bars at 17:01, after the official close):
+    also settle picks expiring TODAY, sourcing today's RTH close live from IB
+    (same source as expire_frozen) so the Snapshots tab settles the same
+    evening as the History tab instead of lagging a day. Older expiries still
+    use Yahoo — IB's last daily bar is always TODAY and would mis-settle them.
+    """
     today = datetime.now().strftime("%Y-%m-%d")
+    ib = _connect_ib() if post_close else None
+    ib_close_cache = {}
+    try:
+        _settle_files(today, ib, ib_close_cache)
+    finally:
+        if ib is not None:
+            ib.disconnect()
+
+
+def _settle_files(today, ib, ib_close_cache) -> None:
     for day_path in sorted(PICKS_DIR.glob("*.json")):
         try:
             payload = json.loads(day_path.read_text())
@@ -98,9 +140,19 @@ def settle() -> None:
                 if p.get("outcome") is not None:
                     continue
                 expiry = (p.get("expiry_date") or "")[:10]
-                if not expiry or expiry >= today:
-                    continue  # not yet expired (settle the morning after)
-                spot = _expiry_close(p["ticker"], expiry)
+                if not expiry or expiry > today:
+                    continue  # not yet expired
+                if expiry == today:
+                    # Same-day settle only after the close, via live IB.
+                    if ib is None:
+                        continue
+                    tk = p["ticker"]
+                    if tk not in ib_close_cache:
+                        from live import expire_frozen
+                        ib_close_cache[tk] = expire_frozen._underlying_price(ib, tk)
+                    spot = ib_close_cache[tk]
+                else:  # expiry < today — morning-after Yahoo close
+                    spot = _expiry_close(p["ticker"], expiry)
                 if spot is None:
                     continue
                 ss, ls = float(p["short_strike"]), float(p["long_strike"])

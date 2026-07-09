@@ -2,52 +2,196 @@
 {% block title %}GEPO Live — History{% endblock %}
 
 {% block content %}
-<h1>Frozen 15:45 history</h1>
-<div class="subtitle">One snapshot per trading day. Drift columns populate at 16:15 close-snapshot.</div>
+<h1>Frozen 15:01 history</h1>
+<div class="subtitle">One snapshot per trading day. Status/P&amp;L update intraday (tracker) and finalize at expiry (settler).</div>
 
 {% if entries %}
   {% for day in entries %}
-    <div class="week-card">
-      <div class="week-head">
+    <div class="week-card" data-date="{{ day.date }}" {% if day.mock %}style="opacity:0.5"{% endif %}>
+      <div class="week-head day-head">
         <div>
-          <div class="week-title">{{ day.date }}</div>
-          <div class="week-sub">frozen {{ day.frozen_at or "—" }} · drift {{ day.drift_at or "pending" }}</div>
+          <div class="week-title">
+            {{ day.date }}{% if day.date_dow %} <span style="color:#888780;font-weight:normal">{{ day.date_dow }}</span>{% endif %}
+            {% if day.mock %}<span style="font-size:11px;padding:1px 6px;border:1px solid #888;border-radius:3px;margin-left:8px;vertical-align:middle">MOCK</span>{% endif %}
+          </div>
+          <div class="week-sub">frozen {{ day.frozen_at or "—" }}{% if day.last_updated_ts %} · updated <span id="ut-{{ loop.index0 }}" data-ts="{{ day.last_updated_ts }}">…</span>{% endif %}</div>
+          {# Regime/SPY line removed 2026-06-09: gate is OFF, both directions
+             eligible. Per-pick direction is shown in the ticker cell instead. #}
+          {% if day.vol_gate and day.vol_gate.rv_20 is not none %}
+            <div class="subtitle" style="margin:4px 0 0">
+              vol gate:
+              {% if day.vol_gate.gated %}
+                <span style="color:#ff6b6b"><strong>GATED</strong></span>
+              {% elif day.vol_gate.threshold is none %}
+                <span style="color:#888780"><strong>disabled</strong></span>
+              {% elif day.vol_gate.is_monday %}
+                <span style="color:#888780">Mon&middot;always</span>
+              {% else %}
+                <span style="color:#7ec99a"><strong>open</strong></span>
+              {% endif %}
+              &middot; SPY rv_20 {{ "%.1f"|format(day.vol_gate.rv_20|rd(1)) }}% vs gate {% if day.vol_gate.threshold is not none %}{{ "%.0f"|format(day.vol_gate.threshold|rd) }}%{% else %}&mdash;{% endif %}
+            </div>
+          {% endif %}
         </div>
         <div style="text-align:right">
-          <div class="week-pnl">{{ day.top_picks | length }} picks</div>
+          {% if day.outcome %}
+            {% if day.outcome.total_pnl_per_contract_actual is defined %}
+              {% set day_pnl = day.outcome.total_pnl_per_contract_actual %}
+              {% set day_pnl_actual = True %}
+              {% set day_pnl_worse = (day.outcome.total_pnl_per_contract_actual | rd(2)) < (day.outcome.total_pnl_per_contract | rd(2)) %}
+            {% else %}
+              {% set day_pnl = day.outcome.total_pnl_per_contract %}
+              {% set day_pnl_actual = False %}
+              {% set day_pnl_worse = False %}
+            {% endif %}
+            <div class="week-pnl {% if day_pnl > 0 %}pos{% elif day_pnl < 0 %}neg{% endif %}">
+              ${{ "%+.0f"|format(day_pnl|rd) }}
+            </div>
+            <div class="week-sub">
+              {{ day.outcome.wins }}W / {{ day.outcome.partials }}P / {{ day.outcome.losses }}L
+              · {{ day.top_picks | length }} picks
+            </div>
+          {% else %}
+            <div class="week-pnl">{{ day.top_picks | length }} picks</div>
+            {% if not day.mock and day.day_total_pnl_per_contract is not none %}
+              <div class="{% if day.day_total_pnl_per_contract > 0 %}pos{% elif day.day_total_pnl_per_contract < 0 %}neg{% endif %}" style="font-size:14px;font-weight:600;margin-top:2px">
+                ${{ "%+.0f"|format(day.day_total_pnl_per_contract|rd) }}
+              </div>
+            {% endif %}
+            <div class="week-sub">unsettled</div>
+          {% endif %}
+          {% if day.day_sum_credit is not none and day.day_sum_max_loss is not none %}
+            <div class="week-sub" style="margin-top:4px">
+              cr ${{ "%.0f"|format(day.day_sum_credit|rd) }} · risk ${{ "%.0f"|format(day.day_sum_max_loss|rd) }}{% if day.day_decimal_odds is not none %} · @{{ "%.2f"|format(day.day_decimal_odds|rd(2)) }}x{% endif %}
+            </div>
+            {% if day.day_sum_credit_actual is defined and day.day_sum_credit_actual is not none and day.day_sum_max_loss_actual is defined and day.day_sum_max_loss_actual is not none %}
+              {% set day_cr_worse = (day.day_sum_credit_actual | rd(2)) < (day.day_sum_credit | rd(2)) %}
+              <div class="week-sub" style="color:{% if day_cr_worse %}#ff6b6b{% else %}#7ec99a{% endif %};margin-top:2px">
+                cr ${{ "%.0f"|format(day.day_sum_credit_actual|rd) }} · risk ${{ "%.0f"|format(day.day_sum_max_loss_actual|rd) }}{% if day.day_decimal_odds_actual is defined and day.day_decimal_odds_actual is not none %} · @{{ "%.2f"|format(day.day_decimal_odds_actual|rd(2)) }}x{% endif %}
+              </div>
+            {% endif %}
+          {% endif %}
         </div>
-      </div>
-      {% if day.regime and day.regime.regime %}
-        <div class="subtitle">
-          regime:
-          <span class="{% if day.regime.regime == 'bull' %}dir-bull{% else %}dir-bear{% endif %}">
-            <strong>{{ day.regime.regime | upper }}</strong>
-          </span>
-          &middot; SPY ${{ "%.2f"|format(day.regime.close) }} vs
-          {{ day.regime.window }}d SMA ${{ "%.2f"|format(day.regime.sma) }}
-        </div>
-      {% endif %}
+      </div>{# /.week-head — align-items:flex-end so right block bottoms-up with regime line #}
       <div class="table-scroll">
       <table>
         <thead><tr>
-          <th>Rank</th><th>Ticker</th><th>Direction</th>
-          <th>Strikes</th><th>Credit ($/ctr)</th><th>Max-Loss ($/ctr)</th><th>GROUND %</th>
+          <th>Rank</th><th>Ticker</th>
+          <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th><th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
           <th>Δ short</th><th>DTE</th>
+          <th>Status</th><th>Mark</th><th style="text-align:right">P&amp;L</th>
         </tr></thead>
         <tbody>
         {% for p in day.top_picks %}
-          <tr>
+          {% set tk = p.ticker %}
+          {% set outcome_row = (day.outcome.results[tk] if day.outcome and day.outcome.results and tk in day.outcome.results else None) %}
+          {% set track_arr = (day.tracking[tk] if day.tracking and tk in day.tracking else []) %}
+          {% set last_track = (track_arr[-1] if track_arr else None) %}
+          {# Latest tracking row that has a spread option mark (for the
+             reference-only Mark column; P&L uses spot-based as-if-expired). #}
+          {% set ns = namespace(marked=None) %}
+          {% for r in track_arr | reverse %}{% if ns.marked is none and r.get('current_mark') is not none %}{% set ns.marked = r %}{% endif %}{% endfor %}
+          {% set last_marked = ns.marked %}
+          <tr{% if last_track and last_track.get('assignment_risk') %} class="assignment-risk"{% endif %}>
             <td>{{ loop.index }}</td>
-            <td class="fw">{{ p.ticker }}</td>
-            <td class="{% if p.spread_type == 'bull_put' %}dir-bull{% else %}dir-bear{% endif %}">
-              {{ "bull-put" if p.spread_type == "bull_put" else "bear-call" }}
+            <td class="fw">{{ tk }}
+              {%- set sv = p.short_volume|default(none) -%}
+              {%- set lv = p.long_volume|default(none) -%}
+              {% if p.spread_type == 'bull_put' %}
+                <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="bull-put: sold higher-strike put, bought lower-strike put">▲ BP</span>
+              {% elif p.spread_type == 'bear_call' %}
+                <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="bear-call: sold lower-strike call, bought higher-strike call">▼ BC</span>
+              {% endif %}
             </td>
-            <td>${{ "%.2f"|format(p.short_strike) }} / ${{ "%.2f"|format(p.long_strike) }}</td>
-            <td>${{ "%.0f"|format(p.net_credit * 100) }}</td>
-            <td>${{ "%.0f"|format(p.max_loss * 100) }}</td>
-            <td class="fw">{{ "%.3f"|format(p.GROUND * 100) }}%</td>
-            <td>{{ "%.2f"|format(p.short_delta) }}</td>
+
+            {# Spot column (underlying price) — before Strikes for visual scan.
+               Top-line is the most current spot (settled, tracked, or freeze
+               entry_price as final fallback). #}
+            <td>
+              {% if outcome_row and outcome_row.underlying_price is defined %}
+                ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}
+              {% elif last_track and 'underlying_price' in last_track and last_track.underlying_price %}
+                ${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}
+              {% elif p.entry_price is not none %}
+                ${{ "%.2f"|format(p.entry_price|rd(2)) }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+
+            <td>${{ "%.2f"|format(p.short_strike|rd(2)) }} / ${{ "%.2f"|format(p.long_strike|rd(2)) }}</td>
+            <td style="color:#e8b366;font-weight:600">{{ p.suggested_qty or 1 }}×</td>
+            {# Credit + max-loss shown as midmid = (mid + max(0,nat))/2.
+               This is the realistic-fill basis and matches the limit price
+               you'd set: fill at midmid or skip. Fall back to mid if no
+               fill_targets (means no bid/ask available to compute natural). #}
+            {# Credit/Max-Loss/Ratio shown as 75%×mid placeholder; actual fill in brackets if recorded. #}
+            {% if p.fill_targets %}
+              {% set mm_c = p.fill_targets[0].credit %}
+              {% set mm_l = p.fill_targets[0].max_loss %}
+              {# Credit always green: bright #7ec99a if actual >= target, dull #5b9474 if worse. #}
+              <td>${{ "%.2f"|format(mm_c|rd(2)) }} {% if p.actual_credit is defined and p.actual_credit is not none %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-current="{{ "%.2f"|format(p.actual_credit|rd(2)) }}" style="color:{% if (p.actual_credit | rd(2)) < (mm_c | rd(2)) %}#5b9474{% else %}#7ec99a{% endif %};cursor:pointer;border-bottom:1px dotted currentColor" title="click to edit actual fill">(${{ "%.2f"|format(p.actual_credit|rd(2)) }})</span>{% else %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-current="" style="color:#666;cursor:pointer;border-bottom:1px dotted #666" title="click to record actual fill">(+)</span>{% endif %}</td>
+              {# Max-loss always red: bright #ff6b6b if actual <= target (less risk), dull #c46868 if actual > target. #}
+              <td>${{ "%.2f"|format(mm_l|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span style="color:{% if (p.actual_max_loss | rd(2)) > (mm_l | rd(2)) %}#c46868{% else %}#ff6b6b{% endif %}">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>
+              {# Ratio always green: bright #7ec99a if actual >= target, dull #5b9474 if worse. #}
+              <td>{% if (mm_l | rd(2)) > 0 %}{{ "%.2f"|format(((mm_c | rd(2)) / (mm_l | rd(2)))|rd(2)) }}{% else %}—{% endif %}{% if p.actual_credit is defined and p.actual_credit is not none and p.actual_max_loss is defined and p.actual_max_loss is not none and (p.actual_max_loss | rd(2)) > 0 and (mm_l | rd(2)) > 0 %}{% set ar = ((p.actual_credit | rd(2)) / (p.actual_max_loss | rd(2))) | rd(2) %}{% set tr = ((mm_c | rd(2)) / (mm_l | rd(2))) | rd(2) %} <span style="color:{% if ar < tr %}#5b9474{% else %}#7ec99a{% endif %}">({{ "%.2f"|format(ar) }})</span>{% endif %}</td>
+            {% else %}
+              <td>${{ "%.2f"|format(p.net_credit|rd(2)) }}</td>
+              <td>${{ "%.2f"|format(p.max_loss|rd(2)) }}</td>
+              <td>{% if p.max_loss > 0 %}{{ "%.2f"|format((p.net_credit / p.max_loss)|rd(2)) }}{% else %}—{% endif %}</td>
+            {% endif %}
+            <td class="fw">{{ "%.3f"|format((p.GROUND * 100)|rd(3)) }}%</td>
+            <td>{{ "%.2f"|format(p.short_delta|rd(2)) }}</td>
             <td>{{ p.DTE }}</td>
+
+            {# Status column — W/L/P (first letter of WIN/WINNING, LOSS/LOSING,
+               PARTIAL). Live picks also get a pulsing dot. #}
+            {% if outcome_row and outcome_row.result %}
+              <td><span class="badge {% if outcome_row.result == 'WIN' %}badge-WIN{% elif outcome_row.result == 'LOSS' %}badge-LOSS{% elif outcome_row.result == 'PARTIAL' %}badge-PARTIAL{% else %}badge-FROZEN{% endif %}" title="{{ outcome_row.result }}">{{ outcome_row.result[0] }}</span></td>
+            {% elif last_track and last_track.live_status %}
+              <td><span class="badge {% if last_track.live_status == 'WINNING' %}badge-WIN{% elif last_track.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}" title="{{ last_track.live_status }}">{{ last_track.live_status[0] }}</span><span class="live-dot" style="margin-left:6px;margin-right:0" title="live — settles at 16:01"></span></td>
+            {% elif last_track %}
+              <td><span style="color:#888780" title="LIVE">·</span><span class="live-dot" style="margin-left:6px;margin-right:0"></span></td>
+            {% else %}
+              <td><span style="color:#666">—</span></td>
+            {% endif %}
+
+            {# Mark column — last known spread option mid, for reference
+               only. P&L is computed from spot, not mark. #}
+            {% if outcome_row %}
+              <td>—</td>
+            {% elif last_marked %}
+              <td>${{ "%.2f"|format(last_marked.current_mark|rd(2)) }}</td>
+            {% else %}
+              <td>—</td>
+            {% endif %}
+
+            {# P&L column for LIVE picks is the as-if-expired payoff (spot
+               vs strikes, via spreads.calc_outcome/calc_pnl). Webapp
+               overrides last_track.unrealized_pnl_per_contract before render. #}
+            {% if outcome_row and outcome_row.pnl_per_contract is defined %}
+              {% if outcome_row.actual_pnl_per_contract is defined %}
+                {% set pick_pnl = outcome_row.actual_pnl_per_contract %}
+                {% set pick_actual = True %}
+                {% set pick_worse = (outcome_row.actual_pnl_per_contract | rd(2)) < (outcome_row.pnl_per_contract | rd(2)) %}
+              {% else %}
+                {% set pick_pnl = outcome_row.pnl_per_contract %}
+                {% set pick_actual = False %}
+                {% set pick_worse = False %}
+              {% endif %}
+              {# Sign-only coloring: green for positive, red for negative.
+                 No actual-vs-theoretical dull distinction here — that's
+                 expressed by the credit/max-loss/ratio columns instead. #}
+              <td class="fw {% if pick_pnl > 0 %}pos{% elif pick_pnl < 0 %}neg{% endif %}" style="text-align:right">
+                ${{ "%+.0f"|format(pick_pnl|rd) }}
+              </td>
+            {% elif last_track and last_track.unrealized_pnl_per_contract is defined and last_track.unrealized_pnl_per_contract is not none %}
+              <td class="{% if last_track.unrealized_pnl_per_contract > 0 %}pos{% elif last_track.unrealized_pnl_per_contract < 0 %}neg{% endif %}" style="text-align:right">
+                ${{ "%+.0f"|format(last_track.unrealized_pnl_per_contract|rd) }}
+              </td>
+            {% else %}
+              <td style="text-align:right">—</td>
+            {% endif %}
           </tr>
         {% endfor %}
         </tbody>
@@ -56,6 +200,95 @@
     </div>
   {% endfor %}
 {% else %}
-  <div class="week-card"><div style="color:#888780;padding:8px">no frozen snapshots yet. They appear after the first 15:45 freeze runs.</div></div>
+  <div class="week-card"><div style="color:#888780;padding:8px">no frozen snapshots yet. They appear after the first 15:01 freeze runs.</div></div>
 {% endif %}
+
+<script>
+// After an actual-credit edit, we swap the one day card in-place instead
+// of reloading. This avoids iOS Safari's scroll-to-top on reload entirely.
+async function refreshDayCard(date) {
+  const resp = await fetch(window.location.pathname, {cache: 'no-store'});
+  if (!resp.ok) throw new Error('history fetch failed: ' + resp.status);
+  const html = await resp.text();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const fresh = doc.querySelector(`.week-card[data-date="${date}"]`);
+  const cur   = document.querySelector(`.week-card[data-date="${date}"]`);
+  if (!fresh || !cur) throw new Error('day card not found for ' + date);
+  cur.replaceWith(fresh);
+}
+
+// Format each "updated …" span's data-ts (naive local-time ISO) to ET 12-hour.
+document.querySelectorAll('span[data-ts]').forEach(el => {
+  const ts = el.dataset.ts;
+  if (!ts || !ts.includes('T')) return;
+  const dt = new Date(ts.slice(0, 19));   // naive local time
+  if (isNaN(dt)) return;
+  el.textContent = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true,
+  }).format(dt);
+});
+
+// Inline edit of actual_credit per pick. Click the (X.XX) or (+) span,
+// type the new fill, Enter to save (Esc to cancel). Server recomputes
+// derived max_loss / ratio / P&L, then we reload.
+document.addEventListener('click', e => {
+  const span = e.target.closest('.actual-edit');
+  if (!span || span.dataset.editing === '1') return;
+  span.dataset.editing = '1';
+  const cur = span.dataset.current || '';
+  const date = span.dataset.date;
+  const ticker = span.dataset.ticker;
+
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.inputMode = 'decimal';
+  inp.value = cur;
+  inp.placeholder = '0.00';
+  inp.style.cssText = 'background:#222;color:#fff;border:1px solid #888;border-radius:3px;padding:1px 4px;width:64px;font:inherit';
+  const parent = span.parentNode;
+  parent.replaceChild(inp, span);
+  inp.focus();
+  inp.select();
+
+  let done = false;
+  const restore = () => { if (!done) { done = true; parent.replaceChild(span, inp); span.dataset.editing = ''; } };
+  const submit = async () => {
+    if (done) return;
+    const raw = inp.value.trim();
+    let val = null;
+    if (raw !== '') {
+      val = parseFloat(raw);
+      if (isNaN(val) || val < 0) { alert('invalid number'); restore(); return; }
+    }
+    done = true;
+    try {
+      const r = await fetch(`/api/frozen/${date}/${ticker}/actual_credit`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({actual_credit: val}),
+      });
+      if (!r.ok) {
+        const msg = await r.text();
+        alert('save failed: ' + r.status + ' ' + msg);
+        done = false; restore(); return;
+      }
+      try {
+        await refreshDayCard(date);
+      } catch (e) {
+        // If the in-place swap fails for any reason, fall back to reload.
+        location.reload();
+      }
+    } catch (err) {
+      alert('save failed: ' + err);
+      done = false; restore();
+    }
+  };
+  inp.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); submit(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+  });
+  inp.addEventListener('blur', submit);
+});
+</script>
 {% endblock %}
