@@ -19,6 +19,17 @@ unset DEVELOPER_DIR
 /usr/bin/caffeinate -i -t 480 &
 
 LOG=live/logs/daily_bars.log
+LOCKDIR=live/logs/cron_daily_bars.lock
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+  {
+    echo ""
+    echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
+    echo "SKIP: cron_daily_bars already running (lock: $LOCKDIR)"
+  } >> "$LOG" 2>&1
+  exit 0
+fi
+trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
+
 {
   echo ""
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="

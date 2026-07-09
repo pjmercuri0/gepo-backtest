@@ -18,6 +18,16 @@ fi
 /usr/bin/caffeinate -i -t 120 &
 
 LOG=live/logs/expire.log
+LOCKDIR=live/logs/cron_expire.lock
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+  {
+    echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
+    echo "SKIP: cron_expire already running (lock: $LOCKDIR)"
+  } >> "$LOG" 2>&1
+  exit 0
+fi
+trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
+
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
   # Pull Mya-side actual_credit edits before settling, so actual P&L

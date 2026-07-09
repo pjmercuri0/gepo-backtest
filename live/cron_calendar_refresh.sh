@@ -12,6 +12,17 @@ mkdir -p live/logs
 /usr/bin/caffeinate -i -t 600 &
 
 LOG=live/logs/calendar_refresh.log
+LOCKDIR=live/logs/cron_calendar_refresh.lock
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+  {
+    echo ""
+    echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
+    echo "SKIP: cron_calendar_refresh already running (lock: $LOCKDIR)"
+  } >> "$LOG" 2>&1
+  exit 0
+fi
+trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
+
 {
   echo ""
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
