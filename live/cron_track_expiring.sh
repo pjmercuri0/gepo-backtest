@@ -19,6 +19,16 @@ fi
 /usr/bin/caffeinate -i -t 180 &
 
 LOG=live/logs/track_expiring.log
+LOCKDIR=live/logs/cron_track_expiring.lock
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+  {
+    echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
+    echo "SKIP: cron_track_expiring already running (lock: $LOCKDIR)"
+  } >> "$LOG" 2>&1
+  exit 0
+fi
+trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
+
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
   # Pull Mya-side actual_credit edits before tracker appends new rows,
