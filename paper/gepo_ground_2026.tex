@@ -1,0 +1,929 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\newtheorem{proposition}{Proposition}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\dkl}{D_{\mathrm{KL}}}
+
+\title{Entropy-Gated Kelly Selection under Market Disagreement\\
+with the Intrinsic GROUND Ratio}
+\author{Peter~J.~Mercurio,~PhD}
+\date{June 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+In this fourth paper of our series on the topic of portfolio optimization, we
+take the entropic portfolio selection framework developed in the first three
+papers \cite{mercurio2020repo, mercurio2020binary, mercurio2020gepo} into
+production application: the systematic selection of short-dated vertical
+credit spreads on S\&P~100 underlyings. We introduce the intrinsic GROUND
+ratio, a per-candidate form of the Growth Rate Over UNiform Divergence
+(GROUND) ratio of our second paper, which scores each candidate trade by its
+Kelly expected growth under the trader's estimated outcome measure $P$,
+discounted exponentially in the Kullback--Leibler divergence of $P$ from a
+reference measure $Q$. The form is fully general in $(P, Q)$; here $P$ is the
+realized-volatility-implied outcome distribution of the spread and $Q$ is the
+market's implied-volatility counterpart. We establish the exact equivalence
+of intrinsic GROUND selection to Hansen--Sargent multiplier preferences, and
+show that to second order in the disagreement the entropic discount charges
+each candidate the Kelly growth that would be forgone if the market's
+measure were correct. We validate a midpoint-based
+execution model on a large sample of same-day option prints, apply the
+intrinsic GROUND ratio to six years of S\&P~100 credit spread data with a
+further out-of-time period, and demonstrate how divergence-gated selection
+outperforms growth-rate selection alone, which loses money under identical
+conditions.
+\end{abstract}
+
+\noindent\textbf{Keywords:} intrinsic GROUND ratio; relative entropy;
+Kullback--Leibler divergence; Kelly criterion; option portfolios; credit
+spreads; variance risk premium; portfolio optimization
+
+\section{Introduction}
+
+Systematic selling of equity option premium is conventionally justified by the
+variance risk premium: implied volatility (IV) exceeds subsequently realized
+volatility (RV) on average, so options are on average sold rich
+\cite{carrwu2009, bollerslev2009, bakshikapadia2003}. The practical
+difficulty is not the existence of this premium but its selection. On any
+given day, hundreds of candidate spreads carry positive model expected value
+(EV), most of that EV is noise in the inputs, and an optimizer that maximizes
+a noisy score reliably selects the noise. This paper, the fourth in our series
+on the topic of portfolio optimization, addresses the selection problem with
+the two-factor entropic structure developed across the first three papers
+\cite{mercurio2020repo, mercurio2020binary, mercurio2020gepo}: growth rate as
+the reward, relative entropy as the risk. A growth factor prices each
+candidate as a Kelly bet \cite{kelly1956} under an RV-implied probability
+measure. An entropy factor measures, in nats, how far that measure sits from
+the IV-implied measure of the same spread, and discounts the growth factor
+exponentially in that distance. The product is the intrinsic GROUND ratio.
+Candidates are gated by a fixed threshold and the top five per entry day are
+taken.
+
+This paper also documents a change of price basis relative to earlier
+revisions of the system. Earlier revisions scored candidates on last-trade
+prices clamped to the bid--ask band. Live operation revealed that intraday
+last prints on the two legs of a spread are asynchronous; pairing a stale
+short-leg print near its ask with a stale long-leg print near its bid
+fabricates credits that were never simultaneously quoted, in the worst cases
+implying payoff odds above 10 on spreads whose guaranteed-fill credit was
+negative at the same instant. The replacement basis, the quoted midpoint, is
+validated empirically in Section~\ref{sec:execution} and is used identically
+in the backtest (vendor end-of-day quotes) and in live operation (intraday
+snapshots), making the ranked score the same object in both environments.
+
+The remainder of the paper is organized as follows. Section~\ref{sec:lit}
+reviews the related literature. Section~\ref{sec:growthrate} provides
+background on the Kelly criterion and extends it to the three-state outcome
+space of a vertical credit spread. Section~\ref{sec:relent} provides
+background on relative entropy as a portfolio risk measure and recalls the
+GROUND ratio. Section~\ref{sec:intrinsic} introduces the intrinsic GROUND
+ratio, its choice of measures, and its theoretical properties. Section~\ref{sec:execution} presents the
+midpoint execution model. Section~\ref{sec:results} applies the method to six
+years of S\&P~100 credit spread data, including a worked example and a
+comparison to Kelly criterion selection. Sections~\ref{sec:discussion}
+and~\ref{sec:conclusions} discuss and conclude.
+
+All logarithms are natural; entropies and divergences are in nats.
+
+\section{Literature Review}
+\label{sec:lit}
+
+Modern portfolio selection begins with the mean-variance portfolio
+optimization (MVPO) program of Markowitz \cite{markowitz1952}, whose limitations under non-Gaussian returns motivated
+information-theoretic risk measures built on Shannon entropy \cite{shannon1948}.
+Philippatos and Wilson \cite{philippatos1972} first proposed entropy as a
+portfolio risk measure; Zhou, Cai, and Tong \cite{zhou2013} survey the
+substantial literature that followed. The direct ancestors of the present
+system are the return-entropy portfolio optimization (REPO) of Mercurio, Wu,
+and Xie \cite{mercurio2020repo}, which replaces the variance objective with
+portfolio entropy computed combinatorially; its extension to discrete-payoff
+assets as discrete entropic portfolio optimization (DEPO), built on relative
+entropy and the Kelly criterion, in
+\cite{mercurio2020binary}, where the Kullback--Leibler divergence of a wager's
+outcome distribution from the uniform reference is shown to be a convex risk
+measure in the sense of \cite{follmer2002}, with the uniform distribution
+playing the role of the minimum-risk wager; and the generalized entropic
+portfolio optimization (GEPO) of \cite{mercurio2020gepo}, which extends DEPO to
+intervals of continuous returns and applies it directly
+to a wealth of option strategies, including the vertical credit spreads traded
+here. The second paper also introduces the risk-adjusted ratio for comparing
+growth rates of discrete-return portfolios, the Growth Rate Over UNiform
+Divergence (GROUND) ratio \cite{mercurio2020binary}, in deliberate analogy to
+the reward-to-variability ratio of Sharpe \cite{sharpe1966}: where the Sharpe
+ratio measures excess return per unit of standard deviation, the GROUND ratio
+measures excess expected growth rate per unit of relative entropy with respect
+to the uniform distribution, with a minimum-risk portfolio playing the role of
+the risk-free asset. The GROUND ratio is then used in \cite{mercurio2020gepo}
+to measure the risk-adjusted performance of GEPO option portfolios.
+
+Read as a series, the four papers trace one idea through increasing contact
+with reality. REPO \cite{mercurio2020repo} establishes entropy as the risk
+objective in place of variance. The second paper \cite{mercurio2020binary}
+moves to relative entropy and the Kelly criterion for discrete payoffs and
+builds the GROUND ratio. GEPO \cite{mercurio2020gepo} generalizes the
+framework to intervals of continuous returns and to structured option
+positions. The present paper is the production stress test: the framework
+meets estimation noise and market microstructure on six years of data and a
+live trading system. The adversary changes accordingly. In the first three
+papers the case for entropy is distributional (variance is the wrong risk
+functional for discrete and asymmetric payoffs); in the fourth, the case is
+informational: the inputs themselves are noisy, the optimizer amplifies that
+noise, and relative entropy, measured between two live probability models of
+the same instrument, is the quantity that separates edge from artifact.
+
+The growth factor descends from Kelly's information-rate interpretation of
+log-optimal betting \cite{kelly1956}, its application to securities markets by
+Thorp \cite{thorp1971}, and the capital growth theory consolidated in MacLean,
+Thorp, and Ziemba \cite{maclean2011}. The connection between log-optimal
+growth and information theory is classical \cite{coverthomas2006}: the growth
+rate foregone by betting under a wrong measure is exactly a Kullback--Leibler
+divergence \cite{kullback1951}, which motivates a divergence-based discount on
+any growth estimate whose input measure is uncertain.
+
+The IV-implied outcome probabilities used here are Black--Scholes--Merton
+exercise probabilities \cite{blackscholes1973, merton1973}; the idea that
+option prices encode a state-price density is due to Breeden and Litzenberger
+\cite{breeden1978}. The empirical relation between implied and realized
+volatility, and the bias of IV as a forecast, is documented by Christensen and
+Prabhala \cite{christensen1998}; high-frequency measurement of realized
+volatility follows Andersen, Bollerslev, Diebold, and Labys
+\cite{andersen2003}. The variance risk premium that the growth factor
+monetizes is documented at the index and single-name level by Carr and Wu
+\cite{carrwu2009}, Bollerslev, Tauchen, and Zhou \cite{bollerslev2009}, and
+Bakshi and Kapadia \cite{bakshikapadia2003}.
+
+Exponential discounting in a relative entropy is the signature of entropic
+risk measures \cite{follmer2002} and of robust control formulations in which
+an agent guards against model misspecification within a relative-entropy
+neighborhood of a reference measure \cite{hansensargent2008,
+maccheroni2006}. In incomplete-market pricing, the minimal entropy martingale
+measure of Frittelli \cite{frittelli2000} selects the pricing measure closest
+in relative entropy to the physical one; the intrinsic GROUND discount inverts
+this logic, treating large divergence between the trader's measure and the
+market's as evidence against the trade rather than as a quantity to be
+minimized. Finally, the execution model of Section~\ref{sec:execution} is
+consistent with the finding of Muravyev and Pearson \cite{muravyev2020} that
+effective option trading costs are substantially below quoted half-spreads
+because executions cluster well inside the quoted band.
+
+\section{Maximum Exponential Growth Rate}
+\label{sec:growthrate}
+
+\subsection{The Kelly Criterion}
+
+We start by providing some background on the growth-rate objective. Consider
+a repeated wager that pays $+b$ per unit staked with probability $p$ and
+$-1$ with probability $q = 1 - p$. A bettor who stakes a constant fraction
+$w$ of wealth on each round compounds wealth at the expected exponential
+growth rate given by (\ref{eq:kelly-growth}),
+\begin{equation}
+G(w) \;=\; p \ln(1 + wb) + q \ln(1 - w),
+\label{eq:kelly-growth}
+\end{equation}
+and the Kelly criterion \cite{kelly1956} selects the fraction $w^\ast$ that
+maximizes (\ref{eq:kelly-growth}). For the two-outcome wager the maximizer
+has the familiar closed form in (\ref{eq:kelly-frac}),
+\begin{equation}
+w^\ast \;=\; \frac{pb - q}{b},
+\label{eq:kelly-frac}
+\end{equation}
+the bettor's edge divided by the odds. Thorp \cite{thorp1971} carried the
+criterion from gambling to securities markets, and Cover and Thomas
+\cite{coverthomas2006} give the information-theoretic treatment: the
+log-optimal growth rate is a mutual information, and the growth foregone by
+betting under an incorrect distribution is a Kullback--Leibler divergence.
+This last fact is the seed of the present paper.
+
+\subsection{The Credit Spread Outcome Model}
+\label{sec:instruments}
+
+Here we will extend the wager of (\ref{eq:kelly-growth}) to the vertical
+credit spread. A bull put credit spread sells a put at strike $K_s$ and buys
+a put at a lower strike $K_\ell$; a bear call credit spread sells a call at
+$K_s$ and buys a call at a higher strike. Let $c$ denote the net credit
+received per share and $w_d$ the strike width, so the maximum loss per share
+is $m = w_d - c$ and the payoff odds are $b = c / m$. At expiry the spread
+resolves into one of three states: full win (the underlying expires on the
+safe side of the short strike, and the seller keeps $c$), full loss (the
+underlying expires beyond the long strike, and the seller pays $m$), or a
+partial outcome (the underlying expires between the strikes). We write the
+outcome distribution as the triple $(p, r_0, q)$, with $p$ the probability of
+the full win, $r_0$ the partial-zone mass, and $q$ the probability of the
+full loss.
+
+Writing the per-unit-risk payoff vector as $\{+b,\ +\alpha b,\ -1\}$, the
+partial-zone payoff coefficient follows from the linear payoff between the
+strikes under a uniform location assumption, as in (\ref{eq:alpha}),
+\begin{equation}
+\alpha(b) \;=\;
+\begin{cases}
+\dfrac{b - 1}{2b}, & b < 1,\\[4pt]
+0, & b \geq 1,
+\end{cases}
+\label{eq:alpha}
+\end{equation}
+so that for $b < 1$ the partial state pays $\alpha b = (b-1)/2$ per unit
+risked, the mean of $+b$ at the short strike and $-1$ at the long strike. For
+$b \geq 1$ the geometric mean payoff of the partial zone is positive, and
+setting it to zero is a conservative simplification that understates the
+value of partial outcomes on high-odds spreads.
+
+\subsection{Kelly Expected Value under the Trader's Measure}
+\label{sec:growth}
+
+For the three-state wager, the growth rate of (\ref{eq:kelly-growth}) becomes
+(\ref{eq:kelly3}),
+\begin{equation}
+\ell(w) \;=\; p \ln(1 + wb) + r_0 \ln(1 + w\alpha b) + q \ln(1 - w),
+\label{eq:kelly3}
+\end{equation}
+whose first-order condition reduces to a quadratic in $w$ (linear when
+$\alpha = 0$, in which case $w^\ast = (pb - q)/(b(p+q))$, the three-state
+generalization of (\ref{eq:kelly-frac})); we denote the maximizer $w^\ast$. The Kelly expected value of the candidate is then given
+by (\ref{eq:kellyev}),
+\begin{equation}
+E \;=\; e^{\ell(w^\ast)} - 1,
+\label{eq:kellyev}
+\end{equation}
+the per-trade geometric expected return at optimal sizing, and we define the
+growth signal as $g = \ln E$. Because $\ell$ is the expectation of a concave
+function of the outcome, a variance penalty is built into $E$ by Jensen's
+inequality: of two candidates with equal arithmetic EV, the higher-variance
+one has the lower $E$.
+
+The probabilities $(p, r_0, q)$ entering (\ref{eq:kelly3}) are the trader's
+estimated outcome measure $P$. For each leg we compute the Black--Scholes
+$N(d_2)$ exercise probability \cite{blackscholes1973} using, in place of the
+quoted IV, the underlying's realized volatility measured over the trailing
+ten trading days (annualized close-to-close standard deviation),
+tenor-matched to the one-to-four-day holding period. We denote this measure
+$P_{\mathrm{rv}}$. The economic motivation for this choice, and for not using
+the market's own probabilities here, is given in
+Section~\ref{sec:measures}.
+
+\section{Minimum Relative Entropy}
+\label{sec:relent}
+
+\subsection{Shannon Entropy and the Kullback--Leibler Divergence}
+
+For the purposes of this paper, the risk of a candidate trade is a relative
+entropy. We start by providing some background. The Shannon entropy
+\cite{shannon1948} of a discrete distribution $P$ with support $\mathcal{X}$
+is given by (\ref{eq:shannon}),
+\begin{equation}
+H(P) \;=\; -\sum_{x \in \mathcal{X}} P(x) \ln P(x).
+\label{eq:shannon}
+\end{equation}
+The Kullback--Leibler divergence \cite{kullback1951}, also known as the
+relative entropy of $P$ with respect to $Q$, is given by (\ref{eq:dkl}),
+\begin{equation}
+\dkl(P \,\|\, Q) \;=\; \sum_{x \in \mathcal{X}} P(x)
+\ln\!\left(\frac{P(x)}{Q(x)}\right).
+\label{eq:dkl}
+\end{equation}
+Gibbs' inequality (see MacKay \cite{mackay2003}) shows that the relative
+entropy is always non-negative, as in (\ref{eq:gibbs}),
+\begin{equation}
+\dkl(P \,\|\, Q) \;\geq\; 0,
+\label{eq:gibbs}
+\end{equation}
+with equality if and only if $P = Q$ almost everywhere.
+
+\subsection{Relative Entropy as a Portfolio Risk Measure}
+
+In \cite{mercurio2020repo} we argued that entropy provides a natural
+alternative to variance for problems in which the return distribution is
+discrete or otherwise ill-suited to mean-variance treatment, and in
+\cite{mercurio2020binary} we showed that the relative entropy of a wager's
+outcome distribution with respect to the uniform reference is a convex risk
+measure in the sense of F\"ollmer and Schied \cite{follmer2002}, with the
+uniform distribution itself playing the role of the minimum-risk wager.
+Conventional risk measures (variance, value-at-risk, conditional
+value-at-risk) are defined on continuous return distributions and become
+degenerate or ill-conditioned on a small finite outcome space; relative
+entropy fills exactly that gap.
+
+\subsection{The GROUND Ratio}
+\label{sec:groundratio}
+
+To compare the growth rates of portfolios with different risk profiles, in
+\cite{mercurio2020binary} we introduced the risk-adjusted ratio called the
+Growth Rate Over UNiform Divergence (GROUND) ratio, in analogy to the
+reward-to-variability ratio of Sharpe \cite{sharpe1966}. Let $U_m$ be the
+$m$-state discrete uniform distribution. For a chosen portfolio $R_a$ and the
+minimum-risk portfolio $R_b$ existing in the $m$-state event space, the GROUND
+ratio $G_m$ is given by (\ref{eq:ground-original}),
+\begin{equation}
+G_m \;=\;
+\frac{\E\!\left(G_a(\mathbf{w}_a) - G_b(\mathbf{w}_b)\right)}
+     {\dkl(R_a \,\|\, U_m) - \dkl(R_b \,\|\, U_m)}
+\;=\;
+\frac{\E\!\left(G_a(\mathbf{w}_a) - G_b(\mathbf{w}_b)\right)}
+     {H(R_b) - H(R_a)},
+\label{eq:ground-original}
+\end{equation}
+where $G_a(\mathbf{w}_a)$ is the growth rate of the chosen portfolio with
+weighting $\mathbf{w}_a$, $G_b(\mathbf{w}_b)$ is the growth rate of the
+minimum-risk portfolio with weighting $\mathbf{w}_b$, $\dkl(R_a \| U_m)$ is
+the relative entropy of the chosen portfolio with respect to $U_m$, and
+$H(\cdot)$ is the Shannon entropy of (\ref{eq:shannon}). The GROUND ratio was
+used in \cite{mercurio2020gepo} to measure the risk-adjusted performance of
+GEPO option portfolios against Kelly criterion strategies.
+
+\section{The Intrinsic GROUND Ratio}
+\label{sec:intrinsic}
+\label{sec:ground}
+
+\subsection{From Comparative to Intrinsic Form}
+
+The GROUND ratio of (\ref{eq:ground-original}) is a comparative score: the
+ranking of a chosen portfolio depends on a reference portfolio $R_b$. In a
+streaming daily-selection setting, where a small number of positions is
+rebuilt from scratch every day from a changing candidate pool, this
+cross-candidate coupling is awkward. To that end, here we introduce the
+\emph{intrinsic} GROUND ratio, a per-candidate score that requires no
+reference member. For a candidate $i$ with Kelly expected value $E$ from
+(\ref{eq:kellyev}) computed under the trader's measure $P$, a reference
+measure $Q$, and discount strength $k > 0$, the intrinsic GROUND ratio is
+given by (\ref{eq:intrinsic}),
+\begin{equation}
+\Gamma_i \;=\; E \cdot e^{-k\,\dkl(P \| Q)}
+\;=\; \left(e^{\ell(w^\ast)} - 1\right) e^{-k\,\dkl(P \| Q)}
+\;=\; \exp\!\left(g - k\,\dkl(P \| Q)\right),
+\label{eq:intrinsic}
+\end{equation}
+where $g = \ln E$ is the growth signal and $\dkl$ is the relative entropy of
+(\ref{eq:dkl}). The first factor is the variance-adjusted expected wealth
+gain per trade at Kelly-optimal sizing; the second factor is an entropic
+discount taking values in $(0, 1]$. Their product is dimensionless and reads
+as a divergence-discounted per-trade geometric expected return. Selection is
+a gate followed by a cap: all candidates with $\Gamma_i \geq \theta$ qualify,
+and the five highest-$\Gamma_i$ qualifiers per entry day are taken. The
+canonical values used in this paper are $k = 10$ and $\theta = 0.05$
+(Section~\ref{sec:sweep}). Across our parameter sweeps, selection under the
+intrinsic form was indistinguishable from selection under the comparative
+form of (\ref{eq:ground-original}).
+
+\subsection{Choice of Measures}
+\label{sec:measures}
+
+The form (\ref{eq:intrinsic}) is fully general in the pair $(P, Q)$. The
+published GROUND ratio takes $Q$ to be the uniform distribution $U_m$, under
+which the entropic term reads as a risk measure on informational
+concentration: a near-certain bet is a sharp informational claim that may not
+survive estimation noise, and the convex-risk-measure property of
+\cite{mercurio2020binary} formalizes this reading. In the present application
+we instead take $Q$ to be the market's IV-implied outcome measure
+$Q_{\mathrm{iv}}$ of the same spread, computed identically to
+$P_{\mathrm{rv}}$ but under each leg's quoted IV.
+
+The choice of measure in each factor is economically forced. The IV-implied
+triple is risk-neutral: it is the measure under which every asset earns the
+riskless rate, so a Kelly expected value computed under $Q_{\mathrm{iv}}$
+against market prices is approximately zero for every fairly quoted spread by
+construction. Implied volatility is a price, not a forecast. Any meaningful
+estimate of expected value must therefore be taken under an estimate of the
+physical measure, and the RV-implied triple is exactly that: the win
+probability if the underlying continues to move as it has actually been
+moving. The growth factor is accordingly computed under $P_{\mathrm{rv}}$,
+and it is permissive: it prices the variance premium and is positive for most
+candidates on most days. It is also a systematic overstatement, because part
+of the gap between implied and realized volatility is earned compensation for
+jump and crash risk that backward-looking realized volatility cannot see; a
+portion of any $P_{\mathrm{rv}}$ expected value is insurance premium rather
+than mispricing. The entropy factor is the correction: it charges the
+estimate for its distance from the market's measure, suppressing exactly
+those candidates whose apparent edge rests on claiming the market is most
+wrong. The growth factor estimates expected value under the trader's physical
+measure; the entropy factor prices that estimate's distance from the market's
+risk-neutral measure, converting a raw variance-risk-premium claim into a
+robustness-priced one. Neither measure alone suffices, and
+Section~\ref{sec:gate} quantifies the division of labor: the ungated
+$P_{\mathrm{rv}}$ expected value loses money in precise agreement with this
+reading. Note that the same measure $P_{\mathrm{rv}}$ appears in both
+factors: the divergence in (\ref{eq:intrinsic}) is weighted by the very
+beliefs the growth factor bets, so it is largest in the states where the
+claimed edge is concentrated and where being wrong costs the most.
+
+\subsection{Theoretical Properties}
+\label{sec:theory}
+
+Define $J_k = g - k\,\dkl(P \| Q)$, the multiplier-preferences functional
+of Hansen and Sargent \cite{hansensargent2008}, a member of the
+variational-preferences class of Maccheroni, Marinacci, and Rustichini
+\cite{maccheroni2006}; the exponential-in-divergence form of
+(\ref{eq:intrinsic}) is likewise the signature of entropic risk measures
+\cite{follmer2002}. The following two propositions make the connection
+exact and give the gate its economic reading.
+
+\begin{proposition}[Robust-preferences equivalence and the geometry of the
+gate]
+\label{prop:equiv}
+For every candidate with $E > 0$, (i) $\Gamma_i = \exp(J_k)$ exactly, and
+for any threshold $\theta > 0$ the acceptance rule
+$\Gamma_i \geq \theta$ is identical to the rule $J_k \geq \ln\theta$;
+in particular, intrinsic GROUND selection and Hansen--Sargent
+multiplier-preference selection produce the same decisions and the same
+rankings. (ii) In the $(\dkl, g)$ plane the acceptance region is the closed
+half-plane
+\begin{equation}
+g \;\geq\; \ln\theta + k\,\dkl,
+\label{eq:halfplane}
+\end{equation}
+a straight line with slope $k$ and intercept $\ln\theta$.
+\end{proposition}
+
+\begin{proof}
+(i) By definition $g = \ln E$, so
+$\exp(J_k) = e^{g} e^{-k\dkl} = E\,e^{-k\dkl} = \Gamma_i$, and the
+equivalence of the two rules follows from the strict monotonicity of the
+exponential. (ii) Take logarithms of $\Gamma_i \geq \theta$ and rearrange.
+\end{proof}
+
+The boundary of (\ref{eq:halfplane}) is the level set of the Lagrangian of
+divergence-budgeted growth selection (maximize $g$ subject to
+$\dkl \leq \varepsilon$), so $k$ admits a direct economic reading: it is
+the shadow price of model disagreement, in nats of log-growth charged per
+nat of relative entropy. The threshold $\theta$ sets the intercept, the
+minimum divergence-free growth a candidate must offer.
+
+\begin{proposition}[Second-order equivalence to the reverse divergence]
+\label{prop:secondorder}
+Let $P$ and $Q$ be distributions on a common finite outcome space with
+$Q(x) > 0$ for all $x$, and write $\delta = \max_x |P(x) - Q(x)|$. Then
+\begin{equation}
+\dkl(P \| Q) \;=\; \tfrac{1}{2}\chi^2(P, Q) + O(\delta^3)
+\;=\; \dkl(Q \| P) + O(\delta^3),
+\label{eq:chi2}
+\end{equation}
+where $\chi^2(P, Q) = \sum_x (P(x) - Q(x))^2 / Q(x)$. Consequently
+$J_k = g - k\,\dkl(Q \| P) + O(\delta^3)$.
+\end{proposition}
+
+\begin{proof}
+Write $P(x) = Q(x) + \varepsilon(x)$ with $\sum_x \varepsilon(x) = 0$.
+Expanding $\ln(1 + \varepsilon/Q)$ to second order,
+$\dkl(P\|Q) = \sum_x (Q + \varepsilon)\left(\tfrac{\varepsilon}{Q} -
+\tfrac{\varepsilon^2}{2Q^2}\right) + O(\delta^3)
+= \tfrac{1}{2}\sum_x \tfrac{\varepsilon^2}{Q} + O(\delta^3)$, using
+$\sum \varepsilon = 0$. The identical expansion of $\dkl(Q\|P)$ yields
+the same leading term, which is $\tfrac{1}{2}\chi^2(P, Q)$.
+\end{proof}
+
+Proposition~\ref{prop:secondorder} supplies the Kelly-theoretic reading of
+the gate. In the idealized proportional-betting setting of Kelly
+\cite{kelly1956} and Cover and Thomas \cite{coverthomas2006}, an agent who
+bets beliefs $P$ in a market whose true measure is $Q$ forgoes exactly
+$\dkl(Q \| P)$ of expected log-growth per period: the reverse divergence is
+the price of being wrong. By (\ref{eq:chi2}), the forward divergence inside
+$\Gamma_i$ equals that price to second order in the disagreement, which for
+the candidates traded here is small (median $\dkl$ of selected picks is
+$0.0147$). The intrinsic GROUND ratio therefore discounts each candidate's
+own-measure growth by $k$ times the growth that would be forgone if the
+market's measure, rather than the trader's, were correct: $\Gamma_i$ is a
+Kelly expected value charged an insurance premium against the market being
+right, and $k$ is the number of such worst-case growth losses charged.
+Beyond second order, and outside the proportional-betting idealization, the
+identification is heuristic; the forward direction additionally weights the
+disagreement by the trader's own beliefs, concentrating the penalty in the
+states the growth factor actually bets. Because the exponential is monotone,
+we prefer the multiplicative form throughout for its direct reading as a
+per-trade risk-adjusted return.
+
+\section{Midpoint Execution Model}
+\label{sec:execution}
+
+The price basis is the central empirical question for any spread-selling
+backtest: the strategy's apparent edge is a small number obtained by
+differencing quoted prices, so a biased basis manufactures or destroys the
+edge before any selection logic runs. Three candidate bases were evaluated
+against data.
+
+First, last prints are disqualified. Across May--June 2026 vendor files,
+restricted to contracts with same-day volume and one to four days to expiry
+($n = 870{,}723$), 19.2\% of last prints lie outside the same day's closing
+bid--ask band. Intraday the problem is worse: the two legs of a spread print
+at different times against different underlying prices, and the difference of
+two asynchronous prints is not a price. In live operation this fabricated
+credits exceeding 90\% of strike width (implied odds $b > 10$) on spreads
+whose short-bid-minus-long-ask credit was negative at the same instant.
+
+Second, the midpoint is the empirical center of execution. On the same print
+sample, the signed location of real trades inside the quoted band,
+$(\mathrm{print} - \mathrm{mid})/\mathrm{halfwidth}$, has median $-0.005$:
+trades center on the midpoint. This holds in every quoted-width bucket,
+including quotes wider than 100\% of the option's own price (per-bucket mean
+signed location between $-0.06$ and $+0.04$). Quoted width is defensive
+posture, not execution cost: market makers fill well inside wide quotes,
+consistent with the effective-spread evidence of \cite{muravyev2020}. This
+finding rejects width-proportional slippage models. It is corroborated by the
+only available real executions (five fills on 2026-05-28), which achieved
+$0.73$ to $0.91\times$ the combo mid (mean $0.82$) with no relationship to
+quoted width; the two widest-quoted names filled closest to mid.
+
+The adopted model follows. Selection scores every candidate on the raw combo
+mid, $c = \mathrm{mid}_{\mathrm{short}} - \mathrm{mid}_{\mathrm{long}}$,
+identically in backtest (end-of-day quotes) and live operation (snapshot
+quotes). Realized fills are modeled as a flat fraction of mid, with $0.80$ as
+the reporting case (rounding the measured $0.82$ toward conservatism) and the
+full ladder $0.80/0.85/0.90/0.95$ reported as a stress test
+(Table~\ref{tab:fillstress}). Because the fill fraction is flat, it does not
+change selection, only realized profit; the calibration rests on five
+executions from a single session and is the softest number in this paper.
+
+Finally, the backtest basis and the live basis agree. Live selection occurs
+at 15:01 Eastern; backtest quotes are end-of-day. On 4{,}305 contracts matched
+between live 15:01 snapshots and vendor end-of-day files across four
+overlapping sessions, the ratio of end-of-day mid to 15:01 mid has median
+$1.000$ (per-day medians $0.983$ to $1.029$). The end-of-day basis is an
+unbiased proxy for the live entry basis.
+
+\section{Credit Spread Selection with the Intrinsic GROUND Ratio}
+\label{sec:results}
+
+\subsection{Data and Selection Procedure}
+\label{sec:design}
+
+We use vendor end-of-day option data from January 2020 through December 2025
+on S\&P~100 underlyings, with January through June 2026 reserved for
+out-of-time evaluation. On each entry day (Monday through Thursday), for each
+underlying, the system considers one-strike-wide vertical credit spreads
+expiring the coming Friday (one to four days to expiry), both bull puts and
+bear calls. The short leg is taken in an absolute delta band of
+$[0.35, 0.65]$; both legs must show open interest of at least 100; the payoff
+odds must satisfy $b \geq 0.30$; and the per-share maximum loss is capped at
+\$5. Entry dates are restricted to exchange trading sessions: the vendor
+files republish the prior session's quotes on market holidays with the days
+to expiry decremented, and without this filter such stale rows admit entries
+on days the market was closed. No trend filter and no index-volatility gate
+are applied (both were
+tested and rejected; each cost roughly a quarter of profit under earlier
+configurations). Settlement uses the underlying's expiry-day close;
+partial-zone wins are haircut to 50\% of intrinsic value to reflect pin and
+assignment risk, while partial losses are taken in full. Flat sizing of one
+contract per pick is the reporting case, with \$10{,}000 starting capital.
+
+\subsection{A Worked Example}
+\label{sec:example}
+
+To illustrate the computation, consider the bull put credit spread on MRK
+selected by the production system on Wednesday 2025-12-17, two days before
+its Friday expiry. The underlying closed at \$99.18. The short leg is the
+\$99 put (quoted $0.50 / 1.37$, midpoint $0.935$) and the long leg is the
+\$98 put (quoted $0.09 / 0.51$, midpoint $0.300$), giving a mid credit of
+$c = 0.635$ on a \$1 strike width, a maximum loss of $m = 0.365$, payoff
+odds $b = 1.740$, and partial coefficient $\alpha = 0$ from
+(\ref{eq:alpha}). Note that the short leg's quoted band ($0.87$) is nearly
+as wide as the midpoint itself ($0.935$); by the evidence of
+Section~\ref{sec:execution}, such width is defensive posture rather than
+execution cost, and the midpoint remains the correct pricing basis.
+
+The trailing ten-day realized volatility of MRK was $21.4\%$, against quoted
+implied volatilities of $35.3\%$ (short leg) and $25.9\%$ (long leg). The
+RV-implied outcome measure from the $N(d_2)$ computation is
+$P_{\mathrm{rv}} = (p, r_0, q) = (0.543,\ 0.230,\ 0.227)$ and the
+IV-implied reference is $Q_{\mathrm{iv}} = (0.523,\ 0.208,\ 0.269)$: the
+trader's measure assigns more probability to the full win and less to the
+full loss than the market prices, the signature of the variance risk premium
+on this name on this day. The divergence from (\ref{eq:dkl}) is
+$\dkl(P_{\mathrm{rv}} \| Q_{\mathrm{iv}}) = 0.0049$. With $\alpha = 0$
+the first-order condition of (\ref{eq:kelly3}) is linear and gives
+$w^\ast = (pb - q)/(b(p+q)) = 0.535$ and $\ell(w^\ast) = 0.1829$, so the
+Kelly expected value from (\ref{eq:kellyev}) is
+$E = e^{0.1829} - 1 = +20.1\%$. The intrinsic GROUND ratio from
+(\ref{eq:intrinsic}) at $k = 10$ is then
+$\Gamma_i = 0.2006 \times e^{-10 \times 0.0049} = 0.191$, which clears the
+threshold $\theta = 0.05$, and the spread qualified. MRK closed on the
+Friday at \$101.09, above the short strike, and the spread settled as a
+full win.
+
+\subsection{Backtest Performance}
+\label{sec:headline}
+
+Table~\ref{tab:headline} reports the canonical configuration on 2020--2025.
+
+\begin{table}[h]
+\centering
+\caption{Canonical configuration ($k=10$, $\theta=0.05$), 2020--2025, one
+contract per pick, fills at $0.80\times$ mid. Starting capital \$10{,}000.}
+\label{tab:headline}
+\begin{tabular}{lr}
+\toprule
+Trades & 2{,}250 \\
+Final equity & \$50{,}798 \\
+Total return & $+408\%$ \\
+Sharpe (daily, annualized) & $+2.36$ \\
+Sharpe (weekly, annualized) & $+2.44$ \\
+Maximum drawdown & $-5.8\%$ \\
+Win rate & $57.0\%$ \\
+Mean profit per trade & \$18.13 \\
+Outcome mix (win/partial/loss) & 1{,}061 / 397 / 792 \\
+Median payoff odds $b$ of picks & 2.03 \\
+Median $\dkl$ of picks & 0.0147 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Fill-quality stress at the canonical cell, 2020--2025, one contract
+per pick. Selection is identical in every row; only the realized fill
+fraction changes. Sharpe and drawdown are not meaningful below the
+break-even fill and are omitted there.}
+\label{tab:fillstress}
+\begin{tabular}{lrrrr}
+\toprule
+Fill & Final & Sharpe (wk) & Max DD & Win \\
+\midrule
+$0.50\times$ mid & $-\$24{,}346$ & --- & --- & $53.4\%$ \\
+$0.60\times$ mid & \$856 & --- & --- & $54.6\%$ \\
+$0.65\times$ mid & \$13{,}398 & $+0.36$ & $-28.2\%$ & $55.3\%$ \\
+$0.70\times$ mid & \$25{,}897 & $+1.25$ & $-14.8\%$ & $56.0\%$ \\
+$0.75\times$ mid & \$38{,}364 & $+1.95$ & $-8.9\%$ & $56.4\%$ \\
+$0.80\times$ mid & \$50{,}798 & $+2.44$ & $-5.8\%$ & $57.0\%$ \\
+$0.85\times$ mid & \$63{,}191 & $+2.78$ & $-3.9\%$ & $57.8\%$ \\
+$0.90\times$ mid & \$75{,}550 & $+3.00$ & $-2.5\%$ & $58.5\%$ \\
+$0.95\times$ mid & \$87{,}862 & $+3.14$ & $-1.7\%$ & $59.2\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each five percentage points of fill quality is worth roughly \$12{,}000 of
+final equity, and extending the ladder downward locates the break-even fill
+at approximately $0.63\times$ mid: the strategy is profitable at
+$0.65\times$ mid, near zero at $0.60$, and ruinous at $0.50$. Three
+observations anchor the reported $0.80$ case well above that floor. The five
+real executions of Section~\ref{sec:execution} filled between $0.73$ and
+$0.91\times$ mid, every one of them above break-even; the print-location
+study shows market executions centering on the midpoint itself; and the
+reporting case of $0.80$ sits below every observed execution. The edge does
+not require good fills, only fills no worse than $0.65\times$ the quoted
+midpoint, a level the executable market has not approached in any
+measurement we have made. Out of time, the
+configuration frozen on 2020--2025 and applied to January--June 2026 produced
+183 trades, final equity \$12{,}726 ($+27.3\%$), weekly Sharpe $+3.22$,
+maximum drawdown $-6.3\%$, and a win rate of $57.9\%$, at the $0.80\times$
+mid fill.
+
+\subsection{The Selection Surface}
+\label{sec:sweep}
+
+The full $(k, \theta)$ grid was evaluated from a cached scoring of all
+73{,}270 candidates, so every cell shares identical inputs and fills.
+Table~\ref{tab:ksweep} reports the best threshold per $k$.
+
+\begin{table}[h]
+\centering
+\caption{Best threshold per $k$ (by final equity), 2020--2025, $0.80\times$
+mid fills, one contract per pick.}
+\label{tab:ksweep}
+\begin{tabular}{rrrrrrr}
+\toprule
+$k$ & $\theta$ & Trades & Final & Sharpe (wk) & Max DD & Win \\
+\midrule
+4  & 0.075 & 2388 & \$47{,}591 & $+2.34$ & $-6.4\%$ & 57.5\% \\
+6  & 0.075 & 1917 & \$49{,}801 & $+2.52$ & $-5.3\%$ & 57.7\% \\
+8  & 0.075 & 1730 & \$49{,}918 & $+2.54$ & $-4.1\%$ & 57.9\% \\
+10 & 0.05  & 2250 & \$50{,}798 & $+2.44$ & $-5.8\%$ & 57.0\% \\
+12 & 0.05  & 2097 & \$49{,}948 & $+2.44$ & $-5.2\%$ & 56.8\% \\
+16 & 0.05  & 1863 & \$47{,}731 & $+2.40$ & $-3.4\%$ & 56.7\% \\
+20 & 0.05  & 1730 & \$44{,}681 & $+2.27$ & $-3.8\%$ & 56.6\% \\
+30 & 0.05  & 1493 & \$40{,}745 & $+2.18$ & $-5.2\%$ & 56.5\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The surface is a broad plateau: $k \in [6, 12]$ is within roughly 2\% of the
+peak final equity, with the growth optimum at $(k, \theta) = (10, 0.05)$ and
+the in-sample weekly Sharpe peak at $(8, 0.075)$. The canonical cell is the growth optimum itself,
+$(k, \theta) = (10, 0.05)$: in a framework whose objective is expected
+growth, the self-consistent selection criterion for the canonical
+configuration is maximum realized growth, and we fix that criterion in
+advance rather than selecting on any path statistic. Drawdown-efficient
+corners exist on the grid (the $k = 16$ row trades roughly 6\% of final
+equity for the shallowest drawdown shown), but maximum drawdown is a path
+statistic, among the noisiest objects measurable on a single six-year path,
+and we decline to select on it. Below $\theta = 0.03$ the strategy disintegrates (drawdowns of
+$-74\%$ and worse; ungated, the full candidate stream barely breaks even),
+while above $\theta = 0.09$ the 2026 out-of-time Sharpe turns negative.
+Over-gating fails forward, a sign that the highest-$\Gamma_i$ tail is not where
+the edge concentrates once the gate has done its work.
+
+\subsection{Comparison to Kelly Criterion Selection}
+\label{sec:gate}
+
+As in the first three papers of this series, the benchmark is the Kelly
+criterion. Selecting the top five candidates per day by the growth signal $g$
+alone, with no divergence gate, is precisely Kelly criterion selection under
+the trader's measure: it produces 5{,}745 trades and a total of
+$-\$15{,}175$ ($-\$2.64$ per trade, win rate 55.0\%) under identical fills.
+The identical pipeline with the $\Gamma_i$ gate produces $+\$40{,}798$
+(Table~\ref{tab:headline}). The gate does not merely improve the growth
+signal; it is the difference between a losing and a winning strategy. The
+mechanism is the noise-selection effect described in the Introduction:
+maximizing a noisy expected value selects the noise, and the cross-measure
+divergence is an observable, per-candidate noise meter.
+
+The same conclusion follows within the Kelly-selected candidates themselves.
+Splitting the top-growth candidates at their median divergence
+($\dkl = 0.0928$) separates a profitable half (total $+\$8{,}312$, mean
+$+\$2.89$ per trade) from an unprofitable half (total $-\$23{,}487$, mean
+$-\$8.18$), with Welch $t = 4.51$ ($p = 6.7 \times 10^{-6}$). High measured
+disagreement between the trader's measure and the market's predicts realized
+loss.
+
+\section{Discussion}
+\label{sec:discussion}
+
+The results support a reading of the intrinsic GROUND ratio as a noise-aware
+growth criterion rather than a return forecaster. The growth factor, taken
+alone, is an aggressive estimate built from a realized-volatility measure
+that is itself a forecastable but noisy object \cite{andersen2003,
+christensen1998}; selecting its maxima harvests estimation error, and the
+negative total of the ungated selection is the empirical face of that
+selection effect. The divergence factor plays the role that relative entropy
+plays in robust decision theory \cite{hansensargent2008} and entropic risk
+measurement \cite{follmer2002}: it prices, per candidate, the distance
+between the trader's measure and the market's, and the data show this
+distance forecasts realized loss within the very candidates the growth factor
+likes most. In the language of the GEPO framework \cite{mercurio2020gepo},
+the production system replaces the portfolio-level entropy objective with a
+per-candidate divergence gate, which is the form the idea takes when the
+portfolio is rebuilt from scratch every day from a small fixed number of
+positions. The change of reference measure (from the uniform distribution of
+\cite{mercurio2020binary, mercurio2020gepo} to the market's IV-implied
+measure) is the substantive theoretical step of this revision: it converts
+the entropic term from a static concentration penalty into a dynamic,
+instrument-specific disagreement measurement, while preserving the
+robust-preferences reading $\ln\Gamma_i = J_k$ \cite{hansensargent2008,
+maccheroni2006} unchanged.
+
+The execution findings deserve emphasis because they generalize beyond this
+strategy. Quoted width in short-dated single-name options is not an execution
+cost schedule; executions center on the midpoint at every width, in line with
+\cite{muravyev2020}, and last prints disagree with closing quotes a fifth of
+the time even when the contract traded that same day. Any backtest of
+multi-leg option strategies that prices legs from last trades, or that
+penalizes fills proportionally to quoted width, is mismeasuring its own edge.
+
+The softest quantities in the system are execution-level: the fill fraction
+rests on five real executions, and selection on quoted mids retains residual
+upward quote noise in its highest-ranked candidates. Both are measurable
+going forward, and both bias in a known direction under the reported
+$0.80\times$ mid fill, which is below every observed execution in the
+calibration sample.
+
+\section{Conclusions}
+\label{sec:conclusions}
+
+The intrinsic GROUND ratio operationalizes a simple division of labor: a
+growth factor that prices the variance risk premium under the trader's
+estimated physical measure, and an entropy factor that suppresses each
+candidate exponentially in the measured disagreement between that measure and
+the market's own. On a calibrated, basis-consistent execution model, the
+gated strategy converts a losing Kelly criterion selection into $+408\%$ over
+six years at a weekly Sharpe of $+2.44$ under conservative fills, with the
+gate's contribution isolated and statistically strong. The configuration
+carries forward the entropic portfolio optimization program of
+\cite{mercurio2020repo, mercurio2020binary, mercurio2020gepo} into a
+production setting in which the adversary is not distributional asymmetry in
+returns but estimation noise in the inputs, and in which relative entropy,
+measured between two live probability measures of the same instrument, is the
+quantity that separates edge from artifact.
+
+\section*{Materials and Methods}
+
+Backtests use vendor end-of-day option chains (2020--2026) on S\&P~100
+underlyings, a trailing ten-day realized-volatility table built from daily
+closes, and per-leg quoted implied volatilities. The print-location study of
+Section~\ref{sec:execution} uses all same-day-traded contracts with one to
+four days to expiry in the May--June 2026 vendor files. Live operation runs
+on snapshot quotes from a brokerage API at half-hour intervals, with the same
+scoring code path as the backtest. All computations were performed in Python
+with pandas and SciPy; the full parameter grid was evaluated from a single
+cached scoring of all candidates so that every configuration shares identical
+inputs and fills.
+
+\section*{Abbreviations}
+
+\begin{tabular}{ll}
+GEPO & generalized entropic portfolio optimization \\
+REPO & return-entropy portfolio optimization \\
+DEPO & discrete entropic portfolio optimization \\
+GROUND & growth rate over uniform divergence \\
+MVPO & mean-variance portfolio optimization \\
+EV & expected value \\
+IV & implied volatility \\
+RV & realized volatility \\
+DTE & days to expiry \\
+\end{tabular}
+
+\begin{thebibliography}{99}
+
+\bibitem{markowitz1952} H.~Markowitz, ``Portfolio Selection,''
+\emph{Journal of Finance}, 7(1):77--91, 1952.
+
+\bibitem{shannon1948} C.~E.~Shannon, ``A Mathematical Theory of Communication,''
+\emph{Bell System Technical Journal}, 27:379--423, 623--656, 1948.
+
+\bibitem{kullback1951} S.~Kullback and R.~A.~Leibler, ``On Information and
+Sufficiency,'' \emph{Annals of Mathematical Statistics}, 22(1):79--86, 1951.
+
+\bibitem{kelly1956} J.~L.~Kelly, Jr., ``A New Interpretation of Information
+Rate,'' \emph{Bell System Technical Journal}, 35(4):917--926, 1956.
+
+\bibitem{sharpe1966} W.~F.~Sharpe, ``Mutual Fund Performance,''
+\emph{Journal of Business}, 39(1):119--138, 1966.
+
+\bibitem{thorp1971} E.~O.~Thorp, ``Portfolio Choice and the Kelly Criterion,''
+\emph{Proceedings of the Business and Economics Section of the American
+Statistical Association}, 215--224, 1971.
+
+\bibitem{philippatos1972} G.~C.~Philippatos and C.~J.~Wilson, ``Entropy, Market
+Risk, and the Selection of Efficient Portfolios,'' \emph{Applied Economics},
+4(3):209--220, 1972.
+
+\bibitem{blackscholes1973} F.~Black and M.~Scholes, ``The Pricing of Options and
+Corporate Liabilities,'' \emph{Journal of Political Economy}, 81(3):637--654,
+1973.
+
+\bibitem{merton1973} R.~C.~Merton, ``Theory of Rational Option Pricing,''
+\emph{Bell Journal of Economics and Management Science}, 4(1):141--183, 1973.
+
+\bibitem{breeden1978} D.~T.~Breeden and R.~H.~Litzenberger, ``Prices of
+State-Contingent Claims Implicit in Option Prices,'' \emph{Journal of Business},
+51(4):621--651, 1978.
+
+\bibitem{christensen1998} B.~J.~Christensen and N.~R.~Prabhala, ``The Relation
+between Implied and Realized Volatility,'' \emph{Journal of Financial
+Economics}, 50(2):125--150, 1998.
+
+\bibitem{frittelli2000} M.~Frittelli, ``The Minimal Entropy Martingale Measure
+and the Valuation Problem in Incomplete Markets,'' \emph{Mathematical Finance},
+10(1):39--52, 2000.
+
+\bibitem{follmer2002} H.~F\"ollmer and A.~Schied, ``Convex Measures of Risk and
+Trading Constraints,'' \emph{Finance and Stochastics}, 6(4):429--447, 2002.
+
+\bibitem{andersen2003} T.~G.~Andersen, T.~Bollerslev, F.~X.~Diebold, and
+P.~Labys, ``Modeling and Forecasting Realized Volatility,''
+\emph{Econometrica}, 71(2):579--625, 2003.
+
+\bibitem{bakshikapadia2003} G.~Bakshi and N.~Kapadia, ``Delta-Hedged Gains and
+the Negative Market Volatility Risk Premium,'' \emph{Review of Financial
+Studies}, 16(2):527--566, 2003.
+
+\bibitem{mackay2003} D.~J.~C.~MacKay, \emph{Information Theory, Inference and
+Learning Algorithms}, Cambridge University Press, 2003.
+
+\bibitem{coverthomas2006} T.~M.~Cover and J.~A.~Thomas, \emph{Elements of
+Information Theory}, 2nd ed., Wiley-Interscience, 2006.
+
+\bibitem{maccheroni2006} F.~Maccheroni, M.~Marinacci, and A.~Rustichini,
+``Ambiguity Aversion, Robustness, and the Variational Representation of
+Preferences,'' \emph{Econometrica}, 74(6):1447--1498, 2006.
+
+\bibitem{hansensargent2008} L.~P.~Hansen and T.~J.~Sargent, \emph{Robustness},
+Princeton University Press, 2008.
+
+\bibitem{carrwu2009} P.~Carr and L.~Wu, ``Variance Risk Premiums,''
+\emph{Review of Financial Studies}, 22(3):1311--1341, 2009.
+
+\bibitem{bollerslev2009} T.~Bollerslev, G.~Tauchen, and H.~Zhou, ``Expected
+Stock Returns and Variance Risk Premia,'' \emph{Review of Financial Studies},
+22(11):4463--4492, 2009.
+
+\bibitem{maclean2011} L.~C.~MacLean, E.~O.~Thorp, and W.~T.~Ziemba (eds.),
+\emph{The Kelly Capital Growth Investment Criterion: Theory and Practice},
+World Scientific, 2011.
+
+\bibitem{zhou2013} R.~Zhou, R.~Cai, and G.~Tong, ``Applications of Entropy in
+Finance: A Review,'' \emph{Entropy}, 15(11):4909--4931, 2013.
+
+\bibitem{mercurio2020repo} P.~J.~Mercurio, Y.~Wu, and H.~Xie, ``An
+Entropy-Based Approach to Portfolio Optimization,'' \emph{Entropy}, 22(3):332,
+2020.
+
+\bibitem{mercurio2020binary} P.~J.~Mercurio, Y.~Wu, and H.~Xie, ``Portfolio
+Optimization for Binary Options Based on Relative Entropy,'' \emph{Entropy},
+22(7):752, 2020.
+
+\bibitem{mercurio2020gepo} P.~J.~Mercurio, Y.~Wu, and H.~Xie, ``Option
+Portfolio Selection with Generalized Entropic Portfolio Optimization,''
+\emph{Entropy}, 22(8):805, 2020.
+
+\bibitem{muravyev2020} D.~Muravyev and N.~D.~Pearson, ``Options Trading Costs
+Are Lower than You Think,'' \emph{Review of Financial Studies},
+33(11):4973--5014, 2020.
+
+\end{thebibliography}
+
+\end{document}

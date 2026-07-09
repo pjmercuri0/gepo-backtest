@@ -1,320 +1,510 @@
-# GEPO live-ticker session handoff
+# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops)
 
-**Last updated:** 2026-05-26 (end-of-day — live data, no drift, parallelism doubled, :31 hourly + 15:45 freeze)
-**Purpose:** Brief a new Claude session on everything that's been done on the GEPO live ticker so it can pick up without losing context. Read this first.
+**Last updated:** 2026-07-08 13:45 EDT (live-ops session — see §0.6). Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). Recent work was operational: cron env fixes, Yahoo daily-bar refresh/settlement repair, Snapshots P&L backfill, Mya deploy/upload hygiene, and Sequoia restart checks.
+
+## ⚠️ HARD RULE — read first
+
+**NEVER delete, overwrite, or wipe parquet files (or any vendor-purchased CSV) without explicit user permission.**
+
+Two incidents on 2026-06-08:
+1. `preprocess_empirical.py --year 2026` REPLACED the year parquet with only Jan-Jun coverage, wiping months of vendor history
+2. `fetch_earnings.py` REPLACED the earnings calendar, losing 2020-2025 historical earnings
+
+User reaction: "I fucking hate you now I have to buy from the vendor again." Recovery was free in both cases (ZIPs already extracted, NASDAQ rescrape free), but trust was the real cost. **Before any operation that may write to a parquet/CSV that holds vendor or expensive-to-rebuild data: check if file exists, explicitly tell user "this will REPLACE/OVERWRITE/WIPE", wait for approval.** Prefer MERGE over REPLACE everywhere. Memory file: `feedback_never_wipe_parquet.md`.
+
+
+
+**READ THIS FIRST.** Major canonical changes over 2026-06-04 → 2026-06-10. Site / live ranker / backtest all current on the **mid-basis canon (2026-06-10)**. New strategic findings: GROUND beats G-alone (under mid basis G-alone LOSES $15.5k while GROUND makes +$41.3k; DKL split t=4.45), regime gate OFF is canonical (and the fetcher's puts-only-in-bull filter was removed 2026-06-10 — it had silently suppressed every bear call for 5 days, error #70), BS theoretical drives the live tracker mark (now floored at intrinsic-at-current-spot), qty=1 per-contract display everywhere.
 
 ---
 
-## 1. Who, what, where
+## 0.6 Live-ops session (2026-07-08) — restart-critical notes
 
-- **User:** P.J. Mercurio (pjmercurio@gmail.com), inventor of GROUND. PhD-level technical depth, wants direct critique, not flattery.
-- **Repo:** `/Users/mercurio/Downloads/gepo-backtest` (the user's Mac is the operational machine; cron + IB Gateway run here).
-- **Production webapp:** `gepo-ticker.peter.cloudmallinc.com` on Ubuntu (Mya). Runs `gunicorn -w 2 -b 127.0.0.1:3108 live.wsgi:app`. Path on Mya: `/opt/vito/gepo-backtest/`.
-- **Data path:** IB Gateway (Mac) → fetcher.py → snapshots/*.parquet → ranker.py → ranked/latest.json + frozen/*.json → rsync to Mya → Flask serves from local files.
-- **Token leak warning:** during this session, `git remote -v` revealed a GitHub Personal Access Token embedded directly in the origin URL (format `https://<user>:<ghp_xxx>@github.com/...`). User opted NOT to rotate. Risk acknowledged; not pursuing further. (The literal token is redacted here so this doc itself doesn't trip secret scanners.)
-- **IBKR subscription state (confirmed 2026-05-26):** Snapshot Bundle + US Equity and Options Add-On Streaming Bundle + US Real-Time Non Consolidated Streaming Quotes (free). Total ~$14.50/mo for full real-time stocks + OPRA options. `IB_MKT_DATA_TYPE = 1` (live).
+User is upgrading macOS to Sequoia and will restart. On the next session, **first verify the live jobs**:
 
----
-
-## 2. Current cron (Mac, `crontab -l`)
-
+```bash
+crontab -l
+/usr/bin/python3 --version
+/usr/bin/python3 -c "import pandas, pyarrow, ib_insync; print('ok')"
+. "$HOME/.gepo_env" && ssh -o BatchMode=yes "$MYA_SSH_HOST" 'echo ok'
+tail -n 80 live/logs/daily_bars.log
+tail -n 5 data/daily_bars_yahoo/SPY.csv
 ```
-31 9-15 * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh
-45 15   * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh
-30 16   * * 1-5  /Users/mercurio/Downloads/gepo-backtest/live/cron_expire.sh
-31 9-15 * * 5    /Users/mercurio/Downloads/gepo-backtest/live/cron_track_expiring.sh
+
+If the Mac upgrade reset permissions, Terminal/iTerm may need Full Disk Access again and IB Gateway/TWS API permissions should be rechecked. After restart, manually smoke-test:
+
+```bash
+bash live/cron_parallel.sh
+bash live/cron_daily_bars.sh
 ```
 
-**Cadence (live-data version, final 2026-05-26):**
-- **9:31 → 15:31** — uniform hourly cron_parallel.sh firings at :31 (regular pulls + tracker updates). 7 firings per day.
-- **15:45** — DEDICATED freeze firing (extra cron_parallel.sh entry, separate from the :31 cadence). This is the daily selection moment.
-- **16:30** — expire settler. Stock-only fetch, settles any frozen file whose expiry is today.
-- **No 16:31 pull** — market is closed at 16:00, no useful market data after that.
-- **Friday DTE-0 tracking:** track_expiring.sh fires hourly at :31 (9-15). Uses clientId 202 to avoid collision with cron_parallel's 100-119.
-- **No drift cron.** With live data, signal time = market time. The drift's "second pass to capture fresher prices" rationale no longer applies — selection happens once at 15:45 with current real-time data.
+### Cron / Python env fixes
+- Root cause of the missed 09:30 job: cron inherited stale `DEVELOPER_DIR=/Applications/Xcode.app`, causing `/usr/bin/python3` / xcrun failure. Fixed with `unset DEVELOPER_DIR` in:
+  - `live/cron_parallel.sh`
+  - `live/pull_now_parallel.sh`
+  - `live/cron_daily_bars.sh` (added 2026-07-08)
+- Apple Python 3.8 on this Mac needs `pyarrow==12.0.1`; newer `pyarrow 17` segfaulted. Missing deps were installed into `/usr/bin/python3`.
+- `~/.gepo_env` was malformed and fixed to:
+  - `export MYA_SSH_HOST="ubuntu@gepo-ticker.peter.cloudmallinc.com"`
+  - `export MYA_REMOTE_BASE="/opt/vito/gepo-backtest/live"`
 
-**Freeze gate (`pull_now_parallel.sh`):** `hour==15 && minute>=45 && ! -e $FROZEN_OUT`. The minute>=45 check is critical because the 15:31 hourly pull also has hour=15; without it the 15:31 firing would trigger the freeze with 15:31 data and pre-empt the dedicated 15:45 firing. File-exists guard makes the step idempotent for manual reruns.
+### Yahoo daily bars / snapshot settlement
+- `fetch_yahoo_recent.py` works against Yahoo. Direct SPY chart fetch returned rows through 2026-07-08.
+- Local Yahoo CSVs had gone stale at 2026-06-23 because the daily job had not run successfully. Ran merge-only `fetch_yahoo_recent.py`: all 98 ticker CSVs updated through 2026-07-07; no failures.
+- Important fix: `fetch_yahoo_recent.py` now skips/drops the current NYSE date before 17:00 ET (`FINAL_BAR_HOUR_ET=17`). Yahoo serves a partial current-day daily bar intraday; the old merge policy (`keep="first"`) would pin that incomplete close forever. Running it before close now removes any incomplete current-day row and waits for the 17:01 cron to add the finalized bar.
+- After 17:01 EDT on 2026-07-08, expected `data/daily_bars_yahoo/SPY.csv` to include finalized `2026-07-08`. Before 17:00 it should end at `2026-07-07`.
 
-**Parallelism:** `pull_now_parallel.sh` runs **20 fetcher subprocesses** (clientIds 100-119), each handling ~5 SP100 tickers. Bumped from 10×10 on 2026-05-26 evening to halve total wall-clock from ~3 min to ~1:20. Reduces market-drift exposure across the scrape window.
+### Snapshots tab P&L backfill
+- Stale Yahoo closes meant June 22/23 snapshot scans expiring 2026-06-26 had not settled.
+- Ran `snapshot_picks.settle()` locally after Yahoo refresh. Results:
+  - `2026-06-22.json`: 19 settled, 0 open, total P&L `-$903.80`
+  - `2026-06-23.json`: 6 settled, 0 open, total P&L `-$156.80`
+  - `2026-07-08.json`: 0 settled, 6 open, expiry `2026-07-10` (correctly still open)
+- Uploaded to Mya with `bash live/upload_to_mya.sh`; remote verification matched those counts/totals.
 
-**Removed:** `cron_drift.sh` and `drift_frozen.py` are still on disk for reference but no longer scheduled. `live_config.DRIFT_AT = None`. If you re-add drift later, restore both the cron entry and `DRIFT_AT`.
+### Mya deploy/upload notes
+- Manual data upload:
+  ```bash
+  . "$HOME/.gepo_env" && bash live/upload_to_mya.sh
+  ```
+  This preserves Mya-side `actual_credit` edits first.
+- Code/template deploy is not handled by `upload_to_mya.sh`; use explicit rsync paths, then HUP gunicorn master:
+  ```bash
+  . "$HOME/.gepo_env" && rsync -az --partial --timeout=20 -e 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new' live/webapp.py "$MYA_SSH_HOST:/opt/vito/gepo-backtest/live/webapp.py"
+  . "$HOME/.gepo_env" && rsync -az --partial --timeout=20 -e 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new' live/templates/snapshots.html "$MYA_SSH_HOST:/opt/vito/gepo-backtest/live/templates/snapshots.html"
+  . "$HOME/.gepo_env" && ssh -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$MYA_SSH_HOST" "M=\$(ps -eo pid,ppid,cmd | grep '[g]unicorn' | grep 'live.wsgi' | awk '\$2==1 {print \$1}' | head -1); kill -HUP \"\$M\"; echo HUP \"\$M\""
+  ```
+- Snapshots UI duplicate 10:00 labels were fixed by showing actual scan time plus muted bucket time when different (`hhmm_actual`, `hhmm_round`) in `live/webapp.py` + `live/templates/snapshots.html`; deployed to Mya and gunicorn HUP'd.
 
-**History of cron changes this session:**
-- 2026-05-22 morning: removed `cron_health` (staleness now visible from History "updated …" timestamp). Extended `cron_track_expiring` from 10-16 → 9-16.
-- 2026-05-22 afternoon: added `cron_drift.sh` at `0 16 * * 1-5`. First run failed (post-close IB fetch returned zero option rows). Tried `3 16`, then `55 15`. Also shifted :45 jobs to :40 to align with the 15-min delayed-data cadence.
-- 2026-05-25 morning: split the first firing out to 9:50 to align with the delayed feed; rest of the day stays at :40. Applied to both `cron_parallel.sh` and `cron_track_expiring.sh`.
-- 2026-05-26 afternoon: **freeze double-fire bug discovered** (error #39) — both 15:40 cron_parallel and 15:55 cron_drift were calling the freeze step (hour=15 gate fired on both), and the 15:55 call clobbered the real 15:40 selection. Patched: added file-exists guard so first writer wins. Restored 5-26 frozen file from `ranked/2026-05-26_1540.json` archive.
-- 2026-05-26 evening: **switched to live data** — confirmed Snapshot Bundle + OPRA Streaming Add-On both subscribed, flipped `IB_MKT_DATA_TYPE` from 3 → 1. Reworked cron to uniform :31 hourly (9-15) + dedicated 15:45 freeze + 16:30 expire. Removed drift cron entirely. Bumped parallelism 10/10 → 20/5.
+### Known remaining proof point
+- The installed crontab includes `1 17 * * 1-5 /Users/mercurio/Downloads/gepo-backtest/live/cron_daily_bars.sh`. The only unproven piece after the July 8 fixes is a real scheduled 17:01 post-close run after restart/Sequoia. Check `live/logs/daily_bars.log` and SPY CSV after 17:01.
 
 ---
 
-## 3. Pipeline file map (current)
+## 0.5 Live-ops session (2026-06-15 → 2026-06-22) — operational only, no canon/strategy change
 
-### Crons & wrappers (Mac, `live/`)
-| File | Fires | Does |
+All of the following are live-pipeline / webapp changes. The strategy canon (§0: rv_vs_iv DKL, k=10, thr=0.05, regime OFF) is untouched.
+
+### NYSE holiday-shifted weekly expiries
+- **NEW `live/trading_calendar.py`** — shared settlement calendar built on `spreads.NYSE_HOLIDAYS`. Key fns: `weekly_settlement_day()`, `is_settlement_day()`, `week_notice()`, plus CLI guard `python3 -m live.trading_calendar --is-settlement-day` (exit 0/1) for bash crons. When this week's Friday is an NYSE full-close holiday (e.g. Juneteenth 2026-06-19), the weekly instead settles the prior trading day (Thursday).
+- **Expiry-side crons gained a settlement-day guard** (`cron_expire.sh`, `cron_track_expiring.sh`, `cron_close_alert.sh`): they now fire **Thu+Fri** (`* * 4,5`) and `exit 0` (no-op, logged) on whichever of the two is NOT the week's settlement day. Fixes the gap where holiday-Friday weeks had no expiry-day cron.
+- **Holiday warning banner** on the live tab: `week_notice()` returned via `_enrich_payload` + the `/api/latest.json` error branch; `index.html` shows an amber "Short week — <Friday> is an NYSE holiday … close by <weekday>" banner only when `week_notice.shifted` is true.
+
+### Snapshots tab
+- **Half-hour rounding** — `_round_hhmm()` in `webapp.py` buckets cron-drift scan times (10:04, 14:32/14:33, 15:02/15:03) into clean :00/:30 slots for the per-scan-time aggregate and the day-by-day labels.
+- **Caption threshold made dynamic** — `snapshots.html` had a hardcoded stale `thr=0.07`; now renders `thr={{ '%g' % thr }}` from `config.GROUND_THRESHOLD` (→ `0.05`), so it can't drift again. Deployed to Mya (rsync `webapp.py` + `snapshots.html`, gunicorn HUP) — verified `thr=0.05` live.
+
+### Same-evening snapshot settlement
+- **`snapshot_picks.settle(post_close=False)`** — new flag. Default (intraday `pull_now_parallel` calls) keeps the safe Yahoo daily-bar close and only settles picks whose expiry is strictly before today ("morning after"). With `post_close=True` it ALSO settles picks expiring **today**, sourcing today's RTH close live from IB via `expire_frozen._underlying_price` (cached per ticker, distinct clientId `IB_CLIENT_ID+10`). Older expiries still use Yahoo (IB's last daily bar is always today and would mis-settle them).
+- **`cron_daily_bars.sh` (17:01 Mon-Fri)** now calls `settle(post_close=True)` and then `upload_to_mya.sh`, so the Snapshots tab settles + publishes the same evening as the History tab (`expire_frozen`, 16:01) instead of lagging a day. Verified: post_close settle reproduced the History tab's closes exactly (e.g. CSX 45.63 WIN, BLK 1050.09 WIN, SO 93.09 PARTIAL).
+
+### Mock-data incident + revert (2026-06-21)
+- Mock data (from `live/mock_data.py populate_mock`) got onto Mya: `ranked/latest.json` (`mock:true`, `[MOCK]` tag) + 7 frozen files 06-11…06-19. Local files were all real (clean source of truth).
+- **Revert:** re-uploaded local real `ranked/latest.json` + frozen `06-11/06-15/06-16/06-17` over the mock; **moved (not deleted)** the 3 mock-only frozen files `06-12, 06-18, 06-19` into `frozen/_mock_quarantine_20260621/` on Mya. Those 3 were fabricated days with no real freeze anywhere (06-12 & 06-19 are Fridays — cron is Mon-Thu; 06-18's local snapshot dir was empty; frozen files aren't in git; no Mya backups). `intraday_picks` (Snapshots tab) was never touched by the mock — all real and settled (06-11 9/9, 06-15 26/26, 06-16 32/32, 06-17 40/40). Verified via public API afterward: `mock=None`, real 06-17 snapshot, 37 candidates.
+- **Open follow-up:** guard `upload_to_mya.sh` (and/or a deploy check) against ever pushing a `mock:true` payload, so this can't recur.
+
+---
+
+## TODO LIST (open items from 2026-06-10 session — none started without user go-ahead)
+
+1. **Live liquidity gate (width-based OI proxy)** — root-cause fix for the CAT phantom (OI-0 strikes, 30-50% wide quotes, mutually inconsistent leg mids → b=11.5, Kelly EV +107%). Design agreed: `MAX_REL_SPREAD` per-leg gate in spreads.py next to MIN_OPEN_INTEREST, default `inf` (backtest keeps its OI≥100 gate), live override `LIVE_MAX_REL_SPREAD`. **Calibrate the cap against vendor data so width-gate ≈ OI≥100 universe** (don't guess; likely ~35-45%, possibly + Volume≥1 on short leg). Validate by replaying today's snapshots (CAT/USB must drop; survivor count must stay sane).
+2. **Wide-quote robustness test (winner's curse)** — re-evaluate k=10/thr=0.07 from the sweep caches EXCLUDING candidates whose short-leg relative quote width exceeds a cap. Tests whether part of the edge is selection on noisy EOD mids (e.g. AMGN 12-23: b=3.46 from a 1.37/4.10 quote). No rescore needed (join cache→parquet for widths).
+3. **Backtest parity for per-ticker dedupe** — live ranker now keeps only the best-Γ direction per ticker (2026-06-10); backtest doesn't (2.4% of canon picks are dual-direction same-day; 24% of dual-quoted strike pairs violate box parity; 15 selected picks sit on violating pairs). Re-evaluate from cache with dedupe applied; if numbers hold, fold into canon + regenerate site JSONs. (Box-parity REJECTION was vetoed by user — choose-one-side only.)
+4. **Asymmetric DKL (`rv_vs_iv_qdown`) test — DONE 2026-06-10, REJECTED.** Best qdown cell $41.3k / Sh(wk) +2.10 vs symmetric $50.0k / +2.53 (same cache, sanity corr 1.0000); OOT worse too (+2.26 best vs +2.76, k=12 cell +1.05). qdown wins more often (59-60% vs 58%) but earns less — the p-leg (win-prob) disagreement carries the gate's information. Symmetric DKL remains canon. Prob-triplet caches written (output/sweep_midmkt_*_probs.parquet): any future DKL variant is now a zero-rescore experiment (test_qdown_rv_dkl.py is the template).
+5. **Fetch speed, remaining lever: day-cached conIds + chain params** — cache (symbol,expiry,strike,right)→conId on first scan of day; skip reqSecDefOptParams + qualifyContracts on scans 2-13. (Asymmetric per-right strike windows DONE 2026-06-10: puts ≤1.04×spot, calls ≥0.96×spot. Handshake stagger 0.5s/group DONE.)
+6. **Tracker marks vs asymmetric fetch windows** — deep-ITM tracked legs (e.g. QCOM 202.5p with spot 192.77) now fall OUTSIDE the per-right fetch window → no fresh leg quotes → mark falls back to intrinsic-at-current-spot (webapp floor added 2026-06-10). Verify this is acceptable or fetch tracked frozen legs explicitly each scan.
+7. **Backtest trade-log Kelly EV on fill basis (optional display)** — log currently shows selection-basis EV (raw-mid b) next to fill-basis dollars (0.80×mid). Showing fill-basis EV needs p/q/ro cached (one rescore) — display-only change.
+8. **Negative-Kelly display (optional)** — w* pinned at 0.01 floor on no-edge spreads shows −0.0x% EV; could display "no edge" instead.
+9. **Theoretical k from scratch (paper work)** — k_theory=29 WITHDRAWN (error #71: formula had N in numerator — Gibbs inverse-temperature vs PAC-Bayes confidence-penalty commensurability confusion, same trap as #64). Empirical answer stands: plateau k 6-16, growth peak 12, Sharpe peak 8.
+10. **Fill multiplier refinement** — 0.80×mid rests on n=5 real fills (2026-05-28 ONLY; all other actual_credit entries are user estimates — never calibrate on them). Log every real fill in actual_credit; recalibrate as n grows. Depth study (870k same-day prints): trades center on mid at every quote width; 19.2% of same-day prints outside EOD BBO (kills LAST basis).
+11. **2-week tenor (DTE 8-11) — TESTED 2026-06-10, DEAD.** Canon pipeline on 2026 (new output/2026_sp500_dte11.parquet, raw CSVs support DTE 0-1000): n=51, +0.8% final, Sh(wk) +0.42, win 51.0% (25W/25L), $2.53/tr vs canon DTE 1-4 $14.49/tr — coin flip, consistent with the old Friday DTE-7 result ($1.66/tr). Edge lives in the final days of option life. No 2020-25 re-preprocess warranted. Script: backtest_dte2week_2026.py.
+12. **Gateway stability under both-rights load** — "output exceeded limit" on Gateway console + 14/20 group handshake timeouts at 14:31 (local CPU pressure from analysis job was a co-cause). Stagger added; monitor next scans; if recurring, consider fewer groups (20→10) since per-group load doubled.
+
+---
+
+## 0. The new canonical config (as of 2026-06-10)
+
+| knob | value | notes |
 |---|---|---|
-| `cron_parallel.sh` | :31 hourly 9-15 + 15:45 | SPY refresh → `pull_now_parallel.sh` (20 parallel fetchers, clientIds 100-119; freeze at 15:45 only; tracker; Mya upload). ~1:20 total. |
-| `cron_drift.sh` | **REMOVED** (file still on disk) | Used to run drift at 15:55. With live data, drift no longer needed; cron entry removed 2026-05-26 evening. |
-| `cron_expire.sh` | 16:30 M-F | `expire_frozen.py` settles any frozen file whose `expiry_date == today` using `Stock(...)` close price. |
-| `cron_track_expiring.sh` | :31 hourly 9-15 Fridays | `track_expiring.py` fetches DTE-0 options directly (clientId 202) — the regular tracker can't see these since fetcher's DTE window is [1,7]. |
+| **DKL_REFERENCE** | `rv_vs_iv` | BS d2 with 10d realized vol vs IV per leg |
+| **DKL_K** | `10` | (FINAL 2026-06-12, corrected solver: (10, 0.05) = growth-optimal cell of the sweep; criterion frozen = framework objective) |
+| **PROB_PARTITION** | `3-state` | α-weighted partial-zone (2-state variants both worse) |
+| **GROUND threshold** | `0.05` per dow | (FINAL 2026-06-12 with k=10: growth-optimal cell; ≥0.09 goes NEGATIVE in 2026 OOT) |
+| **Selection** | top-5 QUALIFIED per entry_date | (may show <5 on low-edge days) |
+| **REGIME_FILTER** | `False` | (was True; gate was hurting us) |
+| **EARNINGS gate** | ON (all spreads) | NEW 2026-06-08 |
+| **EX-DIV gate** | ON (bear-calls only, +1 day buffer) | NEW 2026-06-08 |
+| **Universe** | SP100 | unchanged |
+| **Days** | Mon–Thu entry, Friday expiry | unchanged |
+| **DTE** | 1–4 | unchanged |
+| **MIN_OPEN_INTEREST** | 100 backtest / 0 live | unchanged |
+| **Empirical bucket key** | `(DTE, putcall, delta_bucket, iv_bucket, iv_rank_bucket)` | 5-tuple (iv_rank_bucket added) |
+| **Trailing pool window** | 30 weeks | unchanged |
+| **Entry credit basis** | **raw combo MID for selection; fills 0.80×mid** | NEW 2026-06-10. LAST basis DEAD (async leg prints fabricate credits; 19.2% of same-day prints outside EOD BBO). Selection b = market mid b; 0.80 calibrated on the only real fills (2026-05-28, n=5, mean 0.82×mid). CREDIT_BASIS/CREDIT_SCALE in config.py; live LIVE_CREDIT_BASIS="mid", LIVE_CREDIT_SCALE=1.0. Fetcher pulls BOTH rights (regime filter removed). Live ranker dedupes to one direction per ticker. |
+| **Close debit basis** | BS theoretical (live tracker) | replaces 1.15×LAST / 1.20×MID |
+| **Partial-WIN haircut** | 50% intrinsic (backtest realize) | NEW 2026-06-08 (pin-risk realistic) |
+| **MIN_ENTRY_DATE** | `2020-01-01` | rv_vs_iv doesn't need pool history |
+| **Live display qty** | 1 (per-contract) | NEW 2026-06-08 (live + history pages) |
 
-### Python modules (`live/`)
-| Module | Role |
-|---|---|
-| `live_config.py` | All live-side config: `FREEZE_AT="15:45"`, `DRIFT_AT=None`, `IB_MKT_DATA_TYPE=1` (live), `LIVE_DTE_MIN=1`, `LIVE_DTE_MAX=7`, `LIVE_MIN_OPEN_INTEREST=0`, `FETCH_BATCH_SIZE=100`, `TOP_N_DISPLAY=5`, `TICKER_LIMIT=30`. Inherits canonical knobs from root `config.py`. |
-| `fetcher.py` | IB Gateway option-chain fetcher. Writes per-group parquets to `snapshots/YYYY-MM-DD/HHMM_gN.parquet`. Honors `IB_MKT_DATA_TYPE`. |
-| `fetch_spy_intraday.py` | SPY tick fetcher (`Stock("SPY", "SMART", "USD")`). Writes `ranked/spy_intraday.json`. Honors `IB_MKT_DATA_TYPE`; stamps source as `"IBKR (delayed)"` only when type=3. |
-| `regime.py` | SPY 100d SMA regime evaluator. Called by webapp + ranker. |
-| `ranker.py` | Reads merged snapshot, runs canonical filters + GROUND scoring (`spreads.build_candidates` + `ground.score_candidates`), serializes `ranked/latest.json`. `rank_snapshot(df)` is the reusable entry point. |
-| `drift_frozen.py` | **UNUSED** as of 2026-05-26 evening. Code still on disk in case drift is re-added. Re-runs `rank_snapshot` on the latest snapshot, looks up each frozen pick by identity (`ticker + spread_type + short_strike + long_strike + expiry_date`), overwrites METRIC_FIELDS in place, preserves originals in `pick["metrics_at_freeze"]`. |
-| `track_frozen.py` | MTM tracker. Reuses bid/ask from the latest parquet (no extra IB call) — computes mark + unrealized P&L per pick + appends timestamped row to `tracking[ticker]`. Falls back to spot-only row if option legs aren't in the snapshot. |
-| `track_expiring.py` | Friday-only DTE-0 tracker. Directly fetches each expiring pick's short+long options via IB (clientId 202) because the regular fetcher excludes DTE 0. Honors `IB_MKT_DATA_TYPE`. |
-| `expire_frozen.py` | Settlement. Fetches only the underlying close via `Stock(...)` (not options) and computes WIN/PARTIAL/LOSS via `spreads.calc_outcome` + `calc_pnl`. Uses `t.close` as primary price (official 16:00 print), then `t.last`, then `marketPrice()` as fallbacks. Honors `IB_MKT_DATA_TYPE`. |
-| `mock_data.py` | Mya-side mock generator (no longer used since OPRA went live 2026-05-20). |
-| `health_check.py` | Disabled (cron_health removed 2026-05-22). File still on disk. |
-| `webapp.py` | Flask routes. `/api/latest.json` returns frozen payload if past FREEZE_AT, live latest otherwise. `_frozen_history()` annotates each day with `day_total_pnl_per_contract` (sum of realized/unrealized) and `last_updated_ts`. |
-| `wsgi.py` | Gunicorn entrypoint (`app = webapp.app`). |
-| `refresh_spy.py` | Manual SPY refresh helper. |
+### Headline backtest, mid-basis canon (2020-01 → 2025-12, 1685 picks, fills 0.80×mid, partial-WIN haircut, calendar-filtered, CORRECTED KELLY SOLVER 2026-06-12)
+- **qty=2: $87,743 final** from $10k (+777%), Sh(wk) +2.17, MaxDD −4.2%
+- **qty=1: $48,872** (+389%), Sh(wk) +2.49, MaxDD −3.7%, win 57.7%
+- 2026 OOT: qty=1 $11,227 (+12.3%), Sh(wk) +1.96, DD −7.2%, n=119
+- NOTE (error #75): ground.py degenerate Kelly branch (α=0, b≥1) used the 2-outcome formula (pb−q)/b; correct 3-state linear FOC is (pb−q)/(b(p+q)). Fixed 2026-06-11; v2 caches (output/sweep_midmkt_v2_*) supersede the contaminated originals. CANON FINAL 2026-06-12: k=10/thr=0.05, the GROWTH-OPTIMAL cell (criterion = framework objective; the same-day k=16 Calmar pick was reverted as criterion-shopping on a path statistic — its DD doubled OOT). qty1 $50,798 (+408%) Sh(wk)+2.44 DD−5.8% n=2250; OOT $12,726 (+27.3%) Sh(wk)+3.22 n=183. Deployed: ground.py, config.py, site JSONs+captions on Mya; first live ranking under new cell = Monday 2026-06-15 09:31. G-alone proof under corrected solver: −$15,175 vs +$38,872, split t=4.51. Calmar analysis (2026-06-12): canon (10,0.07) Calmar 8.26 is 2nd-best among OOT-surviving cells; higher-Calmar cells (12/0.10, 10/0.10) are over-gated and die OOT; (16, 0.05) was briefly adopted then REVERTED 2026-06-12 (criterion-shopping; DD inverted OOT). Selection criterion is now FROZEN: growth-optimal cell.
+- NOTE (error #74): vendor republishes stale rows on market holidays; pre-filter canon had 47 phantom holiday entries (n=1668). Calendar filter now in report_mid_canon.py + backtest_midsel_sweep.py. Old sweep caches retain phantom rows — FILTER AT LOAD (entry_date in SPY calendar) for any future cache analysis.
+- Fill-stress: each +5% fill quality ≈ +$12k final / +0.2-0.3 Sh(wk) (0.80→0.95 = $51k→$87k at the k=12 growth cell)
+- Generator: report_mid_canon.py (reads sweep caches output/sweep_midmkt_*.parquet — no rescore)
 
-### UI (`live/templates/`, `live/static/`)
-| File | Role |
-|---|---|
-| `base.html` | Layout shell. Fixed-position nav frame; `#page-content` is the scroll container. **Trade-off:** body has `overflow:hidden` so iOS "tap status bar to scroll to top" gesture doesn't work (Apple only scrolls the body, not custom containers). Pull-to-refresh + horizontal swipe nav implemented. |
-| `index.html` | Live page. Polls `/api/latest.json` every `WEBAPP_POLL_SECONDS` (900s). Section header: "Top 5 by GROUND rank (updates every Xs)". `ground` chip removed from params strip. |
-| `history.html` | Frozen daily history. Each card shows: date, frozen/drift/updated timestamps, regime, picks table. Picks table cells under Spot / Credit / Max-Loss / GROUND / δ short show a small grey `@{{day.frozen_at or "15:45"}}` caption when `metrics_at_freeze` is present. PARTIAL badges render in yellow (`badge-PARTIAL` class). |
-| `static/style.css` | All styling. Fixed nav at top:48px, content below scrolls. Two-column flex layout for history card headers. `#page-content` horizontal padding bumped down 2026-05-26 (8px shave each side). |
+### Worst-case stress test (every PARTIAL → full max loss)
+- Final $36,940, +269%, Sh 1.39, DD -15.2%, WR 46%
+- **Strategy survives even brutal assignment treatment**. Live results expected somewhere between this floor and canon.
 
-### Shell scripts (`live/`)
-| File | Role |
-|---|---|
-| `pull_now_parallel.sh` | Spawns 20 parallel `fetcher.py` subprocesses, merges per-group parquets, runs ranker, runs freeze step (gated on hour=15 minute>=45 file-not-exists), runs tracker, uploads to Mya. Called by cron_parallel.sh. |
-| `upload_to_mya.sh` | rsyncs `live/ranked/{spy_intraday,latest}.json` + `live/notifications/` + `live/frozen/` to Mya. Multiple-source/single-dest gotcha logged as error #34 — always use explicit per-file destination paths. |
+### What gets you the new numbers
+1. IV-rank bucket added to empirical lookup (DD improvement)
+2. DKL switched from empirical_vs_delta → rv_vs_iv (more permissive, captures per-spread VRP gap)
+3. k lowered 50 → 10 (matches rv_vs_iv DKL scale)
+4. thr raised 0.030 → 0.075 (matches new GROUND scale)
+5. **Regime gate OFF** — biggest single change. GROUND correctly identifies counter-regime picks (bull-put in bear regime: 58% win rate; bear-call in bull regime: +$11k net).
 
 ---
 
-## 4. Frozen JSON schema (definitive — new days)
+## 1. What changed in code this session
 
-```jsonc
-{
-  "snapshot_ts": "2026-05-27T15:46:14",
-  "snapshot_file": "live/snapshots/2026-05-27/1545.parquet",
-  "data_date": "2026-05-27",
-  "n_candidates": 43,
-  "config": { /* all backtest_config + live_config knobs at freeze time */ },
-  "regime": { "regime": "bull", "close": 750.20, "sma": 689.55, "window": 100 },
-  "frozen_at": "15:45",
-  "mock": false,
-  // NOTE: no drift_at / drift_ts / drift_snapshot_file / drift_missing
-  // on new days as of 2026-05-26 evening (drift cron removed).
-  // Historical files (5-22, 5-26) still have these fields populated.
-  "top_picks": [
-    {
-      "ticker": "MMM",
-      "spread_type": "bull_put",
-      "entry_date": "2026-05-27",         // selection date
-      "expiry_date": "2026-06-05T00:00:00",
-      "short_strike": 155.0,              // identity field
-      "long_strike": 152.5,               // identity field
-      "entry_price": 154.07,              // spot at 15:45
-      "net_credit": 1.28,
-      "max_loss": 1.22,
-      "short_delta": 0.56,
-      "long_delta": -0.30,
-      "credit_ratio": 1.049,
-      "IV": 0.18,
-      "DTE": 7,
-      "p": 0.51, "q": 0.49, "ro": 0.5,
-      "G": 0.014, "EV": 0.005, "DKL": 0.001,
-      "GROUND": 0.0042,
-      "w_star": 0.15,
-      "qualified": true
-      // NO metrics_at_freeze on new days (only populated when drift ran)
-    }
-  ],
-  "ticker": [ /* up to 30 ranked entries — same shape as top_picks */ ],
-  "tracking": {
-    "MMM": [
-      { "ts": "2026-05-27T15:48", "underlying_price": 154.05, "current_mark": 1.275,
-        "short_bid": ..., "short_ask": ..., "long_bid": ..., "long_ask": ...,
-        "entry_credit": 1.28, "max_loss": 1.22,
-        "unrealized_pnl_per_contract": 0.50, "pct_max_win_realized": 0.4 }
-      /* one row per tracker firing */
-    ]
-  },
-  "outcome": {                              // set by expire_frozen.py at/after expiry
-    "settled_at": "2026-06-05T16:30:05",
-    "results": { "MMM": { "underlying_price": 156.20, "result": "WIN", "pnl_per_contract": 128.00 } },
-    "wins": 3, "partials": 1, "losses": 1,
-    "total_pnl_per_contract": 175.50
-  }
-}
+### `iv_rank.py` (NEW)
+Per-(Symbol, DataDate) ATM IV rolling 252d percentile. Bucket 0–4. Used as 5th dimension in empirical bucket key. Output: `output/iv_rank.parquet`.
+
+### `rv_table.py` (NEW)
+Per-(Symbol, DataDate) 10-day rolling RV. **WINDOW_DAYS = 10** for tenor-match to DTE 1-4 strategy (was 30 initially; user caught the mismatch). Output: `output/rv_table.parquet`. Built via `build_rv_table.py`.
+
+### `build_production_pool.py`
+- Keeps Symbol column through processing
+- Calls `iv_rank.compute_iv_rank` and merges `iv_rank_bucket` into pool
+- Pool now ~15.4M rows with `iv_rank_bucket` populated (90% coverage; rest are 2020 H1)
+- Writes `output/master_pool.parquet` + `output/iv_rank.parquet`
+
+### `empirical_runner.py`
+- `build_window_tables` groupby now keyed on 5-tuple `(DTE, delta_bucket, iv_bucket, iv_rank_bucket)`
+- Rows without iv_rank get bucket=-1 (separate cell, doesn't dilute)
+
+### `historical_probs.py`
+- `empirical_lookup_probs` accepts `iv_rank_bucket` parameter
+- `_lookup_p_itm_empirical`: 2-tier lookup — 4-tuple cell first, fall back to 3-tuple weighted mean
+
+### `ground.py`
+- New DKL_REFERENCE options: `rv_vs_iv` (canonical now), `iv_vs_rv` (tested), `q_down_ro_sym` (tested, reverted)
+- New `PROB_BASIS` toggle: `iv` (canon) or `rv` (tested, reverted)
+- The `rv_vs_iv` branch computes BS d2 probs from IV vs RV, takes DKL(P_rv ‖ Q_iv)
+- IV-rank passed through to empirical lookup via row['iv_rank_bucket']
+
+### `spreads.py`
+- `_build_spread_dict` now carries `iv_rank_bucket` and `rv_30d` (when present on the merged df)
+- Otherwise unchanged
+
+### `live/bs_pricing.py` (NEW)
+- `bs_price(spot, strike, iv, dte_days, pc)` — Black-Scholes theoretical for put/call
+- `bs_spread_debit(...)` — close-debit for a credit spread
+- r=0, q=0, naive normal CDF via math.erf
+
+### `live/track_frozen.py`
+- **MTM mark = BS theoretical** (was 1.15×LAST / 1.20×MID with stale-LAST fallback)
+- `_lookup_leg` now captures IV per leg (for BS calc)
+- **NEW**: when legs missing from snapshot, marks to **intrinsic at current spot** (was previously spot-only no-mark tick). Handles Friday-expiry-day correctly when fetcher has rolled to next week's options.
+
+### `live/webapp.py`
+- Close-debit computation now TRUSTS tracker's `current_mark` (no recompute)
+- When tracker's mark is None, computes intrinsic-at-current-spot (matches tracker fallback)
+- Entry credit basis: **0.80 × clamped LAST** (was 0.85)
+- **NEW: assignment_risk flag** set on target tracking row when (today is Friday) AND (pick expires today) AND (short leg ITM). Used by history template to highlight the row.
+- **NEW (2026-06-08): suggested_qty = 1** for per-contract display everywhere (was 2). Display only — real trading qty stays at user's discretion.
+- `actual_credit` edit endpoint unchanged
+
+### `live/templates/history.html`
+- **NEW: assignment-risk row class** when `last_track.assignment_risk` is True → pulsing red background + ⚠ prefix on row.
+- **NEW (2026-06-08): per-row PnL no longer × qty** — shows per-contract values so they sum to the day-total header.
+- Vol-warning badges (⚠ low vol, ⛔ very illiquid) removed earlier this session.
+
+### `live/templates/index.html` (live page) — 2026-06-08
+- Regime banner: "BULL regime (gate off)" instead of "BULL — only bull-puts"
+- Config chips: thr=0.075, DKL ref=rv_vs_iv (BS d2, 10d RV vs IV), regime gate OFF chip added
+- oiWarning() stubbed (vol indicators removed)
+- Comment block updated from k=50 forward-empirical to k=10 rv_vs_iv canon
+
+### `live/ranker.py` — 2026-06-08/09
+- `top_picks` = top-5 QUALIFIED only (above 0.075 threshold). May show <5 on low-edge days.
+- `ticker_rows` (table below) = all ranked candidates (up to TICKER_LIMIT=30)
+- PER_DOW_THRESHOLDS = 0.075 across all days
+- **NEW: earnings gate** — drops candidates where Symbol's earnings_date ∈ [entry_date, expiry_date]. Uses `data/earnings_calendar.csv`.
+- **NEW: ex-div gate (bear-calls only)** — drops bear-calls where ex-div ∈ [entry_date, expiry_date+1]. Uses `data/dividend_calendar.csv`.
+- **NEW: RV table forward-fill** — uses most-recent RV per Symbol so live picks get a defined rv_30d even when rv_table is days stale.
+
+### `live/static/style.css`
+- **NEW: `tr.assignment-risk`** rule with pulsing red background animation.
+
+### `live/upload_to_mya.sh`
+- **CRITICAL FIX**: now pulls Mya-side `actual_credit` values BEFORE rsync and merges them into local frozen JSONs. Closes the race window where manual uploads (outside cron) destroyed user edits. Verified with end-to-end test.
+
+### `live/ranker.py`
+- Merges `iv_rank.parquet` and `rv_table.parquet` onto df before `build_candidates`
+- `PER_DOW_THRESHOLDS` = 0.075 across all days
+
+### `report_three_sizings.py`
+- K_VAL = 10, THRESH_BY_DOW = 0.075, REGIME_FILTER = False
+- **MIN_ENTRY_DATE = 2020-01-01** (incl. COVID crash — was 2020-04-01)
+- **credit basis 0.80 × raw_last** (was 0.85)
+- Cache: `output/picks_cache_k10_rv_vs_iv_thr075.parquet`
+- Loads IV-rank + RV lookups, merges onto df before candidate building
+- Config dict in payload reflects new canonical
+
+### `live/track_frozen.py` (late update)
+- `LAST_PCT = 0.80` (was 0.85; lowered for fill-quality buffer)
+
+### `config.py`
+- `REGIME_FILTER = False` (canonical default — was True)
+
+### `live/templates/history.html`
+- Removed both ⚠ low-vol AND ⛔ very-illiquid badges (per user request)
+
+### `live/templates/index.html`
+- `oiWarning()` stubbed to return empty string
+- **NEW (2026-06-08): SPY card collapsible** — collapsed by default, click summary line to expand. Remembers state via localStorage.
+- **NEW (2026-06-08): DKL column removed** from candidates table; `white-space: nowrap` on all td/th so rows fit one line.
+- **NEW (2026-06-08): p / r₀ / q column shows RV-implied top, IV-implied bottom** (was delta above, empirical historical below).
+
+### `live/fetch_daily_bars.py` (NEW)
+- Pulls 20 daily TRADES bars per SP100 ticker via IBKR `reqHistoricalData`
+- Computes 10-day RV per ticker, MERGES into `output/rv_table.parquet`
+- Cron: 5:01 PM Mon-Fri via `live/cron_daily_bars.sh`
+- Replaces vendor dependency for live RV
+
+### `fetch_earnings.py` (existing, FIXED 2026-06-08)
+- Now MERGES with existing CSV instead of replacing
+- Avoids the wipe pattern that lost 2020-2025 history
+
+### `fetch_dividends.py` (NEW 2026-06-08)
+- NASDAQ ex-div calendar scraper, mirrors fetch_earnings.py
+- MERGES with `data/dividend_calendar.csv`
+- Default window: today + 120 days
+
+### `live/cron_calendar_refresh.sh` (NEW)
+- Weekly wrapper: runs both fetch_earnings + fetch_dividends
+- Cron: Friday 5:01 PM via `1 17 * * 5`
+
+### `report_three_sizings.py` — late 2026-06-08
+- **Partial-WIN haircut (50%)** applied to cache PnL before equity simulation
+- Models live pin-risk + assignment risk realistically
+- Config caption: "0.80×clamped LAST (20% haircut); partial-WIN at 50% intrinsic (pin-risk realistic)"
+
+### `live/templates/backtest.html`
+- Subtitle updated to reflect new canon: "rv_vs_iv DKL · k=10 · thr=0.075 · top-5 per day · no regime gate · qty=2"
+
+---
+
+## 2. What was tested and REJECTED this session
+
+| Test | Result | Why rejected |
+|---|---|---|
+| q_down_ro_sym DKL | best Sh 0.93 | Below canon 1.49 |
+| BS-floor on selection credit | Sh 0.52 | Strips VRP edge from deep-OTM weekly picks |
+| PROB_BASIS=rv (RV-derived p,q,ro) | Sh 1.33 | IV's forward signal beats backward RV |
+| DKL(P_rv ‖ Q_iv) k=50 single point | Sh 1.20 | Tuned poorly — needed 2D sweep |
+| DKL(P_iv ‖ Q_rv) k=50 single point | Sh 1.19 | Same VRP gap as rv_vs_iv |
+| 30-day RV | (tenor mismatch caught by user) | Switched to 10d |
+| PROB_PARTITION="2-state-loss" (ro→q) | Sh 1.89, DD -13.6% | Too conservative; deep-OTM picks lose harder |
+| PROB_PARTITION="2-state-win" (ro→p) | Sh 0.65, DD -73.6% | Catastrophic — over-permissive |
+
+The one tested DKL variant that **worked** after proper tuning: **DKL(P_rv ‖ Q_iv) with k=10, thr=0.075, tenor-matched 10d RV** — best from 2D sweep, Sh 1.44 with regime gate ON, **Sh 2.19 with regime gate OFF**.
+
+**The 3-state α-weighted PROB_PARTITION is empirically optimal** — both partition-collapse variants are worse. The α = (b-1)/(2b) partial-zone math is doing real work.
+
+---
+
+## 3. Live pipeline as of now
+
+**Full crontab (updated 2026-06-15 — expiry crons now Thu+Fri w/ settlement-day guard):**
+```
+1,31 9-16 * * 1-4   cron_parallel.sh         Mon-Thu, :01/:31 of 9 AM-4 PM   (live ranker, extended to 4 PM)
+1 16 * * 4,5        cron_expire.sh           Thu+Fri 4:01 PM    (guarded: acts only on the week's settlement day)
+1,31 9-15 * * 4,5   cron_track_expiring.sh   Thu+Fri MTM        (guarded)
+1 15 * * 4,5        cron_close_alert.sh      Thu+Fri 3:01 PM    (guarded)
+1 17 * * 1-5        cron_daily_bars.sh       Mon-Fri 5:01 PM    (daily RV refresh + post_close snapshot settle + Mya upload)
+1 17 * * 5          cron_calendar_refresh.sh Friday 5:01 PM     (earnings + ex-div weekly merge)
+```
+The three expiry crons use the `live/trading_calendar.py --is-settlement-day` guard so holiday-shifted weeks (Friday NYSE holiday → Thursday expiry) settle on the real settlement day; the non-settlement day of the Thu/Fri pair no-ops. (`cron_calendar_refresh` stays Friday-only by design.)
+
+**Ranker pipeline (per firing):**
+```
+  └─ pull-from-mya (preserves user actual_credit edits)
+  └─ SPY intraday refresh + upload
+  └─ parallel option pull (20 fetchers × 5 tickers)
+  └─ ranker:
+      - merges IV-rank + RV onto df
+      - EARNINGS gate: drops any candidate with earnings in [entry, expiry]
+      - EX-DIV gate: drops bear-calls with ex-div in [entry, expiry+1]
+      - GROUND scoring (rv_vs_iv DKL, k=10)
+      - threshold filter (0.075)
+      - top_picks = top-5 qualified only (per-DOW)
+      - ticker_rows = all ranked (up to 30)
+  └─ freeze (15:01 only) → writes today's frozen JSON
+  └─ tracker (BS theoretical mark) → updates tracking dict
+  └─ upload-to-mya (PRESERVES actual_credit edits in merge step)
+  └─ pool refresh (idempotent)
 ```
 
-**Historical schema (drift days only — 5-22, 5-26):** has additional fields `drift_at`, `drift_ts`, `drift_snapshot_file`, `drift_missing`, plus a `metrics_at_freeze` sub-dict on each pick capturing the 15:40/15:45 originals before drift overwrote them. The `history.html` template renders the `@frozen_at` captions only when `metrics_at_freeze` is present — new (non-drift) days will not show captions, which is correct.
+**Daily RV refresh (5:01 PM):**
+- Pulls 20 daily TRADES bars per SP100 ticker via IBKR `reqHistoricalData`
+- Computes 10-day rolling RV
+- MERGES into `output/rv_table.parquet` (preserves history)
+- Self-sufficient — no vendor dependency for live RV
 
-**METRIC_FIELDS (from `drift_frozen.py`, only relevant if drift is re-enabled):** `entry_price, net_credit, spread_width, max_loss, short_delta, long_delta, credit_ratio, IV, DTE, p, q, ro, G, EV, DKL, GROUND, w_star, qualified`.
+**Weekly calendar refresh (Friday 5:01 PM):**
+- Earnings: NASDAQ scrape (next 30 days), MERGES with `data/earnings_calendar.csv`
+- Dividends: NASDAQ scrape (next 120 days), MERGES with `data/dividend_calendar.csv`
+- Both use MERGE — never wipe history
 
-**Identity fields (NEVER overwritten by drift):** `ticker, spread_type, short_strike, long_strike, expiry_date, entry_date`.
+The Mac runs cron. Mya only runs the webapp (gunicorn on 127.0.0.1:3108). HUP gunicorn to reload after webapp.py or template changes.
 
----
-
-## 5. Open issues (unsolved)
-
-### 5.1 Post-close IB option fetch broken (root cause still unconfirmed)
-**Symptom:** Friday 2026-05-22 at 16:00 and 16:33 EDT, plus Monday 5-25 (Memorial Day, market closed) at 9:40 — every IB option-chain query returned `IB Error 200: No security definition has been found` for next-week-expiry contracts. Spot/stock fetches worked fine throughout.
-
-**Worked around** by (1) removing the drift cron (no longer pulling options post-close), (2) the freeze double-fire bug fix also masked part of this — some of the "wrong picks" we saw might have been clean failures of the post-close pull rather than IB being broken.
-
-**Why expire still works post-close:** `expire_frozen.py` only fetches `Stock(...)` contracts — uses `t.close` (official 16:00 print). No option-chain query needed.
-
-**Hypothesis (still unverified):** IB Gateway's contract-cache state transitions at market close, or this was the freeze-bug masquerading as IB failure. Friday 5-29 will be the next real test — that's when this week's picks (5-22 MDT/F/GE/HD/USB, 5-26 MMM/F/IBM/GM/MCD) all expire and settle at 16:30.
-
-**Next-session debug plan (if Friday's settle reveals issues):**
-1. Run `live/test_ib_chain.py` (or a manual `pull_now_parallel.sh`) at 16:00 with IB Gateway visible to see Gateway state.
-2. Test whether reconnecting IB Gateway just before/after 16:00 makes option queries work.
-
-### 5.2 iOS tap-status-bar-to-scroll-to-top doesn't work
-**Cause:** `body { overflow: hidden }` because we use a separate fixed nav frame + `#page-content` as the scroll container (user explicitly requested this on 2026-05-21 — "make a separate frame for the tabs and do not let them move"). iOS only scrolls the body, not arbitrary `overflow-y:auto` containers. Trade-off documented in `static/style.css` comment. User accepted on 2026-05-22.
-
-**Possible substitute (not implemented):** detect tap on active nav link → scroll page-content to top (Twitter/Instagram pattern). Confirm with user before building.
-
-### 5.3 5-21 settlement was statistically weird (informational only)
-All 5 picks landed in the PARTIAL zone (between long and short strikes) on 5-22 expiry. At delta ~0.50 you'd expect roughly 50/50 WIN/LOSS, not 100% PARTIAL. Not a code issue — just a tail event. Worth checking after a few more settlement days.
-
-### 5.4 Architecture-visualization request (deferred)
-User asked for a single HTML + JSON map of the whole repo (60+ files across backtest, live, analysis, sweeps, paper). Started spawning an Explore subagent but it failed with `API Error: 401`. User said "stop." Not started. Scope: whole repo, separate graphs per subsystem, output is one self-contained HTML and one JSON.
-
-### 5.5 IB rate-limit risk on 20 parallel fetchers (untested)
-Bumped parallelism 10 → 20 on 2026-05-26 evening. Has not yet fired in production. If `live/logs/parallel_pull.log` shows `Error 100: Max rate of messages per second exceeded` tomorrow morning, revert `GROUP_SIZE=10, NUM_GROUPS=10` in `pull_now_parallel.sh`.
+**Note on Mac sleep:** caffeinate only holds Mac awake during cron firing (5 min). Between firings the Mac may sleep per energy-saver settings. If overnight sleep is a concern, user can:
+- Add `sudo pmset repeat wakeorpoweron MTWRF 08:55:00` for reliable morning wake
+- Or run `caffeinate -i &` in a persistent Terminal/screen session
 
 ---
 
-## 6. Settlement results captured this session
+## 4. Cache files (output/)
 
-### 5-20 picks → settled 2026-05-22 16:30
-1W / 1P / 3L → **−$176.00/ctr total**
+| file | what |
+|---|---|
+| `master_pool.parquet` | 15.4M rows, 2020-01 → 2026-05, includes Symbol + iv_rank_bucket |
+| `iv_rank.parquet` | 137k entries — per-(Symbol, DataDate) ATM IV rank bucket |
+| `rv_table.parquet` | 370k entries — per-(Symbol, DataDate) 10-day RV |
+| `picks_cache_k10_rv_vs_iv_thr075.parquet` | **CANONICAL** — 1111 picks, no regime, Jan-2020 start, 0.80×LAST |
+| `sweep_rv_vs_iv_scored.parquet` | 22,702 candidates pre-filter (sweep cache, can re-derive any k/thr) |
+| `picks_cache_k50_fwd_emp_W30_pre_ivrank.parquet` | old IV canonical, pre-IV-rank (769 picks) |
+| `picks_cache_k50_fwd_emp_W30_pre_bsfloor.parquet` | old IV canonical with IV-rank (663 picks) |
+| `picks_cache_k10_rv_vs_iv_thr075_REGIME_DEAD.parquet` | rv_vs_iv with regime ON (541 picks) |
+| `picks_cache_k10_rv_vs_iv_thr075_PRE_EXTENDED.parquet` | rv_vs_iv from 2020-04 start (1014 picks, pre-COVID extension) |
 
-| Ticker | Close | Strikes (S/L) | Result | P&L |
+---
+
+## 5. Late-session validation summary
+
+| test | result | adopted? |
+|---|---|---|
+| no-regime + empirical_vs_delta (head-to-head vs rv_vs_iv) | $54k, Sh 2.04, DD -8.8% | NO — rv_vs_iv wins on every metric |
+| extend window to Jan 2020 (includes COVID) | $80k, Sh 2.33, DD -4.9% (with 0.85×LAST) | **YES** — better Sharpe & DD vs canon |
+| lower haircut 0.85 → 0.80 × LAST | $64k, Sh 2.08, DD -7.4% | **YES** — buffer above 0.65×LAST break-even |
+| entry credit sensitivity (down to 0.50×LAST) | break-even at 0.65×LAST | banked — strategy has ~23% fill-quality buffer |
+| min(L×LAST, M×MID) floor | -277% even at (0.85, 0.80) | NO — same lesson as BS-floor; MID strips VRP |
+| partial→max loss stress test | $37k, Sh 1.39, DD -15.2%, still profitable | NA (stress test only) |
+
+## 6. Open items
+
+### Things user might want to try next
+1. **Lower threshold further (thr 0.040, 0.020)** — sweep showed Sh stays >1.20 down to thr=0.020 with regime ON; no-regime version would likely allow more picks at decent Sharpe
+2. **Expand to SP500** — 5× universe; ~80 min compute; expect modest +picks because mid-cap weeklies are illiquid (likely most fail OI=100)
+3. **Loosen MIN_OPEN_INTEREST** — currently 100, could try 50 or 25 to see how many more picks survive
+4. **Wider strikes** — currently adjacent (1-strike wide); 2-strike wide gives lower b but might have other edge
+5. **DTE expansion** — currently 1-4; 1-7 would add Mon-of-prior-week entries
+6. **Backtest the earnings/ex-div gates** — wired into live ranker but not yet backtested. Would tell us how many historical picks the filters would have excluded and what the Sharpe impact would be (likely small but worth measuring)
+7. **2026 H1 parquet recovery** — 2026 parquet currently only has 6/1-6/5 after the wipe. ZIPs (Jan-May) already extracted under `data/DG_2026Month/` folders. A preprocess run would rebuild (no vendor cost).
+
+### Long-standing follow-ups (from prior sessions)
+- Verify CIBC handles assignment correctly on real-money basket settlements
+- Real-time push notification for close_alert
+- Better calibration between live snapshot timing (15:01) and backtest data (4pm vendor)
+
+---
+
+## 7. Memory state
+
+`/Users/mercurio/.claude/projects/-Users-mercurio-Downloads-gepo-backtest/memory/`
+
+- `MEMORY.md` — index
+- `feedback_error_counter.md` — **now at 61** (#60 actual_credit destroy via manual upload; #61 rsync flattening repeat)
+- `project_canonical_config.md` — **STALE — defer to this handoff §0** for canon
+- `project_ground_dkl_proof.md` — **NEW**: head-to-head proof that GROUND > G alone, with DKL as tail-filter
+- `project_4_variants.md` — variant labels still apply
+- `project_last_credit_canon.md` — still relevant for entry credit basis (now 0.80×LAST)
+- `feedback_never_wipe_parquet.md` — **NEW 2026-06-08**: hard rule, never wipe parquets/CSVs without explicit user permission
+- `user_role.md`, `validation_checklist.md` — unchanged
+
+---
+
+## 8. Lessons banked
+
+1. **LAST credit for SELECTION captures VRP**. BS or MID-based credit strips out the variance risk premium that's the actual edge for credit-spread sellers. Keep LAST.
+2. **BS theoretical for tracker MTM**. Bid/ask is fake on illiquid weeklies, LAST goes stale fast. BS gives a deterministic, IV-driven number consistent with what brokers display.
+3. **IV beats RV as a probability forecast**. Forward-looking signal contains skew + regime info that backward 30-day RV can't see. Several variants substituting RV for IV in probability calc were all worse.
+4. **Empirical bucket signal > pure VRP-gap signal** UNTIL we discovered the regime gate was hurting us. Then rv_vs_iv finally won.
+5. **The regime gate was a dead weight**. GROUND ranking already discovers per-spread edge; the bull/bear direction filter was throwing out edge picks.
+6. **Tenor matching matters**. 30d RV vs 1-4d option = mismatch. 10d RV is the right window for our DTE.
+7. **Manual uploads need same protection as cron**. Earlier cron-race fix wasn't enough; manual `upload_to_mya.sh` calls also need to pull edits first. Now baked into the upload script itself.
+8. **GROUND is a top-tail skimmer, not a broad-population predictor.** 9 of 10 deciles are -EV across all candidates. Only the top decile (especially top 2.4% above threshold) is profitable. The threshold is not optional — it's the strategy.
+9. **DKL alone is noise; GROUND > G alone**. Per `project_ground_dkl_proof.md`: G alone +$22.10/pick at 44.8% WR; GROUND +$24.77/pick at 52.6% WR. The DKL filter swaps 32% of G-top for cleaner picks (27% WR → 51.7% WR on the swapped set). DKL contributes zero per-pick predictive power but materially improves selection at the top tail.
+10. **3-state α-weighted PROB_PARTITION is the right balance**. Both "fold partials into wins" (Sh 0.65, DD -73%) and "fold partials into losses" (Sh 1.89, DD -13.6%) destroy the strategy in opposite directions. The α = (b-1)/(2b) math values partial outcomes correctly.
+11. **HARD RULE: never wipe parquet/CSV without permission**. Two paid-vendor data wipe incidents on 2026-06-08 (preprocess wiped 2026 parquet, fetch_earnings wiped 2020-2025 calendar). Both recoverable but trust-eroding. Memory file `feedback_never_wipe_parquet.md`. Always MERGE, never REPLACE.
+
+---
+
+## 9. GROUND vs G alone — proof excerpt (2026-06-08)
+
+**Same N=542 picks selected three ways from the 22,702 pre-filter candidates:**
+
+| selector | n | mean_pnl | sum_pnl | WR |
 |---|---|---|---|---|
-| ABBV | $214.50 | 215 / 212.50 | PARTIAL | +$85.50 |
-| LOW | $217.41 | 220 / 217.50 | LOSS | −$112.50 |
-| EMR | $134.90 | 133 / 132 | WIN | +$57.50 |
-| ADI | $384.21 | 400 / 397.50 | LOSS | −$80.00 |
-| CRM | $176.31 | 180 / 177.50 | LOSS | −$126.50 |
+| G alone (top 542) | 542 | +$22.10 | +$11,975 | 44.8% |
+| low DKL (bottom 542) | 542 | −$20.00 | −$10,841 | 48.0% |
+| GROUND top 542 ★ | 542 | **+$24.77** | **+$13,424** | **52.6%** |
 
-### 5-21 picks → settled 2026-05-22 16:30
-0W / **5P** / 0L → **+$282.65/ctr total**
+**The swap that drives the improvement:**
 
-| Ticker | Close | Strikes (S/L) | Result | P&L |
+| set | n | mean_pnl | WR | median_DKL |
 |---|---|---|---|---|
-| ABT | $87.77 | 88 / 87 | PARTIAL | +$40.50 |
-| ISRG | $439.80 | 440 / 437.50 | PARTIAL | +$159.60 |
-| UPS | $98.25 | 99 / 98 | PARTIAL | −$21.50 |
-| EOG | $139.98 | 140 / 139 | PARTIAL | +$62.40 |
-| PEP | $148.85 | 149 / 148 | PARTIAL | +$41.65 |
+| G-top, DKL DROPPED | 172 | −$1.26 | 27.3% | 0.2838 (huge VRP gap = market warning) |
+| GROUND added (G missed) | 172 | +$7.16 | 51.7% | 0.0052 (IV/RV agree = clean edge) |
 
-**Settled net so far:** +$106.65/ctr (two days).
-
-### Currently held / not yet settled
-**5-22 picks** (frozen 15:45, expire Friday 5-29): MDT 79/78, F 15.50/15.00, GE 315/312.50, HD 312.50/310, USB 55/54.
-**5-26 picks** (frozen 15:40, drifted to 15:55, expire Friday 5-29): MMM 155/152.50, F 15.50/15.00, IBM 252.50/250, GM 80/79, MCD 280/277.50.
-
-(F is in both baskets — same strikes but different entry days.)
+DKL alone is uninformative (Pearson with PnL = +0.004) but the exp(-k·DKL) discount swaps 27%-WR picks for 52%-WR ones at the top tail. Full proof: `project_ground_dkl_proof.md`.
 
 ---
 
-## 7. Code changes shipped this session (2026-05-22 → 2026-05-26 evening)
+## 10. Paper follow-up notes — `paper/gepo_ground_2026.tex` (2026-07-08)
 
-### New files
-- `live/drift_frozen.py` — drift script. Includes `--drift-at` and `--frozen` (testing) args. METRIC_FIELDS constant. **Now unused** (drift cron removed) but kept for reference.
-- `live/cron_drift.sh` — wrapper. **Now unused** (removed from crontab).
-- `SESSION_HANDOFF.md` (this file).
+Do not edit yet; user wants to revisit later. Recommended tightening before treating as submission-grade:
 
-### Modified
-- `live/live_config.py` — `FREEZE_AT="15:45"`, `DRIFT_AT=None`, `IB_MKT_DATA_TYPE=1` (live).
-- `live/pull_now_parallel.sh` — freeze step writes `frozen_at="15:45"`; gate is `hour==15 && minute>=45 && ! -e $FROZEN_OUT`; parallelism bumped to `GROUP_SIZE=5, NUM_GROUPS=20`.
-- `live/cron_parallel.sh` — header comments updated.
-- `live/templates/index.html` — dropped the `ground ≥ 0.001` chip from params strip; section header now "Top 5 by GROUND rank (updates every Xs)".
-- `live/templates/history.html` — added `@{{day.frozen_at or "15:45"}}` captions under Spot, Credit, Max-Loss, GROUND %, δ short cells. `metrics_at_freeze` namespace lookup. PARTIAL badges → `badge-PARTIAL` (yellow). Backward-compatible across days with different `frozen_at` values.
-- `live/static/style.css` — reduced horizontal padding on `#page-content` by ~8px each side (mobile 20→12, desktop 32→24).
+1. **Universe / survivorship** — clarify whether S&P 100 membership is point-in-time or current/static. If current/static, acknowledge survivorship bias or add a point-in-time robustness check.
+2. **Frozen protocol / data mining** — make the 2026 out-of-time claim more defensible by stating the final feature/grid freeze date and what was not changed afterward.
+3. **Execution claim strength** — keep the midpoint argument, but soften claims based on five real combo fills. Add explicit commissions/fees assumptions if they are not already included in the reported P&L.
+4. **P/Q measure language** — soften “RV-implied triple is exactly the physical measure” and “IV triple is risk-neutral” into reduced-form/proxy language. Black-Scholes `N(d2)` with per-leg IVs is not a full arbitrage-consistent density.
+5. **Robust-preferences equivalence** — clarify that the Hansen-Sargent-style equivalence is for the transformed score `g = log(E)`, not literally the Kelly log-growth `ell`.
+6. **Add robustness table** — include a compact selector comparison: GROUND vs G-only vs DKL-only / low-DKL / raw EV / random, using identical candidate pool and fill assumptions.
 
-### Backfilled data
-- `live/frozen/2026-05-20.json` — added `metrics_at_freeze` to all 5 picks (copied existing values for the visual preview before drift went live).
-- `live/frozen/2026-05-21.json` — same.
-- `live/frozen/2026-05-26.json` — REBUILT from `ranked/2026-05-26_1540.json` after the freeze double-fire bug overwrote it with 15:55 data. Real 15:40 picks (MMM, F, IBM, GM, MCD) restored; drifted to 15:55 with correct identity matching.
-
-### Crontab (Mac)
-Final state shown in §2.
-
-### Mya deployment
-All template + frozen JSON changes pushed via `rsync` to `/opt/vito/gepo-backtest/live/...`. Flask has `TEMPLATES_AUTO_RELOAD=True`. `webapp.py` changes (not made this session) require `kill -HUP <gunicorn_master_pid>`.
-
-**Rsync gotcha (logged in memory as error #34):** when pushing multiple source files in one `rsync` invocation, use explicit per-file destination paths, NOT a single destination directory — multi-source + dest-dir flattens everything to that dir.
+Overall read: the paper's core is strong. Best empirical fact is still the identical-pipeline comparison where ungated Kelly selection loses money and the GROUND gate wins.
 
 ---
 
-## 8. User preferences (memorized — do not violate)
+## 11. Quick reference: regenerate and push
 
-These are durable instructions across sessions. The auto-memory under `/Users/mercurio/.claude/projects/-Users-mercurio-Downloads-gepo-backtest/memory/` has the full list with rationale, but in brief:
+```bash
+# Re-score from scratch (only if cache deleted)
+python3 -u report_three_sizings.py > /tmp/regen.out 2>&1
 
-1. **No em-dashes in user's files.** Use commas, parens, or rewording. Sweep prose for existing em-dashes before declaring a doc finished.
-2. **No `Co-Authored-By: Claude` in commit trailers.** Explicitly forbidden 2026-05-13.
-3. **Natural log canonical** for G, DKL, entropy, GROUND denominator (`math.exp(k·DKL)`). Switched from base 3 in 2026-05-12. Don't backslide.
-4. **Growth signal `g := ln(Kelly EV)`** — `g = ln(M − 1)` where M is wealth multiplier. **Not** classical Kelly log-growth ℓ(w*). Under this definition `Γᵢ = exp(J_k)` exactly.
-5. **Canonical config:** top-N=5, regime SPY 100d SMA, GROUND threshold 0 (rank-only), k=20 in nats, post-hoc slippage.
-6. **"OOT" in filenames = extended sample (2020-2026), NOT a clean holdout.** Strict OOS is 2025-01-01+.
-7. **Direct critique over flattery.** Trim self-congratulatory adjectives.
-8. **Bundle related changes into one PR.** Don't split refactors across multiple PRs unless they're truly independent.
-9. **Multi-location changes: extract a helper, scan all instances, apply everywhere at once.** Don't patch reactively.
-10. **Before any time-relative claim ("X hours from now", "by Y am/pm", "next Monday"), run `date` in Bash.** I have made this mistake 5+ times — errors #28, #33, #35, #36, #37 in the counter. No exceptions.
-11. **Before claiming any fact about the code/paper/output, verify by reading or running.** Current error count: **40**.
-12. **IBKR field semantics:** `close` = official 16:00 print (use for settlement), `last` = most recent trade (can include after-hours), `marketPrice()` ≈ last. Don't confuse them; the settler correctly uses `close`.
+# Push backtest JSON + frozen + ranked to Mya
+bash live/upload_to_mya.sh
 
----
+# Force gunicorn reload after webapp.py / template changes.
+# NOTE: webapp.py + templates are NOT in upload_to_mya.sh — rsync them by hand, then HUP.
+# Match the MASTER by PPID==1 (cmdline is `live.wsgi:app`). Do NOT `pkill -f gunicorn.*live.wsgi`
+# — that pattern also matches your own SSH command line and kills the session.
+ssh "$MYA_SSH_HOST" 'M=$(ps -eo pid,ppid,cmd | grep "[g]unicorn" | grep "live.wsgi" | awk "\$2==1 {print \$1}" | head -1); kill -HUP "$M"'
 
-## 9. Memory file pointers
+# Rebuild IV-rank + pool from scratch (~20 min)
+python3 -u build_production_pool.py
 
-The user's local auto-memory (not in git) at `/Users/mercurio/.claude/projects/-Users-mercurio-Downloads-gepo-backtest/memory/` contains canonical project state across sessions. Key files:
-
-- `MEMORY.md` — index of all memories
-- `user_role.md` — who the user is
-- `project_canonical_config.md` — frozen strategy config
-- `project_4_variants.md` — the 4 canonical report files (qty1, qty2, qty1-oot, qty2-oot)
-- `project_ground_v3.md` — intrinsic GROUND form
-- `project_paper_state.md` — paper status
-- `project_live_pipeline.md` — pipeline details (KEEP IN SYNC with this file)
-- `feedback_error_counter.md` — running error log, current 40
-- `feedback_holdout_vs_extended.md` — OOT terminology
-- `feedback_log_base.md` — natural log canonical
-- `feedback_growth_signal_definition.md` — g definition
-- `feedback_no_coauthor_trailer.md` — no Claude trailer
-- `feedback_systematic_approach.md` — multi-location strategy
-- `validation_checklist.md` — pre-response checklist
-- `reference_live_ticker.md` — site URL + pull script
-
-**Where this file fits:** auto-memory is local to the Mac. This `SESSION_HANDOFF.md` is in git so it survives across machines, branches, and IDE state. Auto-memory is richer for behavioral preferences; this doc is richer for the immediate operational state of the live ticker.
+# Rebuild RV table only (~30 sec)
+python3 -u build_rv_table.py
+```
 
 ---
 
-## 10. When you start the next session
+## 12. Tone
 
-1. **Read this file first.** Then `cat ~/.claude/projects/-Users-mercurio-Downloads-gepo-backtest/memory/MEMORY.md` for memory index.
-2. **Verify cron is still what §2 says:** `crontab -l`.
-3. **Verify live data is flowing:** check `live/ranked/spy_intraday.json` source field should be `"IBKR"` (not `"IBKR (delayed)"`).
-4. **Verify the latest scrape worked:** `tail -50 live/logs/parallel_pull.log` — look for `fetched N option rows` where N > 0 per group. Also confirm `live/snapshots/$(date +%F)/` has fresh parquets.
-5. **Verify Mya is serving the current frozen file** — open `https://gepo-ticker.peter.cloudmallinc.com/history` and confirm today's date appears with `frozen 15:45`.
-6. **Check the error counter** in `feedback_error_counter.md` (currently 40). Increment promptly on every new factual error.
-7. **If Friday and post-16:30:** check `live/logs/expire.log` for settlement of 5-22 and 5-26 picks. Should see 5 results per file with WIN/PARTIAL/LOSS outcomes against Friday's actual close prices.
-
----
-
-## 11. Things I explicitly DID NOT do this session
-
-- Did not commit any of the pre-existing modified files (the `git status` from session start showed M flags on ~20 files; those remain uncommitted as the user did not authorize a sweep).
-- Did not push to Mya beyond `live/templates/*.html`, `live/static/style.css`, `live/frozen/*.json`.
-- Did not modify the backtest pipeline, the paper, or any analysis scripts.
-- Did not start the repo-wide architecture visualization (user asked for it, agent failed with 401, user said "stop").
-- Did not rotate the GitHub PAT despite finding it in the git remote URL (user explicitly opted out — "I'm not doing any of that").
-- Did not delete `cron_drift.sh` or `drift_frozen.py` from disk despite removing them from the cron schedule. Kept around in case drift is re-enabled.
-- Did not test the 20-fetcher parallelism in production yet. First firing tomorrow 9:31.
-- Did not verify Friday-side post-close IB behavior post-bug-fix. Real test is Friday 5-29 at 16:30 settle.
+User is invested in GROUND (it's their invention). When proposing alternatives that REPLACE GROUND's structure, flag that clearly. When changes preserve GROUND while improving inputs (like IV-rank or rv_vs_iv DKL), they're fair game. User wants critique not flattery; verify numbers before claiming; acknowledge errors directly. Error counter remains visible — read `feedback_error_counter.md` early.

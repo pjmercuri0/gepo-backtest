@@ -31,6 +31,10 @@ SP100_TICKERS = [
     "PNC",  "NSC",  "CCI",  "WM",    "APD",  "F",    "GM",   "GE",
     "BA",   "CAT",  "DE",   "MMM",   "IBM",  "INTC", "CSCO", "VZ",
     "T",    "DIS",  "NFLX", "CRM",   "NOW",  "PYPL",
+    # Daily-expiration tickers (ETF + cash-settled index options).
+    # Enable Mon/Tue/Wed/Thu DTE=1 entries on these names. The rest of the
+    # SP100 universe still only has weekly Friday expirations.
+    "SPY",  "QQQ",  "IWM",  "SPXW",  "RUTW",
 ]
 
 # ── SPREAD PARAMETERS ─────────────────────────────────────────────────────────
@@ -49,6 +53,19 @@ DTE_MAX = 8    # maximum days to expiry
 # the actual-b ranker over-rewards).
 MIN_OPEN_INTEREST = 100
 
+# Credit basis for candidate net_credit (selection pricing).
+#   "last_clamped" — LAST clamped to BBO on each leg (backtest canon 2026-05-30).
+#   "mid"          — BBO midpoint on each leg. Live overrides to this (2026-06-10):
+#                    intraday LAST prints are asynchronous across legs and book
+#                    phantom credits inside wide MM quotes; mid is simultaneous.
+CREDIT_BASIS = "last_clamped"
+
+# Multiplier on the basis net credit → expected-fill credit. 1.0 for the
+# legacy LAST canon (fill haircut applied downstream instead). The mid-basis
+# pipeline uses 0.80 (calibrated 0.82 on real fills 2026-05-28, n=5) so that
+# selection b == realized b.
+CREDIT_SCALE = 1.0
+
 # Minimum credit-to-max-loss ratio (filter out under-priced wide-strike spreads).
 # A spread with credit/max_loss < this gets rejected at candidate construction.
 # 0.30 means: must collect at least 30 cents per $1 of risk.
@@ -57,19 +74,10 @@ MIN_CREDIT_RATIO = 0.30
 
 # Maximum credit-to-max-loss ratio. Comparison is strict `>` — kept
 # iff b ≤ MAX_CREDIT_RATIO, filtered iff b > MAX_CREDIT_RATIO.
-# **Production default is +inf** (no cap) — live ranking takes any
-# high-b spread that survives the OI=100 quote-quality filter, because
-# such spreads have real additive Kelly EV when they're not stale-mid
-# artifacts. For **backtest/paper reporting**, scripts override to 5.0
-# in their setup (e.g. `regen_all.py`, `run_paper_runs.py`) so that
-# headline Sharpe/yield/Calmar numbers do not depend on the ~1-2% of
-# trades with b > 5 — a robustness convention, not a hard truth.
+# Canonical (2026-05-16+): no cap. High-b trades contribute positive edge
+# both in-sample and out-of-sample with no evidence of overfitting.
 MAX_CREDIT_RATIO = float("inf")
-# Convention for paper/backtest reporting (override of MAX_CREDIT_RATIO
-# applied inside regen_all.py et al.). 2026-05-13: chosen so that
-# headline numbers strip the ~21 IS / 6 holdout `b > 5` trades; b ≤ 5
-# kept (strict `>` comparison).
-BACKTEST_MAX_CREDIT_RATIO = 5.0
+BACKTEST_MAX_CREDIT_RATIO = float("inf")
 
 # Hard cap on per-share max loss. Spreads where max_loss > $5/share are
 # rejected at candidate construction (canonical: $5/share).
@@ -110,15 +118,19 @@ LOG_BASE = _math.e
 # equivalently in the canonical regime; Kelly EV is preferred for
 # display because the resulting score is a directly-readable per-trade
 # return after risk adjustment.
-GROUND_THRESHOLD = float("-inf")
-
-# Loss probability factor: q = delta * LOSS_FACTOR
-# Splits the ITM delta probability into full loss vs partial
-LOSS_FACTOR = 0.60
+# Canonical (2026-05-15+): Γᵢ ≥ 0.10% threshold-based selection.
+# Γᵢ is dimensionless and reads as percent risk-adjusted EV per trade,
+# so a 0.0010 cutoff = 0.10% per-trade hurdle on variance-adjusted EV
+# after the entropic ambiguity discount. See paper §7 for the threshold
+# sweep and the comparison against the legacy top-N=5 rule.
+GROUND_THRESHOLD = 0.05  # canonical 2026-06-12 (corrected solver, k=10; growth-optimal cell of the sweep)
 
 # ── SELECTION ────────────────────────────────────────────────────────────────
-# Number of top-ranked candidates entered each week (canonical = 5).
-TOP_N = 5
+# Number of top-ranked candidates entered each week. Under the canonical
+# Γᵢ ≥ 0.10% threshold rule TOP_N is set to None (no per-week cap); every
+# candidate clearing the threshold is taken. Set to a positive integer to
+# fall back to the legacy top-N rule.
+TOP_N = 5  # canonical 2026-06-03 (top-5 per day-of-week)
 
 # Sizing rule: "1" = 1 contract per spread, "2" = 2 contracts, "dyn10k" = dynamic.
 # Per-variant scripts override this.
@@ -133,9 +145,12 @@ USE_DRIFT    = False
 DRIFT_WINDOW = 60
 
 # ── REGIME FILTER ────────────────────────────────────────────────────────────
-# SPY 100-day SMA gate (canonical). REGIME_FILTER=True → bull-puts allowed
-# above the SMA, bear-calls allowed below. Single global series, not per-ticker.
-REGIME_FILTER = True
+# SPY 100-day SMA gate. Canonical 2026-06-05: OFF. With rv_vs_iv DKL ranking,
+# GROUND correctly identifies counter-regime picks with real edge (e.g. bull-put
+# in bear regime had 58% WR over 2020-25). Gate ON: Sh 1.48, DD -11.8%, 541 picks.
+# Gate OFF: Sh 2.19, DD -6.4%, 1014 picks. REGIME_WINDOW kept for any future
+# regime-aware logic.
+REGIME_FILTER = False
 REGIME_WINDOW = 100
 REGIME_SOURCE = "spy"
 

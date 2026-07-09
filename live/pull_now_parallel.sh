@@ -8,6 +8,9 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Avoid xcrun failures from a stale inherited developer-tools path.
+unset DEVELOPER_DIR
+
 TICKERS=(
     "AAPL" "MSFT" "AMZN" "GOOGL" "TSLA" "UNH" "JNJ" "XOM" "JPM" "V"
     "PG" "MA" "NVDA" "HD" "CVX" "MRK" "ABBV" "PEP" "KO" "AVGO"
@@ -21,12 +24,12 @@ TICKERS=(
     "NFLX" "CRM" "NOW" "PYPL"
 )
 
-# Doubled from 10/10 → 5/20 on 2026-05-26 to halve total fetch wall-clock.
-# 20 IB clients (100-119) is well below the 32-client default limit.
-# If parallel_pull.log starts showing "Error 100: Max rate of messages"
-# revert to GROUP_SIZE=10, NUM_GROUPS=10.
-GROUP_SIZE=5
-NUM_GROUPS=20
+# 10 IB clients (100-109), each running its 10 tickers concurrently via
+# asyncio.gather inside fetcher.py. Per-fetcher wall clock = slowest single
+# ticker (~20s), so overall wall clock ~20-25s. Reverted from 20/5 on
+# 2026-05-27 after per-ticker async cut intra-fetcher serial cost.
+GROUP_SIZE=10
+NUM_GROUPS=10
 
 NOW="$(date '+%Y-%m-%d')"
 HHMM="$(date '+%H%M')"
@@ -34,6 +37,20 @@ DATE_DIR="live/snapshots/$NOW"
 mkdir -p "$DATE_DIR"
 
 echo "=== Parallel pull at $(date '+%Y-%m-%d %H:%M:%S') ==="
+
+# Prelude runs concurrently with the option fetchers (saves ~25s of serial
+# time). Both halves only need to finish before the RANKER: pull_from_mya
+# protects Mya-side actual_credit edits from the end-of-run upload, and the
+# SPY refresh feeds the ranker's regime/vol-gate (clientId 12; no collision
+# with fetcher clientIds 100+).
+(
+    if [ -n "${MYA_SSH_HOST:-}" ]; then
+        bash live/pull_from_mya.sh 2>&1 | sed "s/^/  [Pull] /"
+    fi
+    /usr/bin/python3 -m live.fetch_spy_intraday 2>&1 | sed "s/^/  [SPY] /"
+) &
+PRELUDE_PID=$!
+
 echo "Starting $NUM_GROUPS parallel fetchers (batch size $(python3 -c 'from live import live_config; print(live_config.FETCH_BATCH_SIZE)'))..."
 
 PIDS=()
@@ -46,6 +63,10 @@ for g in $(seq 0 $((NUM_GROUPS - 1))); do
     GROUP_FILES+=("$GROUP_OUT")
 
     (
+        # Stagger handshakes 0.5s apart: 20 simultaneous connects can time out
+        # when the Gateway (or this Mac) is loaded (14:31 2026-06-10: 14/20
+        # groups failed handshake under both-rights load + local CPU pressure).
+        sleep "$(echo "$g * 0.5" | bc)"
         echo "  [G$((g+1))] Fetching ${#GROUP_TICKERS[@]} tickers (clientId=$CLIENT_ID)..."
         python3 -m live.fetcher --tickers "${GROUP_TICKERS[@]}" \
                                 --client-id "$CLIENT_ID" \
@@ -60,10 +81,14 @@ for pid in "${PIDS[@]}"; do
 done
 echo "✓ All fetchers completed"
 
+# Prelude (Mya pull + SPY refresh) must land before the merge decision so a
+# pre-open firing (fetchers empty) can still push the fresh SPY tick to Mya.
+wait "$PRELUDE_PID" || echo "  ✗ prelude (Mya pull / SPY refresh) exited non-zero (continuing)"
+
 # Merge all per-group parquets into the canonical HHMM.parquet for the ranker.
 FINAL_OUT="$DATE_DIR/${HHMM}.parquet"
 echo "Merging group parquets into $FINAL_OUT..."
-python3 - <<PYEOF
+if ! python3 - <<PYEOF
 import sys
 from pathlib import Path
 import pandas as pd
@@ -86,24 +111,38 @@ print(f"  ✓ merged {len(existing)} files → {len(merged)} unique rows")
 for p in existing:
     p.unlink()
 PYEOF
+then
+    # Pre-open / no-data firing: ranking is impossible, but the SPY tick was
+    # refreshed by the prelude. Upload it so the site widget stays current
+    # (regression 2026-06-11: removing the standalone SPY upload left Mya
+    # serving yesterday's tick until the first post-open scan).
+    echo "  no option data (pre-open?) — uploading SPY tick only"
+    if [ -n "${MYA_SSH_HOST:-}" ]; then
+        rsync -az live/ranked/spy_intraday.json \
+            "$MYA_SSH_HOST:/opt/vito/gepo-backtest/live/ranked/spy_intraday.json" \
+            && echo "  ✓ SPY tick uploaded to Mya" \
+            || echo "  ✗ SPY tick upload failed (continuing)"
+    fi
+    exit 0
+fi
 
 echo "Running ranker..."
 python3 -m live.ranker 2>&1 | sed "s/^/  [Ranker] /"
 echo "✓ Snapshot, merge, and rankings complete"
 
-# On the dedicated 15:45 firing, freeze BEFORE the tracker so the
-# newly-frozen file gets its first mark captured in this same firing
-# (otherwise it'd wait until tomorrow and miss the rest of today).
+# Archive this scan's qualified picks + settle expired ones (Snapshots tab).
+python3 -m live.snapshot_picks 2>&1 | sed "s/^/  [Snap] /"
+
+# On the 15:01 firing, freeze BEFORE the tracker so the newly-frozen file
+# gets its first mark captured in this same firing.
 #
-# Gate: hour=15 AND minute>=45 AND today's frozen file doesn't yet exist.
-# - minute>=45 stops the 15:31 hourly pull from triggering the freeze
-#   early (only the 15:45 special firing should freeze).
-# - File-exists guard makes the step idempotent; manual reruns won't
-#   clobber an existing freeze. To force a re-freeze, delete
-#   live/frozen/$(date +%F).json first.
+# Gate: hour=15 AND today's frozen file doesn't yet exist.
+# - hour=15 alone is sufficient because the cron only fires once at hour 15
+#   (the 15:01 firing). The file-exists guard prevents re-freeze on manual
+#   reruns. To force a re-freeze, delete live/frozen/$(date +%F).json first.
 TODAY="$(date +%Y-%m-%d)"
 FROZEN_OUT="live/frozen/${TODAY}.json"
-if [ "$(date +%H)" = "15" ] && [ "$(date +%M)" -ge "45" ] && [ ! -e "$FROZEN_OUT" ]; then
+if [ "$(date +%H)" = "15" ] && [ ! -e "$FROZEN_OUT" ]; then
     echo "[freeze] writing ${FROZEN_OUT}..."
     /usr/bin/python3 - <<PYEOF
 import json
@@ -113,7 +152,7 @@ dst = Path("$FROZEN_OUT")
 dst.parent.mkdir(parents=True, exist_ok=True)
 with open(src) as f:
     d = json.load(f)
-d["frozen_at"] = "15:45"
+d["frozen_at"] = "15:01"
 d["mock"] = False
 with open(dst, "w") as f:
     json.dump(d, f, indent=2)

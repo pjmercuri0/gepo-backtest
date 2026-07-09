@@ -212,12 +212,40 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
     if short_row["OpenInterest"] < min_oi or long_row["OpenInterest"] < min_oi:
         return None
 
-    # Selection always uses mid-mid pricing. Slippage is applied as a
-    # post-hoc P&L haircut in backtest.py, so it does not contaminate
-    # filters (credit_ratio, theta_credit_ratio, etc.) or trade selection.
-    short_mid  = (short_row["BidPrice"] + short_row["AskPrice"]) / 2.0
-    long_mid   = (long_row["BidPrice"]  + long_row["AskPrice"])  / 2.0
-    net_credit = round(short_mid - long_mid, 4)
+    # Selection uses LAST-based pricing (canonical 2026-05-30, clamped 2026-05-30).
+    # LAST is the price of the most recent trade, but vendor EOD snapshots often
+    # have LAST OUTSIDE the current BBO (LAST trade happened earlier when the
+    # market was at a different level). Audit found 48.6% of picks had short
+    # LAST > short ASK, inflating credit by +$0.23/share average. Clamping LAST
+    # to [BID, ASK] caps the credit at the natural ceiling (short_ask − long_bid)
+    # — the best realistic fill at 15:01 — and floors it at the natural debit.
+    short_last_raw = float(short_row.get("LastPrice", 0) or 0)
+    long_last_raw  = float(long_row.get("LastPrice", 0) or 0)
+    short_bid_raw  = float(short_row["BidPrice"])
+    short_ask_raw  = float(short_row["AskPrice"])
+    long_bid_raw   = float(long_row["BidPrice"])
+    long_ask_raw   = float(long_row["AskPrice"])
+    short_mid_raw  = (short_bid_raw + short_ask_raw) / 2.0
+    long_mid_raw   = (long_bid_raw  + long_ask_raw)  / 2.0
+    if short_last_raw <= 0 or long_last_raw <= 0:
+        return None  # no LAST on either leg → no real market, skip
+    credit_basis = getattr(config, "CREDIT_BASIS", "last_clamped")
+    if credit_basis == "mid":
+        short_credit_basis = short_mid_raw
+        long_credit_basis  = long_mid_raw
+    else:
+        # Clamp LAST to current BBO on each leg
+        short_credit_basis = max(short_bid_raw, min(short_last_raw, short_ask_raw))
+        long_credit_basis  = max(long_bid_raw,  min(long_last_raw,  long_ask_raw))
+    # Expected-fill scaling (calibrated 2026-06-10 on real May-28 fills:
+    # fill ≈ 0.82×mid flat across tight and wide books; width-penalty model
+    # rejected — widest books filled closest to mid). 1.0 = raw basis.
+    credit_scale = getattr(config, "CREDIT_SCALE", 1.0)
+    net_credit = round(credit_scale * (short_credit_basis - long_credit_basis), 4)
+    # Mid still computed for display fields (short_mid / long_mid) and for
+    # back-compat with diagnostics that read the *_mid columns.
+    short_mid = short_mid_raw
+    long_mid  = long_mid_raw
     spread_width = round(abs(short_strike - long_strike), 4)
     max_loss     = round(spread_width - net_credit, 4)
 
@@ -269,6 +297,21 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
         "long_delta":      round(long_row["AbsDelta"], 4),
         "short_mid":       round(short_mid, 4),
         "long_mid":        round(long_mid, 4),
+        "short_bid":       round(float(short_row["BidPrice"]), 4),
+        "short_ask":       round(float(short_row["AskPrice"]), 4),
+        "long_bid":        round(float(long_row["BidPrice"]),  4),
+        "long_ask":        round(float(long_row["AskPrice"]),  4),
+        "short_last":      round(float(short_row.get("LastPrice", 0.0) or 0.0), 4),
+        "long_last":       round(float(long_row.get("LastPrice", 0.0) or 0.0), 4),
+        "short_oi":        (None if pd.isna(short_row.get("OpenInterest")) else int(short_row["OpenInterest"])),
+        "long_oi":         (None if pd.isna(long_row.get("OpenInterest"))  else int(long_row["OpenInterest"])),
+        "short_volume":    (None if "Volume" not in short_row or pd.isna(short_row.get("Volume")) else int(short_row["Volume"])),
+        "long_volume":     (None if "Volume" not in long_row  or pd.isna(long_row.get("Volume"))  else int(long_row["Volume"])),
+        # Top-of-book sizes (live snapshots only; vendor EOD data lacks them).
+        "short_bid_size":  (None if "BidSize" not in short_row or pd.isna(short_row.get("BidSize")) else int(short_row["BidSize"])),
+        "short_ask_size":  (None if "AskSize" not in short_row or pd.isna(short_row.get("AskSize")) else int(short_row["AskSize"])),
+        "long_bid_size":   (None if "BidSize" not in long_row  or pd.isna(long_row.get("BidSize"))  else int(long_row["BidSize"])),
+        "long_ask_size":   (None if "AskSize" not in long_row  or pd.isna(long_row.get("AskSize"))  else int(long_row["AskSize"])),
         "net_credit":      net_credit,
         "spread_width":    spread_width,
         "max_loss":        max_loss,
@@ -278,6 +321,13 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
         "long_theta":          round(long_theta, 4),
         "theta_credit_ratio":  round(theta_credit_ratio, 4),
         "DTE":                 dte,
+        # Pre-merged on the input df by score_year; None if not present.
+        "iv_rank_bucket":      (None if 'iv_rank_bucket' not in short_row
+                                or pd.isna(short_row.get('iv_rank_bucket'))
+                                else int(short_row['iv_rank_bucket'])),
+        "rv_30d":              (None if 'rv_30d' not in short_row
+                                or pd.isna(short_row.get('rv_30d'))
+                                else float(short_row['rv_30d'])),
     }
 
 
@@ -301,15 +351,34 @@ def calc_outcome(ep: float, sp: float, bp: float,
             return (ep - mp) / (bp - mp)
 
 
-def calc_pnl(outcome: float, net_credit: float, max_loss: float) -> float:
-    if outcome == 1.0:
-        return net_credit
-    elif outcome == -1.0:
-        return -max_loss
-    elif outcome > 0:
-        return round(net_credit * outcome, 4)
-    else:
-        return round(max_loss * outcome, 4)
+def calc_pnl(spot: float, sp: float, bp: float,
+             net_credit: float, max_loss: float,
+             spread_type: str) -> float:
+    """True piecewise-linear bull-put / bear-call spread payoff at expiry.
+
+    Replaces the old outcome-scaled formula `pnl = max_loss * outcome` /
+    `pnl = credit * outcome`, which assumed breakeven sits at the midpoint
+    between strikes. That's only correct for symmetric fills (credit =
+    width/2). With actual fills at 75%+ of mid, credit > width/2 and the
+    real breakeven is at `sp - credit` (bull-put) or `sp + credit`
+    (bear-call) — the model was misreporting partial-zone P&L.
+
+    True payoff:
+      bull-put:  pnl(spot) = clamp(credit - max(sp - spot, 0), -max_loss, credit)
+      bear-call: pnl(spot) = clamp(credit - max(spot - sp, 0), -max_loss, credit)
+    """
+    if spread_type == "bull_put":
+        if spot >= sp:
+            return float(net_credit)
+        if spot <= bp:
+            return -float(max_loss)
+        return round(float(net_credit) - (float(sp) - float(spot)), 4)
+    else:  # bear_call
+        if spot <= sp:
+            return float(net_credit)
+        if spot >= bp:
+            return -float(max_loss)
+        return round(float(net_credit) - (float(spot) - float(sp)), 4)
 
 
 def build_regime_lookup(csv_path: str, sma_window: int = 50):

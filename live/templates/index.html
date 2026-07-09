@@ -12,6 +12,8 @@
 
 <div id="spy-live"></div>
 
+<div id="holiday-banner"></div>
+
 <div id="stale-banner"></div>
 
 <div class="params-row" id="params-row"></div>
@@ -474,6 +476,23 @@ async function refresh() {
     // option rows. If the newest ranking isn't from today, the picks shown are
     // stale (e.g. a holiday-shifted expiry that returned no chains) — flag it
     // so a day-old ranking is never mistaken for live.
+    // Holiday-week banner: when this week's Friday is an NYSE holiday the
+    // weekly expiry rolls back, so the closing day is not the usual Friday.
+    const holidayEl = document.getElementById("holiday-banner");
+    if (holidayEl) {
+      const wn = data.week_notice;
+      if (wn && wn.shifted) {
+        const fmt = (iso) => new Intl.DateTimeFormat("en-US",
+          { weekday: "long", month: "short", day: "numeric", timeZone: "America/New_York" })
+          .format(new Date(iso + "T12:00:00"));
+        holidayEl.innerHTML = `<div class="week-card" style="background:#3a2a15;border:1px solid #6b5227;padding:14px;margin-bottom:18px">
+          <div style="color:#ffce8a;font-weight:600">&#9888; Short week &mdash; ${fmt(wn.nominal_friday)} is an NYSE holiday</div>
+          <div class="week-sub" style="margin-top:4px">This week's weekly options expire <strong>${fmt(wn.settlement_date)}</strong>. Close positions by ${wn.settlement_weekday}, not Friday.</div></div>`;
+      } else {
+        holidayEl.innerHTML = "";
+      }
+    }
+
     const staleEl = document.getElementById("stale-banner");
     if (staleEl) {
       const todayET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());

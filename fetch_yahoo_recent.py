@@ -22,6 +22,7 @@ import pandas as pd
 OUT = Path("data/daily_bars_yahoo")
 ALIAS = {"SPXW": "^SPX", "RUTW": "^RUT"}
 LOOKBACK_DAYS = 30
+FINAL_BAR_HOUR_ET = 17
 
 
 def _fetch(sym: str, p1: int, p2: int) -> pd.DataFrame | None:
@@ -39,17 +40,26 @@ def _fetch(sym: str, p1: int, p2: int) -> pd.DataFrame | None:
     return out[["date", "open", "high", "low", "close"]]
 
 
+def _incomplete_date_to_skip(now_utc: datetime) -> str | None:
+    """Yahoo's current daily bar is intraday until after the close buffer."""
+    now_et = pd.Timestamp(now_utc).tz_convert("America/New_York")
+    if now_et.hour < FINAL_BAR_HOUR_ET:
+        return str(now_et.date())
+    return None
+
+
 def main() -> None:
     now = datetime.now(timezone.utc)
     p1 = int((now - timedelta(days=LOOKBACK_DAYS)).timestamp())
     p2 = int((now + timedelta(days=1)).timestamp())
+    skip_date = _incomplete_date_to_skip(now)
 
     paths = sorted(OUT.glob("*.csv"))
     if not paths:
         print(f"[fetch_yahoo_recent] no existing CSVs in {OUT} — nothing to refresh")
         return
 
-    added, unchanged, fail = 0, 0, []
+    added, unchanged, corrected, fail = 0, 0, 0, []
     for path in paths:
         ticker = path.stem
         sym = ALIAS.get(ticker, ticker)
@@ -64,21 +74,34 @@ def main() -> None:
             unchanged += 1
             time.sleep(0.7)
             continue
+        if skip_date:
+            fresh = fresh[fresh["date"] != skip_date]
         existing = pd.read_csv(path, dtype={"date": str})
+        dropped_existing = 0
+        if skip_date and "date" in existing.columns:
+            is_incomplete = existing["date"].astype(str).eq(skip_date)
+            dropped_existing = int(is_incomplete.sum())
+            if dropped_existing:
+                existing = existing.loc[~is_incomplete].copy()
         before = set(existing["date"])
         merged = (pd.concat([existing, fresh], ignore_index=True)
                   .drop_duplicates(subset=["date"], keep="first")
                   .sort_values("date"))
         new_dates = sorted(set(merged["date"]) - before)
-        if new_dates:
+        if new_dates or dropped_existing:
             merged.to_csv(path, index=False)
-            added += 1
-            print(f"{ticker}: +{len(new_dates)} dates ({new_dates[0]}..{new_dates[-1]})", flush=True)
+            if new_dates:
+                added += 1
+                print(f"{ticker}: +{len(new_dates)} dates ({new_dates[0]}..{new_dates[-1]})", flush=True)
+            if dropped_existing:
+                corrected += 1
+                print(f"{ticker}: dropped incomplete {skip_date} bar", flush=True)
         else:
             unchanged += 1
         time.sleep(0.7)
 
-    print(f"\ndone: {added} updated, {unchanged} already current, failed: {fail}")
+    print(f"\ndone: {added} updated, {unchanged} already current, "
+          f"{corrected} corrected, failed: {fail}")
 
 
 if __name__ == "__main__":

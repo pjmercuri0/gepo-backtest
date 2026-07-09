@@ -5,7 +5,7 @@
 <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">Intraday Snapshot Picks</h1>
 <div class="subtitle">Every :01/:31 scan's threshold-qualified top-5, settled at expiry
 (entry 0.80&times;mid, partial-WIN at 50% intrinsic — same P&amp;L model as the backtest).
-Question under test: does thr=0.07 pick well at any time of day, or only near the close?</div>
+Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or only near the close?</div>
 
 <div class="section-label">Performance by scan time of day (settled picks only)</div>
 <div class="week-card">
@@ -42,7 +42,12 @@ Question under test: does thr=0.07 pick well at any time of day, or only near th
   <div class="week-title">{{ d.date }}</div>
   {% for scan in d.scans|reverse %}
   <div style="margin-top:10px">
-    <div class="week-sub">scan {{ scan.hhmm[:2] }}:{{ scan.hhmm[2:] }} · {{ scan.picks|length }} qualified</div>
+    <div class="week-sub">
+      scan {{ scan.hhmm_actual[:2] }}:{{ scan.hhmm_actual[2:] }} · {{ scan.picks|length }} qualified
+      {% if scan.hhmm_actual != scan.hhmm_round %}
+        <span style="color:#888780">(bucket {{ scan.hhmm_round[:2] }}:{{ scan.hhmm_round[2:] }})</span>
+      {% endif %}
+    </div>
     {% if scan.picks %}
     <div class="table-scroll">
     <table>

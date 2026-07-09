@@ -30,10 +30,10 @@ import config as backtest_config
 from live import live_config
 from live.regime import current_regime
 
-# Canonical k mirror. Source of truth is DKL_K but mock_data is
+# Canonical k mirror. Source of truth is ground.DKL_K but mock_data is
 # kept self-contained (no import of ground) so it runs on hosts that
 # don't have the full backtest dependency tree.
-DKL_K = 20.0
+DKL_K = 12.0  # canonical 2026-06-10 (mirror of ground.DKL_K)
 
 
 # Plausible spot prices for SP100 names (approximate, May 2026 ballpark).
@@ -170,7 +170,7 @@ def _gen_spread(rng: random.Random, ticker: str, spot: float, entry_date: date,
         sum(x * _m.log(x / _u) for x in (p, ro, q) if x > 0),
         5,
     )
-    k = DKL_K  # canonical k = 20 in nats
+    k = DKL_K  # canonical k = 12 in nats (2026-06-10)
 
     # Canonical GROUND (2026-05-13+): Γᵢ = Kelly EV · exp(−k·DKL) where
     # E := exp(ℓ(w*)) − 1. Under Choice B, g := ln E so Γᵢ = exp(g − k·DKL).
@@ -310,15 +310,19 @@ def populate_mock():
 
     # 1. Latest "live" snapshot — current timestamp.
     latest = _build_payload(today, n_candidates=28, seed=int(today.timestamp()) % 100000)
+    latest["mock"] = True
     _atomic_write_json(Path(live_config.RANKED_DIR) / "latest.json", latest)
     print(f"wrote live/ranked/latest.json ({latest['n_candidates']} candidates)")
 
     # 2. Frozen daily snapshots for the last 7 weekdays. Each frozen snapshot
-    # is timestamped at 15:45 of that day.
+    # is timestamped at 15:45 of that day. Marked mock=True so the History
+    # tab greys them out — distinguishing them from real freezes produced
+    # by cron_parallel.sh after OPRA-via-API went live (2026-05-20+).
     for i, d in enumerate(_previous_weekdays(today.date(), 7)):
         ts = datetime.combine(d, datetime.strptime("15:45", "%H:%M").time())
         payload = _build_payload(ts, n_candidates=15, seed=i * 17 + 9001)
         payload["frozen_at"] = "15:45"
+        payload["mock"]      = True
         out = Path(live_config.FROZEN_DIR) / f"{d.isoformat()}.json"
         _atomic_write_json(out, payload)
         print(f"wrote {out.relative_to(ROOT)} ({len(payload['top_picks'])} picks)")

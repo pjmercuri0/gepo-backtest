@@ -1,5 +1,9 @@
 /data/
 /output/
+analysis/output/
+old_data/
+preprocess_archive/
+saved_versions/
 # Big parquet snapshots stay local. Small CSV/HTML summaries commit.
 live/data/scored/*/*.parquet
 live/data/opra/
@@ -10,3 +14,13 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+texput.log
+paper/**/*.aux
+paper/**/*.bbl
+paper/**/*.blg
+paper/**/*.log
+paper/**/*.out
+paper/**/*.pdf
+paper/**/.Rhistory
+paper/**/texput.log
+paper/**/missfont.log

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Backtest with top_n=None to get all per-ticker-per-week picks, then
 plot GROUND vs P&L across the full candidate distribution.
 
@@ -111,6 +112,25 @@ def main() -> int:
     decile_out = os.path.join(config.OUTPUT_DIR, "ground_vs_pnl_decile.csv")
     decile_stats.round(4).to_csv(decile_out)
     print(f"Saved {decile_out}")
+
+    # Split deciles: in-sample (2020-2024) vs holdout (2025-2026)
+    tr["entry_date"] = pd.to_datetime(tr["entry_date"])
+    is_mask = tr["entry_date"] < pd.Timestamp("2025-01-01")
+    for label, mask in [("is", is_mask), ("oos", ~is_mask)]:
+        sub = tr[mask].copy()
+        if sub.empty:
+            continue
+        sub["decile"] = pd.qcut(sub["exp_J"], q=10, labels=False, duplicates="drop")
+        sub_stats = sub.groupby("decile").agg(
+            mean_yield=("yield_pct", "mean"),
+            win_rate=("result", lambda r: (r == "WIN").mean() * 100),
+            n=("yield_pct", "count"),
+            mean_ground=("exp_J", "mean"),
+        )
+        sp_sub = sub["exp_J"].corr(sub["yield_pct"], method="spearman")
+        sub_path = os.path.join(config.OUTPUT_DIR, f"ground_vs_pnl_decile_{label}.csv")
+        sub_stats.round(4).to_csv(sub_path)
+        print(f"Saved {sub_path}  (n={len(sub):,}, Spearman ρ={sp_sub:+.3f})")
 
     tr["pnl_dollars"] = tr["pnl_per_contract"] * 100  # qty=1 throughout
 

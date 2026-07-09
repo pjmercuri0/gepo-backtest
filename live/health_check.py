@@ -41,14 +41,15 @@ from live import live_config
 SPY_PATH         = Path(live_config.RANKED_DIR) / "spy_intraday.json"
 NOTIFICATIONS    = Path(live_config.NOTIFICATIONS_DIR)
 LOG_PATH         = Path(live_config.LOGS_DIR) / "health.log"
-STALE_THRESHOLD_MIN = 30
+STALE_THRESHOLD_MIN = 60
 
 
-# Market hours (US Eastern). The cron schedule already restricts to 9-16
+# Market hours (US Eastern). The cron schedule already restricts to 10-17
 # weekday, but we double-check here so a misconfigured cron entry doesn't
-# spam overnight.
+# spam overnight. 17:15 cushion lets the 17:00 health check still alert
+# on a failed 16:45 parallel firing.
 MARKET_OPEN  = dtime(hour=9,  minute=30)
-MARKET_CLOSE = dtime(hour=16, minute=15)   # allow 15-min cushion after close
+MARKET_CLOSE = dtime(hour=17, minute=15)
 
 
 def _in_market_hours(now: datetime) -> bool:
