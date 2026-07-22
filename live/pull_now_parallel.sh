@@ -24,12 +24,12 @@ TICKERS=(
     "NFLX" "CRM" "NOW" "PYPL"
 )
 
-# 10 IB clients (100-109), each running its 10 tickers concurrently via
-# asyncio.gather inside fetcher.py. Per-fetcher wall clock = slowest single
-# ticker (~20s), so overall wall clock ~20-25s. Reverted from 20/5 on
-# 2026-05-27 after per-ticker async cut intra-fetcher serial cost.
-GROUP_SIZE=10
-NUM_GROUPS=10
+# Eight IB clients (100-107), each running its tickers concurrently via
+# asyncio.gather inside fetcher.py. This keeps groups smaller/faster than the
+# conservative 6-client setting while staying below the old 10-client burst
+# that repeatedly timed out during Gateway's account/execution-sync handshake.
+GROUP_SIZE=12
+NUM_GROUPS=8
 
 NOW="$(date '+%Y-%m-%d')"
 HHMM="$(date '+%H%M')"
@@ -38,16 +38,13 @@ mkdir -p "$DATE_DIR"
 
 echo "=== Parallel pull at $(date '+%Y-%m-%d %H:%M:%S') ==="
 
-# Prelude runs concurrently with the option fetchers (saves ~25s of serial
-# time). Both halves only need to finish before the RANKER: pull_from_mya
-# protects Mya-side actual_credit edits from the end-of-run upload, and the
-# SPY refresh feeds the ranker's regime/vol-gate (clientId 12; no collision
-# with fetcher clientIds 100+).
+# Pull Mya-side edits while the option fetchers run. The separate SPY IBKR
+# connection runs after all option clients disconnect so it cannot overload
+# Gateway during its connection handshake.
 (
     if [ -n "${MYA_SSH_HOST:-}" ]; then
         bash live/pull_from_mya.sh 2>&1 | sed "s/^/  [Pull] /"
     fi
-    /usr/bin/python3 -m live.fetch_spy_intraday 2>&1 | sed "s/^/  [SPY] /"
 ) &
 PRELUDE_PID=$!
 
@@ -63,10 +60,10 @@ for g in $(seq 0 $((NUM_GROUPS - 1))); do
     GROUP_FILES+=("$GROUP_OUT")
 
     (
-        # Stagger handshakes 0.5s apart: 20 simultaneous connects can time out
-        # when the Gateway (or this Mac) is loaded (14:31 2026-06-10: 14/20
-        # groups failed handshake under both-rights load + local CPU pressure).
-        sleep "$(echo "$g * 0.5" | bc)"
+        # Gateway has repeatedly timed out during bursty client initialization.
+        # Stagger eight sessions enough to avoid synchronized account/execution
+        # syncs while keeping the run materially faster than the 6-client mode.
+        sleep "$(python3 -c "print($g * 1.5)")"
         echo "  [G$((g+1))] Fetching ${#GROUP_TICKERS[@]} tickers (clientId=$CLIENT_ID)..."
         python3 -m live.fetcher --tickers "${GROUP_TICKERS[@]}" \
                                 --client-id "$CLIENT_ID" \
@@ -81,9 +78,40 @@ for pid in "${PIDS[@]}"; do
 done
 echo "✓ All fetchers completed"
 
-# Prelude (Mya pull + SPY refresh) must land before the merge decision so a
-# pre-open firing (fetchers empty) can still push the fresh SPY tick to Mya.
-wait "$PRELUDE_PID" || echo "  ✗ prelude (Mya pull / SPY refresh) exited non-zero (continuing)"
+# Mya-side actual-credit edits must land before the upload at the end of run.
+wait "$PRELUDE_PID" || echo "  ✗ Mya pull exited non-zero (continuing)"
+
+# This uses its own IBKR connection. Run it only after the option sessions
+# exit, rather than competing with their Gateway initialization.
+#
+# HARD WATCHDOG: a wedged SPY connection (Gateway accepts the socket but never
+# delivers a quote — seen 2026-07-16 and 2026-07-22) has no internal timeout on
+# the blocking connect/reqTickers/reqHistoricalData calls, so it used to hang
+# here indefinitely, holding cron_parallel.lock and making every later scan
+# SKIP until a manual kill. Run it in the background with a wall-clock kill so a
+# stuck fetch can never block the merge/rank/upload steps below. On timeout we
+# proceed with the last valid tick (fetch_spy_intraday preserves it on failure).
+SPY_TIMEOUT="${SPY_FETCH_TIMEOUT:-90}"
+SPY_LOG="$(mktemp -t gepo_spy)"
+echo "Refreshing SPY intraday tick (hard timeout ${SPY_TIMEOUT}s)..."
+/usr/bin/python3 -m live.fetch_spy_intraday > "$SPY_LOG" 2>&1 &
+SPY_PID=$!
+(
+    sleep "$SPY_TIMEOUT"
+    if kill -0 "$SPY_PID" 2>/dev/null; then
+        echo "watchdog: SPY fetch exceeded ${SPY_TIMEOUT}s — killing pid $SPY_PID" >> "$SPY_LOG"
+        kill -TERM "$SPY_PID" 2>/dev/null || true
+        sleep 3
+        kill -KILL "$SPY_PID" 2>/dev/null || true
+    fi
+) &
+SPY_WATCH_PID=$!
+wait "$SPY_PID" 2>/dev/null || echo "  ✗ SPY refresh failed or timed out (continuing with last valid tick)"
+# Stop the watchdog early if the fetch already returned, then reap it.
+kill -TERM "$SPY_WATCH_PID" 2>/dev/null || true
+wait "$SPY_WATCH_PID" 2>/dev/null || true
+sed "s/^/  [SPY] /" "$SPY_LOG" 2>/dev/null || true
+rm -f "$SPY_LOG"
 
 # Merge all per-group parquets into the canonical HHMM.parquet for the ranker.
 FINAL_OUT="$DATE_DIR/${HHMM}.parquet"
@@ -133,31 +161,10 @@ echo "✓ Snapshot, merge, and rankings complete"
 # Archive this scan's qualified picks + settle expired ones (Snapshots tab).
 python3 -m live.snapshot_picks 2>&1 | sed "s/^/  [Snap] /"
 
-# On the 15:01 firing, freeze BEFORE the tracker so the newly-frozen file
-# gets its first mark captured in this same firing.
-#
-# Gate: hour=15 AND today's frozen file doesn't yet exist.
-# - hour=15 alone is sufficient because the cron only fires once at hour 15
-#   (the 15:01 firing). The file-exists guard prevents re-freeze on manual
-#   reruns. To force a re-freeze, delete live/frozen/$(date +%F).json first.
-TODAY="$(date +%Y-%m-%d)"
-FROZEN_OUT="live/frozen/${TODAY}.json"
-if [ "$(date +%H)" = "15" ] && [ ! -e "$FROZEN_OUT" ]; then
-    echo "[freeze] writing ${FROZEN_OUT}..."
-    /usr/bin/python3 - <<PYEOF
-import json
-from pathlib import Path
-src = Path("live/ranked/latest.json")
-dst = Path("$FROZEN_OUT")
-dst.parent.mkdir(parents=True, exist_ok=True)
-with open(src) as f:
-    d = json.load(f)
-d["frozen_at"] = "15:01"
-d["mock"] = False
-with open(dst, "w") as f:
-    json.dump(d, f, indent=2)
-print(f"  ✓ froze {dst} ({len(d.get('top_picks', []))} picks)")
-PYEOF
+# Freeze during 15:xx. If 15:01 is blank, the 15:31 scan can replace it with
+# real picks; if 15:01 has picks, it is kept.
+if [ "$(date +%H)" = "15" ]; then
+    /usr/bin/python3 -m live.freeze_snapshot 2>&1 | sed "s/^/  /"
 fi
 
 # Update MTM tracking on all active frozen files using the parquet we
