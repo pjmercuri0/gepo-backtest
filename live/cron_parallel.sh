@@ -29,9 +29,12 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
 
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
-  echo "[1/2] Parallel option pull (Mya-edits pull + SPY refresh run inside,"
+  echo "Parallel option pull (Mya-edits pull + SPY refresh run inside,"
   echo "      concurrent with fetchers; incl. 15:01 freeze + tracker + Mya upload)..."
   bash live/pull_now_parallel.sh
-  echo "[2/2] Empirical pool refresh (idempotent; no-op if no new vendor data)..."
-  /usr/bin/python3 monthly_pool_refresh.py 2>&1 | sed "s/^/  [Pool] /"
+  # Empirical pool refresh moved OUT of the per-scan path (2026-07-27). It is a
+  # weekly-by-design job: monthly_pool_refresh.py reprocesses ~25M vendor CSV
+  # rows and rewrites the 15.6M-row master pool. ITM outcomes only resolve at
+  # Friday expiry, so running it on every :01/:31 scan cooked the CPU 16x/day
+  # for zero benefit. Now scheduled weekly via cron_pool_refresh.sh (Fri 17:31).
 } >> "$LOG" 2>&1
