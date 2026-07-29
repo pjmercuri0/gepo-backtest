@@ -1,10 +1,22 @@
 #!/usr/bin/env bash
-# Sunday 15:01 ET — refresh master_pool.parquet from current-month vendor folder.
-# Picks up any DG_YYYYMonth/ CSVs uploaded since last refresh.
+# Friday 17:31 ET — refresh master_pool.parquet from the current-month vendor
+# folder, after the 17:01 daily-bars/calendar jobs and this week's Friday expiry
+# (ITM outcomes only resolve at Friday close). Picks up any DG_YYYYMonth/ CSVs
+# uploaded since last refresh. Friday chosen so the Mac is actually awake.
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
 
+# Cron/launchd can inherit a stale DEVELOPER_DIR pointing at a removed Xcode
+# app, which makes Apple's /usr/bin/python3 fail via xcrun before our code runs.
+unset DEVELOPER_DIR
+
 [ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
+
+# Hold the Mac awake for the pool rebuild (~25M CSV rows → 5-10 min). caffeinate
+# self-terminates after 900s. It cannot WAKE a sleeping Mac, only keep an awake
+# one from sleeping — see the pmset note in SESSION_HANDOFF if Friday-evening
+# sleep ever causes a miss.
+/usr/bin/caffeinate -i -t 900 &
 
 LOG=live/logs/pool_refresh.log
 {
