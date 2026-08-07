@@ -34,7 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from live import live_config
+from live import credit_basis, live_config
 
 try:
     from ib_insync import IB, Option, Stock
@@ -125,8 +125,11 @@ def _fetch_pick(ib: IB, pick: dict) -> dict | None:
     short_mid = (s_bid + s_ask) / 2.0
     long_mid  = (l_bid + l_ask) / 2.0
     current_mark = round(short_mid - long_mid, 4)
-    entry_credit = float(pick.get("net_credit") or 0)
-    max_loss     = float(pick.get("max_loss") or 0)
+    # Canonical shared basis (actual_credit > 0.80×MID). Was the RAW stored
+    # net_credit with no fill haircut, which overstated P&L against every
+    # other surface.
+    entry_credit = credit_basis.entry_credit(pick)
+    max_loss     = round(credit_basis.spread_width(pick) - entry_credit, 4)
     pnl_per_contract = round((entry_credit - current_mark) * 100, 2)
     pct_realized = round(((entry_credit - current_mark) / entry_credit) * 100, 2) \
         if entry_credit > 0 else 0.0

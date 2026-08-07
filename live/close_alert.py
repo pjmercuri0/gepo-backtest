@@ -18,7 +18,7 @@ Usage:
   python3 -m live.close_alert --safe-cushion 0.005  # restore old 0.5% policy
 """
 from __future__ import annotations
-import argparse, json, os, sys, tempfile
+import argparse, json, os, sys, tempfile, time
 from datetime import datetime, date
 from pathlib import Path
 
@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from live import live_config
+from live import credit_basis, live_config
 
 try:
     from ib_insync import IB, Option, Stock
@@ -42,6 +42,36 @@ except ImportError as e:
 # 99 = effectively infinite; no cushion clears it → every pick is MUST_CLOSE.
 # Drop to 0.005 (0.5%) or similar to re-enable selective SAFE_EXPIRE.
 DEFAULT_SAFE_CUSHION_PCT = 99.0
+
+
+def _connect_ib_with_retries(client_id: int) -> IB:
+    last_error = None
+    for attempt in range(1, live_config.IB_CONNECT_ATTEMPTS + 1):
+        ib = IB()
+        try:
+            ib.connect(
+                live_config.IB_HOST,
+                live_config.IB_PORT,
+                clientId=client_id,
+                timeout=live_config.IB_CONNECT_TIMEOUT,
+            )
+            return ib
+        except Exception as error:
+            last_error = error
+            ib.disconnect()
+            if attempt == live_config.IB_CONNECT_ATTEMPTS:
+                break
+            delay = live_config.IB_CONNECT_RETRY_DELAY * attempt
+            print(
+                f"  IB connection attempt {attempt}/{live_config.IB_CONNECT_ATTEMPTS} "
+                f"failed ({error.__class__.__name__}); retrying in {delay}s",
+                flush=True,
+            )
+            time.sleep(delay)
+    raise RuntimeError(
+        f"IB Gateway connection failed after {live_config.IB_CONNECT_ATTEMPTS} "
+        f"attempts (clientId={client_id})"
+    ) from last_error
 
 
 def _right_for(spread_type: str) -> str:
@@ -141,29 +171,11 @@ def _fetch_close_prices(ib: IB, pick: dict) -> dict | None:
     # overpay vs the immediate-fill price for tight bid-ask spreads.
     rec_debit     = min(1.25 * mid_debit, natural_debit)
 
-    # Entry-credit basis when no actual_credit recorded: 0.85×LAST else
-    # 0.80×MID (matches webapp._enrich_pick + track_frozen + expire_frozen).
-    if pick.get("actual_credit") is not None:
-        actual_credit = float(pick["actual_credit"])
-    else:
-        nc = float(pick.get("net_credit") or 0)
-        ml = float(pick.get("max_loss") or 0)
-        spread_w = nc + ml
-        sl = pick.get("short_last"); ll = pick.get("long_last")
-        if sl and ll and sl > 0 and ll > 0:
-            # Clamp LAST to [BID, ASK] per leg + cap at spread_width.
-            psb = pick.get("short_bid"); psa = pick.get("short_ask")
-            plb = pick.get("long_bid");  pla = pick.get("long_ask")
-            sl_eff = float(sl); ll_eff = float(ll)
-            if psb is not None and psa is not None:
-                sl_eff = max(float(psb), min(sl_eff, float(psa)))
-            if plb is not None and pla is not None:
-                ll_eff = max(float(plb), min(ll_eff, float(pla)))
-            raw = max(sl_eff - ll_eff, 0.0)
-            actual_credit = min(raw, spread_w) * 0.85
-        else:
-            actual_credit = nc * 0.80
-        actual_credit = min(actual_credit, spread_w)
+    # Entry-credit basis: canonical shared basis (actual_credit > 0.80×MID).
+    # Was 0.85×LAST here — stale on both the fraction and the basis after
+    # webapp._enrich_pick and expire_frozen moved to mid (canon 2026-06-10),
+    # which made close-alert P&L disagree with the History tab.
+    actual_credit = credit_basis.entry_credit(pick)
     pnl_now = round((float(actual_credit) - rec_debit) * 100, 2)
 
     return {
@@ -214,9 +226,8 @@ def main() -> int:
 
     print(f"Generating close alerts for {len(expiring)} expiring frozen file(s)...", flush=True)
 
-    ib = IB()
     try:
-        ib.connect(live_config.IB_HOST, live_config.IB_PORT, clientId=args.client_id)
+        ib = _connect_ib_with_retries(args.client_id)
     except Exception as e:
         print(f"  ✗ IB connect failed: {e}", flush=True)
         return 1
