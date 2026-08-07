@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from live import live_config
+from live import credit_basis, live_config
 
 
 def _is_active(payload: dict) -> bool:
@@ -150,19 +150,8 @@ def _track_pick(df: pd.DataFrame, pick: dict, existing_rows: list = None) -> dic
         spread_w   = mid_credit + mid_ml
         current_mark = min(max(0.0, short_intr - long_intr), spread_w)
 
-        # Entry credit (same priority as the main path: actual_credit > 0.85×freeze-LAST > 0.80×MID)
-        psl = pick.get("short_last"); pll = pick.get("long_last")
-        if psl and pll and psl > 0 and pll > 0:
-            psb = pick.get("short_bid"); psa = pick.get("short_ask")
-            plb = pick.get("long_bid");  pla = pick.get("long_ask")
-            psl_eff = float(psl); pll_eff = float(pll)
-            if psb is not None and psa is not None:
-                psl_eff = max(float(psb), min(psl_eff, float(psa)))
-            if plb is not None and pla is not None:
-                pll_eff = max(float(plb), min(pll_eff, float(pla)))
-            entry_credit = round(min(max(psl_eff - pll_eff, 0.0), spread_w) * LAST_PCT, 4)
-        else:
-            entry_credit = round(mid_credit * MID_FALLBACK_PCT, 4)
+        # Entry credit: canonical shared basis (actual_credit > 0.80×MID).
+        entry_credit = credit_basis.entry_credit(pick)
         max_loss = round(spread_w - entry_credit, 4)
         pnl_per_contract = round((entry_credit - current_mark) * 100, 2)
         pct_realized = round(((entry_credit - current_mark) / entry_credit) * 100, 2) \
@@ -206,22 +195,12 @@ def _track_pick(df: pd.DataFrame, pick: dict, existing_rows: list = None) -> dic
     current_mark = round(min(bs_debit, spread_w), 4)
     mark_basis = "BS_theo"
 
-    # Entry basis: prefer frozen-pick short_last/long_last (clamped to that
-    # row's bid/ask from freeze-time), fall back to 0.80×MID.
-    psl = pick.get("short_last"); pll = pick.get("long_last")
-    if psl and pll and psl > 0 and pll > 0:
-        psb = pick.get("short_bid"); psa = pick.get("short_ask")
-        plb = pick.get("long_bid");  pla = pick.get("long_ask")
-        psl_eff = float(psl); pll_eff = float(pll)
-        if psb is not None and psa is not None:
-            psl_eff = max(float(psb), min(psl_eff, float(psa)))
-        if plb is not None and pla is not None:
-            pll_eff = max(float(plb), min(pll_eff, float(pla)))
-        raw_e = max(psl_eff - pll_eff, 0.0)
-        entry_credit = round(min(raw_e, spread_w) * LAST_PCT, 4)
-    else:
-        entry_credit = round(mid_credit * MID_FALLBACK_PCT, 4)
-    entry_credit = min(entry_credit, round(spread_w, 4))
+    # Entry basis: canonical shared basis (actual_credit > 0.80×MID). The old
+    # LAST-preferred basis disagreed with webapp/expire_frozen — e.g. BLK
+    # 1140/1145 on 2026-08-04 reported entry 4.00 (P&L +$400) here vs the
+    # canonical 2.36 (+$236) on the site, because its LAST credit (5.45)
+    # exceeded the 5.00 spread width and clamped to it.
+    entry_credit = credit_basis.entry_credit(pick)
     max_loss     = round(spread_w - entry_credit, 4)
     pnl_per_contract = round((entry_credit - current_mark) * 100, 2)
     pct_realized = round(((entry_credit - current_mark) / entry_credit) * 100, 2) \
