@@ -14,7 +14,7 @@
             {{ day.date }}{% if day.date_dow %} <span style="color:#888780;font-weight:normal">{{ day.date_dow }}</span>{% endif %}
             {% if day.mock %}<span style="font-size:11px;padding:1px 6px;border:1px solid #888;border-radius:3px;margin-left:8px;vertical-align:middle">MOCK</span>{% endif %}
           </div>
-          <div class="week-sub">frozen {{ day.frozen_at or "—" }}{% if day.last_updated_ts %} · updated <span id="ut-{{ loop.index0 }}" data-ts="{{ day.last_updated_ts }}">…</span>{% endif %}</div>
+          <div class="week-sub">frozen {{ day.frozen_at or "—" }}{% if day.freeze_topup_added_count %} · +{{ day.freeze_topup_added_count }} from {{ day.freeze_topup_at }}{% endif %}{% if day.last_updated_ts %} · updated <span id="ut-{{ loop.index0 }}" data-ts="{{ day.last_updated_ts }}">…</span>{% endif %}</div>
           {# Regime/SPY line removed 2026-06-09: gate is OFF, both directions
              eligible. Per-pick direction is shown in the ticker cell instead. #}
           {% if day.vol_gate and day.vol_gate.rv_20 is not none %}
@@ -84,7 +84,13 @@
         <tbody>
         {% for p in day.top_picks %}
           {% set tk = p.ticker %}
-          {% set outcome_row = (day.outcome.results[tk] if day.outcome and day.outcome.results and tk in day.outcome.results else None) %}
+          {# outcome.results is keyed by TICKER, so a day holding the same name twice
+             collapsed to one entry and showed the wrong per-row WIN/LOSS (2026-06-15:
+             DE and ISRG each appeared in both directions). Prefer the index-aligned
+             per-pick list when present; fall back to the ticker lookup otherwise. #}
+          {% set rbp = (day.outcome.results_by_pick if day.outcome and day.outcome.results_by_pick else None) %}
+          {% set outcome_row = (rbp[loop.index0] if rbp and rbp|length > loop.index0
+                                else (day.outcome.results[tk] if day.outcome and day.outcome.results and tk in day.outcome.results else None)) %}
           {% set track_arr = (day.tracking[tk] if day.tracking and tk in day.tracking else []) %}
           {% set last_track = (track_arr[-1] if track_arr else None) %}
           {# Latest tracking row that has a spread option mark (for the
@@ -95,6 +101,7 @@
           <tr{% if last_track and last_track.get('assignment_risk') %} class="assignment-risk"{% endif %}>
             <td>{{ loop.index }}</td>
             <td class="fw">{{ tk }}
+              {% if p.freeze_added_at %}<span style="font-size:10px;color:#e8b366;margin-left:6px" title="added from later freeze snapshot">+{{ p.freeze_added_at }}</span>{% endif %}
               {%- set sv = p.short_volume|default(none) -%}
               {%- set lv = p.long_volume|default(none) -%}
               {% if p.spread_type == 'bull_put' %}
