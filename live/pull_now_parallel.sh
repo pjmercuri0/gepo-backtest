@@ -8,8 +8,7 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-# Avoid xcrun failures from a stale inherited developer-tools path.
-unset DEVELOPER_DIR
+[ -f live/cron_env.sh ] && . live/cron_env.sh
 
 TICKERS=(
     "AAPL" "MSFT" "AMZN" "GOOGL" "TSLA" "UNH" "JNJ" "XOM" "JPM" "V"
@@ -48,7 +47,8 @@ echo "=== Parallel pull at $(date '+%Y-%m-%d %H:%M:%S') ==="
 ) &
 PRELUDE_PID=$!
 
-echo "Starting $NUM_GROUPS parallel fetchers (batch size $(python3 -c 'from live import live_config; print(live_config.FETCH_BATCH_SIZE)'))..."
+FETCH_BATCH_SIZE="$("${GEPO_PYTHON:-python3}" -c 'from live import live_config; print(live_config.FETCH_BATCH_SIZE)')"
+echo "Starting $NUM_GROUPS parallel fetchers (batch size $FETCH_BATCH_SIZE)..."
 
 PIDS=()
 GROUP_FILES=()
@@ -63,9 +63,10 @@ for g in $(seq 0 $((NUM_GROUPS - 1))); do
         # Gateway has repeatedly timed out during bursty client initialization.
         # Stagger eight sessions enough to avoid synchronized account/execution
         # syncs while keeping the run materially faster than the 6-client mode.
-        sleep "$(python3 -c "print($g * 1.5)")"
+        STAGGER="$("${GEPO_PYTHON:-python3}" -c "print($g * 1.5)")"
+        sleep "$STAGGER"
         echo "  [G$((g+1))] Fetching ${#GROUP_TICKERS[@]} tickers (clientId=$CLIENT_ID)..."
-        python3 -m live.fetcher --tickers "${GROUP_TICKERS[@]}" \
+        "${GEPO_PYTHON:-python3}" -m live.fetcher --tickers "${GROUP_TICKERS[@]}" \
                                 --client-id "$CLIENT_ID" \
                                 --out "$GROUP_OUT" 2>&1 | sed "s/^/  [G$((g+1))] /"
     ) &
@@ -94,7 +95,7 @@ wait "$PRELUDE_PID" || echo "  ✗ Mya pull exited non-zero (continuing)"
 SPY_TIMEOUT="${SPY_FETCH_TIMEOUT:-90}"
 SPY_LOG="$(mktemp -t gepo_spy)"
 echo "Refreshing SPY intraday tick (hard timeout ${SPY_TIMEOUT}s)..."
-/usr/bin/python3 -m live.fetch_spy_intraday > "$SPY_LOG" 2>&1 &
+"${GEPO_PYTHON:-python3}" -m live.fetch_spy_intraday > "$SPY_LOG" 2>&1 &
 SPY_PID=$!
 (
     sleep "$SPY_TIMEOUT"
@@ -116,7 +117,7 @@ rm -f "$SPY_LOG"
 # Merge all per-group parquets into the canonical HHMM.parquet for the ranker.
 FINAL_OUT="$DATE_DIR/${HHMM}.parquet"
 echo "Merging group parquets into $FINAL_OUT..."
-if ! python3 - <<PYEOF
+if ! "${GEPO_PYTHON:-python3}" - <<PYEOF
 import sys
 from pathlib import Path
 import pandas as pd
@@ -145,7 +146,12 @@ then
     # (regression 2026-06-11: removing the standalone SPY upload left Mya
     # serving yesterday's tick until the first post-open scan).
     echo "  no option data (pre-open?) — uploading SPY tick only"
-    if [ -n "${MYA_SSH_HOST:-}" ]; then
+    # Same non-production guard as upload_to_mya.sh. THIS branch is what
+    # clobbered Mya on 2026-08-20: a retired host whose fetches all failed
+    # rsynced its stale SPY tick over the live one every 30 minutes.
+    if [ -f live/NOT_PRODUCTION ] && [ "${GEPO_FORCE_UPLOAD:-0}" != "1" ]; then
+        echo "  ⊘ SPY tick upload skipped (live/NOT_PRODUCTION on $(hostname -s))"
+    elif [ -n "${MYA_SSH_HOST:-}" ]; then
         rsync -az live/ranked/spy_intraday.json \
             "$MYA_SSH_HOST:/opt/vito/gepo-backtest/live/ranked/spy_intraday.json" \
             && echo "  ✓ SPY tick uploaded to Mya" \
@@ -155,16 +161,16 @@ then
 fi
 
 echo "Running ranker..."
-python3 -m live.ranker 2>&1 | sed "s/^/  [Ranker] /"
+"${GEPO_PYTHON:-python3}" -m live.ranker 2>&1 | sed "s/^/  [Ranker] /"
 echo "✓ Snapshot, merge, and rankings complete"
 
 # Archive this scan's qualified picks + settle expired ones (Snapshots tab).
-python3 -m live.snapshot_picks 2>&1 | sed "s/^/  [Snap] /"
+"${GEPO_PYTHON:-python3}" -m live.snapshot_picks 2>&1 | sed "s/^/  [Snap] /"
 
 # Freeze during 15:xx. If 15:01 is blank, the 15:31 scan can replace it with
 # real picks; if 15:01 has picks, it is kept.
 if [ "$(date +%H)" = "15" ]; then
-    /usr/bin/python3 -m live.freeze_snapshot 2>&1 | sed "s/^/  /"
+    "${GEPO_PYTHON:-python3}" -m live.freeze_snapshot 2>&1 | sed "s/^/  /"
 fi
 
 # Update MTM tracking on all active frozen files using the parquet we
@@ -172,7 +178,7 @@ fi
 # Runs AFTER any 15:45 freeze so today's freshly-frozen picks get tracked
 # immediately in this same firing.
 echo "Running MTM tracker on active frozen files..."
-python3 -m live.track_frozen 2>&1 | sed "s/^/  [Tracker] /" || echo "  ✗ tracker failed (non-fatal)"
+"${GEPO_PYTHON:-python3}" -m live.track_frozen 2>&1 | sed "s/^/  [Tracker] /" || echo "  ✗ tracker failed (non-fatal)"
 
 # Push to Mya if SSH host configured. Soft-fail so a network blip
 # doesn't kill the cron exit code.

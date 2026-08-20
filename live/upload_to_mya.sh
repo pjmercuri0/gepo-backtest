@@ -16,6 +16,27 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+[ -f live/cron_env.sh ] && . live/cron_env.sh
+
+# --- Non-production guard -------------------------------------------------
+# Only ONE machine may publish to Mya. When the pipeline moved to the Mac mini
+# (2026-08-20), the retired MacBook Air kept firing scans; each failed scan fell
+# through to the "upload SPY tick only" branch and rsynced its stale Aug-19 tick
+# over the mini's live quote — three times in one morning before it was caught.
+#
+# Deliberately FAIL-OPEN: this blocks only when live/NOT_PRODUCTION exists, so a
+# machine that pulls this change keeps publishing normally. Drop the marker file
+# on any host that must never publish. Override for a one-off with
+# GEPO_FORCE_UPLOAD=1.
+if [ -f live/NOT_PRODUCTION ] && [ "${GEPO_FORCE_UPLOAD:-0}" != "1" ]; then
+  echo "REFUSING to upload: live/NOT_PRODUCTION marker present on $(hostname -s)." >&2
+  echo "  This host is not the publisher; uploading would overwrite production data." >&2
+  [ -s live/NOT_PRODUCTION ] && sed 's/^/  | /' live/NOT_PRODUCTION >&2
+  echo "  Override with: GEPO_FORCE_UPLOAD=1 bash live/upload_to_mya.sh" >&2
+  exit 1
+fi
+# --------------------------------------------------------------------------
+
 # Config
 : "${MYA_SSH_HOST:?MYA_SSH_HOST not set — see header comment for setup}"
 : "${MYA_REMOTE_BASE:=/opt/vito/gepo-backtest/live}"
@@ -105,6 +126,14 @@ for src in "${UPLOAD_FILES[@]}"; do
     continue
   fi
   dest="$MYA_SSH_HOST:$MYA_REMOTE_BASE/${src#live/}"
+  if [ "$src" = "live/notifications/" ]; then
+    # Health alerts are event payloads. Re-syncing old health-*.json on every
+    # normal data upload can make Mya re-send stale alerts outside market hours.
+    eval "$RSYNC --exclude 'health-*.json' \"$src\" \"$dest\"" \
+      && echo "  ✓ uploaded $src (excluding health alerts)" \
+      || echo "  ✗ rsync failed for $src"
+    continue
+  fi
   eval "$RSYNC \"$src\" \"$dest\"" \
     && echo "  ✓ uploaded $src" \
     || echo "  ✗ rsync failed for $src"
