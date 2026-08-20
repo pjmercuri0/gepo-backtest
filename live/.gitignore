@@ -5,7 +5,12 @@ drift/
 intraday_picks/
 notifications/
 logs/
+cache/
 data/chain_*.csv
 data/chain_*.html
 *.pyc
 __pycache__/
+
+# Per-host publisher guard — MUST stay local. Committing this would
+# disable uploads on the production host the moment it pulls.
+NOT_PRODUCTION
