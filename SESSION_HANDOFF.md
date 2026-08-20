@@ -1,6 +1,6 @@
-# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-18 (production host plan)
+# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover)
 
-**Last updated:** 2026-08-18 18:28 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). Recent repo/live work was operational: IBKR quote-outage recovery, health-alert hygiene, 15:01+15:31 freeze top-ups, OOT July update, live table display change, CPU/process triage, and production-host planning.
+**Last updated:** 2026-08-19 21:20 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). Recent repo/live work was operational: IBKR quote-outage recovery, health-alert hygiene, 15:01+15:31 freeze top-ups, OOT July/August update, live table display change, CPU/process triage, and Mac mini production-runner setup.
 
 ## ⚠️ HARD RULE — read first
 
@@ -18,9 +18,9 @@ User reaction: "I fucking hate you now I have to buy from the vendor again." Rec
 
 ---
 
-## 0.12 Production host plan (2026-08-18) — move live ops off the MacBook Air
+## 0.12 Production host status (2026-08-19) — live ops moved toward Mac mini
 
-**Decision direction:** buy a dedicated **M4 Mac mini 16GB / 256GB** as the production runner, keep the current MacBook Air for dev/backtests, and keep Mya as the public/display server unless/until there is a reason to collapse both roles.
+**Decision:** use the dedicated **M4 Mac mini 16GB / 256GB** as the production runner, keep the current MacBook Air for dev/backtests, and keep Mya as the public/display server unless/until there is a reason to collapse both roles.
 
 **Why this is enough:** the current machine is a 2020 Intel MacBook Air (`MacBookAir9,1`) with a 1.1 GHz dual-core i3, 8GB RAM, and ~256GB-class internal SSD. That explains the fan/heat pain when IB Gateway, pandas/parquet jobs, Codex/Terminal, browser, Spotlight/iCloud, and `monthly_pool_refresh.py` overlap. A base M4 Mac mini with 16GB RAM is a large step up for a dedicated always-on runner. The 24GB/512GB config was quoted at about CAD 1700 vs CAD 1100 for 16GB/256GB; at that spread, do **not** pay the extra CAD 600 unless the mini will also become a research/backtest workstation.
 
@@ -31,35 +31,15 @@ User reaction: "I fucking hate you now I have to buy from the vendor again." Rec
 **Production split:**
 - Mac mini = production runner: IB Gateway, scheduled live fetch/rank/freeze jobs, `health_check`, `expire_frozen`, `track_frozen`, weekly pool refresh if kept local, and sync/upload to Mya.
 - Mya server = public web/display: Flask/gunicorn/nginx serving generated `live/ranked`, `live/frozen`, `live/intraday_picks`, notifications, and equity JSON. No IBKR credentials needed on Mya.
-- MacBook Air = dev only: code edits, backtests, manual testing. Disable production cron here once mini is proven.
+- MacBook Air = dev only: code edits, backtests, manual testing. Current choice is to leave its existing crons in place and keep IB Gateway closed on the Air; revisit only if duplicate uploads become a problem.
 
 **IBKR constraint:** IB Gateway/TWS requires GUI login/authentication and is not a true serverless/headless workload. IB Gateway is the right app over full TWS because it is lighter, but it still needs re-auth/attention around IBKR reset windows. Keep Apple Screen Sharing available at home and Chrome Remote Desktop available away from home so the user can approve login/2FA and inspect Gateway.
 
-**Migration estimate:** basic transfer 1-2 hours; production-ready half day; hardened with monitoring/backups 1-2 days.
+**Actual 2026-08-19 setup:** Mac mini is initialized as a new Mac, reachable by Chrome Remote Desktop, has repo/data copied, has Mya SSH working, has IB Gateway 10.50 connected on localhost port `4001`, has read-only API enabled, has the GEPO cron block installed, and has `pmset` configured so the computer does not sleep.
 
-**Migration checklist:**
-1. Clean repo state. Commit/push the desired local changes. Critical: rotate the GitHub token that appeared embedded in `origin` remote URL, then set the remote to `https://github.com/pjmercuri0/gepo-backtest.git`.
-2. Set up the mini: Xcode CLI tools, Homebrew if needed, Python/venv, git, IB Gateway, Apple Screen Sharing, Chrome Remote Desktop, SSH/Remote Login, disable computer sleep (display sleep OK), connect to stable Wi-Fi or Ethernet.
-3. Clone repo and install:
-   ```bash
-   git clone https://github.com/pjmercuri0/gepo-backtest.git
-   cd gepo-backtest
-   python3 -m venv .venv
-   . .venv/bin/activate
-   pip install -r requirements.txt -r live/requirements.txt
-   ```
-4. Copy production state from MacBook to mini with `rsync`: `live/frozen/`, `live/intraday_picks/`, `live/ranked/`, and `live/data/`. These are mostly gitignored, so git clone alone is not enough.
-5. Create `~/.gepo_env` on the mini with production settings: `MYA_SSH_HOST`, `MYA_REMOTE_BASE`, optional `MYA_SSH_KEY`, `IB_PORT=4001` for live or `4002` for paper.
-6. Start IB Gateway manually, log in, enable socket clients/API, confirm the live/paper API port, and run smoke tests:
-   ```bash
-   python3 -m live.fetch_spy_intraday
-   python3 -m live.health_check --force
-   bash live/cron_parallel.sh
-   ```
-7. Move scheduling from the MacBook to the mini. Short-term cron is acceptable because the repo already uses cron wrappers. Better final form on macOS is launchd plists for market scan, health check, freeze/expire/track, daily bars, and weekly pool refresh.
-8. After the mini has completed at least one normal market scan and uploaded to Mya, disable production cron on the MacBook.
+**Current next step:** enable a second IBKR username dedicated to the Mac mini Gateway/API session. Keep that username logged in on the mini only, keep API read-only, and use the primary username for manual Client Portal/TWS work so logging in manually does not kill the mini's IB Gateway session. Confirm whether market-data entitlements need to be duplicated for the second username before relying on live scans.
 
-**Productionization work to add to repo:** a `deploy/mac-mini/` folder with bootstrap script, env template, launchd plist templates, and a smoke-test command. Also consider a `requirements-live.txt` or proper pinned `pyproject.toml` so live dependencies are reproducible.
+**Productionization repo work:** `deploy/mac-mini/` now exists with bootstrap, env template, cron installer, cron template, README, and smoke test. Also consider a `requirements-live.txt` or proper pinned `pyproject.toml` so live dependencies are reproducible.
 
 **Risk notes:** do not expose IBKR API port publicly; keep it localhost-only. Back up `live/frozen`, `live/intraday_picks`, `live/ranked`, and any actual-fill edits. Keep trading human-in-the-loop until the runner has weeks of clean logs and reconciliation.
 
@@ -921,7 +901,77 @@ Goal: stop running production GEPO live ops on the 2020 Intel MacBook Air. The A
 
 - **Mac mini:** production runner. Runs IB Gateway, live option/SPY fetches, ranking, freezing, tracking, expiry settlement, health checks, and upload/sync to Mya.
 - **Mya:** web/display server. Serves Flask/gunicorn/nginx and receives generated live artifacts. No IBKR credentials required.
-- **MacBook Air:** dev only. Code edits, backtests, manual checks. Production cron disabled after the mini proves itself.
+- **MacBook Air:** dev only. Code edits, backtests, manual checks. Existing crons are currently left in place by user choice; keep IB Gateway closed on the Air so it does not compete for live IBKR data.
+
+### Actual setup status — 2026-08-19
+
+Mac mini is now the intended production runner.
+
+Confirmed setup:
+- Mac mini was set up as a new Mac under user `securio`; repo path is `/Users/securio/Downloads/gepo-backtest`.
+- Chrome Remote Desktop works and is the reliable remote path for now.
+- Apple Screen Sharing/VNC was enabled and `screensharingd` listened on port `5900`, but it failed from the MacBook Air because local LAN traffic between `192.168.2.200` and `192.168.2.202` timed out both ways. Diagnosis: Bell Home Hub 3000 Wi-Fi/router client isolation or LAN filtering, not a macOS firewall problem.
+- Xcode Command Line Tools installed.
+- Repo was cloned on the mini, but GitHub push from the MacBook failed because the existing `origin` token is invalid. Today’s unpushed Mac mini setup kit and data were relayed through Mya instead.
+- Mya SSH works from the mini after adding the mini's `gepo-mac-mini` public key to Mya `~/.ssh/authorized_keys`.
+- Mini `~/.gepo_env`:
+  ```bash
+  export MYA_SSH_HOST="ubuntu@gepo-ticker.peter.cloudmallinc.com"
+  export MYA_REMOTE_BASE="/opt/vito/gepo-backtest/live"
+  export IB_PORT=4001
+  ```
+- Copied production data/setup from MacBook to mini through Mya `/tmp/gepo-mini-transfer/`:
+  - `output/master_pool.parquet`
+  - `output/iv_rank.parquet`
+  - `output/rv_table.parquet`
+  - `output/2026_sp500_last_oot_combined.parquet`
+  - `output/picks_cache_oot2026_oot_combined_grv_k10_thr0.05_mid.parquet`
+  - `live/data/backtest_equity.json`
+  - `live/data/oot_equity.json`
+  - `deploy/mac-mini/`
+  - updated `append_oot_vendor_data.py` and `report_oot_2026.py`
+
+IB Gateway/API state:
+- IB Gateway 10.50 installed and running on the mini.
+- API socket port is `4001`.
+- **Read-Only API is ON and should stay ON. Do not disable it unless user explicitly decides to allow trading automation.**
+- Market-data and historical-data farms showed connected.
+- Manual data-only smoke worked:
+  ```bash
+  nc -zv 127.0.0.1 "$IB_PORT"
+  python3 -m live.fetch_spy_intraday
+  python3 -m live.health_check --force
+  bash live/upload_to_mya.sh
+  ```
+- `fetch_spy_intraday` logs IBKR read-only errors for order/open-order calls. That is expected and desirable while the API is read-only; SPY quote fetch still wrote `live/ranked/spy_intraday.json`.
+
+Cron installed on the mini:
+```cron
+# BEGIN GEPO MAC MINI
+1,31 9-16 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_parallel.sh
+1 16 * * 4,5 /Users/securio/Downloads/gepo-backtest/live/cron_expire.sh
+1,31 9-15 * * 4,5 /Users/securio/Downloads/gepo-backtest/live/cron_track_expiring.sh
+1 15 * * 4,5 /Users/securio/Downloads/gepo-backtest/live/cron_close_alert.sh
+1 17 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_daily_bars.sh
+1 17 * * 5 /Users/securio/Downloads/gepo-backtest/live/cron_calendar_refresh.sh
+*/5 9-17 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_health.sh
+31 17 * * 5 /Users/securio/Downloads/gepo-backtest/live/cron_pool_refresh.sh
+# END GEPO MAC MINI
+```
+
+MacBook Air crons were intentionally left in place per user instruction. User plans to keep IB Gateway closed on the MacBook Air so MacBook production jobs cannot fetch live IBKR data. Remaining risk: non-IB jobs on the Air may still run and upload duplicate health/data artifacts; revisit only if duplicate uploads show up.
+
+Power settings on the mini:
+```bash
+sudo pmset -a sleep 0 disksleep 0 displaysleep 30 womp 1
+pmset -g
+```
+Verified state included `sleep 0`, `disksleep 0`, `displaysleep 30`, and `womp 1`. Computer should stay awake; display can sleep.
+
+Known rough edges:
+- `deploy/mac-mini/smoke_test.sh` passes the venv import check, but the `/usr/bin/python3` system-Python import check reports missing packages. Manual venv smoke and upload passed. Patch the smoke script later to skip system Python by default or make every cron wrapper explicitly use `.venv`.
+- Chrome Remote Desktop resolution is constrained by the attached HDMI/TV display advertising only `1920x1080`. If headless remote resolution remains annoying, buy a cheap HDMI dummy plug that advertises better/multiple resolutions.
+- Fix GitHub remote auth/token and push the `455f1a1 Add Mac mini production setup kit` commit plus any later handoff edits.
 
 ### Hardware decision
 
@@ -953,9 +1003,21 @@ Later wired options if Wi-Fi proves flaky:
 
 IBKR Gateway/TWS is not serverless. It needs GUI login/authentication and occasional attention. IB Gateway is still the right production app because it is lighter than full TWS.
 
-Phase 1: use the existing IBKR username on the mini. If logging into IBKR elsewhere kicks the Gateway/API session, remote into the mini and relogin Gateway. Health checks should alert when market data goes stale.
+Current phase: the mini is using the existing IBKR username. This is fragile because logging into IBKR elsewhere can kick the Gateway/API session on the mini.
 
-Phase 2 if this gets annoying: create a second IBKR username dedicated to the mini/API. IBKR allows additional usernames, but market data entitlements are username/session-specific, so duplicate OPRA/data fees may apply.
+Next action: create/enable a second IBKR username dedicated to the mini/API. Keep that username logged in only on IB Gateway on the mini. Use the primary username for manual Client Portal/TWS/trading work. Goal: manual logins should not kill the mini's API/data session.
+
+Important constraints:
+- Keep mini API read-only until the user explicitly chooses otherwise. User said: "dont fucking trade anything."
+- Confirm the second username has the needed market-data entitlements. IBKR market data can be username/session-specific, so duplicate OPRA/options data fees may apply.
+- After second username is active, log the mini into Gateway with that username, rerun:
+  ```bash
+  source .venv/bin/activate
+  source ~/.gepo_env
+  python3 -m live.fetch_spy_intraday
+  bash deploy/mac-mini/smoke_test.sh --ibkr
+  ```
+  Then verify Mya updates from the mini while the primary username is used elsewhere.
 
 ### Migration checklist
 
@@ -1020,6 +1082,14 @@ Phase 2 if this gets annoying: create a second IBKR username dedicated to the mi
    - Back up `live/frozen/`, `live/intraday_picks/`, `live/ranked/`, `live/data/`, and any actual-fill edits.
    - Do not expose the IBKR API socket publicly. Keep it localhost-only.
    - Keep MacBook capable of manual emergency run during cutover, but do not let both machines run production schedules at the same time.
+
+9. **Still todo after 2026-08-19 setup.**
+   - Enable second IBKR username for the Mac mini so the mini Gateway session is not killed by manual IBKR logins.
+   - Confirm second username market-data entitlements.
+   - Watch the next regular market scan logs on the mini after 09:31 ET.
+   - Fix GitHub auth/token and push the local Mac mini setup commit.
+   - Patch `smoke_test.sh` system-Python check or make all cron wrappers explicitly use `.venv`.
+   - Decide later whether to disable MacBook Air crons; for now user chose to leave them and keep MacBook IB Gateway closed.
 
 ### Repo work still worth adding
 
