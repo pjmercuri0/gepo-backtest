@@ -1,6 +1,6 @@
-# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops)
+# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-18 (production host plan)
 
-**Last updated:** 2026-07-08 13:45 EDT (live-ops session — see §0.6). Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). Recent work was operational: cron env fixes, Yahoo daily-bar refresh/settlement repair, Snapshots P&L backfill, Mya deploy/upload hygiene, and Sequoia restart checks.
+**Last updated:** 2026-08-18 18:28 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). Recent repo/live work was operational: IBKR quote-outage recovery, health-alert hygiene, 15:01+15:31 freeze top-ups, OOT July update, live table display change, CPU/process triage, and production-host planning.
 
 ## ⚠️ HARD RULE — read first
 
@@ -15,6 +15,414 @@ User reaction: "I fucking hate you now I have to buy from the vendor again." Rec
 
 
 **READ THIS FIRST.** Major canonical changes over 2026-06-04 → 2026-06-10. Site / live ranker / backtest all current on the **mid-basis canon (2026-06-10)**. New strategic findings: GROUND beats G-alone (under mid basis G-alone LOSES $15.5k while GROUND makes +$41.3k; DKL split t=4.45), regime gate OFF is canonical (and the fetcher's puts-only-in-bull filter was removed 2026-06-10 — it had silently suppressed every bear call for 5 days, error #70), BS theoretical drives the live tracker mark (now floored at intrinsic-at-current-spot), qty=1 per-contract display everywhere.
+
+---
+
+## 0.12 Production host plan (2026-08-18) — move live ops off the MacBook Air
+
+**Decision direction:** buy a dedicated **M4 Mac mini 16GB / 256GB** as the production runner, keep the current MacBook Air for dev/backtests, and keep Mya as the public/display server unless/until there is a reason to collapse both roles.
+
+**Why this is enough:** the current machine is a 2020 Intel MacBook Air (`MacBookAir9,1`) with a 1.1 GHz dual-core i3, 8GB RAM, and ~256GB-class internal SSD. That explains the fan/heat pain when IB Gateway, pandas/parquet jobs, Codex/Terminal, browser, Spotlight/iCloud, and `monthly_pool_refresh.py` overlap. A base M4 Mac mini with 16GB RAM is a large step up for a dedicated always-on runner. The 24GB/512GB config was quoted at about CAD 1700 vs CAD 1100 for 16GB/256GB; at that spread, do **not** pay the extra CAD 600 unless the mini will also become a research/backtest workstation.
+
+**Recommended spend instead of 24GB/512GB:** UPS battery backup, 1TB external USB-C/NVMe SSD if local storage gets tight, remote access setup, and possibly AppleCare. RAM is the only non-upgradeable concern, but 16GB should be fine if the mini is kept dedicated and the weekly pool rebuild is controlled/off-hours. Storage is easy to add externally.
+
+**Network:** Mac mini has built-in Wi-Fi. Wi-Fi is acceptable for this workload if Ethernet is inconvenient; the jobs run every 15-30 minutes and can tolerate brief network blips if health checks alert. Ethernet is still better if easy. If wired is desired later without running cable from the front closet, options are MoCA over coax, powerline Ethernet, a mesh node with an Ethernet jack near the mini, or paying someone to run one Ethernet cable.
+
+**Production split:**
+- Mac mini = production runner: IB Gateway, scheduled live fetch/rank/freeze jobs, `health_check`, `expire_frozen`, `track_frozen`, weekly pool refresh if kept local, and sync/upload to Mya.
+- Mya server = public web/display: Flask/gunicorn/nginx serving generated `live/ranked`, `live/frozen`, `live/intraday_picks`, notifications, and equity JSON. No IBKR credentials needed on Mya.
+- MacBook Air = dev only: code edits, backtests, manual testing. Disable production cron here once mini is proven.
+
+**IBKR constraint:** IB Gateway/TWS requires GUI login/authentication and is not a true serverless/headless workload. IB Gateway is the right app over full TWS because it is lighter, but it still needs re-auth/attention around IBKR reset windows. Keep Apple Screen Sharing available at home and Chrome Remote Desktop available away from home so the user can approve login/2FA and inspect Gateway.
+
+**Migration estimate:** basic transfer 1-2 hours; production-ready half day; hardened with monitoring/backups 1-2 days.
+
+**Migration checklist:**
+1. Clean repo state. Commit/push the desired local changes. Critical: rotate the GitHub token that appeared embedded in `origin` remote URL, then set the remote to `https://github.com/pjmercuri0/gepo-backtest.git`.
+2. Set up the mini: Xcode CLI tools, Homebrew if needed, Python/venv, git, IB Gateway, Apple Screen Sharing, Chrome Remote Desktop, SSH/Remote Login, disable computer sleep (display sleep OK), connect to stable Wi-Fi or Ethernet.
+3. Clone repo and install:
+   ```bash
+   git clone https://github.com/pjmercuri0/gepo-backtest.git
+   cd gepo-backtest
+   python3 -m venv .venv
+   . .venv/bin/activate
+   pip install -r requirements.txt -r live/requirements.txt
+   ```
+4. Copy production state from MacBook to mini with `rsync`: `live/frozen/`, `live/intraday_picks/`, `live/ranked/`, and `live/data/`. These are mostly gitignored, so git clone alone is not enough.
+5. Create `~/.gepo_env` on the mini with production settings: `MYA_SSH_HOST`, `MYA_REMOTE_BASE`, optional `MYA_SSH_KEY`, `IB_PORT=4001` for live or `4002` for paper.
+6. Start IB Gateway manually, log in, enable socket clients/API, confirm the live/paper API port, and run smoke tests:
+   ```bash
+   python3 -m live.fetch_spy_intraday
+   python3 -m live.health_check --force
+   bash live/cron_parallel.sh
+   ```
+7. Move scheduling from the MacBook to the mini. Short-term cron is acceptable because the repo already uses cron wrappers. Better final form on macOS is launchd plists for market scan, health check, freeze/expire/track, daily bars, and weekly pool refresh.
+8. After the mini has completed at least one normal market scan and uploaded to Mya, disable production cron on the MacBook.
+
+**Productionization work to add to repo:** a `deploy/mac-mini/` folder with bootstrap script, env template, launchd plist templates, and a smoke-test command. Also consider a `requirements-live.txt` or proper pinned `pyproject.toml` so live dependencies are reproducible.
+
+**Risk notes:** do not expose IBKR API port publicly; keep it localhost-only. Back up `live/frozen`, `live/intraday_picks`, `live/ranked`, and any actual-fill edits. Keep trading human-in-the-loop until the runner has weeks of clean logs and reconciliation.
+
+---
+
+## 0.11 SPY-fetch watchdog (2026-07-22) — pipeline self-heals on wedged SPY connection
+
+**Incident:** the 11:31 scan on 2026-07-22 fetched all option groups fine, then hung on the SPY step (`pull_now_parallel.sh` → `python3 -m live.fetch_spy_intraday`, PID stuck ~37 min at 0% CPU, state `S` — blocked on an IB socket that accepted the connection but never delivered a quote). Because that step has no internal timeout, the run never merged/ranked and never released `cron_parallel.lock`; the 12:01 scan logged `SKIP: cron_parallel already running`. The site froze at the 11:01 fetch (shown ~11:03). Port 4001 was up and options were healthy — only the dedicated SPY connection wedged (same class as the 2026-07-16 null-quote outage, but a hang rather than nulls). Manual recovery: killed the stuck tree (releases the lock), then `bash live/cron_parallel.sh` — SPY recovered on its own, 47 candidates / 2 picks at 12:12.
+
+**Fix (committed):** `live/pull_now_parallel.sh` now runs the SPY step under a bash wall-clock watchdog — background the fetch, `TERM` then `KILL` after 3s if still alive at the timeout (default 90s, override `SPY_FETCH_TIMEOUT`). On timeout it logs and continues to merge/rank/upload with the last valid tick (which `fetch_spy_intraday` already preserves), so a wedged SPY connection can no longer hold the lock and stall later scans. Verified both paths (wedged → killed at timeout, script survives `set -e`; normal → no added delay). Local-only (cron runs on the Mac; Mya only serves the webapp). Backstop, not a root-cause fix — if Gateway wedges get frequent, the deeper fix is still a periodic Gateway bounce.
+
+---
+
+## 0.10 Live-ops session (2026-07-16/17) — current restart handoff
+
+### Current GEPO status before closing this OpenCode session
+- IB Gateway was restarted on 2026-07-16 after it served empty live/delayed quote fields despite API port 4001 being reachable and market-data farms reporting OK.
+- After restart, SPY quotes recovered:
+  - SPY quote test at `2026-07-16T09:49:16`: `mark=750.86`, bid/ask `750.85/750.88`, regime bull.
+- Recovery scan completed at `09:51`:
+  - Snapshot source: `live/snapshots/2026-07-16/0949.parquet`
+  - `767` option rows loaded
+  - `47` candidate spreads built
+  - `3` dropped for earnings
+  - per-ticker dedupe `32 -> 24`
+  - `1/24` qualified above threshold
+  - qualified pick: `JPM bear_call`, `GROUND≈0.05772`
+  - Uploaded to Mya successfully.
+- No GEPO fetch/ranker job was running during later fan/CPU checks.
+- Current heavy CPU was OpenCode itself, not GEPO:
+  - `opencode` process was seen at `~70-212% CPU` during this session.
+  - `IB Gateway` was mild around `3-4% CPU`.
+  - Brave was killed by the user and no longer the main load.
+
+### If reopening after closing this session
+Run this first:
+
+```bash
+date '+%Y-%m-%d %H:%M:%S %Z'
+crontab -l
+ps -axo pid=,ppid=,%cpu=,%mem=,etime=,command= | sort -k3 -nr | head -20
+python3 -m live.fetch_spy_intraday --print
+python3 - <<'PY'
+import json
+from pathlib import Path
+for p in [Path('live/ranked/latest.json'), Path('live/ranked/spy_intraday.json'), Path('live/frozen/2026-07-17.json')]:
+    print('\n', p, p.exists())
+    if p.exists():
+        d=json.loads(p.read_text())
+        print('snapshot', d.get('snapshot_ts'), 'frozen_at', d.get('frozen_at'))
+        print('n_candidates', d.get('n_candidates'), 'top_picks', len(d.get('top_picks') or []))
+PY
+```
+
+If SPY quote output has `mark: null` or no bid/ask:
+- IB Gateway may again be connected but not delivering quotes.
+- Confirm API port and process:
+  ```bash
+  nc -zv 127.0.0.1 4001
+  lsof -nP -iTCP:4001 -sTCP:LISTEN
+  ps -ax -o pid=,etime=,command= | rg -i 'IB Gateway|JavaApplicationStub|ibgateway'
+  ```
+- Safe recovery used on 2026-07-16:
+  ```bash
+  kill -TERM <IB_GATEWAY_PID>
+  sleep 10
+  open "/Users/mercurio/Applications/IB Gateway 10.45/IB Gateway 10.45.app"
+  ```
+- Wait for API port 4001 to reopen, then rerun:
+  ```bash
+  python3 -m live.fetch_spy_intraday --print
+  bash live/cron_parallel.sh
+  ```
+
+### Health-alert fixes (Mya stale alert issue)
+Root cause of 9am / after-hours stale alerts:
+- Local health check had `MARKET_CLOSE=17:15`, so it legitimately emitted alerts around 16:35-17:00 after normal trading signal time.
+- `live/upload_to_mya.sh` synced the whole `live/notifications/` directory on every normal upload, including old `health-*.json` files.
+- Mya's `notify_watcher.sh` could re-process old health files if they reappeared or were not marked processed.
+
+Fixes applied locally and deployed to Mya:
+- `live/health_check.py`
+  - Tightened market-hours alert window to `09:30-16:05` ET.
+  - Detects an all-null SPY quote payload as an outage.
+- `live/fetch_spy_intraday.py`
+  - Does **not** overwrite last valid SPY tick with an all-null quote.
+- `live/upload_to_mya.sh`
+  - Excludes `health-*.json` during normal uploads.
+- `live/cron_health.sh`
+  - Uploads only newly-created health alerts, not the entire notifications directory.
+- Remote-only `/opt/vito/gepo-backtest/live/notify_watcher.sh`
+  - Patched to skip `health-alert` files unless filename date is today and time is within `09:30-16:05` ET.
+- Old active health files were moved out of active notification queues:
+  - local: `live/notifications_archive_health/`
+  - remote: `/opt/vito/gepo-backtest/notifications_archive_health/`
+- Remote active `live/notifications/` should contain no `health-*.json`; it may contain state files `.processed` and `.last_health_alert`.
+
+Validation already run:
+- `python3 -m py_compile live/health_check.py live/fetch_spy_intraday.py`
+- `bash -n live/cron_health.sh live/upload_to_mya.sh`
+- `python3 -m live.health_check` before 9:30 produced no alert.
+- Remote watcher passed `bash -n` after patch.
+
+### 15:01 + 15:31 freeze top-up behavior
+New policy implemented in `live/freeze_snapshot.py`:
+- If 15:01 freeze has 0 picks, later 15:xx can replace blank with 15:31 picks.
+- If 15:01 freeze has 1-4 picks, 15:31 can append unique picks until the basket reaches `TOP_N_DISPLAY=5`.
+- Existing 15:01 picks are preserved and remain first.
+- Added metadata:
+  - `freeze_topup_at`
+  - `freeze_topup_added_count`
+  - per-pick `freeze_added_at`
+- `live/templates/history.html` displays `frozen 15:01+15:31 · +N from 15:31` and marks added picks with `+15:31`.
+
+Backfill applied to historical frozen files:
+- `2026-06-01`: `2 + 2 = 4`
+- `2026-06-03`: `3 + 2 = 5`
+- `2026-06-08`: `3 + 1 = 4`
+- `2026-06-11`: `2 + 3 = 5`
+- `2026-06-15`: `3 + 2 = 5`
+- `2026-07-08`: `2 + 2 = 4`
+- `2026-07-09`: `3 + 2 = 5`
+- `2026-07-14`: `1 + 4 = 5`
+- `2026-07-15`: `1 + 3 = 4`
+
+Closed/expired topped-up histories were settled from daily closes:
+- `2026-06-01`: `4` picks, P&L `-482.8`
+- `2026-06-03`: `5` picks, P&L `-339.2`
+- `2026-06-08`: `4` picks, P&L `-56.0`
+- `2026-06-11`: `5` picks, P&L `+405.8`
+- `2026-06-15`: `5` picks, P&L `+96.8`
+- `2026-07-08`: `4` picks, P&L `+401.2`
+- `2026-07-09`: `5` picks, P&L `+98.0`
+- `2026-07-14` and `2026-07-15` expire `2026-07-17`; not settled at time of check.
+
+### OOT July update
+- Incrementally appended only new dates from `data/DG_2026July` after prior OOT end `2026-07-07`:
+  - `2026-07-08`, `2026-07-09`, `2026-07-10`
+- Wrote:
+  - `output/2026_sp500_last_oot_incremental_20260708_20260710.parquet`
+  - updated `output/2026_sp500_last_oot_combined.parquet`
+  - backup: `output/2026_sp500_last_oot_combined.parquet.bak_before_20260708_20260710`
+- Removed stale OOT combined cache and regenerated `live/data/oot_equity.json`.
+- OOT result after regeneration:
+  - `n_trades=218`
+  - `strategy_final=17595.4`
+  - return `+75.95%`
+  - Sharpe `3.19`
+  - max DD `-12.04%`
+- New OOT trades added:
+  - `2026-07-08 VZ bull_put -9.2`
+  - `2026-07-08 ADI bull_put +148.0`
+  - `2026-07-08 T bull_put +18.8`
+  - `2026-07-09 BMY bull_put +2.0`
+  - `2026-07-09 T bull_put +20.8`
+  - `2026-07-09 PM bear_call -20.0`
+- July 6 had data but no qualified picks:
+  - `23,205` raw rows
+  - `99` candidates
+  - `51` scored
+  - `0` above `GROUND >= 0.05`
+  - best was `COST bull_put`, `GROUND≈0.04467`.
+
+### Live table display change
+- `live/ranker.py` now serializes every positive-GROUND candidate into the table payload instead of capping at `TICKER_LIMIT=30`.
+- `TICKER_LIMIT` removed from `live/live_config.py` and mock data updated.
+- Example after change: `45` ranked candidates, `40` positive rows shown.
+- Top-pick cards still show only threshold-qualified picks.
+
+### Current dirty/untracked files to be aware of
+- Expected local modifications from this work include:
+  - `live/freeze_snapshot.py` (new/untracked but already used by cron and deployed)
+  - `live/templates/history.html`
+  - `live/health_check.py`
+  - `live/fetch_spy_intraday.py`
+  - `live/cron_health.sh`
+  - `live/upload_to_mya.sh`
+  - many earlier live reliability files from this broader session
+- `live/notifications_archive_health/` is an archive of old health alert payloads, not active queue data.
+- `default.profraw` is present and untracked; likely an incidental profiling/runtime artifact. Do not assume it is needed.
+
+---
+
+## 0.8 Live Friday scans (2026-07-10) — DTE0 same-day expiry
+
+User wanted Friday scans to run, but **not** next-week DTE7. Final behavior:
+- `live/live_config.py`: `LIVE_DTE_MIN=0`, `LIVE_DTE_MAX=6`.
+- This keeps Mon-Thu on the same-week Friday expiry naturally:
+  - Mon DTE4, Tue DTE3, Wed DTE2, Thu DTE1.
+- Friday now scans same-day Friday expiry:
+  - Fri DTE0.
+- The installed crontab main scanner is now Mon-Fri:
+  - `1,31 9-16 * * 1-5 /Users/mercurio/Downloads/gepo-backtest/live/cron_parallel.sh`
+
+Implementation notes:
+- `live.fetcher._weekly_expiries_in_dte_window()` now accepts an explicit DTE window and defaults through `live_config.live_dte_window()`.
+- `live.ranker` serializes the active DTE window into `latest.json` config, so the UI shows `0-6d`.
+- Python 3.9 compatibility was preserved; no `X | None` annotations.
+
+Verification on Friday 2026-07-10:
+- Local helper test selected `20260710` for Friday 2026-07-10 with DTE window `(0, 6)`.
+- Manual run started at `09:41` after missing the 09:31 cron boundary:
+  - Fetchers logged `Live fetch: ... DTE [0, 6]`.
+  - Same-day contracts requested with `lastTradeDateOrContractMonth='20260710'`.
+  - Merged `7` group files into `live/snapshots/2026-07-10/0941.parquet`.
+  - `926` unique option rows loaded.
+  - Ranker built `38` candidate spreads, deduped `14 -> 12`, qualified `1`.
+  - Wrote `live/ranked/latest.json` and `live/ranked/2026-07-10_0941.json`.
+  - `snapshot_picks` captured `1` qualified pick at `0942`.
+  - Upload to Mya completed.
+  - Latest top pick at that time: `LOW bull_put`, expiry `2026-07-10`, `DTE=0`, `GROUND≈0.08084`.
+- Some IB fetcher groups timed out on connect during the manual run, but enough groups completed for ranking/upload. Monitor the next scheduled run (`10:01` or `10:31`) for whether connect timeouts persist.
+
+---
+
+## 0.7 Mac cleanup follow-up (2026-07-09) — remaining after user removal
+
+User cleaned up old Microsoft/Office/OneDrive, Citrix, MoneyWiz, and MinerGate traces during market day. Do not ask for a restart until after market close; user said they will restart tonight.
+
+### Confirmed removed
+- Exact cleanup targets are gone:
+  - `/Library/Application Support/deviceTRUST`
+  - `/Library/Preferences/com.microsoft.autoupdate2.plist`
+  - `/Library/Preferences/com.microsoft.teams.plist`
+  - `/Library/Caches/com.microsoft.autoupdate.fba`
+  - `/Library/Caches/com.microsoft.autoupdate.helper`
+  - `/private/var/db/receipts/com.moneywiz.personalfinance.*`
+  - `~/Library/Application Support/FileProvider/com.microsoft.OneDrive.FileProvider`
+  - `~/Library/Logs/OneDrive`
+  - `~/Library/Logs/ReceiverInstall.log`
+  - `~/Library/Receipts/citrix.CitrixEndpointAnalysis.*`
+  - `~/Library/Cookies/com.microsoft.OneDriveStandaloneUpdater.binarycookies`
+- No active Microsoft/Citrix/MoneyWiz/MinerGate processes. `ps` matches were false positives from 1Password and Apple Passwords/PasswordBreachAgent.
+- Individual launchd queries for these labels return "Could not find service":
+  - `com.microsoft.update.agent`
+  - `com.citrix.ReceiverHelper`
+  - `com.citrix.AuthManager_Mac`
+  - `com.citrix.ServiceRecords`
+  - `com.citrix.UninstallMonitor`
+  - `com.citrix.safariadapter`
+
+### Deletion log for rollback/debug
+User first manually removed these user-level app containers/support files:
+
+```bash
+rm -rf \
+  "$HOME/Library/Containers/com.microsoft.OneDriveLauncher" \
+  "$HOME/Library/Containers/com.microsoft.outlook.profilemanager" \
+  "$HOME/Library/Containers/com.microsoft.Powerpoint" \
+  "$HOME/Library/Containers/com.microsoft.SkypeForBusiness" \
+  "$HOME/Library/Containers/com.moneywiz.personalfinance" \
+  "$HOME/Library/Containers/com.microsoft.Word" \
+  "$HOME/Library/Containers/com.microsoft.OneDrive.FinderSync" \
+  "$HOME/Library/Containers/com.microsoft.onenote.mac" \
+  "$HOME/Library/Containers/com.citrix.NetScalerGateway.macos.app" \
+  "$HOME/Library/Containers/com.microsoft.Outlook.CalendarWidget" \
+  "$HOME/Library/Containers/com.microsoft.Excel" \
+  "$HOME/Library/Containers/com.microsoft.openxml.excel.app" \
+  "$HOME/Library/Containers/com.microsoft.errorreporting" \
+  "$HOME/Library/Containers/com.microsoft.Microsoft-Mashup-Container" \
+  "$HOME/Library/Containers/com.microsoft.onenote.mac.shareextension" \
+  "$HOME/Library/Containers/com.microsoft.SkyDriveLauncher" \
+  "$HOME/Library/Containers/com.microsoft.Outlook" \
+  "$HOME/Library/Application Support/minergate" \
+  "$HOME/Library/Preferences/com.microsoft.autoupdate.fba.plist" \
+  "$HOME/Library/Preferences/UBF8T346G9.OfficeOneDriveSyncIntegration.plist" \
+  "$HOME/Library/Preferences/UBF8T346G9.OneDriveStandaloneSuite.plist" \
+  "$HOME/Library/Preferences/com.microsoft.OneDriveStandaloneUpdater.plist" \
+  "$HOME/Library/Preferences/com.microsoft.shared.plist" \
+  "$HOME/Library/Preferences/com.microsoft.OutlookSkypeIntegration.plist" \
+  "$HOME/Library/Preferences/com.microsoft.OneDriveUpdater.plist" \
+  "$HOME/Library/Caches/com.citrix.UninstallReceiver.mac" \
+  "$HOME/Library/Caches/SentryCrash/Uninstall Citrix Workspace" \
+  "$HOME/Library/Caches/com.microsoft.autoupdate.fba"
+```
+
+Then user was given and appears to have run this second cleanup command:
+
+```bash
+sudo rm -rf \
+  "/Library/Application Support/deviceTRUST" \
+  "/Library/Preferences/com.microsoft.autoupdate2.plist" \
+  "/Library/Preferences/com.microsoft.teams.plist" \
+  "/Library/Caches/com.microsoft.autoupdate.fba" \
+  "/Library/Caches/com.microsoft.autoupdate.helper" \
+  "/private/var/db/receipts/com.moneywiz.personalfinance.bom" \
+  "/private/var/db/receipts/com.moneywiz.personalfinance.plist"
+
+rm -rf \
+  "$HOME/Library/Application Support/FileProvider/com.microsoft.OneDrive.FileProvider" \
+  "$HOME/Library/Logs/OneDrive" \
+  "$HOME/Library/Logs/ReceiverInstall.log" \
+  "$HOME/Library/Receipts/citrix.CitrixEndpointAnalysis.plist" \
+  "$HOME/Library/Receipts/citrix.CitrixEndpointAnalysis.bom" \
+  "$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.microsoft.excel.sfl2" \
+  "$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.microsoft.word.sfl2" \
+  "$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.microsoft.powerpoint.sfl2" \
+  "$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.citrix.receiver.helper.sfl3" \
+  "$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.citrix.citrixreceiverlauncher.sfl3" \
+  "$HOME/Library/Safari/LocalStorage/https_support.citrix.com_0.localstorage"* \
+  "$HOME/Library/Safari/LocalStorage/https_www.citrix.com_0.localstorage"* \
+  "$HOME/Library/Safari/LocalStorage/https_support.microsoft.com_0.localstorage"* \
+  "$HOME/Library/Safari/LocalStorage/https_myaccount.microsoft.com_0.localstorage"* \
+  "$HOME/Library/Safari/LocalStorage/https_teams.microsoft.com_0.localstorage"* \
+  "$HOME/Library/Cookies/com.microsoft.OneDriveStandaloneUpdater.binarycookies"
+```
+
+Optional iCloud cleanup was offered but not confirmed as run:
+
+```bash
+rm -rf \
+  "$HOME/Library/Mobile Documents/iCloud~com~microsoft~azureauthenticator" \
+  "$HOME/Library/Mobile Documents/iCloud~com~microsoft~skydrive" \
+  "$HOME/Library/Mobile Documents/iCloud~com~microsoft~onenote" \
+  "$HOME/Library/Mobile Documents/iCloud~com~microsoft~skype~teams" \
+  "$HOME/Library/Mobile Documents/iCloud~com~microsoft~officemobile" \
+  "$HOME/Library/Mobile Documents/iCloud~moneywiz~personalfinance"
+```
+
+Rollback notes:
+- These were deleted with `rm -rf`, not moved to Trash. Local rollback requires Time Machine/local backup, app reinstall, or cloud re-sync.
+- Microsoft Office/OneDrive/Outlook/OneNote/Teams breakage: reinstall Microsoft 365/OneDrive and sign in again. Deleted containers/preferences are per-user app state; reinstall recreates defaults, but local-only caches/preferences are gone.
+- Citrix breakage: reinstall Citrix Workspace and any deviceTRUST/Endpoint Analysis component required by the workplace. The removed `/Library/Application Support/deviceTRUST` folder was root-owned support code.
+- MoneyWiz breakage: reinstall MoneyWiz and restore from its sync/account/iCloud data if needed. The package receipt was removed, not app data beyond the earlier `com.moneywiz.personalfinance` container if user removed it.
+- Browser/site state breakage: Safari local storage/cookies for Microsoft/Citrix sites may require signing in again.
+- Recent-document entries are cosmetic and will rebuild as apps are used.
+
+### Still visible before restart
+- Background Task Management still shows a disabled stale entry:
+  - `com.microsoft.OneDriveStandaloneUpdaterDaemon`
+  - Status seen via `sfltool dumpbtm`: `Disposition: [disabled, allowed, visible, not notified]`, `URL: (null)`, `Identifier: Unknown Developer`.
+- `launchctl print gui/$(id -u)` still prints enabled-name lines for Citrix/Microsoft, but direct `launchctl print gui/$(id -u)/<label>` cannot find the services. Treat as registration/cache state unless a backing plist reappears.
+
+### Low-risk user data traces still present
+- Recent-document lists:
+  - `~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.microsoft.excel.sfl2`
+  - `.../com.microsoft.word.sfl2`
+  - `.../com.microsoft.powerpoint.sfl2`
+  - `.../com.citrix.receiver.helper.sfl3`
+  - `.../com.citrix.citrixreceiverlauncher.sfl3`
+- Safari local storage for Office/Outlook/SharePoint:
+  - `~/Library/Safari/LocalStorage/https_outlook.office365.com_0.localstorage*`
+  - `~/Library/Safari/LocalStorage/https_portal.office.com_0.localstorage*`
+  - `~/Library/Safari/LocalStorage/https_yuoffice-my.sharepoint.com_0.localstorage*`
+- iCloud containers remain unless user chooses optional cleanup:
+  - `~/Library/Mobile Documents/iCloud~com~microsoft~azureauthenticator`
+  - `~/Library/Mobile Documents/iCloud~com~microsoft~skydrive`
+  - `~/Library/Mobile Documents/iCloud~com~microsoft~onenote`
+  - `~/Library/Mobile Documents/iCloud~com~microsoft~skype~teams`
+  - `~/Library/Mobile Documents/iCloud~com~microsoft~officemobile`
+  - `~/Library/Mobile Documents/iCloud~moneywiz~personalfinance`
+- Ignore false positives from LibreOffice, iWork `OfficeFonts.plist`, Apple CoreSpotlight `receiver.*`, Apple Passwords, and 1Password.
+
+### After restart tonight
+Run:
+
+```bash
+sfltool dumpbtm | rg -i "microsoft|onedrive|citrix|receiver|moneywiz|minergate"
+launchctl print gui/$(id -u) 2>/dev/null | rg -i "microsoft|onedrive|citrix|receiver|moneywiz|minergate"
+ps -eo pid,ppid,etime,command | rg -i "microsoft|onedrive|citrix|receiver|moneywiz|minergate"
+```
+
+Expected: no active processes; ideally no BTM result. If `com.microsoft.OneDriveStandaloneUpdaterDaemon` remains after restart, it is a stale disabled BTM registration with no file URL. Next step is to inspect/remove via macOS Login Items & Background Items UI or research the current `sfltool`/BTM reset method for this macOS version before attempting any destructive database edit.
 
 ---
 
@@ -322,7 +730,7 @@ The one tested DKL variant that **worked** after proper tuning: **DKL(P_rv ‖ Q
 
 **Full crontab (updated 2026-06-15 — expiry crons now Thu+Fri w/ settlement-day guard):**
 ```
-1,31 9-16 * * 1-4   cron_parallel.sh         Mon-Thu, :01/:31 of 9 AM-4 PM   (live ranker, extended to 4 PM)
+1,31 9-16 * * 1-5   cron_parallel.sh         Mon-Fri, :01/:31 of 9 AM-4 PM   (live ranker; Fri scans same-day DTE0)
 1 16 * * 4,5        cron_expire.sh           Thu+Fri 4:01 PM    (guarded: acts only on the week's settlement day)
 1,31 9-15 * * 4,5   cron_track_expiring.sh   Thu+Fri MTM        (guarded)
 1 15 * * 4,5        cron_close_alert.sh      Thu+Fri 3:01 PM    (guarded)
@@ -505,6 +913,134 @@ python3 -u build_rv_table.py
 
 ---
 
-## 12. Tone
+## 12. Production migration plan — Mac mini runner, Mya display, MacBook dev
+
+Goal: stop running production GEPO live ops on the 2020 Intel MacBook Air. The Air is only 2-core i3 / 8GB RAM and is already showing fan/heat problems under IB Gateway + pandas/parquet + Codex/browser/background jobs. Production should be boring and dedicated.
+
+### Target shape
+
+- **Mac mini:** production runner. Runs IB Gateway, live option/SPY fetches, ranking, freezing, tracking, expiry settlement, health checks, and upload/sync to Mya.
+- **Mya:** web/display server. Serves Flask/gunicorn/nginx and receives generated live artifacts. No IBKR credentials required.
+- **MacBook Air:** dev only. Code edits, backtests, manual checks. Production cron disabled after the mini proves itself.
+
+### Hardware decision
+
+Buy **M4 Mac mini 16GB / 256GB** unless a 24GB/512GB refurb is close in price. User quoted roughly CAD 1100 for 16/256 vs CAD 1700 for 24/512; at that spread, do not pay the extra CAD 600 for this workload.
+
+Reasoning:
+- 16GB is enough if the mini is dedicated to production runner duties.
+- Storage is easy to extend with a 1TB external USB-C/NVMe SSD.
+- Spend savings on UPS, remote access reliability, external storage, and possibly AppleCare.
+- 24GB/512GB only makes sense if the mini also becomes a research/backtest workstation.
+
+### Network and physical setup
+
+Mac mini has built-in Wi-Fi, so Ethernet is not required for phase 1. Use Wi-Fi if running cable from the front closet is painful. Jobs run every 15-30 minutes, so brief network blips are survivable if health checks alert.
+
+Initial setup needs a temporary screen/input path:
+- TV or monitor over HDMI.
+- USB keyboard works. If keyboard/mouse are USB-A, use a USB-C hub.
+- Bluetooth mouse usually works during setup, but wired/borrowed mouse is easier.
+- After setup, enable Apple Screen Sharing for home access, Chrome Remote Desktop for away-from-home access, and SSH/Remote Login for terminal work. Then run the mini headless.
+
+Later wired options if Wi-Fi proves flaky:
+- MoCA adapters if coax outlets exist near router and mini.
+- Powerline Ethernet.
+- Mesh Wi-Fi node with Ethernet jack near mini.
+- One professionally run Ethernet cable.
+
+### IBKR operating model
+
+IBKR Gateway/TWS is not serverless. It needs GUI login/authentication and occasional attention. IB Gateway is still the right production app because it is lighter than full TWS.
+
+Phase 1: use the existing IBKR username on the mini. If logging into IBKR elsewhere kicks the Gateway/API session, remote into the mini and relogin Gateway. Health checks should alert when market data goes stale.
+
+Phase 2 if this gets annoying: create a second IBKR username dedicated to the mini/API. IBKR allows additional usernames, but market data entitlements are username/session-specific, so duplicate OPRA/data fees may apply.
+
+### Migration checklist
+
+1. **Clean Git/security first.**
+   - Rotate the GitHub token that appeared embedded in the `origin` remote URL.
+   - Set token-free remote:
+     ```bash
+     git remote set-url origin https://github.com/pjmercuri0/gepo-backtest.git
+     ```
+   - Commit/push the code intended for production.
+
+2. **Set up the mini.**
+   - Complete macOS setup.
+   - Join Wi-Fi.
+   - Enable Screen Sharing and Remote Login.
+   - Install Chrome Remote Desktop for away-from-home access.
+   - Disable computer sleep; display sleep is OK.
+   - Install Xcode Command Line Tools, git, Python tooling, and IB Gateway.
+
+3. **Clone and install.**
+   ```bash
+   git clone https://github.com/pjmercuri0/gepo-backtest.git
+   cd gepo-backtest
+   python3 -m venv .venv
+   . .venv/bin/activate
+   pip install -r requirements.txt -r live/requirements.txt
+   ```
+
+4. **Copy live state from MacBook to mini.**
+   These dirs are mostly gitignored; git clone is not enough:
+   ```bash
+   rsync -az live/frozen live/intraday_picks live/ranked live/data mini:~/gepo-backtest/live/
+   ```
+
+5. **Create `~/.gepo_env` on the mini.**
+   ```bash
+   export MYA_SSH_HOST="ubuntu@..."
+   export MYA_REMOTE_BASE="/opt/vito/gepo-backtest/live"
+   export IB_PORT=4001
+   # optional:
+   export MYA_SSH_KEY="$HOME/.ssh/id_ed25519"
+   ```
+
+6. **IB Gateway smoke test.**
+   - Log into IB Gateway on the mini.
+   - Confirm API/socket clients enabled.
+   - Confirm live port `4001` or paper port `4002`.
+   - Run:
+     ```bash
+     python3 -m live.fetch_spy_intraday
+     python3 -m live.health_check --force
+     bash live/cron_parallel.sh
+     bash live/upload_to_mya.sh
+     ```
+
+7. **Move scheduling.**
+   - Short term: copy existing cron schedule to the mini because the repo already has cron wrappers.
+   - Better final form: `launchd` plists for scan, health, daily bars, pool refresh, expiry/track/close-alert jobs.
+   - Remove/disable production cron from MacBook only after the mini completes a real market scan and Mya updates correctly.
+
+8. **Backups and rollback.**
+   - Back up `live/frozen/`, `live/intraday_picks/`, `live/ranked/`, `live/data/`, and any actual-fill edits.
+   - Do not expose the IBKR API socket publicly. Keep it localhost-only.
+   - Keep MacBook capable of manual emergency run during cutover, but do not let both machines run production schedules at the same time.
+
+### Repo work still worth adding
+
+Created `deploy/mac-mini/` on 2026-08-18 as tomorrow's phase-1 setup kit:
+- `README.md` — physical setup, clone/install, state copy, smoke tests, crontab cutover, acceptance checks.
+- `gepo.env.example` — template for `~/.gepo_env` on the mini.
+- `bootstrap.sh` — macOS checks, directory creation, and dependency install for both `python3` and `/usr/bin/python3` when they differ.
+- `smoke_test.sh` — import checks, repo/state checks, forced health alert, optional `--ibkr` SPY fetch, optional `--full` live pipeline.
+- `crontab.template` — current production schedule with `__REPO__` placeholder.
+- `install_crontab.sh` — preserves existing crontab outside a `BEGIN/END GEPO MAC MINI` managed block; supports `--dry-run`.
+
+Launchd plists are still the cleaner final form, but phase 1 should use cron because the live wrappers are already cron-shaped and tested.
+
+Also consider pinning live dependencies more explicitly. Current `requirements.txt` is backtest-focused and `live/requirements.txt` carries Flask/pyarrow/ib_insync/gunicorn.
+
+### Trading-stage note
+
+Current stage is testing money, not full production bankroll. User has about CAD 908 in IBKR, enough to test tiny defined-risk spreads if IBKR preview confirms buying power and market-data minimums remain satisfied. For a GE 375/377.5 bear call at 1.40 credit, max loss is `(2.50 - 1.40) * 100 = USD 110` per 1-lot, but actual max loss depends on actual fill credit. Do not rely on the site mid as guaranteed fill.
+
+---
+
+## 13. Tone
 
 User is invested in GROUND (it's their invention). When proposing alternatives that REPLACE GROUND's structure, flag that clearly. When changes preserve GROUND while improving inputs (like IV-rank or rv_vs_iv DKL), they're fair game. User wants critique not flattery; verify numbers before claiming; acknowledge errors directly. Error counter remains visible — read `feedback_error_counter.md` early.
