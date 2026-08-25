@@ -14,7 +14,7 @@
             {{ day.date }}{% if day.date_dow %} <span style="color:#888780;font-weight:normal">{{ day.date_dow }}</span>{% endif %}
             {% if day.mock %}<span style="font-size:11px;padding:1px 6px;border:1px solid #888;border-radius:3px;margin-left:8px;vertical-align:middle">MOCK</span>{% endif %}
           </div>
-          <div class="week-sub">frozen {{ day.frozen_at or "—" }}{% if day.last_updated_ts %} · updated <span id="ut-{{ loop.index0 }}" data-ts="{{ day.last_updated_ts }}">…</span>{% endif %}</div>
+          <div class="week-sub">frozen {{ day.frozen_at or "—" }}{% if day.freeze_topup_added_count %} · +{{ day.freeze_topup_added_count }} from {{ day.freeze_topup_at }}{% endif %}{% if day.last_updated_ts %} · updated <span id="ut-{{ loop.index0 }}" data-ts="{{ day.last_updated_ts }}">…</span>{% endif %}</div>
           {# Regime/SPY line removed 2026-06-09: gate is OFF, both directions
              eligible. Per-pick direction is shown in the ticker cell instead. #}
           {% if day.vol_gate and day.vol_gate.rv_20 is not none %}
@@ -95,6 +95,7 @@
           <tr{% if last_track and last_track.get('assignment_risk') %} class="assignment-risk"{% endif %}>
             <td>{{ loop.index }}</td>
             <td class="fw">{{ tk }}
+              {% if p.freeze_added_at %}<span style="margin-left:6px;color:#e8b366;font-size:10px;font-weight:600" title="added from the {{ p.freeze_added_at }} ranking">+{{ p.freeze_added_at }}</span>{% endif %}
               {%- set sv = p.short_volume|default(none) -%}
               {%- set lv = p.long_volume|default(none) -%}
               {% if p.spread_type == 'bull_put' %}

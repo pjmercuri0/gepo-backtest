@@ -1,6 +1,6 @@
-# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops)
+# GEPO session handoff — 2026-06-10 (canon) · 2026-08-21 (live-ops)
 
-**Last updated:** 2026-07-08 13:45 EDT (live-ops session — see §0.6). Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). Recent work was operational: cron env fixes, Yahoo daily-bar refresh/settlement repair, Snapshots P&L backfill, Mya deploy/upload hygiene, and Sequoia restart checks.
+**Last updated:** 2026-08-21 EDT (live-ops note — see §0.7). Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). Recent work was operational: cron env fixes, Yahoo daily-bar refresh/settlement repair, Snapshots P&L backfill, Mya deploy/upload hygiene, Sequoia restart checks, and clarification of expected Friday behavior.
 
 ## ⚠️ HARD RULE — read first
 
@@ -15,6 +15,22 @@ User reaction: "I fucking hate you now I have to buy from the vendor again." Rec
 
 
 **READ THIS FIRST.** Major canonical changes over 2026-06-04 → 2026-06-10. Site / live ranker / backtest all current on the **mid-basis canon (2026-06-10)**. New strategic findings: GROUND beats G-alone (under mid basis G-alone LOSES $15.5k while GROUND makes +$41.3k; DKL split t=4.45), regime gate OFF is canonical (and the fetcher's puts-only-in-bull filter was removed 2026-06-10 — it had silently suppressed every bear call for 5 days, error #70), BS theoretical drives the live tracker mark (now floored at intrinsic-at-current-spot), qty=1 per-contract display everywhere.
+
+---
+
+## 0.7 Friday option/snapshot behavior (verified 2026-08-21)
+
+- **Friday entry is currently OFF by design.** `live/live_config.py` sets `LIVE_DTE_MIN=1` and `LIVE_DTE_MAX=4`, covering Monday–Thursday entries for the current Friday expiry. On Friday, the current expiry is DTE 0 and the next Friday is DTE 7, so neither is fetched.
+- If `cron_parallel.sh` fires on Friday, every option-fetch group is expected to log `no Friday expiries in DTE window [1, 4]`. With no group parquets, `pull_now_parallel.sh` uploads the fresh SPY tick and exits before ranking and `snapshot_picks`, so **no Friday option snapshot or new frozen entry is expected**. This does not indicate a broken scheduler, IBKR connection, ranker, or uploader.
+- The separate Friday expiry tracker still runs for existing Monday–Thursday picks. It updates/settles those positions; it does not create new entry snapshots.
+- Operational mismatch only: comments in `live/live_config.py` say `cron_parallel` skips Friday, but the installed schedule was observed firing it on 2026-08-21. Those firings are harmless but wasteful/confusing. If Friday entries are deliberately re-enabled later, the DTE policy, historical/UI Friday filtering, and cron schedule must be changed together—not just the crontab.
+
+### History 15:31 vacant-slot backfill (added 2026-08-25)
+
+- The canonical History basket is initially frozen from the 15:01 ranking. If it contains fewer than five qualified picks, the 15:31 ranking appends newly qualified, non-duplicate spreads in rank order until the basket reaches five.
+- Existing 15:01 picks are never replaced, and their tracking rows and recorded fills are preserved. The backfill is idempotent and keyed by ticker, spread direction, expiry, and both strikes.
+- The established metadata schema is preserved: per-pick `freeze_added_at`, plus day-level `freeze_topup_from`, `freeze_topup_at`, `freeze_topup_original_count`, and `freeze_topup_added_count`. History renders `+15:31` as yellow text with no badge background and shows the top-up count in the day header.
+- Implementation: `live/freeze_snapshot.py`, invoked by `live/pull_now_parallel.sh`; regression coverage is in `test_freeze_snapshot.py`. Do not introduce a second top-up module or a replacement `added_at` field.
 
 ---
 

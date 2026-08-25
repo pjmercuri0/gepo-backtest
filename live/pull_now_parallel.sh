@@ -133,31 +133,11 @@ echo "✓ Snapshot, merge, and rankings complete"
 # Archive this scan's qualified picks + settle expired ones (Snapshots tab).
 python3 -m live.snapshot_picks 2>&1 | sed "s/^/  [Snap] /"
 
-# On the 15:01 firing, freeze BEFORE the tracker so the newly-frozen file
-# gets its first mark captured in this same firing.
-#
-# Gate: hour=15 AND today's frozen file doesn't yet exist.
-# - hour=15 alone is sufficient because the cron only fires once at hour 15
-#   (the 15:01 firing). The file-exists guard prevents re-freeze on manual
-#   reruns. To force a re-freeze, delete live/frozen/$(date +%F).json first.
-TODAY="$(date +%Y-%m-%d)"
-FROZEN_OUT="live/frozen/${TODAY}.json"
-if [ "$(date +%H)" = "15" ] && [ ! -e "$FROZEN_OUT" ]; then
-    echo "[freeze] writing ${FROZEN_OUT}..."
-    /usr/bin/python3 - <<PYEOF
-import json
-from pathlib import Path
-src = Path("live/ranked/latest.json")
-dst = Path("$FROZEN_OUT")
-dst.parent.mkdir(parents=True, exist_ok=True)
-with open(src) as f:
-    d = json.load(f)
-d["frozen_at"] = "15:01"
-d["mock"] = False
-with open(dst, "w") as f:
-    json.dump(d, f, indent=2)
-print(f"  ✓ froze {dst} ({len(d.get('top_picks', []))} picks)")
-PYEOF
+# Freeze the 15:01 basket, then top up vacant slots from the 15:31 ranking.
+# freeze_snapshot preserves original picks/tracking/fills, adds only unique
+# spreads, and records the established freeze_added_at/freeze_topup_* metadata.
+if [ "$(date +%H)" = "15" ]; then
+    python3 -m live.freeze_snapshot
 fi
 
 # Update MTM tracking on all active frozen files using the parquet we
