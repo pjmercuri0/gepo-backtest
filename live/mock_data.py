@@ -237,7 +237,7 @@ def _build_payload(when: datetime, n_candidates: int = 30, seed: int = 0,
     for p in picks:
         p["qualified"] = p["GROUND"] >= threshold
     top_picks = picks[:live_config.TOP_N_DISPLAY]
-    ticker_rows = picks[:live_config.TICKER_LIMIT]
+    ticker_rows = [p for p in picks if p["GROUND"] > 0]
 
     return {
         "snapshot_ts":   when.isoformat(timespec="seconds"),

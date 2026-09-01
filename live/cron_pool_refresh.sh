@@ -6,11 +6,7 @@
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
 
-# Cron/launchd can inherit a stale DEVELOPER_DIR pointing at a removed Xcode
-# app, which makes Apple's /usr/bin/python3 fail via xcrun before our code runs.
-unset DEVELOPER_DIR
-
-[ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
+[ -f live/cron_env.sh ] && . live/cron_env.sh
 
 # Hold the Mac awake for the pool rebuild (~25M CSV rows → 5-10 min). caffeinate
 # self-terminates after 900s. It cannot WAKE a sleeping Mac, only keep an awake
@@ -21,6 +17,6 @@ unset DEVELOPER_DIR
 LOG=live/logs/pool_refresh.log
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
-  /usr/bin/python3 monthly_pool_refresh.py
+  "${GEPO_PYTHON:-python3}" monthly_pool_refresh.py
   echo ""
 } >> "$LOG" 2>&1

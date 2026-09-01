@@ -44,12 +44,11 @@ LOG_PATH         = Path(live_config.LOGS_DIR) / "health.log"
 STALE_THRESHOLD_MIN = 60
 
 
-# Market hours (US Eastern). The cron schedule already restricts to 10-17
-# weekday, but we double-check here so a misconfigured cron entry doesn't
-# spam overnight. 17:15 cushion lets the 17:00 health check still alert
-# on a failed 16:45 parallel firing.
+# Market hours (US Eastern). Keep this tight so Mya does not receive stale
+# alerts after the tradeable session; normal expiry/settlement jobs handle
+# post-close state separately.
 MARKET_OPEN  = dtime(hour=9,  minute=30)
-MARKET_CLOSE = dtime(hour=17, minute=15)
+MARKET_CLOSE = dtime(hour=16, minute=5)
 
 
 def _in_market_hours(now: datetime) -> bool:
@@ -62,6 +61,15 @@ def _spy_mtime() -> datetime | None:
     if not SPY_PATH.exists():
         return None
     return datetime.fromtimestamp(SPY_PATH.stat().st_mtime)
+
+
+def _spy_has_quote() -> bool:
+    try:
+        with open(SPY_PATH) as f:
+            payload = json.load(f)
+        return payload.get("mark") is not None
+    except (OSError, json.JSONDecodeError):
+        return False
 
 
 def _atomic_write_json(path: Path, payload: dict) -> None:
@@ -130,6 +138,12 @@ def main() -> int:
         out = emit_alert("no SPY snapshot file on disk", None, None)
         _append_log(f"{now.isoformat(timespec='seconds')}  ALERT (no file)  → {out.name}")
         print(f"  ✗ no SPY snapshot file; wrote alert {out}")
+        return 0
+
+    if not _spy_has_quote():
+        out = emit_alert("SPY snapshot has no quote", None, mtime.isoformat())
+        _append_log(f"{now.isoformat(timespec='seconds')}  ALERT (empty quote)  → {out.name}")
+        print(f"  ✗ SPY snapshot has no quote; wrote alert {out}")
         return 0
 
     age_min = (now - mtime).total_seconds() / 60

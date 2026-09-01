@@ -8,7 +8,7 @@
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
 
-[ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
+[ -f live/cron_env.sh ] && . live/cron_env.sh
 /usr/bin/caffeinate -i -t 600 &
 
 LOG=live/logs/calendar_refresh.log
@@ -27,8 +27,8 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
   echo ""
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
   echo "[1/2] Earnings calendar refresh..."
-  /usr/bin/python3 fetch_earnings.py --start "$(date '+%Y-%m-%d')" --end "$(date -v+30d '+%Y-%m-%d')" --workers 8
+  "${GEPO_PYTHON:-python3}" fetch_earnings.py --start "$(date '+%Y-%m-%d')" --end "$(date -v+30d '+%Y-%m-%d')" --workers 8
   echo ""
   echo "[2/2] Dividend calendar refresh..."
-  /usr/bin/python3 fetch_dividends.py --workers 8
+  "${GEPO_PYTHON:-python3}" fetch_dividends.py --workers 8
 } >> "$LOG" 2>&1

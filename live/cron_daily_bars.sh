@@ -13,7 +13,7 @@ mkdir -p live/logs
 unset DEVELOPER_DIR
 
 # Source the user's shell env so IBKR settings etc. are visible to cron.
-[ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
+[ -f live/cron_env.sh ] && . live/cron_env.sh
 
 # Keep Mac awake for the next 8 minutes (IBKR bars < 2 min + Yahoo refresh ~70s).
 /usr/bin/caffeinate -i -t 480 &
@@ -33,15 +33,15 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
 {
   echo ""
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
-  /usr/bin/python3 -m live.fetch_daily_bars
+  "${GEPO_PYTHON:-python3}" -m live.fetch_daily_bars
   # Refresh Yahoo daily closes (MERGE, never wipe) so snapshot_picks.settle()
   # can resolve each pick's expiry close.
-  /usr/bin/python3 fetch_yahoo_recent.py
+  "${GEPO_PYTHON:-python3}" fetch_yahoo_recent.py
   # Settle expired snapshot picks now (post_close=True): same-day expiries
   # settle this evening off the live IB RTH close, matching the History tab,
   # instead of lagging to the next-day Yahoo "morning after". Settle-only —
   # no capture() — so a stale Friday latest.json isn't re-snapshotted.
-  /usr/bin/python3 -c "from live import snapshot_picks; snapshot_picks.settle(post_close=True)"
+  "${GEPO_PYTHON:-python3}" -c "from live import snapshot_picks; snapshot_picks.settle(post_close=True)"
   # Push the freshly-settled intraday_picks to Mya so the Snapshots tab shows
   # outcomes the same evening instead of waiting for the next morning's scan.
   if [ -n "${MYA_SSH_HOST:-}" ]; then

@@ -56,6 +56,20 @@ def _with_added_marker(pick: dict, hhmm: str) -> dict:
     return out
 
 
+def _latest_hhmm(latest: dict, fallback: datetime) -> str:
+    snap_file = str(latest.get("snapshot_file") or "")
+    stem = Path(snap_file).stem
+    if len(stem) == 4 and stem.isdigit():
+        return f"{stem[:2]}:{stem[2:]}"
+    snap_ts = latest.get("snapshot_ts")
+    if isinstance(snap_ts, str):
+        try:
+            return datetime.fromisoformat(snap_ts).strftime("%H:%M")
+        except ValueError:
+            pass
+    return fallback.strftime("%H:%M")
+
+
 def _read_json(path: Path) -> dict | None:
     try:
         with open(path) as f:
@@ -88,6 +102,7 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
         return 1
 
     latest_picks = latest.get("top_picks") or []
+    latest_hhmm = _latest_hhmm(latest, now)
     existing = _read_json(dst) if dst.exists() else None
     if existing is not None and (existing.get("top_picks") or []):
         existing_picks = existing.get("top_picks") or []
@@ -105,7 +120,7 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
             key = _dedupe_key(pick)
             if key in seen:
                 continue
-            additions.append(_with_added_marker(pick, now.strftime("%H:%M")))
+            additions.append(_with_added_marker(pick, latest_hhmm))
             seen.add(key)
             if len(existing_picks) + len(additions) >= target:
                 break
@@ -118,9 +133,9 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
         payload["top_picks"] = existing_picks + additions
         original_at = str(payload.get("frozen_at") or live_config.FREEZE_AT)
         if "+" not in original_at:
-            payload["frozen_at"] = f"{original_at}+{now:%H:%M}"
+            payload["frozen_at"] = f"{original_at}+{latest_hhmm}"
         payload["freeze_topup_from"] = latest.get("snapshot_file")
-        payload["freeze_topup_at"] = now.strftime("%H:%M")
+        payload["freeze_topup_at"] = latest_hhmm
         payload["freeze_topup_original_count"] = len(existing_picks)
         payload["freeze_topup_added_count"] = len(additions)
         payload["mock"] = False
@@ -136,11 +151,11 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
         return 0
 
     payload = dict(latest)
-    payload["frozen_at"] = now.strftime("%H:%M")
+    payload["frozen_at"] = latest_hhmm
     payload["mock"] = False
     if existing is not None:
         payload["freeze_fallback_from"] = existing.get("snapshot_file")
-        payload["freeze_fallback_at"] = now.strftime("%H:%M")
+        payload["freeze_fallback_at"] = latest_hhmm
         action = "replaced blank"
     else:
         action = "wrote"

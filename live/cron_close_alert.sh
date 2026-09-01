@@ -10,11 +10,11 @@
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
 
-[ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
+[ -f live/cron_env.sh ] && . live/cron_env.sh
 
 # Scheduled Thu+Fri; only act on the week's real settlement day so holiday-
 # shifted weeks (Friday NYSE holiday → Thursday expiry) alert on the right day.
-if ! /usr/bin/python3 -m live.trading_calendar --is-settlement-day; then
+if ! "${GEPO_PYTHON:-python3}" -m live.trading_calendar --is-settlement-day; then
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') not weekly settlement day — skip ===" >> live/logs/close_alert.log
   exit 0
 fi
@@ -37,7 +37,7 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
   if [ -n "${MYA_SSH_HOST:-}" ]; then
     bash live/pull_from_mya.sh 2>&1 | sed "s/^/  [Pull] /"
   fi
-  /usr/bin/python3 -m live.close_alert
+  "${GEPO_PYTHON:-python3}" -m live.close_alert
   if [ -n "${MYA_SSH_HOST:-}" ]; then
     bash live/upload_to_mya.sh 2>&1 | sed "s/^/  [Upload] /"
   fi

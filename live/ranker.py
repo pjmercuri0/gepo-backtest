@@ -284,6 +284,7 @@ def _vol_gate_status(snap_time: datetime) -> dict:
 def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
     """Build the JSON payload consumed by the webapp."""
     snap_time = datetime.now()
+    dte_min, dte_max = live_config.live_dte_window(snap_time.date())
 
     # Ensure qualified column exists (fallback if missing from ranker).
     # Skip on empty ranked: no GROUND column exists either, so the
@@ -301,16 +302,15 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
     # Top-N picks (canonical): top-N from QUALIFIED only (GROUND ≥ per-DOW
     # threshold). Cards rendered are exactly these — no dimmed extras. May
     # yield <N picks on low-edge days.
-    # ticker_rows is the full ranked candidate list (top TICKER_LIMIT by GROUND)
-    # for the table below; template dims rows that are either rank>5 or below
-    # threshold.
+    # ticker_rows contains every positive-GROUND candidate for the table below;
+    # the table still dims rows that are either rank>5 or below threshold.
     # Canonical: top cards = top-5 QUALIFIED picks only (above per-DOW threshold).
     # On low-edge days you may see < 5 cards — that's intentional, only show
     # picks that actually meet the GROUND threshold. Full ranked list (including
     # below-threshold) lives in `ticker_rows` for the table below.
     qualified_only = ranked[ranked.get("qualified", False) == True] if not ranked.empty else ranked
     top = qualified_only.head(live_config.TOP_N_DISPLAY)
-    ticker_rows = ranked.head(live_config.TICKER_LIMIT)
+    ticker_rows = ranked[ranked["GROUND"] > 0]
 
     def row_to_dict(r):
         # JSON-safe rendering of one ranked spread.
@@ -364,8 +364,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
         "data_date":     snap_time.date().isoformat(),
         "n_candidates":  int(len(ranked)),
         "config": {
-            "DTE_MIN":          live_config.LIVE_DTE_MIN,
-            "DTE_MAX":          live_config.LIVE_DTE_MAX,
+            "DTE_MIN":          dte_min,
+            "DTE_MAX":          dte_max,
             "DELTA_MIN":        backtest_config.DELTA_MIN,
             "DELTA_MAX":        backtest_config.DELTA_MAX,
             "MIN_CREDIT_RATIO": backtest_config.MIN_CREDIT_RATIO,

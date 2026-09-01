@@ -1,6 +1,6 @@
-# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover)
+# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair)
 
-**Last updated:** 2026-08-19 21:20 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). Recent repo/live work was operational: IBKR quote-outage recovery, health-alert hygiene, 15:01+15:31 freeze top-ups, OOT July/August update, live table display change, CPU/process triage, and Mac mini production-runner setup.
+**Last updated:** 2026-08-24 12:25 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). Recent repo/live work was operational: IBKR quote-outage recovery, health-alert hygiene, 15:01+15:31 freeze top-ups, OOT July/August updates, live table display change, CPU/process triage, Mac mini production-runner setup, and 2026-08-24 repair of missing Aug 20 OOT bets + missing History top-up.
 
 ## ⚠️ HARD RULE — read first
 
@@ -15,6 +15,96 @@ User reaction: "I fucking hate you now I have to buy from the vendor again." Rec
 
 
 **READ THIS FIRST.** Major canonical changes over 2026-06-04 → 2026-06-10. Site / live ranker / backtest all current on the **mid-basis canon (2026-06-10)**. New strategic findings: GROUND beats G-alone (under mid basis G-alone LOSES $15.5k while GROUND makes +$41.3k; DKL split t=4.45), regime gate OFF is canonical (and the fetcher's puts-only-in-bull filter was removed 2026-06-10 — it had silently suppressed every bear call for 5 days, error #70), BS theoretical drives the live tracker mark (now floored at intrinsic-at-current-spot), qty=1 per-contract display everywhere.
+
+---
+
+## 0.13 Current ops repair (2026-08-24) — OOT Aug 20 + History 15:31 top-up
+
+### OOT Aug 20 missing bets — fixed
+
+User uploaded the new August vendor files and requested **append only new days; do not rerun old days**.
+
+Work done:
+- Appended only new vendor rows beyond existing OOT parquet max:
+  - input dates: `2026-08-19`, `2026-08-20`, `2026-08-21`
+  - source files: `data/DG_2026August/Greek_20260819_OData*.csv`, `Greek_20260820_OData*.csv`, `Greek_20260821_OData*.csv`
+  - skipped old August files outside append window
+  - appended `220,638` rows
+  - combined OOT parquet now covers `DataDate 2026-01-01 -> 2026-08-21`
+  - backup written before append: `output/2026_sp500_last_oot_combined.parquet.bak_before_append_20260824_120000`
+- First `report_oot_2026.py` run extended cache only through `2026-08-19`; user noticed no Aug 20 bets.
+- Root cause: `report_oot_2026.py` filters candidate dates through the SPY daily calendar. `data/daily_bars_yahoo/SPY.csv` stopped at `2026-08-19`, so valid `2026-08-20` vendor rows were filtered out before scoring.
+- Patched data append-only:
+  - appended SPY calendar rows for `2026-08-20` and `2026-08-21` from vendor SPY `UnderlyingPrice`:
+    - `2026-08-20 = 762.60`
+    - `2026-08-21 = 765.72`
+  - backup: `data/daily_bars_yahoo/SPY.csv.bak_before_aug20_patch_20260824_121342`
+  - appended RV lookup rows for `2026-08-20` and `2026-08-21`, `464` symbols per day
+  - backup: `output/rv_table.parquet.bak_before_aug20_patch_20260824_121342`
+- Patched `report_oot_2026.py`:
+  - tolerates headered `data/daily_bars_yahoo/SPY.csv`
+  - fills missing SPY calendar dates from `output/2026_sp500_last_oot_combined.parquet` in memory, so future vendor dates do not silently vanish when Yahoo/SPY daily bars lag
+  - handles empty candidate frames cleanly after the cache reaches a date where the only newer parquet date is an inactive Friday
+- Re-ran normal cached report path. It did **not** use `--no-cache`; it extended after the cached max only.
+
+Result:
+- OOT picks cache now has `279` rows, max entry `2026-08-20`.
+- Aug 20 picks added:
+  - `ACN` bear call `182.5/185`, exp `2026-08-21`
+  - `TJX` bull put `141/140`, exp `2026-08-21`
+  - `ABT` bear call `114/115`, exp `2026-08-21`
+  - `LOW` bear call `217.5/220`, exp `2026-08-21`
+  - `PYPL` bear call `62.5/63`, exp `2026-08-21`
+- `live/data/oot_equity.json` regenerated and uploaded directly to Mya despite MacBook `live/NOT_PRODUCTION` guard by rsyncing only that one JSON.
+- Mya verification after upload:
+  - file size `249123`
+  - `window_end=2026-08-21`
+  - `n_trades=279`
+  - `strategy_final=21857.0`
+
+Important: full `live/upload_to_mya.sh` on the MacBook correctly refuses because `live/NOT_PRODUCTION` exists. Do not override for a full upload from the MacBook unless intentionally repairing one file and you know exactly what is being sent.
+
+### History did not show the 15:31 pick — fixed on Mya, code patch pending deployment
+
+User noticed History did not add the `15:31` pick. Diagnosis on Mya for `2026-08-24`:
+- `live/frozen/2026-08-24.json` had 4 picks from the `15:01` freeze:
+  - `NEE`, `GS`, `ISRG`, `BMY`
+- `live/ranked/latest.json` was the `15:31` scan and had 1 qualified pick:
+  - `AMGN`
+- `live/intraday_picks/2026-08-24.json` correctly recorded the `1532` scan with 1 pick.
+- Therefore the scan existed; the frozen History file simply was not topped up during the production run.
+
+Manual production repair:
+```bash
+ssh "$MYA_SSH_HOST" 'cd /opt/vito/gepo-backtest && python3 -m live.freeze_snapshot --latest live/ranked/latest.json'
+```
+
+That immediately topped up:
+- `4 + 1 = 5`
+- frozen picks now: `NEE`, `GS`, `ISRG`, `BMY`, `AMGN`
+- restamped production JSON so `AMGN` shows `freeze_added_at="15:31"` and day header shows `frozen_at="15:01+15:31"`.
+
+Code patch made locally in `live/freeze_snapshot.py`:
+- new helper `_latest_hhmm(latest, fallback)`
+- top-up/fallback labels now use the source ranked snapshot time (`snapshot_file` stem like `1531`, or `snapshot_ts`) instead of the wall-clock time when the repair command happens
+- syntax check passed with:
+  ```bash
+  PYTHONPYCACHEPREFIX=/tmp/gepo_pycache python3 -m py_compile live/freeze_snapshot.py
+  ```
+
+Still todo:
+- Deploy/pull the patched `live/freeze_snapshot.py` onto the Mac mini production runner so future top-up labels are correct there.
+- Investigate why the production 15:31 run did not execute the freeze top-up automatically even though `live/pull_now_parallel.sh` calls `python3 -m live.freeze_snapshot` for every `15:xx` scan. The one-off manual run proved the data and code path can top up correctly.
+- Check Mac mini `live/logs/parallel_pull.log` around `2026-08-24 15:31` directly on the mini if possible. Mya did not show useful `[freeze]` log lines.
+
+### Current dirty files relevant to this repair
+
+Expected local modified files from this session:
+- `report_oot_2026.py`
+- `live/freeze_snapshot.py`
+- `live/data/oot_equity.json`
+
+There are many other pre-existing dirty live files in the worktree. Treat them as unrelated unless explicitly investigating them; do not revert user/previous-session changes.
 
 ---
 
