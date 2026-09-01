@@ -175,6 +175,13 @@ def main() -> int:
         print(f"  ✗ both attempts failed; preserving previous snapshot", flush=True)
         return 1
 
+    # A connected Gateway can still stop delivering quote fields. Do not
+    # replace the last valid tick with an all-null payload: that would make
+    # freshness monitoring treat a market-data outage as a successful update.
+    if snap.get("mark") is None:
+        print("  ✗ SPY returned no quote; preserving previous snapshot", flush=True)
+        return 1
+
     _atomic_write_json(OUT_PATH, snap)
 
     summary = (f"SPY {snap.get('mark', '—')}  "

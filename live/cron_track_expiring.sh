@@ -5,11 +5,11 @@
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
 
-[ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
+[ -f live/cron_env.sh ] && . live/cron_env.sh
 
 # Scheduled Thu+Fri; only act on the week's real settlement day so holiday-
 # shifted weeks (Friday NYSE holiday → Thursday expiry) track on the right day.
-if ! /usr/bin/python3 -m live.trading_calendar --is-settlement-day; then
+if ! "${GEPO_PYTHON:-python3}" -m live.trading_calendar --is-settlement-day; then
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') not weekly settlement day — skip ===" >> live/logs/track_expiring.log
   exit 0
 fi
@@ -43,7 +43,7 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
   EXPIRING=()
   for f in live/frozen/*.json; do
     [ -e "$f" ] || continue
-    if /usr/bin/python3 -c "
+    if "${GEPO_PYTHON:-python3}" -c "
 import json, sys
 d = json.load(open('$f'))
 if d.get('outcome'): sys.exit(1)
@@ -65,7 +65,7 @@ sys.exit(0 if exp == '$TODAY' else 1)
     for f in "${EXPIRING[@]}"; do
       DATE="$(basename "$f" .json)"
       CID=$((203 + i))
-      /usr/bin/python3 -m live.track_expiring --date "$DATE" --client-id $CID \
+      "${GEPO_PYTHON:-python3}" -m live.track_expiring --date "$DATE" --client-id $CID \
         > "live/logs/track_${DATE}.log" 2>&1 &
       PIDS+=($!)
       i=$((i + 1))

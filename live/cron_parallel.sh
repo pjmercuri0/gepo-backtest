@@ -6,11 +6,7 @@ cd "$(dirname "$0")/.."
 mkdir -p live/logs
 
 # Source the user's shell env so MYA_SSH_HOST etc. are visible to cron.
-[ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
-
-# Cron/launchd can inherit a stale DEVELOPER_DIR. If it points at a removed
-# full Xcode app, Apple's /usr/bin/python3 fails via xcrun before our code runs.
-unset DEVELOPER_DIR
+[ -f live/cron_env.sh ] && . live/cron_env.sh
 
 # Keep the Mac awake for the next 10 minutes (parallel pull takes ~3 min;
 # headroom for slow groups + SPY step). caffeinate self-terminates after 600s.

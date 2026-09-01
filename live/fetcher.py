@@ -26,6 +26,7 @@ CLI:
 from __future__ import annotations
 import argparse
 import asyncio
+import json
 import os
 import sys
 import time
@@ -58,10 +59,74 @@ except ImportError as e:
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
+def _cache_day() -> str:
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def _cache_path(kind: str, symbol: str) -> Path:
+    safe = symbol.replace("/", "_")
+    return Path(live_config.CACHE_DIR) / _cache_day() / f"{kind}_{safe}.json"
+
+
+def _read_json(path: Path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _write_json(path: Path, payload) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "w") as f:
+        json.dump(payload, f)
+    os.replace(tmp, path)
+
+
+def _contract_cache_key(expiry: str, strike: float, right: str) -> str:
+    return f"{expiry}|{float(strike):.8g}|{right}"
+
+
+def _contract_to_payload(c: Option) -> dict:
+    return {
+        "conId": int(c.conId),
+        "symbol": c.symbol,
+        "lastTradeDateOrContractMonth": c.lastTradeDateOrContractMonth,
+        "strike": float(c.strike),
+        "right": c.right,
+        "exchange": c.exchange or "SMART",
+        "currency": c.currency or "USD",
+        "multiplier": c.multiplier,
+        "localSymbol": c.localSymbol,
+        "tradingClass": c.tradingClass,
+    }
+
+
+def _payload_to_contract(d: dict) -> Option:
+    c = Option(
+        d["symbol"],
+        d["lastTradeDateOrContractMonth"],
+        float(d["strike"]),
+        d["right"],
+        d.get("exchange") or "SMART",
+    )
+    c.conId = int(d["conId"])
+    c.currency = d.get("currency") or "USD"
+    c.multiplier = d.get("multiplier") or "100"
+    c.localSymbol = d.get("localSymbol") or ""
+    c.tradingClass = d.get("tradingClass") or ""
+    return c
+
+
 # ── Date helpers ────────────────────────────────────────────────────────────
 
-def _weekly_expiries_in_dte_window(today: datetime.date) -> list[str]:
-    """Return YYYYMMDD strings for the weekly expiry whose DTE ∈ [LIVE_DTE_MIN, LIVE_DTE_MAX].
+def _weekly_expiries_in_dte_window(
+    today: datetime.date,
+    dte_min=None,
+    dte_max=None,
+) -> list[str]:
+    """Return YYYYMMDD strings for weekly expiries in the active live DTE window.
 
     The canonical weekly expires Friday. When that Friday is an NYSE full-close
     holiday (e.g. Juneteenth, Good Friday), the contract instead expires the
@@ -70,9 +135,11 @@ def _weekly_expiries_in_dte_window(today: datetime.date) -> list[str]:
     every ticker comes back "no qualified options" (the 2026-06-19 Juneteenth
     case that produced zero live picks all week).
     """
+    if dte_min is None or dte_max is None:
+        dte_min, dte_max = live_config.live_dte_window(today)
     expiries: list[str] = []
     seen: set[str] = set()
-    for offset in range(live_config.LIVE_DTE_MIN, live_config.LIVE_DTE_MAX + 1):
+    for offset in range(dte_min, dte_max + 1):
         d = today + timedelta(days=offset)
         if d.weekday() != 4:  # canonical weekly = Friday
             continue
@@ -80,7 +147,7 @@ def _weekly_expiries_in_dte_window(today: datetime.date) -> list[str]:
         while exp.weekday() >= 5 or pd.Timestamp(exp) in _NYSE_HOLIDAY_SET:
             exp -= timedelta(days=1)
         dte = (exp - today).days
-        if dte < live_config.LIVE_DTE_MIN or dte > live_config.LIVE_DTE_MAX:
+        if dte < dte_min or dte > dte_max:
             continue  # rolled out of window (e.g. Thursday entry → same-day expiry)
         s = exp.strftime("%Y%m%d")
         if s not in seen:
@@ -123,22 +190,34 @@ async def _qualify_options_for(
     halving the contract count.
     """
     symbol = stock.symbol
-    try:
-        chains = await ib.reqSecDefOptParamsAsync(stock.symbol, "", stock.secType, stock.conId)
-    except Exception as e:
-        print(f"  [{symbol}] reqSecDefOptParams failed: {e}", flush=True)
-        return []
+    chain_path = _cache_path("chain", symbol)
+    chain_payload = _read_json(chain_path)
+    if chain_payload:
+        available_exps = set(chain_payload.get("expirations") or [])
+        all_strikes = chain_payload.get("strikes") or []
+    else:
+        try:
+            chains = await ib.reqSecDefOptParamsAsync(stock.symbol, "", stock.secType, stock.conId)
+        except Exception as e:
+            print(f"  [{symbol}] reqSecDefOptParams failed: {e}", flush=True)
+            return []
 
-    smart = next((c for c in chains if c.exchange == "SMART"), None)
-    if smart is None:
-        return []
+        smart = next((c for c in chains if c.exchange == "SMART"), None)
+        if smart is None:
+            return []
+        available_exps = set(smart.expirations)
+        all_strikes = sorted(float(s) for s in smart.strikes)
+        _write_json(chain_path, {
+            "symbol": symbol,
+            "expirations": sorted(available_exps),
+            "strikes": all_strikes,
+        })
 
-    available_exps = set(smart.expirations)
     target_exps = [e for e in expiry_strs if e in available_exps]
     if not target_exps:
         return []
 
-    target_strikes = sorted(s for s in smart.strikes if strike_lo <= s <= strike_hi)
+    target_strikes = sorted(float(s) for s in all_strikes if strike_lo <= float(s) <= strike_hi)
     if not target_strikes:
         return []
 
@@ -150,7 +229,7 @@ async def _qualify_options_for(
     put_hi  = 1.04 * mid_spot
     call_lo = 0.96 * mid_spot
 
-    raw_contracts: list[Option] = []
+    needed: list[tuple[str, float, str]] = []
     for exp in target_exps:
         for k in target_strikes:
             for right in rights:
@@ -158,15 +237,41 @@ async def _qualify_options_for(
                     continue
                 if right == "C" and k < call_lo:
                     continue
-                raw_contracts.append(Option(symbol, exp, k, right, "SMART"))
+                needed.append((exp, k, right))
 
-    try:
-        qualified = await ib.qualifyContractsAsync(*raw_contracts)
-    except Exception as e:
-        print(f"  [{symbol}] qualifyContracts(options) failed: {e}", flush=True)
-        return []
+    contract_path = _cache_path("contracts", symbol)
+    cached_payload = _read_json(contract_path) or {}
+    cached = cached_payload.get("contracts") or {}
+    qualified_by_key: dict[str, Option] = {}
+    missing: list[Option] = []
+    for exp, k, right in needed:
+        key = _contract_cache_key(exp, k, right)
+        payload = cached.get(key)
+        if payload and payload.get("conId"):
+            qualified_by_key[key] = _payload_to_contract(payload)
+        else:
+            missing.append(Option(symbol, exp, k, right, "SMART"))
 
-    return [c for c in qualified if c.conId]
+    if missing:
+        try:
+            qualified_missing = await ib.qualifyContractsAsync(*missing)
+        except Exception as e:
+            print(f"  [{symbol}] qualifyContracts(options) failed: {e}", flush=True)
+            qualified_missing = []
+        changed = False
+        for c in qualified_missing:
+            if not c.conId:
+                continue
+            key = _contract_cache_key(c.lastTradeDateOrContractMonth, c.strike, c.right)
+            qualified_by_key[key] = c
+            cached[key] = _contract_to_payload(c)
+            changed = True
+        if changed:
+            _write_json(contract_path, {"symbol": symbol, "contracts": cached})
+
+    return [qualified_by_key[_contract_cache_key(exp, k, right)]
+            for exp, k, right in needed
+            if _contract_cache_key(exp, k, right) in qualified_by_key]
 
 
 async def _fetch_one_ticker(
@@ -299,10 +404,11 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = N
         client_id = live_config.IB_CLIENT_ID
 
     today = datetime.now().date()
-    expiry_strs = _weekly_expiries_in_dte_window(today)
+    dte_min, dte_max = live_config.live_dte_window(today)
+    expiry_strs = _weekly_expiries_in_dte_window(today, dte_min, dte_max)
     if not expiry_strs:
-        print(f"  no Friday expiries in DTE window [{live_config.LIVE_DTE_MIN}, "
-              f"{live_config.LIVE_DTE_MAX}] from {today}", flush=True)
+        print(f"  no Friday expiries in DTE window [{dte_min}, {dte_max}] "
+              f"from {today}", flush=True)
         return pd.DataFrame()
 
     # Both rights, always. The regime gate is OFF in canon (2026-06-05:
@@ -313,9 +419,33 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = N
     rights = ("P", "C")
     print(f"  regime={regime.get('regime')} (gate OFF) → fetching rights={rights}", flush=True)
 
-    ib = IB()
-    ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-               clientId=client_id)
+    ib = None
+    for attempt in range(1, live_config.IB_CONNECT_ATTEMPTS + 1):
+        ib = IB()
+        try:
+            ib.connect(
+                live_config.IB_HOST,
+                live_config.IB_PORT,
+                clientId=client_id,
+                timeout=live_config.IB_CONNECT_TIMEOUT,
+            )
+            break
+        except Exception as error:
+            ib.disconnect()
+            if attempt == live_config.IB_CONNECT_ATTEMPTS:
+                raise RuntimeError(
+                    f"IB Gateway connection failed after {attempt} attempts "
+                    f"(clientId={client_id})"
+                ) from error
+            delay = live_config.IB_CONNECT_RETRY_DELAY * attempt
+            print(
+                f"  IB connection attempt {attempt}/{live_config.IB_CONNECT_ATTEMPTS} "
+                f"failed ({error.__class__.__name__}); retrying in {delay}s",
+                flush=True,
+            )
+            time.sleep(delay)
+
+    assert ib is not None
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
 
     t_start = time.monotonic()
@@ -356,8 +486,9 @@ def main() -> int:
     args = parser.parse_args()
 
     tickers = _tickers_from_arg(args.tickers)
-    print(f"Live fetch: {len(tickers)} tickers, DTE [{live_config.LIVE_DTE_MIN}, "
-          f"{live_config.LIVE_DTE_MAX}]", flush=True)
+    dte_min, dte_max = live_config.live_dte_window(datetime.now().date())
+    print(f"Live fetch: {len(tickers)} tickers, DTE [{dte_min}, {dte_max}]",
+          flush=True)
 
     df = fetch_snapshot(tickers, dry_run=args.dry_run, client_id=args.client_id)
     if df.empty:

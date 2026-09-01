@@ -7,15 +7,24 @@ cd "$(dirname "$0")/.."
 mkdir -p live/logs live/notifications
 
 # Source env so MYA_SSH_HOST etc are visible to cron-spawned shells.
-[ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
+[ -f live/cron_env.sh ] && . live/cron_env.sh
+: "${MYA_REMOTE_BASE:=/opt/vito/gepo-backtest/live}"
 
-# Count existing notification files before
-BEFORE=$(ls -1 live/notifications/ 2>/dev/null | wc -l | tr -d ' ')
+# Capture existing health alerts before the check. Only newly-created health
+# files are uploaded; normal live/upload_to_mya.sh intentionally excludes them.
+BEFORE=$(mktemp)
+AFTER=$(mktemp)
+trap 'rm -f "$BEFORE" "$AFTER"' EXIT
+find live/notifications -maxdepth 1 -name 'health-*.json' -type f -print | sort > "$BEFORE"
 
-/usr/bin/python3 -m live.health_check
+"${GEPO_PYTHON:-python3}" -m live.health_check
 
-# Count after — if a new file appeared, ship it
-AFTER=$(ls -1 live/notifications/ 2>/dev/null | wc -l | tr -d ' ')
-if [ "$AFTER" -gt "$BEFORE" ] && [ -n "${MYA_SSH_HOST:-}" ]; then
-  ./live/upload_to_mya.sh >> live/logs/health.log 2>&1
+# Upload only newly created health alerts.
+find live/notifications -maxdepth 1 -name 'health-*.json' -type f -print | sort > "$AFTER"
+if [ -n "${MYA_SSH_HOST:-}" ]; then
+  comm -13 "$BEFORE" "$AFTER" | while IFS= read -r alert; do
+    [ -n "$alert" ] || continue
+    rsync -az --partial --timeout=20 -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new ${MYA_SSH_KEY:+-i $MYA_SSH_KEY}" \
+      "$alert" "$MYA_SSH_HOST:$MYA_REMOTE_BASE/notifications/" >> live/logs/health.log 2>&1
+  done
 fi

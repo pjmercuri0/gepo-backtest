@@ -12,6 +12,7 @@ of day, or only at the 15:01 freeze that mirrors the backtest's EOD basis.
 """
 import json
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -94,15 +95,29 @@ def _connect_ib():
     except ImportError:
         print("[snapshot_picks] ib_insync unavailable — cannot fetch live close")
         return None
-    ib = IB()
-    try:
-        ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-                   clientId=live_config.IB_CLIENT_ID + 10)
-    except Exception as e:
-        print(f"[snapshot_picks] IB connect failed: {e}")
-        return None
-    ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
-    return ib
+    client_id = live_config.IB_CLIENT_ID + 10
+    for attempt in range(1, live_config.IB_CONNECT_ATTEMPTS + 1):
+        ib = IB()
+        try:
+            ib.connect(
+                live_config.IB_HOST,
+                live_config.IB_PORT,
+                clientId=client_id,
+                timeout=live_config.IB_CONNECT_TIMEOUT,
+            )
+            ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
+            return ib
+        except Exception as e:
+            ib.disconnect()
+            if attempt == live_config.IB_CONNECT_ATTEMPTS:
+                print(f"[snapshot_picks] IB connect failed after {attempt} attempts: {e}")
+                return None
+            delay = live_config.IB_CONNECT_RETRY_DELAY * attempt
+            print(
+                f"[snapshot_picks] IB connection attempt {attempt}/{live_config.IB_CONNECT_ATTEMPTS} "
+                f"failed ({e.__class__.__name__}); retrying in {delay}s"
+            )
+            time.sleep(delay)
 
 
 def settle(post_close=False) -> None:

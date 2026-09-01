@@ -29,6 +29,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from datetime import datetime, date
 from pathlib import Path
 
@@ -45,6 +46,36 @@ try:
     from ib_insync import IB, Stock
 except ImportError as e:
     raise SystemExit("ib_insync not installed. `pip install ib_insync`") from e
+
+
+def _connect_ib_with_retries(client_id: int) -> IB:
+    last_error = None
+    for attempt in range(1, live_config.IB_CONNECT_ATTEMPTS + 1):
+        ib = IB()
+        try:
+            ib.connect(
+                live_config.IB_HOST,
+                live_config.IB_PORT,
+                clientId=client_id,
+                timeout=live_config.IB_CONNECT_TIMEOUT,
+            )
+            return ib
+        except Exception as error:
+            last_error = error
+            ib.disconnect()
+            if attempt == live_config.IB_CONNECT_ATTEMPTS:
+                break
+            delay = live_config.IB_CONNECT_RETRY_DELAY * attempt
+            print(
+                f"  IB connection attempt {attempt}/{live_config.IB_CONNECT_ATTEMPTS} "
+                f"failed ({error.__class__.__name__}); retrying in {delay}s",
+                flush=True,
+            )
+            time.sleep(delay)
+    raise RuntimeError(
+        f"IB Gateway connection failed after {live_config.IB_CONNECT_ATTEMPTS} "
+        f"attempts (clientId={client_id})"
+    ) from last_error
 
 
 def _is_settable(payload: dict, force: bool = False) -> bool:
@@ -153,9 +184,8 @@ def main() -> int:
 
     print(f"Settling {len(settable)} frozen file(s)...", flush=True)
 
-    ib = IB()
     try:
-        ib.connect(live_config.IB_HOST, live_config.IB_PORT, clientId=args.client_id)
+        ib = _connect_ib_with_retries(args.client_id)
     except Exception as e:
         print(f"  ✗ IB connect failed: {e}", flush=True)
         return 1

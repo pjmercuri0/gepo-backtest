@@ -48,9 +48,16 @@ def load_spy_daily():
         pass
     yahoo_spy = 'data/daily_bars_yahoo/SPY.csv'
     if os.path.exists(yahoo_spy):
-        y = pd.read_csv(yahoo_spy, header=None,
-                        names=['Date', 'Open', 'High', 'Low', 'Close'],
-                        parse_dates=['Date'])
+        y = pd.read_csv(yahoo_spy)
+        y.columns = [str(c).strip().lower() for c in y.columns]
+        if {'date', 'open', 'high', 'low', 'close'}.issubset(y.columns):
+            y = y.rename(columns={'date': 'Date', 'open': 'Open', 'high': 'High',
+                                  'low': 'Low', 'close': 'Close'})
+            y['Date'] = pd.to_datetime(y['Date'], errors='coerce')
+        else:
+            y = pd.read_csv(yahoo_spy, header=None,
+                            names=['Date', 'Open', 'High', 'Low', 'Close'],
+                            parse_dates=['Date'])
         frames.append(y[['Date', 'Open', 'High', 'Low', 'Close']])
     spy = pd.concat(frames, ignore_index=True)
     spy['Date'] = pd.to_datetime(spy['Date'], errors='coerce')
@@ -59,6 +66,29 @@ def load_spy_daily():
         if col in spy.columns:
             spy[col] = pd.to_numeric(spy[col], errors='coerce')
     spy = spy.dropna(subset=['Close'])
+    if os.path.exists(YEAR_PARQUET):
+        try:
+            existing_dates = set(spy['Date'].dt.normalize())
+            vendor_spy = pd.read_parquet(
+                YEAR_PARQUET,
+                columns=['Symbol', 'DataDate', 'UnderlyingPrice'],
+            )
+            vendor_spy = vendor_spy[vendor_spy['Symbol'].astype(str).str.upper().eq('SPY')]
+            vendor_spy['Date'] = pd.to_datetime(vendor_spy['DataDate'], errors='coerce').dt.normalize()
+            vendor_spy = (vendor_spy.dropna(subset=['Date', 'UnderlyingPrice'])
+                                    .groupby('Date', as_index=False)['UnderlyingPrice'].first())
+            vendor_spy = vendor_spy[~vendor_spy['Date'].isin(existing_dates)]
+            if not vendor_spy.empty:
+                fill = pd.DataFrame({
+                    'Date': vendor_spy['Date'],
+                    'Open': vendor_spy['UnderlyingPrice'],
+                    'High': vendor_spy['UnderlyingPrice'],
+                    'Low': vendor_spy['UnderlyingPrice'],
+                    'Close': vendor_spy['UnderlyingPrice'],
+                })
+                spy = pd.concat([spy, fill], ignore_index=True)
+        except Exception as exc:
+            print(f'WARNING: could not fill SPY calendar from {YEAR_PARQUET}: {exc}')
     return (spy.drop_duplicates(subset='Date', keep='last')
                .sort_values('Date')
                .reset_index(drop=True))
@@ -128,6 +158,8 @@ def score_year(year, min_entry_after=None):
     bt_config.CREDIT_SCALE = 1.0
 
     candidates = spreads.build_candidates(df)
+    if candidates.empty or 'entry_date' not in candidates.columns:
+        return pd.DataFrame(), expiry_close
 
     # Per-date rolling empirical lookup (put/call split, 50w trailing window)
     parts = []
@@ -151,6 +183,8 @@ def score_year(year, min_entry_after=None):
 
 
 def realize(scored, expiry_close):
+    if scored.empty or 'entry_date' not in scored.columns:
+        return pd.DataFrame(columns=['entry_date','realize_date','pnl_per_contract','max_loss_dollar'])
     s = scored.copy()
     s['entry_dow'] = pd.to_datetime(s['entry_date']).dt.dayofweek
     parts = []

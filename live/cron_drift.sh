@@ -10,7 +10,7 @@
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
 
-[ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
+[ -f live/cron_env.sh ] && . live/cron_env.sh
 
 # Keep Mac awake long enough for the full pipeline (~3 min parallel pull
 # + ~10s ranker + ~5s drift + ~5s tracker + upload).
@@ -20,7 +20,7 @@ LOG=live/logs/drift.log
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
   echo "[1/4] SPY intraday refresh..."
-  /usr/bin/python3 -m live.fetch_spy_intraday
+  "${GEPO_PYTHON:-python3}" -m live.fetch_spy_intraday
   echo "[2/4] Parallel option pull + ranker..."
   # pull_now_parallel.sh runs fetch+merge+ranker+tracker+upload. The freeze
   # branch only fires when $(date +%H) == 15, so it's a no-op at 16:00. We
@@ -29,9 +29,9 @@ LOG=live/logs/drift.log
   # entry_credit feeds into the 16:00 P&L row.
   bash live/pull_now_parallel.sh
   echo "[3/4] Drift today's frozen picks to 15:55 metrics..."
-  /usr/bin/python3 -m live.drift_frozen --drift-at 15:55 2>&1 | sed "s/^/  [Drift] /"
+  "${GEPO_PYTHON:-python3}" -m live.drift_frozen --drift-at 15:55 2>&1 | sed "s/^/  [Drift] /"
   echo "[4/4] Re-running MTM tracker so drifted entry_credit feeds the 15:55 mark..."
-  /usr/bin/python3 -m live.track_frozen 2>&1 | sed "s/^/  [Tracker] /"
+  "${GEPO_PYTHON:-python3}" -m live.track_frozen 2>&1 | sed "s/^/  [Tracker] /"
   if [ -n "${MYA_SSH_HOST:-}" ]; then
     bash live/upload_to_mya.sh 2>&1 | sed "s/^/  [Upload] /"
   fi

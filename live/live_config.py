@@ -14,6 +14,7 @@ FROZEN_DIR        = os.path.join(ROOT_DIR, "frozen")
 DRIFT_DIR         = os.path.join(ROOT_DIR, "drift")
 NOTIFICATIONS_DIR = os.path.join(ROOT_DIR, "notifications")
 LOGS_DIR          = os.path.join(ROOT_DIR, "logs")
+CACHE_DIR         = os.path.join(ROOT_DIR, "cache")
 
 # --- IBKR gateway ---
 IB_HOST       = "127.0.0.1"
@@ -27,13 +28,24 @@ IB_MKT_DATA_TYPE = 1             # 1=live, 2=frozen, 3=delayed, 4=delayed-frozen
 FETCH_BATCH_SIZE        = 100     # contracts per reqTickers call (bumped from 50)
 FETCH_PER_TICKER_TIMEOUT = 25     # seconds before giving up on a ticker
 FETCH_RETRY_ON_NO_GREEKS = True   # one retry if Greeks come back None
+# Gateway can delay its initial account/execution sync when several clients
+# connect together. Retry the connection itself before dropping a whole group.
+IB_CONNECT_TIMEOUT      = 15
+IB_CONNECT_ATTEMPTS     = 3
+IB_CONNECT_RETRY_DELAY  = 3
 
 # --- Live DTE window ---
-# Mon→DTE 4, Tue→DTE 3, Wed→DTE 2, Thu→DTE 1. Friday entries excluded
-# (DTE=7 to next-Friday averaged $1.66/trade in daily backtest vs $20-37
-# for Mon-Thu — zero-edge). Cron also skips Friday firings for cron_parallel.
-LIVE_DTE_MIN = 1
-LIVE_DTE_MAX = 4
+# Weekly expiry window for live scans. Mon→DTE 4, Tue→DTE 3, Wed→DTE 2,
+# Thu→DTE 1, Fri→DTE 0 for same-week Friday expiry. The upper bound gives
+# holiday-shifted / calendar edge cases enough room without targeting the
+# following week's normal Friday.
+LIVE_DTE_MIN = 0
+LIVE_DTE_MAX = 6
+
+
+def live_dte_window(day=None):
+    """Return the active live DTE window for the given calendar day."""
+    return LIVE_DTE_MIN, LIVE_DTE_MAX
 
 # --- Live OI gate ---
 # Canonical backtest uses MIN_OPEN_INTEREST = 100, but live IBKR feeds
@@ -90,4 +102,3 @@ WEBAPP_POLL_SECONDS = 900         # browser polls /api/latest.json this often
                                   # (15 min — matches the fetcher cadence; no
                                   # point polling more often than new data arrives)
 TOP_N_DISPLAY = 5                 # canonical top-N picks
-TICKER_LIMIT = 30                 # max ranked candidates shown in the scrolling ticker
