@@ -169,22 +169,41 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
             dc = pd.read_csv(div_path)
             dc['ExDividendDate'] = pd.to_datetime(dc['ExDividendDate']).dt.date
             dc_by_sym = dc.groupby('Symbol')['ExDividendDate'].apply(set).to_dict()
-            def has_exdiv_in_window(row):
-                if row['spread_type'] != 'bear_call':
-                    return False
-                tk = row['ticker']
-                dates = dc_by_sym.get(tk, set())
+            def exdiv_hits(row):
+                """True if an ex-div date falls in this row's exposure window.
+
+                Bear call: entry .. expiry+1. The +1 covers early assignment the
+                day before ex-div, which is the call-specific risk.
+                Bull put:  entry .. expiry. No assignment incentive, so no
+                buffer — the exposure is the ex-div price drop itself, which
+                only matters on or before expiry.
+                """
+                dates = dc_by_sym.get(row['ticker'], set())
                 if not dates:
                     return False
                 start = pd.Timestamp(row['entry_date']).date()
-                end   = (pd.Timestamp(row['expiry_date']) + pd.Timedelta(days=1)).date()
-                return any(start <= d <= end for d in dates)
-            before = len(candidates)
-            mask_exdiv = candidates.apply(has_exdiv_in_window, axis=1)
+                end_ts = pd.Timestamp(row['expiry_date'])
+                if row['spread_type'] == 'bear_call':
+                    end_ts = end_ts + pd.Timedelta(days=1)
+                return any(start <= d <= end_ts.date() for d in dates)
+
+            is_call = candidates['spread_type'] == 'bear_call'
+            hits = candidates.apply(exdiv_hits, axis=1)
+            call_hits = int((hits & is_call).sum())
+            put_hits  = int((hits & ~is_call).sum())
+
+            # Calls always gated; puts only when LIVE_EXDIV_GATE_PUTS is on.
+            mask_exdiv = hits & (is_call | live_config.LIVE_EXDIV_GATE_PUTS)
             candidates = candidates[~mask_exdiv].copy()
-            dropped = before - len(candidates)
-            if dropped > 0:
-                print(f"  ex-div gate: dropped {dropped} bear-call(s)", flush=True)
+
+            if call_hits:
+                print(f"  ex-div gate: dropped {call_hits} bear-call(s)", flush=True)
+            if put_hits:
+                if live_config.LIVE_EXDIV_GATE_PUTS:
+                    print(f"  ex-div gate: dropped {put_hits} bull-put(s)", flush=True)
+                else:
+                    print(f"  ex-div gate: {put_hits} bull-put(s) would be dropped "
+                          f"(LIVE_EXDIV_GATE_PUTS off — kept)", flush=True)
     except Exception as e:
         print(f"  ex-div gate: ERR {type(e).__name__}: {e}", flush=True)
     if candidates.empty:
