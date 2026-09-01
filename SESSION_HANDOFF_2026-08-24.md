@@ -264,18 +264,30 @@ entirely blank instead of degrading to a daily close. Not hypothetical:
 `health.log` has `ALERT (stale 765.0m)` (2026-08-20) and
 `ALERT (stale 3898.9m)` (2026-08-24).
 
-Why it never self-healed: **`live/cron_spy.sh` exists in the repo but is not in
-the crontab**, and nothing else regenerates the file. Two scripts can write it —
-`live/refresh_spy.py` (Yahoo, adjusted close, no IBKR needed) and
-`live/refresh_spy_history.py` (IBKR `reqHistoricalData`) — neither scheduled.
+Why it never self-healed: nothing regenerates the file. Two scripts can write
+it — `live/refresh_spy.py` (Yahoo, adjusted close, no IBKR needed) and
+`live/refresh_spy_history.py` (IBKR `reqHistoricalData`) — neither was scheduled.
+
+**Correction:** an earlier version of this section suggested scheduling
+`live/cron_spy.sh`. That is wrong — `cron_spy.sh` runs `live.fetch_spy_intraday`,
+which produces the **tier-1** `spy_intraday.json` tick and is already executed
+every :01/:31 inside `pull_now_parallel.sh`. It never touches `spy_us_d.csv`.
+(It is also still on `/usr/bin/python3`, pre-dating the venv migration — a sign
+it is abandoned. Leave it unscheduled.)
 
 Fixed by running `python -m live.refresh_spy`: 5029 rows, 20y, through
 2026-08-31. Fallback verified: `build_regime_lookup` → 4,930 day classifications
 (3,709 bull / 1,221 bear); `current_regime()` → `bull, close=767.05, sma=741.09,
 source="Yahoo daily", stale_days=1`.
 
-**Consider scheduling `cron_spy.sh` (or `refresh_spy.py`) so the fallback stays
-current.** It is presently a one-shot fix that will age.
+**FIXED (2026-09-01):** `"$PYTHON" -m live.refresh_spy` added to
+`live/cron_daily_bars.sh`, which already runs 17:01 Mon-Fri — so **no crontab
+change was needed**. Post-close placement matches `fetch_yahoo_recent`'s
+`FINAL_BAR_HOUR_ET=17` so the day's bar is final. `refresh_spy.py` validates
+before writing (`MIN_ROWS=1000`, `_validate_csv`) and uses `_atomic_write`; on a
+bad Yahoo response it prints `existing … left untouched` and returns 4. The cron
+script has no `set -e`, so that non-zero return cannot abort the settle/upload
+steps that follow.
 
 ### Cutover pattern — silent missing data files under `/data/`
 
