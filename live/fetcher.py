@@ -335,10 +335,13 @@ async def _fetch_all_tickers(
     asyncio.gather lets one fetcher process its full ticker list in roughly
     the time of its slowest single ticker, instead of sum-of-all.
     """
-    # Hard per-ticker cap. FETCH_PER_TICKER_TIMEOUT bounds the whole run: the
-    # group finishes in ~one slow ticker, not the sum. The inner `deadline` sits
-    # a couple of seconds earlier so a slow *data* phase returns partial rows;
-    # the outer wait_for is the backstop for a hard hang (e.g. qualifyContracts).
+    # Group wall-clock budget, NOT a per-ticker cap: every ticker starts at once
+    # and shares one deadline, so the whole group must finish inside `cap`. The
+    # inner `deadline` sits a couple of seconds earlier so a slow *data* phase
+    # returns partial rows; the outer wait_for is the backstop for a hard hang
+    # (e.g. qualifyContracts). Keep `cap` well above real group latency — under
+    # production load (10 groups x 10 tickers) that is 48-95s, not the ~15-20s a
+    # single 4-ticker connection sees.
     cap = float(live_config.FETCH_PER_TICKER_TIMEOUT)
     deadline = time.monotonic() + max(cap - 2.0, 1.0)
     results = await asyncio.gather(
