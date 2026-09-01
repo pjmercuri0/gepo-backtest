@@ -2,6 +2,21 @@
 
 **Last updated:** 2026-09-01 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for the current state. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14 explicitly carries them forward.
 
+## 🛑 START HERE — CURRENT OPERATING STATE
+
+This block and the two safety/workflow blocks immediately below it are the authoritative instructions for current work. **Do not infer current tasks from the historical archive later in this file.**
+
+- GitHub `origin/main` is the source of truth. At this update, the MacBook and Mac mini histories have been fully reconciled and pushed; there are no seven-commit or eleven-commit transfers left to perform.
+- GitHub SSH authentication works on both machines. Any later statement that GitHub authentication is broken, a token must be fixed, or commits still need to be transferred is historical and obsolete.
+- The Mac mini at `/Users/securio/Downloads/gepo-backtest` is the production runner. The MacBook is the development machine.
+- The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
+- IBKR API access must remain read-only. Never place trades or enable trading access.
+- The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
+- Before editing on either computer, follow the Git workflow below: inspect status, fetch, and fast-forward. If anything is dirty, ahead, behind in both directions, or divergent, stop and explain it instead of modifying history.
+- At the end of work, test, commit relevant source files, push directly to `origin/main`, and verify synchronization. Never force-push `main`.
+
+For detailed evidence of the completed 2026-09-01 integration, see §0.14. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
+
 ## ⚠️ HARD RULE — read first
 
 **NEVER delete, overwrite, or wipe parquet files (or any vendor-purchased CSV) without explicit user permission.**
@@ -74,7 +89,11 @@ Still operationally relevant:
 
 ---
 
-## 0.13 Current ops repair (2026-08-24) — OOT Aug 20 + History 15:31 top-up
+# 🗃️ HISTORICAL ARCHIVE — NOT A CURRENT TASK LIST
+
+The remainder records prior incidents, repairs, experiments, and once-pending work. It intentionally preserves historical detail, including instructions that were correct at the time but are now completed or obsolete. **Do not execute or report an item below as current unless the START HERE block or §0.14 explicitly carries it forward.**
+
+## 0.13 HISTORICAL: ops repair (2026-08-24) — OOT Aug 20 + History 15:31 top-up
 
 ### OOT Aug 20 missing bets — fixed
 
@@ -164,7 +183,7 @@ There are many other pre-existing dirty live files in the worktree. Treat them a
 
 ---
 
-## 0.12 Production host status (2026-08-19) — live ops moved toward Mac mini
+## 0.12 HISTORICAL: production host status (2026-08-19) — live ops moved toward Mac mini
 
 **Decision:** use the dedicated **M4 Mac mini 16GB / 256GB** as the production runner, keep the current MacBook Air for dev/backtests, and keep Mya as the public/display server unless/until there is a reason to collapse both roles.
 
