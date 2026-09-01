@@ -25,7 +25,10 @@ IB_MKT_DATA_TYPE = 1             # 1=live, 2=frozen, 3=delayed, 4=delayed-frozen
 
 # --- Fetch behaviour ---
 FETCH_BATCH_SIZE        = 100     # contracts per reqTickers call (bumped from 50)
-FETCH_PER_TICKER_TIMEOUT = 25     # seconds before giving up on a ticker
+FETCH_PER_TICKER_TIMEOUT = 150    # Wall-clock budget for a fetcher group. All tickers in a
+                                  # group run concurrently under one shared deadline, so this
+                                  # bounds the group, not each ticker. Production groups take
+                                  # 48-95s (2026-08-31 logs); 25 killed every ticker.
 FETCH_RETRY_ON_NO_GREEKS = True   # one retry if Greeks come back None
 
 # --- Live DTE window ---
