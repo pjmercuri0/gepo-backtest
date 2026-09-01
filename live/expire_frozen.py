@@ -155,7 +155,7 @@ def main() -> int:
 
     ib = IB()
     try:
-        ib.connect(live_config.IB_HOST, live_config.IB_PORT, clientId=args.client_id)
+        ib.connect(live_config.IB_HOST, live_config.IB_PORT, clientId=args.client_id, readonly=True)
     except Exception as e:
         print(f"  ✗ IB connect failed: {e}", flush=True)
         return 1

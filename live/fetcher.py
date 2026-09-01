@@ -172,6 +172,7 @@ async def _qualify_options_for(
 async def _fetch_one_ticker(
     ib: IB, sym: str, expiry_strs: list[str], rights: tuple,
     today: datetime.date, batch_size: int, dry_run: bool,
+    deadline: float | None = None,
 ) -> tuple[list[dict], str]:
     """Fetch one ticker's spot + qualified options + Greeks.
 
@@ -202,6 +203,10 @@ async def _fetch_one_ticker(
     rows: list[dict] = []
     try:
         for i in range(0, len(contracts), batch_size):
+            if deadline is not None and time.monotonic() >= deadline:
+                elapsed = time.monotonic() - t_start
+                return rows, (f"  [{sym}] spot=${spot:.2f}  rows={len(rows)}/{len(contracts)} "
+                              f"({elapsed:.1f}s, deadline hit - partial)")
             batch = contracts[i:i + batch_size]
             tickers = await ib.reqTickersAsync(*batch)
             for c, t in zip(batch, tickers):
@@ -225,13 +230,25 @@ async def _fetch_all_tickers(
     asyncio.gather lets one fetcher process its full ticker list in roughly
     the time of its slowest single ticker, instead of sum-of-all.
     """
+    # Hard per-ticker cap. FETCH_PER_TICKER_TIMEOUT bounds the whole run: the
+    # group finishes in ~one slow ticker, not the sum. The inner `deadline` sits
+    # a couple of seconds earlier so a slow *data* phase returns partial rows;
+    # the outer wait_for is the backstop for a hard hang (e.g. qualifyContracts).
+    cap = float(live_config.FETCH_PER_TICKER_TIMEOUT)
+    deadline = time.monotonic() + max(cap - 2.0, 1.0)
     results = await asyncio.gather(
-        *[_fetch_one_ticker(ib, sym, expiry_strs, rights, today, batch_size, dry_run)
+        *[asyncio.wait_for(
+            _fetch_one_ticker(ib, sym, expiry_strs, rights, today, batch_size,
+                              dry_run, deadline=deadline),
+            timeout=cap)
           for sym in tickers],
         return_exceptions=True,
     )
     all_rows: list[dict] = []
     for sym, r in zip(tickers, results):
+        if isinstance(r, asyncio.TimeoutError):
+            print(f"  [{sym}] timed out at {cap:.0f}s cap - skipped", flush=True)
+            continue
         if isinstance(r, Exception):
             print(f"  [{sym}] exception during fetch: {r}", flush=True)
             continue
@@ -315,7 +332,7 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = N
 
     ib = IB()
     ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-               clientId=client_id)
+               clientId=client_id, readonly=True)
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
 
     t_start = time.monotonic()

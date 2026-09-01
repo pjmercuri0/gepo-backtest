@@ -38,7 +38,7 @@ def fetch(duration: str = "20 Y") -> pd.DataFrame:
     # Reuse a unique clientId so this doesn't collide with the regular SPY
     # ticker (IB_CLIENT_ID + 1) or option fetchers (100-109).
     ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-               clientId=live_config.IB_CLIENT_ID + 10)
+               clientId=live_config.IB_CLIENT_ID + 10, readonly=True)
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
     try:
         stock = Stock("SPY", "SMART", "USD")

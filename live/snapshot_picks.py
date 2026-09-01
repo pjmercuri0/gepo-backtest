@@ -97,7 +97,7 @@ def _connect_ib():
     ib = IB()
     try:
         ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-                   clientId=live_config.IB_CLIENT_ID + 10)
+                   clientId=live_config.IB_CLIENT_ID + 10, readonly=True)
     except Exception as e:
         print(f"[snapshot_picks] IB connect failed: {e}")
         return None
