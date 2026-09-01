@@ -8,6 +8,8 @@
 # Self-sufficient — no vendor data dependency.
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
+PYTHON="$PWD/.venv/bin/python"
+export PATH="$PWD/.venv/bin:/usr/bin:/bin"
 
 # Avoid xcrun failures from a stale inherited developer-tools path.
 unset DEVELOPER_DIR
@@ -37,6 +39,16 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
   # Refresh Yahoo daily closes (MERGE, never wipe) so snapshot_picks.settle()
   # can resolve each pick's expiry close.
   "${GEPO_PYTHON:-python3}" fetch_yahoo_recent.py
+  # Refresh data/spy_us_d.csv (20y SPY daily, Yahoo adjusted close). This is the
+  # TIER-2 fallback for live/regime.py: tier 1 is live/ranked/spy_intraday.json,
+  # but only while it is < 60 min old — past that, regime.py falls through to
+  # this CSV, and with it missing current_regime() returned all-None instead of
+  # a daily close. Post-close (17:01) matches fetch_yahoo_recent's
+  # FINAL_BAR_HOUR_ET=17 so today's bar is finalized. Validates before writing
+  # (MIN_ROWS=1000) and writes atomically, so a bad Yahoo response leaves the
+  # existing file untouched. NOT cron_spy.sh — that runs fetch_spy_intraday
+  # (tier 1), which pull_now_parallel.sh already does every :01/:31.
+  "${GEPO_PYTHON:-python3}" -m live.refresh_spy
   # Settle expired snapshot picks now (post_close=True): same-day expiries
   # settle this evening off the live IB RTH close, matching the History tab,
   # instead of lagging to the next-day Yahoo "morning after". Settle-only —
