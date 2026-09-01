@@ -19,6 +19,13 @@ LOGS_DIR          = os.path.join(ROOT_DIR, "logs")
 IB_HOST       = "127.0.0.1"
 IB_PORT       = int(os.environ.get("IB_PORT", 4001))  # paper 4002, live 4001 (env-overridable)
 IB_CLIENT_ID  = 11               # avoid collision with test_ib_chain.py (=1)
+IB_CONNECT_TIMEOUT = 30          # seconds per ib.connect() attempt. ib_insync defaults to 4,
+                                 # which is far too tight: pull_now_parallel launches 10 fetchers
+                                 # at once and the Gateway serialises the API handshake, so the
+                                 # last groups in the queue always timed out (G8/G9/G10 only,
+                                 # 75 occurrences in parallel_pull.log; G1-G7 never).
+IB_CONNECT_ATTEMPTS = 3          # retries around that timeout, backing off 2s then 4s.
+
 IB_MKT_DATA_TYPE = 1             # 1=live, 2=frozen, 3=delayed, 4=delayed-frozen. Account has
                                  # Snapshot Bundle + OPRA Streaming Add-On subscribed, so type 1
                                  # serves real-time. Was 3 before 2026-05-26.

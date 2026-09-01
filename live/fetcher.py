@@ -261,6 +261,42 @@ async def _fetch_all_tickers(
     return all_rows
 
 
+def _connect_with_retry(ib: IB, client_id: int) -> None:
+    """Connect to the Gateway, retrying a timed-out handshake.
+
+    ib_insync's connect() timeout defaults to 4s. pull_now_parallel.sh starts
+    all 10 fetcher groups at the same instant and the Gateway serialises the
+    API handshake, so the groups at the back of the queue never made it inside
+    4s: every connect timeout in parallel_pull.log belongs to G8, G9 or G10
+    (75 of them; G1-G7 have none). A failed connect killed the whole group,
+    costing ~10 tickers a scan.
+    """
+    attempts = int(live_config.IB_CONNECT_ATTEMPTS)
+    timeout = float(live_config.IB_CONNECT_TIMEOUT)
+    for attempt in range(1, attempts + 1):
+        try:
+            ib.connect(live_config.IB_HOST, live_config.IB_PORT,
+                       clientId=client_id, readonly=True, timeout=timeout)
+            if attempt > 1:
+                print(f"  connected on attempt {attempt}/{attempts}", flush=True)
+            return
+        except Exception as e:
+            # A half-open socket from the failed attempt would make the retry
+            # collide with its own clientId.
+            try:
+                ib.disconnect()
+            except Exception:
+                pass
+            if attempt == attempts:
+                print(f"  connect failed after {attempts} attempts "
+                      f"({timeout:.0f}s each): {e}", flush=True)
+                raise
+            backoff = 2.0 * attempt
+            print(f"  connect attempt {attempt}/{attempts} failed ({e}); "
+                  f"retrying in {backoff:.0f}s", flush=True)
+            time.sleep(backoff)
+
+
 def _row_from_ticker(c: Option, t, spot: float, today: datetime.date) -> dict | None:
     """Convert (contract, ticker) → a row in the backtest schema. Returns None if
     the row is unusable (no Greeks, no bid/ask, etc.)."""
@@ -334,8 +370,7 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = N
     print(f"  regime={regime.get('regime')} (gate OFF) → fetching rights={rights}", flush=True)
 
     ib = IB()
-    ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-               clientId=client_id, readonly=True)
+    _connect_with_retry(ib, client_id)
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
 
     t_start = time.monotonic()
