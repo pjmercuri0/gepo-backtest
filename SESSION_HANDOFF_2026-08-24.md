@@ -188,6 +188,58 @@ remote update worth attempting. User decision 2026-08-31: not updating for now.
 reboot and every cron fails on port 4001 until it is launched by hand. User explicitly
 declined building one (2026-08-31).
 
+### Earnings + ex-div gates were DEAD on the mini (2026-09-01) — fixed
+
+Both gates have existed in `live/ranker.py` since June (earnings canonical
+2026-06-08 at :132, ex-div canonical 2026-06-09 at :159) but **neither had run a
+single time on the Mac mini.** Both are wrapped in `if path.exists()`, and
+`data/earnings_calendar.csv` / `data/dividend_calendar.csv` did not exist — so
+they skipped silently, no error, no log line.
+
+Cause: `cron_calendar_refresh.sh` fired on 2026-08-21 and 2026-08-28 and failed
+identically both times — `ModuleNotFoundError: No module named 'requests'`.
+`requests` was never installed in `.venv` and is not pinned in
+`live/requirements.txt` or `requirements.txt`. Same class of cutover gap as the
+missing `data/daily_bars_yahoo/`.
+
+**Every pick selected on the mini since 2026-08-19 was chosen with no earnings
+filter and no ex-dividend filter.**
+
+Fixed: `.venv/bin/pip install requests` (2.32.5), then ran
+`bash live/cron_calendar_refresh.sh` — both CSVs now populate. Coverage is
+near-window only, which is all a DTE 1-4 gate needs: earnings 5 rows
+(2026-09-01 → 2026-10-01), dividends 12 rows (NASDAQ publishes ex-div ~30 days
+out). Both fetchers MERGE, so coverage accumulates on each weekly refresh.
+
+**Add `requests` to `requirements.txt`** so this cannot recur on the next host.
+
+### Ex-div gate scope — puts flag added, default OFF
+
+New `live_config.LIVE_EXDIV_GATE_PUTS` (default `False`). The gate in
+`ranker.py` was rewritten so:
+- **bear calls are always gated**, window `entry .. expiry+1` (the +1 covers
+  early assignment the day before ex-div — the call-specific risk)
+- **bull puts** are gated only when the flag is on, window `entry .. expiry`
+  (no assignment incentive; the exposure is the ex-div price drop itself, so no
+  buffer is warranted)
+
+With the flag off the ranker still **logs what would have been dropped**
+(`N bull-put(s) would be dropped (LIVE_EXDIV_GATE_PUTS off — kept)`) so the
+decision can be made on accumulated evidence rather than theory.
+
+The open question for puts: the ex-div drop (~the dividend) moves against a
+bullish position, but the date and amount are known in advance and already
+priced into the premium — gating may drop trades whose risk was already paid
+for. Note the **backtest has no ex-div gate at all** (`spreads.py` has the
+earnings filter, nothing for dividends), so the bear-call gate is already
+live-only and unvalidated against backtest results; extending to puts widens
+that divergence. Measure before flipping.
+
+Validated on the 2026-08-31 1531 snapshot (139 candidates, entry 08-31 →
+expiry 09-04): earnings dropped 4 (AVGO 09-02, MDT 09-01); ex-div dropped 3
+bear calls (PEP/PYPL 09-04, QCOM 09-03); 4 bull puts flagged and kept
+(ADI 09-01, PEP, PYPL, QCOM).
+
 ### Still open from this session
 
 1. `pull_from_mya.sh` `PULL_DIRS` still contains only `live/frozen/`. The 2026-08-21

@@ -83,6 +83,19 @@ FREEZE_AT = "15:01"
 # compatibility with any historical references; ignore for new code.
 DRIFT_AT = None
 
+# --- Ex-dividend gate scope ---
+# Bear calls are ALWAYS gated on ex-div (canonical 2026-06-09): a short call can
+# be early-assigned the day before ex-div so the holder captures the dividend,
+# hence the +1 day buffer past expiry on that side.
+#
+# Bull puts carry no dividend-driven early-exercise incentive. The only exposure
+# is the ex-div price drop (~the dividend amount) moving against a bullish
+# position, and that drop is known in advance and already priced into the
+# premium — so gating puts may drop trades whose risk you were already paid for.
+# Left OFF pending measurement; the ranker logs what WOULD have been dropped so
+# the decision can be made on evidence.
+LIVE_EXDIV_GATE_PUTS = False
+
 # --- Webapp ---
 WEBAPP_HOST = "127.0.0.1"
 WEBAPP_PORT = 5050
