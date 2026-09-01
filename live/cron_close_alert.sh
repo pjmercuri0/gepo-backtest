@@ -9,12 +9,14 @@
 # the afternoon if you want fresh classification as spot drifts.
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
+PYTHON="$PWD/.venv/bin/python"
+export PATH="$PWD/.venv/bin:/usr/bin:/bin"
 
 [ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
 
 # Scheduled Thu+Fri; only act on the week's real settlement day so holiday-
 # shifted weeks (Friday NYSE holiday → Thursday expiry) alert on the right day.
-if ! /usr/bin/python3 -m live.trading_calendar --is-settlement-day; then
+if ! "$PYTHON" -m live.trading_calendar --is-settlement-day; then
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') not weekly settlement day — skip ===" >> live/logs/close_alert.log
   exit 0
 fi
@@ -37,7 +39,7 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
   if [ -n "${MYA_SSH_HOST:-}" ]; then
     bash live/pull_from_mya.sh 2>&1 | sed "s/^/  [Pull] /"
   fi
-  /usr/bin/python3 -m live.close_alert
+  "$PYTHON" -m live.close_alert
   if [ -n "${MYA_SSH_HOST:-}" ]; then
     bash live/upload_to_mya.sh 2>&1 | sed "s/^/  [Upload] /"
   fi

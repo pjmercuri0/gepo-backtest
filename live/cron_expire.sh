@@ -4,12 +4,14 @@
 # underlying close price via ib_insync. Idempotent — re-runs are safe.
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
+PYTHON="$PWD/.venv/bin/python"
+export PATH="$PWD/.venv/bin:/usr/bin:/bin"
 
 [ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
 
 # Scheduled Thu+Fri; only act on the week's real settlement day so holiday-
 # shifted weeks (Friday NYSE holiday → Thursday expiry) settle on the right day.
-if ! /usr/bin/python3 -m live.trading_calendar --is-settlement-day; then
+if ! "$PYTHON" -m live.trading_calendar --is-settlement-day; then
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') not weekly settlement day — skip ===" >> live/logs/expire.log
   exit 0
 fi
@@ -35,7 +37,7 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
   if [ -n "${MYA_SSH_HOST:-}" ]; then
     bash live/pull_from_mya.sh 2>&1 | sed "s/^/  [Pull] /"
   fi
-  /usr/bin/python3 -m live.expire_frozen
+  "$PYTHON" -m live.expire_frozen
   if [ -n "${MYA_SSH_HOST:-}" ]; then
     bash live/upload_to_mya.sh 2>&1 | sed "s/^/  [Upload] /"
   fi

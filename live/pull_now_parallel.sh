@@ -47,7 +47,7 @@ echo "=== Parallel pull at $(date '+%Y-%m-%d %H:%M:%S') ==="
     if [ -n "${MYA_SSH_HOST:-}" ]; then
         bash live/pull_from_mya.sh 2>&1 | sed "s/^/  [Pull] /"
     fi
-    /usr/bin/python3 -m live.fetch_spy_intraday 2>&1 | sed "s/^/  [SPY] /"
+    python3 -m live.fetch_spy_intraday 2>&1 | sed "s/^/  [SPY] /"
 ) &
 PRELUDE_PID=$!
 

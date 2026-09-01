@@ -4,6 +4,8 @@
 # before the ranker) → ranker → freeze (15:01 only) → tracker → upload.
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
+PYTHON="$PWD/.venv/bin/python"
+export PATH="$PWD/.venv/bin:/usr/bin:/bin"
 
 # Source the user's shell env so MYA_SSH_HOST etc. are visible to cron.
 [ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
@@ -33,5 +35,5 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
   echo "      concurrent with fetchers; incl. 15:01 freeze + tracker + Mya upload)..."
   bash live/pull_now_parallel.sh
   echo "[2/2] Empirical pool refresh (idempotent; no-op if no new vendor data)..."
-  /usr/bin/python3 monthly_pool_refresh.py 2>&1 | sed "s/^/  [Pool] /"
+  "$PYTHON" monthly_pool_refresh.py 2>&1 | sed "s/^/  [Pool] /"
 } >> "$LOG" 2>&1

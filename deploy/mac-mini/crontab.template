@@ -1,0 +1,10 @@
+# BEGIN GEPO MAC MINI
+1,31 9-16 * * 1-5 __REPO__/live/cron_parallel.sh
+1 16 * * 4,5 __REPO__/live/cron_expire.sh
+1,31 9-15 * * 4,5 __REPO__/live/cron_track_expiring.sh
+1 15 * * 4,5 __REPO__/live/cron_close_alert.sh
+1 17 * * 1-5 __REPO__/live/cron_daily_bars.sh
+1 17 * * 5 __REPO__/live/cron_calendar_refresh.sh
+*/5 9-17 * * 1-5 __REPO__/live/cron_health.sh
+31 17 * * 5 __REPO__/live/cron_pool_refresh.sh
+# END GEPO MAC MINI

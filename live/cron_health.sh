@@ -5,6 +5,8 @@
 # Mya so she picks it up immediately.
 cd "$(dirname "$0")/.."
 mkdir -p live/logs live/notifications
+PYTHON="$PWD/.venv/bin/python"
+export PATH="$PWD/.venv/bin:/usr/bin:/bin"
 
 # Source env so MYA_SSH_HOST etc are visible to cron-spawned shells.
 [ -f "$HOME/.gepo_env" ] && . "$HOME/.gepo_env"
@@ -12,7 +14,7 @@ mkdir -p live/logs live/notifications
 # Count existing notification files before
 BEFORE=$(ls -1 live/notifications/ 2>/dev/null | wc -l | tr -d ' ')
 
-/usr/bin/python3 -m live.health_check
+"$PYTHON" -m live.health_check
 
 # Count after — if a new file appeared, ship it
 AFTER=$(ls -1 live/notifications/ 2>/dev/null | wc -l | tr -d ' ')

@@ -2,6 +2,7 @@
 Identical pipeline to report_three_sizings.py, scoped to 2026 Jan-Jun.
 Writes live/data/oot_equity.json (NEW file — never touches backtest_equity.json).
 """
+import argparse
 import sys, math, json, os
 import numpy as np, pandas as pd
 sys.path.insert(0, '.')
@@ -25,6 +26,18 @@ if not os.path.exists(YEAR_PARQUET):
     YEAR_PARQUET = 'output/2026_sp500_last_oot_refresh.parquet'
 if not os.path.exists(YEAR_PARQUET):
     YEAR_PARQUET = 'output/2026_sp500_last.parquet'
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description='Build live/data/oot_equity.json')
+    p.add_argument('--no-cache', action='store_true',
+                   help='Re-score OOT picks even when the picks cache exists.')
+    p.add_argument('--cache-only', action='store_true',
+                   help='Use the existing picks cache exactly as-is; do not extend it.')
+    return p.parse_args()
+
+
+ARGS = parse_args()
 
 
 def load_spy_daily():
@@ -75,7 +88,7 @@ POOL = er.load_master_pool()
 print(f'Loaded master pool: {len(POOL):,} rows', flush=True)
 
 
-def score_year(year):
+def score_year(year, min_entry_after=None):
     df_full = pd.read_parquet(YEAR_PARQUET)
     df_full = df_full[df_full['Symbol'].isin(SP100)]
     df_full['PutCall'] = df_full['PutCall'].str.lower().str.strip()
@@ -91,6 +104,8 @@ def score_year(year):
     df = df[(df['DTE']>=1)&(df['DTE']<=4)]
     df = df[df['LastPrice'].astype(float) > 0]
     df = df[df['DataDate'] >= MIN_ENTRY_DATE]
+    if min_entry_after is not None:
+        df = df[df['DataDate'] > pd.Timestamp(min_entry_after)]
     df = df[df['DataDate'].dt.normalize().isin(spy_dates)]
     df = df.copy()
     df['AbsDelta'] = df['Delta'].abs()
@@ -165,19 +180,58 @@ def realize(scored, expiry_close):
 
 _cache_tag = os.path.splitext(os.path.basename(YEAR_PARQUET))[0].replace('2026_sp500_last_', '')
 CACHE_PATH = f'output/picks_cache_oot2026_{_cache_tag}_grv_k{K_VAL:g}_thr{bt_config.GROUND_THRESHOLD:g}_mid.parquet'
-if os.path.exists(CACHE_PATH):
-    print(f'Loading cached picks from {CACHE_PATH}...')
-    all_picks = pd.read_parquet(CACHE_PATH)
-    all_picks['entry_date_dt'] = pd.to_datetime(all_picks['entry_date_dt'])
-    print(f'  {len(all_picks):,} picks loaded (skip --no-cache to force re-score)')
-else:
-    print(f'Building picks for k={K_VAL:g}, threshold={bt_config.GROUND_THRESHOLD:g}, Mon-Thu...')
+def _cache_key_cols(df):
+    cols = ['entry_date_dt', 'ticker', 'expiry_date', 'spread_type', 'short_strike', 'long_strike']
+    return [c for c in cols if c in df.columns]
+
+
+def _build_realized_picks(min_entry_after=None):
     all_picks_per_year = []
     for year in YEARS:
         print(f'── {year} ──', flush=True)
-        scored, expiry_close = score_year(year)
+        scored, expiry_close = score_year(year, min_entry_after=min_entry_after)
         all_picks_per_year.append(realize(scored, expiry_close))
-    all_picks = pd.concat(all_picks_per_year, ignore_index=True).sort_values('entry_date_dt').reset_index(drop=True)
+    if not all_picks_per_year:
+        return pd.DataFrame()
+    return pd.concat(all_picks_per_year, ignore_index=True)
+
+
+if os.path.exists(CACHE_PATH) and not ARGS.no_cache:
+    print(f'Loading cached picks from {CACHE_PATH}...')
+    all_picks = pd.read_parquet(CACHE_PATH)
+    all_picks['entry_date_dt'] = pd.to_datetime(all_picks['entry_date_dt'])
+    if 'realize_date' in all_picks.columns:
+        all_picks['realize_date'] = pd.to_datetime(all_picks['realize_date'])
+    cached_max_entry = all_picks['entry_date_dt'].max()
+    parquet_max_data_date = pd.read_parquet(YEAR_PARQUET, columns=['DataDate'])['DataDate'].max()
+    print(f'  {len(all_picks):,} picks loaded through entry {cached_max_entry.date()}')
+    if ARGS.cache_only or parquet_max_data_date <= cached_max_entry:
+        if ARGS.cache_only:
+            print('  --cache-only set; not extending cache')
+        else:
+            print('  cache already covers current parquet dates')
+    else:
+        print(f'  extending cache from entries after {cached_max_entry.date()} '
+              f'(parquet through {parquet_max_data_date.date()})...')
+        new_picks = _build_realized_picks(min_entry_after=cached_max_entry)
+        if new_picks.empty:
+            print('  no additional realized picks found; cache unchanged')
+        else:
+            new_picks['entry_date_dt'] = pd.to_datetime(new_picks['entry_date_dt'])
+            if 'realize_date' in new_picks.columns:
+                new_picks['realize_date'] = pd.to_datetime(new_picks['realize_date'])
+            before = len(all_picks)
+            all_picks = pd.concat([all_picks, new_picks], ignore_index=True)
+            key_cols = _cache_key_cols(all_picks)
+            all_picks = (all_picks.drop_duplicates(subset=key_cols, keep='last')
+                         .sort_values('entry_date_dt')
+                         .reset_index(drop=True))
+            print(f'  cache extended: {before:,} + {len(new_picks):,} new -> {len(all_picks):,} picks')
+            all_picks.to_parquet(CACHE_PATH)
+            print(f'  wrote extended cache: {CACHE_PATH}')
+else:
+    print(f'Building picks for k={K_VAL:g}, threshold={bt_config.GROUND_THRESHOLD:g}, Mon-Thu...')
+    all_picks = _build_realized_picks().sort_values('entry_date_dt').reset_index(drop=True)
     print(f'  {len(all_picks):,} picks total — caching to {CACHE_PATH}')
     all_picks.to_parquet(CACHE_PATH)
 
