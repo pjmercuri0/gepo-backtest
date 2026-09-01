@@ -28,6 +28,7 @@
 <div class="nav">
   <a href="{{ url_for('index') }}"    class="{% if request.endpoint == 'index'        %}active{% endif %}">live</a>
   <a href="{{ url_for('history') }}"  class="{% if request.endpoint == 'history'      %}active{% endif %}">history</a>
+  <a href="{{ url_for('actuals') }}"  class="{% if request.endpoint == 'actuals'      %}active{% endif %}">actuals</a>
   <a href="{{ url_for('backtest') }}" class="{% if request.endpoint == 'backtest'     %}active{% endif %}">backtest</a>
   <a href="{{ url_for('oot') }}"      class="{% if request.endpoint == 'oot'          %}active{% endif %}">oot</a>
   <a href="{{ url_for('snapshots') }}" class="{% if request.endpoint == 'snapshots'    %}active{% endif %}">snapshots</a>
@@ -50,6 +51,7 @@
   const PAGES = [
     "{{ url_for('index') }}",
     "{{ url_for('history') }}",
+    "{{ url_for('actuals') }}",
     "{{ url_for('backtest') }}",
     "{{ url_for('oot') }}"
   ];
@@ -197,6 +199,51 @@
     axis = null;
   }, { passive: true });
 })();
+</script>
+
+<script>
+document.addEventListener('click', async e => {
+  const add = e.target.closest('.actuals-add');
+  if (add) {
+    e.preventDefault();
+    if (add.disabled) return;
+    const url = add.dataset.url;
+    if (!url) return;
+    add.disabled = true;
+    const old = add.textContent;
+    add.textContent = '...';
+    try {
+      const resp = await fetch(url, {method: 'POST'});
+      if (!resp.ok) throw new Error(await resp.text());
+      add.textContent = '+';
+      add.classList.add('actuals-added');
+      add.title = 'added to actuals';
+    } catch (err) {
+      add.textContent = old;
+      add.disabled = false;
+      alert('actuals add failed: ' + err);
+    }
+    return;
+  }
+
+  const remove = e.target.closest('.actuals-remove');
+  if (remove) {
+    e.preventDefault();
+    if (remove.disabled) return;
+    const id = remove.dataset.id;
+    if (!id) return;
+    remove.disabled = true;
+    try {
+      const resp = await fetch('/api/actuals/' + encodeURIComponent(id), {method: 'DELETE'});
+      if (!resp.ok) throw new Error(await resp.text());
+      const row = remove.closest('tr');
+      if (row) row.remove();
+    } catch (err) {
+      remove.disabled = false;
+      alert('actuals remove failed: ' + err);
+    }
+  }
+});
 </script>
 
 {% block scripts %}{% endblock %}

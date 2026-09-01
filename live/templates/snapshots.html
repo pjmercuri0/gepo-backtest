@@ -52,6 +52,7 @@ Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or 
     <div class="table-scroll">
     <table>
       <thead><tr>
+        <th>actual</th>
         <th>ticker</th><th>type</th><th>strikes</th><th>mid credit</th>
         <th>entry (0.80&times;)</th><th>&Gamma;</th><th>expiry</th>
         <th>expiry px</th><th>outcome</th><th>P&amp;L</th>
@@ -59,6 +60,7 @@ Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or 
       <tbody>
       {% for p in scan.picks %}
         <tr>
+          <td><button class="actuals-add" data-url="{{ url_for('add_actual_from_snapshot', date=d.date, hhmm=scan.hhmm, index=loop.index0) }}" title="add this pick to actuals">+</button></td>
           <td class="fw"><span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}">{{ '▲' if p.spread_type == 'bull_put' else '▼' }}</span> {{ p.ticker }}</td>
           <td>{{ 'bull put' if p.spread_type == 'bull_put' else 'bear call' }}</td>
           <td>${{ '%.2f' % p.short_strike }} / ${{ '%.2f' % p.long_strike }}</td>
