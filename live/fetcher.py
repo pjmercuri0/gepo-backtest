@@ -329,6 +329,11 @@ def _row_from_ticker(c: Option, t, spot: float, today: datetime.date) -> dict | 
         "DataDate":          pd.Timestamp(today),
         "ExpirationDate":    pd.Timestamp(expiry_date),
         "StrikePrice":       float(c.strike),
+        # IB contract id. Needed to build a BAG (combo) contract downstream:
+        # the ranker quotes the two-leg spread directly off the complex-order
+        # book instead of differencing two leg mids. Without this the ranker
+        # would have to re-qualify every leg to recover the conId.
+        "conId":             int(c.conId) if getattr(c, "conId", 0) else 0,
         "PutCall":           "put" if c.right == "P" else "call",
         "BidPrice":          float(bid),
         "AskPrice":          float(ask),
