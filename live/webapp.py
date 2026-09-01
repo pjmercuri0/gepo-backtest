@@ -131,15 +131,18 @@ def _enrich_pick(pick: dict, tracking_rows: list = None, credit_frac: float = 1.
     # honest mid from them; frozen files stay immutable, only display changes.
     sb_q = pick.get("short_bid"); sa_q = pick.get("short_ask")
     lb_q = pick.get("long_bid");  la_q = pick.get("long_ask")
-    combo_mid = pick.get("combo_credit_mid")
-    if pick.get("combo_priced") and combo_mid is not None and float(combo_mid) > 0:
-        # IBKR's own two-leg book. Preferred over the leg-mid recompute below:
-        # differencing two leg mids inherits whatever junk sits on either leg's
-        # quote (MO Sep04 70/69 on 2026-09-01 12:31 → 0.620 from a 50-lot 1.68
-        # offer; IBKR's book was -0.91/-0.06, mid 0.485). Only set when the
-        # ranker actually got a book and it passed the width gate.
-        base_mid = float(combo_mid)
-        basis = "COMBO MID"
+    if pick.get("combo_priced") and mid_c > 0:
+        # Take net_credit as the ranker set it. Do NOT re-derive from
+        # combo_credit_mid: on a too-wide book the ranker deliberately prices
+        # off the combo's LAST instead, and combo_credit_mid still holds the
+        # useless wide-book midpoint. TMO Sep04 602.5/600 on 2026-09-01 15:38:
+        # book -5.80/+1.90 (7.70 wide on a 2.50 spread), combo_credit_mid 1.95,
+        # net_credit 0.93 from combo last — and 0.93 is IBKR's ticket price.
+        # Preferred over the leg-mid recompute below because differencing two
+        # leg mids inherits whatever junk sits on either leg (MO Sep04 70/69 at
+        # 12:31 → 0.620 from a 50-lot 1.68 offer; IBKR's book mid was 0.485).
+        base_mid = mid_c
+        basis = "COMBO MID" if not pick.get("combo_too_wide") else "COMBO LAST"
     elif None not in (sb_q, sa_q, lb_q, la_q) and float(sa_q) > 0 and float(la_q) > 0:
         base_mid = max((float(sb_q) + float(sa_q)) / 2.0 - (float(lb_q) + float(la_q)) / 2.0, 0.0)
         basis = "MID"
