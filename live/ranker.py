@@ -83,25 +83,44 @@ def _reprice_on_combos(candidates: pd.DataFrame) -> pd.DataFrame:
     have = candidates[col].notna()
 
     # A combo book wider than LIVE_COMBO_MAX_WIDTH x spread_width is not a
-    # price — its midpoint is as meaningless as a wide leg's. Fall back to leg
-    # mids on those rather than let a 7-point-wide book set the credit.
+    # price — its midpoint is as meaningless as a wide leg's.
     max_w = float(getattr(live_config, "LIVE_COMBO_MAX_WIDTH", float("inf")))
     book_w = (candidates["combo_ask"] - candidates["combo_bid"]).abs()
     too_wide = have & (book_w > max_w * candidates["spread_width"])
+
+    # Do NOT fall back to leg mids on a too-wide book. When IB has no native
+    # complex-order book it SYNTHESISES the combo from the very same legs
+    # (bid = -short_ask + long_bid, ask = -short_bid + long_ask), so a garbage
+    # combo book means garbage legs and the leg mid is the identical bad
+    # number. TMO Sep04 602.5/600 on 2026-09-01 15:33: legs 5.70/10.20 and
+    # 4.40/7.30, leg mid 2.10 on a 2.50-wide spread (ratio 5.25), combo book
+    # -5.80/+1.60 = 7.40 wide, combo mid 2.10 — the same 2.10. IBKR's ticket
+    # showed -0.93. Use the combo's last trade there, which is the headline
+    # number on the TWS order ticket, and drop the row if there isn't one.
+    last_c = candidates["combo_credit_last"]
+    use_last = too_wide & last_c.notna() & (last_c > 0)
+    unpriceable = too_wide & ~use_last
+
     n_wide = int(too_wide.sum())
     if n_wide:
         print(f"  combo re-pricing: {n_wide} combo book(s) wider than "
-              f"{max_w:g}x spread width → kept leg mids", flush=True)
+              f"{max_w:g}x spread width → {int(use_last.sum())} priced on combo "
+              f"last, {int(unpriceable.sum())} dropped (no last)", flush=True)
+
     have = have & ~too_wide
     candidates["combo_too_wide"] = too_wide
-    candidates["combo_priced"] = have
+    candidates["combo_priced"] = have | use_last
     candidates["leg_mid_credit"] = candidates["net_credit"]
 
     candidates.loc[have, "net_credit"] = candidates.loc[have, col]
+    candidates.loc[use_last, "net_credit"] = candidates.loc[use_last, "combo_credit_last"]
+    # Nothing trustworthy to price these on.
+    candidates.loc[unpriceable, "net_credit"] = float("nan")
     candidates["max_loss"] = (candidates["spread_width"] - candidates["net_credit"]).round(4)
 
     # Same rejections build_candidates would have made, now on real prices.
-    keep = (candidates["net_credit"] > 0) & (candidates["max_loss"] > 0)
+    keep = (candidates["net_credit"].notna() & (candidates["net_credit"] > 0)
+            & candidates["max_loss"].notna() & (candidates["max_loss"] > 0))
     dropped_nocredit = int((~keep).sum())
     candidates = candidates[keep].copy()
     if candidates.empty:
@@ -437,6 +456,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             # 70/69 on 2026-09-01 12:31: leg mids 0.620, combo book 0.485.
             "leg_mid_credit":   _num(r.get("leg_mid_credit")),
             "combo_priced":     bool(r.get("combo_priced")) if r.get("combo_priced") is not None else None,
+            "combo_too_wide":   bool(r.get("combo_too_wide")) if r.get("combo_too_wide") is not None else None,
             "combo_bid":        _num(r.get("combo_bid")),
             "combo_ask":        _num(r.get("combo_ask")),
             "combo_last":       _num(r.get("combo_last")),
