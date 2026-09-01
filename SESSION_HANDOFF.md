@@ -1,6 +1,6 @@
-# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair)
+# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration)
 
-**Last updated:** 2026-08-24 12:25 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). Recent repo/live work was operational: IBKR quote-outage recovery, health-alert hygiene, 15:01+15:31 freeze top-ups, OOT July/August updates, live table display change, CPU/process triage, Mac mini production-runner setup, and 2026-08-24 repair of missing Aug 20 OOT bets + missing History top-up.
+**Last updated:** 2026-09-01 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for the current state. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14 explicitly carries them forward.
 
 ## ⚠️ HARD RULE — read first
 
@@ -34,6 +34,43 @@ When switching computers, the first instruction to the AI should be: **"Sync thi
 
 
 **READ THIS FIRST.** Major canonical changes over 2026-06-04 → 2026-06-10. Site / live ranker / backtest all current on the **mid-basis canon (2026-06-10)**. New strategic findings: GROUND beats G-alone (under mid basis G-alone LOSES $15.5k while GROUND makes +$41.3k; DKL split t=4.45), regime gate OFF is canonical (and the fetcher's puts-only-in-bull filter was removed 2026-06-10 — it had silently suppressed every bear call for 5 days, error #70), BS theoretical drives the live tracker mark (now floored at intrinsic-at-current-spot), qty=1 per-contract display everywhere.
+
+---
+
+## 0.14 Cross-machine integration complete (2026-09-01) — CURRENT STATE
+
+The previous divergence is resolved. Seven MacBook commits, eleven Mac mini commits, and the relevant work-in-progress changes from both machines were preserved, integrated commit-by-commit, conflict-resolved, tested, and pushed to GitHub `main`.
+
+Current source-of-truth rules:
+
+- GitHub `origin/main` is authoritative. Both computers must fast-forward from it before an AI edits anything; follow the two-computer workflow at the top of this document.
+- The Mac mini production checkout was updated to integrated `main` and smoke-tested. Its local `.venv/` is intentionally untracked.
+- The MacBook was updated to the same integrated `main`. Its local `default.profraw` and `live/notifications_archive_health/` are intentionally untracked generated artifacts.
+- Safety branches remain on GitHub: `backup/mac-mini-2026-09-01`, `backup/macbook-wip-2026-09-01`, and `integration/2026-09-01`. Keep them until the integrated live system has run normally for a reasonable period.
+- GitHub authentication is fixed on both machines using their respective SSH keys. The old notes saying GitHub auth is broken are obsolete.
+
+Previously pending patches are now integrated and deployed in the Mac mini checkout:
+
+- `report_oot_2026.py` includes the missing-SPY-calendar fallback used for the Aug OOT repair.
+- `live/freeze_snapshot.py` uses ranked snapshot time for top-up labels, supports 15:31 vacant-slot top-up, deduplicates by ticker, and has a passing regression test in `test_freeze_snapshot.py`.
+- The production fetch path includes readonly IB connections, bounded per-ticker fetching, connection retries/timeouts, revived earnings/ex-dividend gates, daily `spy_us_d.csv` refresh, and IBKR BAG/combo pricing.
+- Cron wrappers use the shared `live/cron_env.sh` environment path. The parallel pull retains the SPY watchdog, non-production upload guard, virtualenv selection, and safer staggered fetch groups.
+
+Integration verification completed on 2026-09-01:
+
+- Python compilation passed for the affected live modules.
+- All `live/*.sh` and `deploy/mac-mini/*.sh` files passed `bash -n`.
+- `test_freeze_snapshot.py` passed under `unittest`.
+- Fetcher, configuration, and combo-pricing modules imported successfully from the Mac mini production virtualenv.
+- Full `pytest` was not run because `pytest` is not installed in that virtualenv; dependencies were not changed merely to run it.
+
+Do **not** follow the old §0.13 instruction to stash the Mac mini and bring over seven MacBook commits; that recovery is complete. Do not redeploy the two patches that §0.13 calls "local" or "pending"; they are already in integrated `main` and the Mac mini checkout.
+
+Still operationally relevant:
+
+- The Mac mini is the intended production runner for IB Gateway, cron, ranking, tracking, settlement, and Mya upload.
+- A second IBKR username for the Mac mini is still desirable so a manual login does not terminate its Gateway/API session.
+- The historical 2026-08-24 15:31 miss may still be investigated in archived logs if useful, but the top-up code path itself is now integrated and regression-tested.
 
 ---
 
