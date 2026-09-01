@@ -211,7 +211,8 @@ near-window only, which is all a DTE 1-4 gate needs: earnings 5 rows
 (2026-09-01 → 2026-10-01), dividends 12 rows (NASDAQ publishes ex-div ~30 days
 out). Both fetchers MERGE, so coverage accumulates on each weekly refresh.
 
-**Add `requests` to `requirements.txt`** so this cannot recur on the next host.
+`requests>=2.28.0` is now pinned in root `requirements.txt` so this cannot recur
+on the next host.
 
 ### Ex-div gate scope — puts flag added, default OFF
 
@@ -239,6 +240,62 @@ Validated on the 2026-08-31 1531 snapshot (139 candidates, entry 08-31 →
 expiry 09-04): earnings dropped 4 (AVGO 09-02, MDT 09-01); ex-div dropped 3
 bear calls (PEP/PYPL 09-04, QCOM 09-03); 4 bull puts flagged and kept
 (ADI 09-01, PEP, PYPL, QCOM).
+
+### `data/spy_us_d.csv` was missing too — regime fallback was dead
+
+Third missing data file from the cutover. The ranker logged
+`[regime] benchmark file not found` on every single run.
+
+**Candidate selection was NOT affected.** `spreads.py:118` guards with
+`if REGIME_FILTER and REGIME_LOOKUP is not None:` and canon has
+`REGIME_FILTER = False`, so the empty lookup was never consulted. No picks were
+mis-selected — unlike the calendar gates, this one was cosmetic in the ranker.
+
+**What it did break: the regime fallback.** `live/regime.py:current_regime()` is
+two-tier —
+1. `live/ranked/spy_intraday.json` if < 60 min old → `source="IBKR live"`
+2. else `data/spy_us_d.csv` → `source="Yahoo daily"`
+3. else every field `None`
+
+Tier 1 was carrying it (refreshed each :01/:31 by the SPY step in
+`pull_now_parallel.sh`), but with the CSV missing **tier 2 was dead**, so any
+time the SPY tick went stale past 60 min the regime went straight from live to
+entirely blank instead of degrading to a daily close. Not hypothetical:
+`health.log` has `ALERT (stale 765.0m)` (2026-08-20) and
+`ALERT (stale 3898.9m)` (2026-08-24).
+
+Why it never self-healed: **`live/cron_spy.sh` exists in the repo but is not in
+the crontab**, and nothing else regenerates the file. Two scripts can write it —
+`live/refresh_spy.py` (Yahoo, adjusted close, no IBKR needed) and
+`live/refresh_spy_history.py` (IBKR `reqHistoricalData`) — neither scheduled.
+
+Fixed by running `python -m live.refresh_spy`: 5029 rows, 20y, through
+2026-08-31. Fallback verified: `build_regime_lookup` → 4,930 day classifications
+(3,709 bull / 1,221 bear); `current_regime()` → `bull, close=767.05, sma=741.09,
+source="Yahoo daily", stale_days=1`.
+
+**Consider scheduling `cron_spy.sh` (or `refresh_spy.py`) so the fallback stays
+current.** It is presently a one-shot fix that will age.
+
+### Cutover pattern — silent missing data files under `/data/`
+
+Three separate failures this session share one shape: a file under `data/` that
+the 2026-08-19 cutover did not carry across, consumed by code that degrades
+silently when it is absent.
+
+| file | consumer | failure mode |
+|---|---|---|
+| `data/daily_bars_yahoo/` | `snapshot_picks._expiry_close()` | returns `None` → `settle()` silently `continue`s; picks older than same-day can never settle |
+| `data/earnings_calendar.csv` | `ranker.py:132` earnings gate | `if path.exists()` false → gate skipped, no log |
+| `data/dividend_calendar.csv` | `ranker.py:159` ex-div gate | same |
+| `data/spy_us_d.csv` | `regime.py` tier-2 fallback | regime returns all-`None` when the SPY tick is stale |
+
+`/data/` is **line 1 of `.gitignore`**, so a fresh clone gets none of these and
+nothing complains. Every one of them fails by doing nothing rather than raising.
+
+**Recommended:** a startup/preflight check that asserts the expected data files
+exist and logs loudly when they do not. It would have caught all four on day one
+of the mini. `deploy/mac-mini/smoke_test.sh` is the natural home.
 
 ### Still open from this session
 
