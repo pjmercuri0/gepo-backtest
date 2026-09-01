@@ -74,15 +74,25 @@ LIVE_CREDIT_SCALE = 1.0
 # scored 0.620 credit off a 50-lot 1.68 offer sitting against a 994-lot 0.41
 # bid, and ranked #1 on a 1.63 credit ratio. IBKR's combo book was -0.91/-0.06,
 # i.e. 0.06 actually openable. See live/combo_quotes.py.
-LIVE_COMBO_ENABLED   = False   # flip on only after a verified live run
+LIVE_COMBO_ENABLED   = True    # verified live 2026-09-01
 LIVE_COMBO_CLIENT_ID = 110     # avoid 100-109 (fetchers), 11 (default), 12 (SPY)
 LIVE_COMBO_TIMEOUT   = 60      # wall-clock budget for the whole combo pass
 LIVE_COMBO_EXCHANGE  = "CBOE"  # NOT SMART — SMART returns nan on every combo field
+# Reject a combo book wider than this multiple of the spread width and fall
+# back to leg mids. A wide combo book has the same disease as a wide leg quote:
+# its midpoint is not a price. 2026-09-01 13:21 DE 670/667.5 quoted -5.60/+1.60
+# — 7.20 wide on a 2.50 spread — and its mid handed the candidate +0.850 of
+# credit it could never collect. MO's book (0.85 wide on a 1.00 spread) passes.
+LIVE_COMBO_MAX_WIDTH = 1.0
+# Coverage is limited by which spreads have a resting two-sided complex-order
+# book, NOT by how long we wait: batch 25 / wait 12 took 72.9s and returned 56
+# of 130, batch 50 / wait 8 took 24.4s and returned 57. Take the fast one.
 LIVE_COMBO_BATCH     = 50      # bags streamed at once (market-data line budget)
 LIVE_COMBO_WAIT      = 8       # seconds to wait for a batch's books to arrive
 # Which combo price becomes net_credit:
 #   "mid"   - midpoint of the combo book; direct analogue of today's leg mid
 #   "touch" - -ask, what you actually collect buying the combo at market
+#   "last"  - the combo's last trade: the number shown on the TWS order ticket
 LIVE_COMBO_BASIS     = "mid"
 
 # --- Vol gate ---

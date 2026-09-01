@@ -27,6 +27,10 @@ the ask. Hence:
 
     credit_mid   = -(bid + ask) / 2      the package's midpoint
     credit_touch = -ask                  what you get hitting the offer now
+    credit_last  = -last                 the combo's last trade -- this is the
+                                         big number on the TWS order ticket
+                                         (MO 70/69P showed -0.30 there and
+                                         t.last returns -0.30)
 """
 from __future__ import annotations
 
@@ -109,8 +113,8 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
         return candidates
 
     df = candidates.copy()
-    for col in ("combo_bid", "combo_ask", "combo_last",
-                "combo_credit_mid", "combo_credit_touch"):
+    for col in ("combo_bid", "combo_ask", "combo_last", "combo_credit_mid",
+                "combo_credit_touch", "combo_credit_last"):
         df[col] = float("nan")
 
     pairs = [(idx, _bag_for(row)) for idx, row in df.iterrows()]
@@ -152,6 +156,7 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
         df.at[idx, "combo_ask"] = float(ask)
         if last is not None and pd.notna(last):
             df.at[idx, "combo_last"] = float(last)
+            df.at[idx, "combo_credit_last"] = round(-float(last), 4)
         df.at[idx, "combo_credit_mid"] = round(-(float(bid) + float(ask)) / 2.0, 4)
         df.at[idx, "combo_credit_touch"] = round(-float(ask), 4)
         filled += 1

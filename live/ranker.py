@@ -78,8 +78,22 @@ def _reprice_on_combos(candidates: pd.DataFrame) -> pd.DataFrame:
     candidates = combo_quotes.attach_combo_quotes(candidates)
 
     basis = getattr(live_config, "LIVE_COMBO_BASIS", "mid")
-    col = "combo_credit_touch" if basis == "touch" else "combo_credit_mid"
+    col = {"touch": "combo_credit_touch",
+           "last": "combo_credit_last"}.get(basis, "combo_credit_mid")
     have = candidates[col].notna()
+
+    # A combo book wider than LIVE_COMBO_MAX_WIDTH x spread_width is not a
+    # price — its midpoint is as meaningless as a wide leg's. Fall back to leg
+    # mids on those rather than let a 7-point-wide book set the credit.
+    max_w = float(getattr(live_config, "LIVE_COMBO_MAX_WIDTH", float("inf")))
+    book_w = (candidates["combo_ask"] - candidates["combo_bid"]).abs()
+    too_wide = have & (book_w > max_w * candidates["spread_width"])
+    n_wide = int(too_wide.sum())
+    if n_wide:
+        print(f"  combo re-pricing: {n_wide} combo book(s) wider than "
+              f"{max_w:g}x spread width → kept leg mids", flush=True)
+    have = have & ~too_wide
+    candidates["combo_too_wide"] = too_wide
     candidates["combo_priced"] = have
     candidates["leg_mid_credit"] = candidates["net_credit"]
 
@@ -417,6 +431,17 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "short_delta":      _num(r.get("short_delta")),
             "long_delta":       _num(r.get("long_delta")),
             "net_credit":       _num(r.get("net_credit")),
+            # Combo pricing provenance. net_credit above is the IBKR combo
+            # book's mid when combo_priced is true; leg_mid_credit is what the
+            # old mid(short)-mid(long) arithmetic would have said. MO Sep04
+            # 70/69 on 2026-09-01 12:31: leg mids 0.620, combo book 0.485.
+            "leg_mid_credit":   _num(r.get("leg_mid_credit")),
+            "combo_priced":     bool(r.get("combo_priced")) if r.get("combo_priced") is not None else None,
+            "combo_bid":        _num(r.get("combo_bid")),
+            "combo_ask":        _num(r.get("combo_ask")),
+            "combo_last":       _num(r.get("combo_last")),
+            "combo_credit_mid":   _num(r.get("combo_credit_mid")),
+            "combo_credit_touch": _num(r.get("combo_credit_touch")),
             "spread_width":     _num(r.get("spread_width")),
             "max_loss":         _num(r.get("max_loss")),
             "credit_ratio":     _num(_ratio(r.get("net_credit"), r.get("max_loss"))),
