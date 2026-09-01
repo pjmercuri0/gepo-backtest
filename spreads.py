@@ -315,6 +315,11 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
         "net_credit":      net_credit,
         "spread_width":    spread_width,
         "max_loss":        max_loss,
+        # IB contract ids (live snapshots only; vendor EOD data lacks them).
+        # Let the ranker build a BAG and quote the spread off the complex-order
+        # book rather than differencing two leg mids.
+        "short_conid":     (None if "conId" not in short_row or pd.isna(short_row.get("conId")) else int(short_row["conId"])),
+        "long_conid":      (None if "conId" not in long_row  or pd.isna(long_row.get("conId"))  else int(long_row["conId"])),
         "IV":                  round(short_row["ImpliedVolatility"], 4),
         "long_IV":             round(long_row["ImpliedVolatility"], 4),
         "short_theta":         round(short_theta, 4),
