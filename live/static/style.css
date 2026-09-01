@@ -69,6 +69,25 @@ td.fw { font-weight: 600; }
 .badge-PARTIAL { background: rgba(239,159,39,0.15); color: #EF9F27; }
 .badge-FROZEN  { background: rgba(55,138,221,0.15); color: #378ADD; }
 .badge-LIVE    { background: rgba(29,158,117,0.18); color: #1D9E75; }
+.actuals-add,
+.actuals-remove {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: #202020;
+  color: #e8e8e8;
+  font: inherit;
+  font-weight: 700;
+  line-height: 20px;
+  padding: 0;
+  cursor: pointer;
+}
+.actuals-add:hover,
+.actuals-remove:hover { border-color: rgba(255,255,255,0.34); }
+.actuals-add:disabled,
+.actuals-remove:disabled { opacity: 0.55; cursor: default; }
+.actuals-added { color: #7ec99a; border-color: rgba(126,201,154,0.55); }
 /* Friday-of-expiry, short leg ITM → must close to avoid assignment.
    Pulsing red row background draws eye on the history page. */
 tr.assignment-risk {

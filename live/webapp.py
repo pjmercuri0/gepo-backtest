@@ -3,6 +3,7 @@
 Routes:
   GET  /                    — live page (auto-polls /api/latest.json)
   GET  /history             — list of frozen 15:45 daily snapshots
+  GET  /actuals             — user-selected actual trades copied from history/snapshots
   GET  /api/latest.json     — most recent ranked snapshot (frozen flag set if past 15:45)
   GET  /api/notifications/latest — most recent freeze payload (for Mya pickup)
 
@@ -69,6 +70,7 @@ def _read_json(path: Path) -> dict | None:
 
 
 def _atomic_write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".tmp-", suffix=".json")
     try:
         with os.fdopen(fd, "w") as f:
@@ -96,6 +98,160 @@ def _is_past_freeze() -> bool:
 def _frozen_payload_today() -> dict | None:
     today = datetime.now().date().isoformat()
     return _read_json(Path(live_config.FROZEN_DIR) / f"{today}.json")
+
+
+def _actuals_path() -> Path:
+    return Path(live_config.ROOT_DIR) / "actuals.json"
+
+
+def _json_clone(obj):
+    return json.loads(json.dumps(obj))
+
+
+def _actuals_store() -> dict:
+    payload = _read_json(_actuals_path())
+    if not isinstance(payload, dict):
+        return {"version": 1, "trades": []}
+    payload.setdefault("version", 1)
+    payload.setdefault("trades", [])
+    return payload
+
+
+def _pick_identity(pick: dict) -> str:
+    parts = [
+        pick.get("ticker"),
+        pick.get("spread_type"),
+        pick.get("expiry_date"),
+        pick.get("short_strike"),
+        pick.get("long_strike"),
+    ]
+    return "|".join(str(x) for x in parts)
+
+
+def _source_id(source: dict, pick: dict) -> str:
+    kind = source.get("kind")
+    if kind == "frozen":
+        return f"frozen:{source.get('date')}:{source.get('index')}:{_pick_identity(pick)}"
+    if kind == "snapshot":
+        return f"snapshot:{source.get('date')}:{source.get('hhmm')}:{source.get('index')}:{_pick_identity(pick)}"
+    return f"unknown:{_pick_identity(pick)}"
+
+
+def _save_actual_from_source(source: dict, pick: dict, source_label: str, source_time: str | None) -> tuple[dict, bool]:
+    store = _actuals_store()
+    trade_id = _source_id(source, pick)
+    now = datetime.now().isoformat(timespec="seconds")
+    trades = store.get("trades") or []
+    existing = next((t for t in trades if t.get("id") == trade_id), None)
+    row = {
+        "id": trade_id,
+        "source": source,
+        "source_label": source_label,
+        "source_time": source_time,
+        "added_at": now,
+        "pick": _json_clone(pick),
+    }
+    if existing is not None:
+        existing.update(row)
+        added = False
+    else:
+        trades.append(row)
+        added = True
+    store["trades"] = trades
+    store["updated_at"] = now
+    _atomic_write_json(_actuals_path(), store)
+    return row, added
+
+
+def _source_time_from_frozen(payload: dict, pick: dict) -> str | None:
+    if pick.get("freeze_added_at"):
+        return str(pick["freeze_added_at"])
+    frozen_at = payload.get("frozen_at")
+    if isinstance(frozen_at, str) and frozen_at:
+        return frozen_at.split("+", 1)[0]
+    return None
+
+
+def _find_snapshot_scan(date: str, hhmm: str) -> tuple[dict, dict] | tuple[None, None]:
+    payload = _read_json(Path(live_config.ROOT_DIR) / "intraday_picks" / f"{date}.json")
+    if payload is None:
+        return None, None
+    for scan in payload.get("scans", []):
+        if str(scan.get("hhmm")) == str(hhmm):
+            return payload, scan
+    return payload, None
+
+
+def _actuals_rows() -> list[dict]:
+    store = _actuals_store()
+    rows = []
+    history_by_date = {d.get("date"): d for d in _frozen_history(limit=500)}
+    for item in store.get("trades") or []:
+        source = item.get("source") or {}
+        pick = _json_clone(item.get("pick") or {})
+        source_label = item.get("source_label") or source.get("kind") or "source"
+        source_time = item.get("source_time")
+        outcome_row = None
+        last_track = None
+        last_marked = None
+
+        if source.get("kind") == "frozen":
+            day = history_by_date.get(source.get("date"))
+            idx = source.get("index")
+            try:
+                idx = int(idx)
+            except (TypeError, ValueError):
+                idx = -1
+            if day and 0 <= idx < len(day.get("top_picks") or []):
+                fresh = day["top_picks"][idx]
+                if _pick_identity(fresh) == _pick_identity(pick):
+                    pick = _json_clone(fresh)
+                    rbp = (day.get("outcome") or {}).get("results_by_pick") or []
+                    if idx < len(rbp):
+                        outcome_row = rbp[idx]
+                    else:
+                        outcome_row = ((day.get("outcome") or {}).get("results") or {}).get(pick.get("ticker"))
+                    track_arr = (day.get("tracking") or {}).get(pick.get("ticker")) or []
+                    last_track = track_arr[-1] if track_arr else None
+                    for tr in reversed(track_arr):
+                        if tr.get("current_mark") is not None:
+                            last_marked = tr
+                            break
+
+        elif source.get("kind") == "snapshot":
+            payload, scan = _find_snapshot_scan(str(source.get("date")), str(source.get("hhmm")))
+            idx = source.get("index")
+            try:
+                idx = int(idx)
+            except (TypeError, ValueError):
+                idx = -1
+            if scan and 0 <= idx < len(scan.get("picks") or []):
+                fresh = scan["picks"][idx]
+                if _pick_identity(fresh) == _pick_identity(pick):
+                    pick = _json_clone(fresh)
+                    source_time = f"{str(scan.get('hhmm', ''))[:2]}:{str(scan.get('hhmm', ''))[2:]}"
+            if not pick.get("fill_targets"):
+                mid_c = float(pick.get("net_credit") or pick.get("entry_credit") or 0)
+                width = float(pick.get("spread_width") or (mid_c + float(pick.get("max_loss") or 0)) or 0)
+                entry_credit = float(pick.get("entry_credit") or (mid_c * 0.80))
+                if width > 0:
+                    pick["fill_targets"] = [{"credit": round(entry_credit, 4),
+                                             "max_loss": round(width - entry_credit, 4)}]
+                pick["suggested_qty"] = pick.get("suggested_qty") or 1
+
+        rows.append({
+            "id": item.get("id"),
+            "date": source.get("date") or str(pick.get("entry_date") or "")[:10],
+            "source_label": source_label,
+            "source_time": source_time,
+            "added_at": item.get("added_at"),
+            "pick": pick,
+            "outcome_row": outcome_row,
+            "last_track": last_track,
+            "last_marked": last_marked,
+        })
+
+    return sorted(rows, key=lambda r: (str(r.get("date") or ""), str(r.get("source_time") or ""), str(r.get("added_at") or "")), reverse=True)
 
 
 def _enrich_pick(pick: dict, tracking_rows: list = None, credit_frac: float = 1.0) -> None:
@@ -521,6 +677,11 @@ def history():
                            close_alert=close_alert)
 
 
+@app.route("/actuals")
+def actuals():
+    return render_template("actuals.html", rows=_actuals_rows())
+
+
 @app.route("/api/latest.json")
 def latest_json():
     """Return the latest ranked snapshot.
@@ -598,6 +759,56 @@ def frozen_by_date(date: str):
     if payload is None:
         abort(404)
     return jsonify(payload)
+
+
+@app.route("/api/actuals/from_frozen/<date>/<int:index>", methods=["POST"])
+def add_actual_from_frozen(date: str, index: int):
+    payload = _read_json(Path(live_config.FROZEN_DIR) / f"{date}.json")
+    if payload is None:
+        abort(404)
+    picks = payload.get("top_picks") or []
+    if index < 0 or index >= len(picks):
+        abort(404)
+    pick = picks[index]
+    source = {"kind": "frozen", "date": date, "index": index}
+    row, added = _save_actual_from_source(
+        source,
+        pick,
+        "history",
+        _source_time_from_frozen(payload, pick),
+    )
+    return jsonify({"ok": True, "added": added, "actual": row})
+
+
+@app.route("/api/actuals/from_snapshot/<date>/<hhmm>/<int:index>", methods=["POST"])
+def add_actual_from_snapshot(date: str, hhmm: str, index: int):
+    _payload, scan = _find_snapshot_scan(date, hhmm)
+    if scan is None:
+        abort(404)
+    picks = scan.get("picks") or []
+    if index < 0 or index >= len(picks):
+        abort(404)
+    pick = picks[index]
+    source = {"kind": "snapshot", "date": date, "hhmm": hhmm, "index": index}
+    row, added = _save_actual_from_source(
+        source,
+        pick,
+        "snapshots",
+        f"{hhmm[:2]}:{hhmm[2:]}" if len(hhmm) == 4 else hhmm,
+    )
+    return jsonify({"ok": True, "added": added, "actual": row})
+
+
+@app.route("/api/actuals/<path:trade_id>", methods=["DELETE"])
+def delete_actual(trade_id: str):
+    store = _actuals_store()
+    before = len(store.get("trades") or [])
+    store["trades"] = [t for t in store.get("trades") or [] if t.get("id") != trade_id]
+    if len(store["trades"]) == before:
+        abort(404)
+    store["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    _atomic_write_json(_actuals_path(), store)
+    return jsonify({"ok": True, "removed": trade_id})
 
 
 @app.route("/api/frozen/<date>/<ticker>/actual_credit", methods=["POST"])

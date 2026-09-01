@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}GEPO Live — Actuals{% endblock %}
+
+{% block content %}
+<h1>Actuals</h1>
+<div class="subtitle">Trades you added from History or Snapshots.</div>
+
+{% if rows %}
+  <div class="week-card">
+    <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th></th><th>Date</th><th>Time</th><th>Source</th><th>Ticker</th>
+        <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th>
+        <th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
+        <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th style="text-align:right">P&amp;L</th>
+      </tr></thead>
+      <tbody>
+      {% for row in rows %}
+        {% set p = row.pick %}
+        {% set outcome_row = row.outcome_row %}
+        {% set last_track = row.last_track %}
+        {% set last_marked = row.last_marked %}
+        <tr{% if last_track and last_track.get('assignment_risk') %} class="assignment-risk"{% endif %}>
+          <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
+          <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
+          <td>{{ row.source_time or '—' }}</td>
+          <td>{{ row.source_label }}</td>
+          <td class="fw">{{ p.ticker }}
+            {% if p.spread_type == 'bull_put' %}
+              <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
+            {% elif p.spread_type == 'bear_call' %}
+              <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600" title="bear-call">▼ BC</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if outcome_row and outcome_row.underlying_price is defined %}
+              ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}
+            {% elif last_track and 'underlying_price' in last_track and last_track.underlying_price %}
+              ${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}
+            {% elif p.entry_price is not none %}
+              ${{ "%.2f"|format(p.entry_price|rd(2)) }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>${{ "%.2f"|format(p.short_strike|rd(2)) }} / ${{ "%.2f"|format(p.long_strike|rd(2)) }}</td>
+          <td style="color:#e8b366;font-weight:600">{{ p.suggested_qty or 1 }}×</td>
+          {% if p.fill_targets %}
+            {% set cr = p.fill_targets[0].credit %}
+            {% set ml = p.fill_targets[0].max_loss %}
+          {% elif p.entry_credit is defined and p.entry_credit is not none %}
+            {% set cr = p.entry_credit %}
+            {% set ml = (p.spread_width or ((p.net_credit or 0) + (p.max_loss or 0))) - p.entry_credit %}
+          {% else %}
+            {% set cr = p.net_credit %}
+            {% set ml = p.max_loss %}
+          {% endif %}
+          <td>${{ "%.2f"|format(cr|rd(2)) }}</td>
+          <td>${{ "%.2f"|format(ml|rd(2)) }}</td>
+          <td>{% if (ml|rd(2)) > 0 %}{{ "%.2f"|format(((cr|rd(2)) / (ml|rd(2)))|rd(2)) }}{% else %}—{% endif %}</td>
+          <td class="fw">{% if p.GROUND is not none %}{{ "%.3f"|format((p.GROUND * 100)|rd(3)) }}%{% else %}—{% endif %}</td>
+          <td>{% if p.short_delta is defined and p.short_delta is not none %}{{ "%.2f"|format(p.short_delta|rd(2)) }}{% else %}—{% endif %}</td>
+          <td>{{ p.DTE if p.DTE is not none else '—' }}</td>
+          {% if outcome_row and outcome_row.result %}
+            <td><span class="badge {% if outcome_row.result == 'WIN' %}badge-WIN{% elif outcome_row.result == 'LOSS' %}badge-LOSS{% elif outcome_row.result == 'PARTIAL' %}badge-PARTIAL{% else %}badge-FROZEN{% endif %}" title="{{ outcome_row.result }}">{{ outcome_row.result[0] }}</span></td>
+          {% elif p.outcome %}
+            <td><span class="badge badge-{{ p.outcome }}" title="{{ p.outcome }}">{{ p.outcome[0] }}</span></td>
+          {% elif last_track and last_track.live_status %}
+            <td><span class="badge {% if last_track.live_status == 'WINNING' %}badge-WIN{% elif last_track.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}" title="{{ last_track.live_status }}">{{ last_track.live_status[0] }}</span><span class="live-dot" style="margin-left:6px;margin-right:0"></span></td>
+          {% else %}
+            <td><span style="color:#888780">open</span></td>
+          {% endif %}
+          {% if outcome_row %}
+            <td>—</td>
+          {% elif last_marked %}
+            <td>${{ "%.2f"|format(last_marked.current_mark|rd(2)) }}</td>
+          {% else %}
+            <td>—</td>
+          {% endif %}
+          {% if outcome_row and outcome_row.pnl_per_contract is defined %}
+            {% set pnl = outcome_row.actual_pnl_per_contract if outcome_row.actual_pnl_per_contract is defined else outcome_row.pnl_per_contract %}
+            <td class="fw {% if pnl > 0 %}pos{% elif pnl < 0 %}neg{% endif %}" style="text-align:right">${{ "%+.0f"|format(pnl|rd) }}</td>
+          {% elif p.pnl is defined and p.pnl is not none %}
+            <td class="{% if p.pnl > 0 %}pos{% elif p.pnl < 0 %}neg{% endif %}" style="text-align:right">${{ "%.0f"|format(p.pnl|rd) }}</td>
+          {% elif last_track and last_track.unrealized_pnl_per_contract is defined and last_track.unrealized_pnl_per_contract is not none %}
+            <td class="{% if last_track.unrealized_pnl_per_contract > 0 %}pos{% elif last_track.unrealized_pnl_per_contract < 0 %}neg{% endif %}" style="text-align:right">${{ "%+.0f"|format(last_track.unrealized_pnl_per_contract|rd) }}</td>
+          {% else %}
+            <td style="text-align:right">—</td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+{% else %}
+  <div class="week-card"><div class="week-sub" style="color:#888780;padding:12px">
+    no actual trades added yet
+  </div></div>
+{% endif %}
+{% endblock %}

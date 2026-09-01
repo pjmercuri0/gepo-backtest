@@ -76,6 +76,7 @@
       <div class="table-scroll">
       <table>
         <thead><tr>
+          <th>Actual</th>
           <th>Rank</th><th>Ticker</th>
           <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th><th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
           <th>Δ short</th><th>DTE</th>
@@ -99,6 +100,7 @@
           {% for r in track_arr | reverse %}{% if ns.marked is none and r.get('current_mark') is not none %}{% set ns.marked = r %}{% endif %}{% endfor %}
           {% set last_marked = ns.marked %}
           <tr{% if last_track and last_track.get('assignment_risk') %} class="assignment-risk"{% endif %}>
+            <td><button class="actuals-add" data-url="{{ url_for('add_actual_from_frozen', date=day.date, index=loop.index0) }}" title="add this pick to actuals">+</button></td>
             <td>{{ loop.index }}</td>
             <td class="fw">{{ tk }}
               {% if p.freeze_added_at %}<span style="font-size:10px;color:#e8b366;margin-left:6px" title="added from later freeze snapshot">+{{ p.freeze_added_at }}</span>{% endif %}

@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration)
 
-**Last updated:** 2026-09-01 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for the current state. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14 explicitly carries them forward.
+**Last updated:** 2026-09-01 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state and §0.15 for the Actuals tab. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14 or §0.15 explicitly carries them forward.
 
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
@@ -9,13 +9,14 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - GitHub `origin/main` is the source of truth. At this update, the MacBook and Mac mini histories have been fully reconciled and pushed; there are no seven-commit or eleven-commit transfers left to perform.
 - GitHub SSH authentication works on both machines. Any later statement that GitHub authentication is broken, a token must be fixed, or commits still need to be transferred is historical and obsolete.
 - The Mac mini at `/Users/securio/Downloads/gepo-backtest` is the production runner. The MacBook is the development machine.
+- The web app has an `actuals` tab for manually tracked real trades. It is populated only by pressing `+` on History or Snapshots rows; it does not place trades and does not require IBKR API write access.
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
 - The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
 - Before editing on either computer, follow the Git workflow below: inspect status, fetch, and fast-forward. If anything is dirty, ahead, behind in both directions, or divergent, stop and explain it instead of modifying history.
 - At the end of work, test, commit relevant source files, push directly to `origin/main`, and verify synchronization. Never force-push `main`.
 
-For detailed evidence of the completed 2026-09-01 integration, see §0.14. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
+For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
 ## ⚠️ HARD RULE — read first
 
@@ -49,6 +50,38 @@ When switching computers, the first instruction to the AI should be: **"Sync thi
 
 
 **READ THIS FIRST.** Major canonical changes over 2026-06-04 → 2026-06-10. Site / live ranker / backtest all current on the **mid-basis canon (2026-06-10)**. New strategic findings: GROUND beats G-alone (under mid basis G-alone LOSES $15.5k while GROUND makes +$41.3k; DKL split t=4.45), regime gate OFF is canonical (and the fetcher's puts-only-in-bull filter was removed 2026-06-10 — it had silently suppressed every bear call for 5 days, error #70), BS theoretical drives the live tracker mark (now floored at intrinsic-at-current-spot), qty=1 per-contract display everywhere.
+
+---
+
+## 0.15 Actuals tab added (2026-09-01) — CURRENT STATE
+
+The web app now has an `actuals` tab for tracking real trades the user actually placed. This is bookkeeping only: the app remains read-only with respect to IBKR and must not place orders or require API write access.
+
+Behavior:
+
+- History rows have a `+` button. Pressing it copies that frozen pick into `live/actuals.json`.
+- Snapshots rows have a `+` button. Pressing it copies that specific scan-time pick into `live/actuals.json`, so the user can record trades taken from any snapshot, not only the 15:01/15:45 freeze.
+- The Actuals tab renders like the History table, but includes only rows explicitly added by the user. It carries through source date/time, ticker, direction, strikes, quantity, credit/max-loss, ratio, GROUND, delta, DTE, status, mark, and P&L when those fields are available.
+- Rows can be removed from Actuals with the `x` button. Removal only updates `live/actuals.json`; it does not modify frozen/history/snapshot source files.
+- `live/upload_to_mya.sh` preserves and merges Mya-side `actuals.json` before upload, just like it already preserves Mya-side `actual_credit` edits, so manual actual-trade records are not clobbered by a production upload.
+
+Implementation files:
+
+- `live/webapp.py`
+- `live/templates/base.html`
+- `live/templates/history.html`
+- `live/templates/snapshots.html`
+- `live/templates/actuals.html`
+- `live/static/style.css`
+- `live/upload_to_mya.sh`
+
+Verification on the MacBook dev checkout:
+
+- `PYTHONPYCACHEPREFIX=/tmp/gepo_pycache python3 -m py_compile live/webapp.py`
+- `bash -n live/upload_to_mya.sh`
+- Flask test client loaded `/`, `/history`, `/snapshots`, and `/actuals`, then added and removed a temporary actual from `/api/actuals/from_frozen/...` using `/tmp/gepo_actuals_test.json`.
+
+Runtime data note: `live/actuals.json` is user/live state. Do not commit real user actual-trade data unless explicitly requested.
 
 ---
 

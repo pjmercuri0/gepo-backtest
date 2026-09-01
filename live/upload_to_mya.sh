@@ -94,6 +94,55 @@ for fp in local_frozen.glob('*.json'):
 print(f"  → preserved {preserved} actual_credit edit(s) total")
 PYEOF
 
+echo "  → preserving Mya-side actuals..."
+python3 - <<'PYEOF'
+import json, os, subprocess
+from pathlib import Path
+host = os.environ['MYA_SSH_HOST']
+remote_base = os.environ.get('MYA_REMOTE_BASE', '/opt/vito/gepo-backtest/live')
+local_path = Path('live/actuals.json')
+ssh_key = os.environ.get('MYA_SSH_KEY', '')
+ssh_opts = ['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new']
+if ssh_key: ssh_opts += ['-i', ssh_key]
+
+def empty():
+    return {'version': 1, 'trades': []}
+
+try:
+    out = subprocess.check_output(['ssh'] + ssh_opts + [host,
+        f"python3 -c \"import json, pathlib; p=pathlib.Path('{remote_base}/actuals.json'); print(p.read_text() if p.exists() else '{{}}')\""
+    ], stderr=subprocess.DEVNULL, timeout=15).decode()
+    remote = json.loads(out) if out.strip() else empty()
+except Exception:
+    remote = empty()
+
+if local_path.exists():
+    try:
+        local = json.loads(local_path.read_text())
+    except Exception:
+        local = empty()
+else:
+    local = empty()
+
+merged = {'version': 1, 'trades': []}
+by_id = {}
+for src in (local, remote):
+    for trade in src.get('trades', []) or []:
+        tid = trade.get('id')
+        if tid:
+            by_id[tid] = trade
+merged['trades'] = list(by_id.values())
+updated = max([x for x in [local.get('updated_at'), remote.get('updated_at')] if x] or [''])
+if updated:
+    merged['updated_at'] = updated
+
+if merged['trades'] or local_path.exists():
+    tmp = local_path.with_suffix('.tmp')
+    tmp.write_text(json.dumps(merged, indent=2))
+    tmp.replace(local_path)
+print(f"  → preserved/merged {len(merged['trades'])} actual trade(s)")
+PYEOF
+
 # rsync flags:
 #   -a : archive (preserves timestamps, perms)
 #   -z : compress in transit
@@ -116,6 +165,7 @@ UPLOAD_FILES=(
   "live/notifications/"             # health alerts and (later) 15:45 freeze payloads
   "live/frozen/"                    # daily 15:45 freeze snapshots (History tab)
   "live/intraday_picks/"            # every :01/:31 scan's qualified picks (Snapshots tab)
+  "live/actuals.json"               # user-selected actual trades (Actuals tab)
   "live/data/backtest_equity.json"  # precomputed equity curve (Backtest tab)
   "live/data/oot_equity.json"       # 2026 out-of-time equity curve (OOT tab)
 )
