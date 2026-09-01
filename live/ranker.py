@@ -64,6 +64,55 @@ def _latest_snapshot() -> Path | None:
 
 # ── Ranking pipeline ────────────────────────────────────────────────────────
 
+
+def _reprice_on_combos(candidates: pd.DataFrame) -> pd.DataFrame:
+    """Replace leg-mid net_credit with IBKR's combo quote, then gate.
+
+    Rows IBKR returns no market for keep their leg-mid credit and are marked
+    combo_priced=False, so a thin complex-order book degrades to today's
+    behaviour instead of silently emptying the scan.
+    """
+    from live import combo_quotes
+
+    before = len(candidates)
+    candidates = combo_quotes.attach_combo_quotes(candidates)
+
+    basis = getattr(live_config, "LIVE_COMBO_BASIS", "mid")
+    col = "combo_credit_touch" if basis == "touch" else "combo_credit_mid"
+    have = candidates[col].notna()
+    candidates["combo_priced"] = have
+    candidates["leg_mid_credit"] = candidates["net_credit"]
+
+    candidates.loc[have, "net_credit"] = candidates.loc[have, col]
+    candidates["max_loss"] = (candidates["spread_width"] - candidates["net_credit"]).round(4)
+
+    # Same rejections build_candidates would have made, now on real prices.
+    keep = (candidates["net_credit"] > 0) & (candidates["max_loss"] > 0)
+    dropped_nocredit = int((~keep).sum())
+    candidates = candidates[keep].copy()
+    if candidates.empty:
+        print(f"  combo re-pricing: all {before} candidates fail credit>0", flush=True)
+        return candidates
+
+    candidates["credit_ratio"] = candidates["net_credit"] / candidates["max_loss"]
+    gate = ((candidates["credit_ratio"] >= backtest_config.MIN_CREDIT_RATIO) &
+            (candidates["credit_ratio"] <= getattr(backtest_config, "MAX_CREDIT_RATIO", float("inf"))) &
+            (candidates["max_loss"] <= getattr(backtest_config, "MAX_MAX_LOSS", float("inf"))))
+    dropped_gate = int((~gate).sum())
+    candidates = candidates[gate].copy()
+
+    shift = (candidates["net_credit"] - candidates["leg_mid_credit"])
+    print(f"  combo re-pricing ({basis}): {int(candidates['combo_priced'].sum())} priced on "
+          f"IBKR combo book, {int((~candidates['combo_priced']).sum())} fell back to leg mids",
+          flush=True)
+    print(f"  combo re-pricing: dropped {dropped_nocredit} (no credit) + "
+          f"{dropped_gate} (ratio/max-loss) → {len(candidates)}/{before} survive", flush=True)
+    if not shift.empty:
+        print(f"  combo re-pricing: credit shift median {shift.median():+.3f}, "
+              f"min {shift.min():+.3f}, max {shift.max():+.3f}", flush=True)
+    return candidates
+
+
 def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     """Run the full backtest-canonical ranking pipeline on a live snapshot."""
     if df.empty:
@@ -126,8 +175,32 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         pass
 
     # Build candidates (one per ticker × direction × expiry).
+    #
+    # Strike PAIRING is price-independent (short leg = closest |delta| to
+    # DELTA_TARGET, long leg = adjacent strike), but build_candidates also
+    # applies the credit gates using leg-mid pricing. When combo pricing is on
+    # we want those gates evaluated against the REAL spread quote, so neutralise
+    # them here and re-apply after the combo pass. Otherwise a pair the leg mids
+    # misprice is discarded before IBKR ever gets asked about it.
+    if live_config.LIVE_COMBO_ENABLED:
+        _saved_gates = (backtest_config.MIN_CREDIT_RATIO,
+                        getattr(backtest_config, "MAX_CREDIT_RATIO", float("inf")),
+                        getattr(backtest_config, "MAX_MAX_LOSS", float("inf")))
+        backtest_config.MIN_CREDIT_RATIO = float("-inf")
+        backtest_config.MAX_CREDIT_RATIO = float("inf")
+        backtest_config.MAX_MAX_LOSS = float("inf")
     candidates = spreads.build_candidates(df)
+    if live_config.LIVE_COMBO_ENABLED:
+        (backtest_config.MIN_CREDIT_RATIO,
+         backtest_config.MAX_CREDIT_RATIO,
+         backtest_config.MAX_MAX_LOSS) = _saved_gates
     print(f"  built {len(candidates)} candidate spreads", flush=True)
+
+    # Re-price on IBKR's complex-order book, then re-apply the credit gates.
+    if live_config.LIVE_COMBO_ENABLED and not candidates.empty:
+        candidates = _reprice_on_combos(candidates)
+        if candidates.empty:
+            return pd.DataFrame()
 
     # Earnings gate (canonical 2026-06-08): drop any candidate whose underlying
     # has earnings between entry_date and expiry_date (overnight gap risk).

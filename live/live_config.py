@@ -80,6 +80,23 @@ LIVE_CREDIT_BASIS = "mid"
 # stress parameter in the backtest, not a selection input.
 LIVE_CREDIT_SCALE = 1.0
 
+# --- Combo (BAG) pricing ---
+# Rank on IBKR's own two-leg spread quote instead of mid(short) - mid(long).
+# Leg mids break when one leg is quoted badly: 2026-09-01 12:31 MO Sep04 70/69
+# scored 0.620 credit off a 50-lot 1.68 offer sitting against a 994-lot 0.41
+# bid, and ranked #1 on a 1.63 credit ratio. IBKR's combo book was -0.91/-0.06,
+# i.e. 0.06 actually openable. See live/combo_quotes.py.
+LIVE_COMBO_ENABLED   = False   # flip on only after a verified live run
+LIVE_COMBO_CLIENT_ID = 110     # avoid 100-109 (fetchers), 11 (default), 12 (SPY)
+LIVE_COMBO_TIMEOUT   = 60      # wall-clock budget for the whole combo pass
+LIVE_COMBO_EXCHANGE  = "CBOE"  # NOT SMART — SMART returns nan on every combo field
+LIVE_COMBO_BATCH     = 50      # bags streamed at once (market-data line budget)
+LIVE_COMBO_WAIT      = 8       # seconds to wait for a batch's books to arrive
+# Which combo price becomes net_credit:
+#   "mid"   - midpoint of the combo book; direct analogue of today's leg mid
+#   "touch" - -ask, what you actually collect buying the combo at market
+LIVE_COMBO_BASIS     = "mid"
+
 # --- Vol gate ---
 # DISABLED 2026-05-30 after re-test on LAST credit / Mon+Thu canon:
 # the 196 high-vol Thursdays the gate dropped 2022-2025 were +$3,438
