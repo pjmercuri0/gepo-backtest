@@ -12,6 +12,25 @@ Two incidents on 2026-06-08:
 
 User reaction: "I fucking hate you now I have to buy from the vendor again." Recovery was free in both cases (ZIPs already extracted, NASDAQ rescrape free), but trust was the real cost. **Before any operation that may write to a parquet/CSV that holds vendor or expensive-to-rebuild data: check if file exists, explicitly tell user "this will REPLACE/OVERWRITE/WIPE", wait for approval.** Prefer MERGE over REPLACE everywhere. Memory file: `feedback_never_wipe_parquet.md`.
 
+## ⚠️ TWO-COMPUTER GIT / AI WORKFLOW — MacBook + Mac mini
+
+GitHub `origin/main` is the source of truth. The user works directly on `main` and may alternate between the MacBook and Mac mini. **Never allow both machines or two AI sessions to edit concurrently. Finish and push on one computer before beginning on the other.**
+
+At the start of every AI session, before editing anything:
+
+1. Run `git status --short --branch` and `git fetch origin`.
+2. If the working tree has no unexplained changes and local `main` has no unpushed commits, run `git pull --ff-only origin main`.
+3. If there are local changes, unpushed commits, or divergence, stop and explain exactly what exists. Do **not** automatically stash, reset, rebase, overwrite, or force-push.
+
+After completing work:
+
+1. Test the change.
+2. Commit only relevant files. Exclude virtual environments, logs, caches, credentials, profiler output, and generated artifacts unless they intentionally belong in Git. Do not use `git add .` blindly.
+3. Push directly with `git push origin main`.
+4. Verify local `main` equals `origin/main`, report the final commit hash, and identify anything intentionally left untracked.
+
+When switching computers, the first instruction to the AI should be: **"Sync this computer from `origin/main` before making changes. Stop if it has local or unpushed work."** At the end of a session: **"Finish the current work, test it, commit it, push it to `origin/main`, and verify nothing remains unexpectedly uncommitted or unpushed."** Never use `--force` on `main`.
+
 
 
 **READ THIS FIRST.** Major canonical changes over 2026-06-04 → 2026-06-10. Site / live ranker / backtest all current on the **mid-basis canon (2026-06-10)**. New strategic findings: GROUND beats G-alone (under mid basis G-alone LOSES $15.5k while GROUND makes +$41.3k; DKL split t=4.45), regime gate OFF is canonical (and the fetcher's puts-only-in-bull filter was removed 2026-06-10 — it had silently suppressed every bear call for 5 days, error #70), BS theoretical drives the live tracker mark (now floored at intrinsic-at-current-spot), qty=1 per-contract display everywhere.
