@@ -54,6 +54,7 @@ def _connect_ib_with_retries(client_id: int) -> IB:
                 live_config.IB_PORT,
                 clientId=client_id,
                 timeout=live_config.IB_CONNECT_TIMEOUT,
+                readonly=True,
             )
             return ib
         except Exception as error:

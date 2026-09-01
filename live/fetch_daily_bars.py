@@ -55,7 +55,7 @@ def _bars_to_rv(bars, ticker: str) -> pd.DataFrame | None:
 def fetch_all(tickers: list[str]) -> pd.DataFrame:
     ib = IB()
     ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-               clientId=live_config.IB_CLIENT_ID + 2)
+               clientId=live_config.IB_CLIENT_ID + 2, readonly=True)
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
     rows = []
     try:

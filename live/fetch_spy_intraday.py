@@ -97,7 +97,7 @@ def _sma_context_from_ib(ib, stock) -> dict:
 def fetch() -> dict:
     ib = IB()
     ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-               clientId=live_config.IB_CLIENT_ID + 1)  # +1 to avoid colliding with the option fetcher
+               clientId=live_config.IB_CLIENT_ID + 1, readonly=True)  # +1 to avoid colliding with the option fetcher
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
 
     try:

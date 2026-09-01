@@ -104,6 +104,7 @@ def _connect_ib():
                 live_config.IB_PORT,
                 clientId=client_id,
                 timeout=live_config.IB_CONNECT_TIMEOUT,
+                readonly=True,
             )
             ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
             return ib
