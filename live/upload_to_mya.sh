@@ -58,17 +58,37 @@ local_frozen = Path('live/frozen')
 ssh_key = os.environ.get('MYA_SSH_KEY', '')
 ssh_opts = ['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new']
 if ssh_key: ssh_opts += ['-i', ssh_key]
+# ONE ssh for the whole frozen directory. This used to open a connection per
+# file, and at 61 frozen files x ~0.5s of SSH handshake that was ~30s — the
+# entire cost of the upload step, since the rsyncs themselves total under 4s.
+_REMOTE = r"""
+import json, glob, os, sys
+out = {}
+for fp in glob.glob(sys.argv[1] + "/frozen/*.json"):
+    try:
+        j = json.load(open(fp))
+    except Exception:
+        continue
+    edits = {p["ticker"]: p.get("actual_credit")
+             for p in (j.get("top_picks") or [])
+             if p.get("actual_credit") is not None}
+    if edits:
+        out[os.path.basename(fp)] = edits
+print(json.dumps(out))
+"""
+try:
+    _r = subprocess.run(['ssh'] + ssh_opts + [host, 'python3 - ' + remote_base],
+                        input=_REMOTE.encode(), stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL, timeout=60)
+    _out = _r.stdout.decode().strip()
+    all_edits = json.loads(_out) if _out else {}
+except Exception:
+    all_edits = {}
+
 preserved = 0
 for fp in local_frozen.glob('*.json'):
     name = fp.name
-    # Pull just this file's actual_credit values from Mya
-    try:
-        out = subprocess.check_output(['ssh'] + ssh_opts + [host,
-            f"python3 -c \"import json; j=json.load(open('{remote_base}/frozen/{name}')); print(json.dumps({{p['ticker']: p.get('actual_credit') for p in j.get('top_picks', []) if p.get('actual_credit') is not None}}))\""
-        ], stderr=subprocess.DEVNULL, timeout=15).decode().strip()
-        mya_edits = json.loads(out) if out else {}
-    except Exception:
-        continue
+    mya_edits = all_edits.get(name) or {}
     if not mya_edits:
         continue
     local = json.loads(fp.read_text())
