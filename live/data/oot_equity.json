@@ -4,8 +4,8 @@
     "days": "Mon, Tue, Wed, Thu",
     "expiry": "Friday (DTE 1-4)",
     "selection": "top-5 per day, k=10, GROUND threshold 0.05 (all days) \u2014 FROZEN canon, no 2026 tuning",
-    "scoring": "G_rv: RV-implied N(d2) probs in G (canon 2026-06-09); rv_vs_iv DKL (BS d2, 10d RV vs IV); raw combo MID credit",
-    "fill_basis": "0.80\u00d7raw combo MID (20% haircut); partial-WIN at 50% intrinsic (pin-risk realistic)",
+    "scoring": "G_rv: RV-implied N(d2) probs in G (canon 2026-06-09); rv_vs_iv DKL (BS d2, 10d RV vs IV); clamped LAST credit",
+    "fill_basis": "0.80\u00d7clamped LAST (20% haircut); partial-WIN at 50% intrinsic (pin-risk realistic)",
     "regime": "OFF (both directions eligible)",
     "vol_gate": "OFF",
     "sizing": "qty=2 per pick (canonical 2026-06-05)",
@@ -13,40 +13,40 @@
   },
   "summary": {
     "window_start": "2026-01-05",
-    "window_end": "2026-08-21",
-    "years": 0.62,
-    "trading_days": 162,
-    "n_trades": 279,
-    "strategy_final": 21857.0,
-    "strategy_total_return": 118.57,
-    "strategy_cagr": 249.96,
-    "strategy_sharpe": 3.6,
-    "strategy_sharpe_weekly": 3.94,
+    "window_end": "2026-09-01",
+    "years": 0.65,
+    "trading_days": 169,
+    "n_trades": 260,
+    "strategy_final": 20474.8,
+    "strategy_total_return": 104.75,
+    "strategy_cagr": 198.96,
+    "strategy_sharpe": 3.31,
+    "strategy_sharpe_weekly": 3.5,
     "strategy_max_dd": -12.04,
-    "qty1_final": 15928.5,
-    "qty1_total_return": 59.28,
-    "qty1_cagr": 110.8,
-    "qty1_sharpe": 3.68,
-    "qty1_sharpe_weekly": 4.08,
+    "qty1_final": 15237.4,
+    "qty1_total_return": 52.37,
+    "qty1_cagr": 90.34,
+    "qty1_sharpe": 3.38,
+    "qty1_sharpe_weekly": 3.61,
     "qty1_max_dd": -6.34,
-    "sixteenk_final": 22167.2,
-    "sixteenk_total_return": 121.67,
-    "sixteenk_cagr": 257.95,
-    "sixteenk_sharpe": 3.07,
-    "sixteenk_sharpe_weekly": 3.19,
+    "sixteenk_final": 21989.7,
+    "sixteenk_total_return": 119.9,
+    "sixteenk_cagr": 233.42,
+    "sixteenk_sharpe": 2.98,
+    "sixteenk_sharpe_weekly": 3.04,
     "sixteenk_max_dd": -16.62,
-    "spy_final": 11134.18,
-    "spy_total_return": 11.34,
-    "spy_cagr": 18.78,
-    "spy_sharpe": 1.3,
-    "spy_sharpe_weekly": 1.27,
-    "spy_max_dd": -9.13,
-    "strategy_wagered": 46537.6,
-    "qty1_wagered": 23268.8,
-    "sixteenk_wagered": 57358.0,
-    "strategy_yield": 25.48,
-    "qty1_yield": 25.48,
-    "sixteenk_yield": 21.21
+    "spy_final": 11135.76,
+    "spy_total_return": 11.36,
+    "spy_cagr": 17.87,
+    "spy_sharpe": 1.26,
+    "spy_sharpe_weekly": 1.23,
+    "spy_max_dd": -8.88,
+    "strategy_wagered": 43520.8,
+    "qty1_wagered": 21760.4,
+    "sixteenk_wagered": 53288.0,
+    "strategy_yield": 24.07,
+    "qty1_yield": 24.07,
+    "sixteenk_yield": 22.5
   },
   "points": [
     {
@@ -82,7 +82,7 @@
       "strategy": 10350.6,
       "qty1": 10175.3,
       "sixteenk": 10572.5,
-      "spy": 10092.33
+      "spy": 10092.34
     },
     {
       "date": "2026-01-12",
@@ -110,7 +110,7 @@
       "strategy": 10350.6,
       "qty1": 10175.3,
       "sixteenk": 10572.5,
-      "spy": 10065.72
+      "spy": 10065.73
     },
     {
       "date": "2026-01-16",
@@ -124,7 +124,7 @@
       "strategy": 10923.8,
       "qty1": 10461.9,
       "sixteenk": 11466.1,
-      "spy": 10057.29
+      "spy": 10110.74
     },
     {
       "date": "2026-01-20",
@@ -264,7 +264,7 @@
       "strategy": 9965.4,
       "qty1": 9982.7,
       "sixteenk": 10057.7,
-      "spy": 9913.19
+      "spy": 9965.87
     },
     {
       "date": "2026-02-17",
@@ -292,7 +292,7 @@
       "strategy": 10024.6,
       "qty1": 10012.3,
       "sixteenk": 10221.1,
-      "spy": 10024.86
+      "spy": 10024.87
     },
     {
       "date": "2026-02-23",
@@ -320,14 +320,14 @@
       "strategy": 10024.6,
       "qty1": 10012.3,
       "sixteenk": 10221.1,
-      "spy": 10022.97
+      "spy": 10022.98
     },
     {
       "date": "2026-02-27",
       "strategy": 9898.4,
       "qty1": 9949.2,
       "sixteenk": 9991.6,
-      "spy": 9974.84
+      "spy": 9974.85
     },
     {
       "date": "2026-03-02",
@@ -341,7 +341,7 @@
       "strategy": 9898.4,
       "qty1": 9949.2,
       "sixteenk": 9991.6,
-      "spy": 9892.54
+      "spy": 9892.55
     },
     {
       "date": "2026-03-04",
@@ -355,14 +355,14 @@
       "strategy": 9898.4,
       "qty1": 9949.2,
       "sixteenk": 9991.6,
-      "spy": 9906.79
+      "spy": 9906.8
     },
     {
       "date": "2026-03-06",
       "strategy": 10312.4,
       "qty1": 10156.2,
       "sixteenk": 10374.0,
-      "spy": 9776.94
+      "spy": 9776.95
     },
     {
       "date": "2026-03-09",
@@ -432,756 +432,805 @@
       "strategy": 12976.4,
       "qty1": 11488.2,
       "sixteenk": 13037.2,
-      "spy": 9430.73
+      "spy": 9456.48
     },
     {
       "date": "2026-03-23",
       "strategy": 12976.4,
       "qty1": 11488.2,
       "sixteenk": 13037.2,
-      "spy": 9529.75
+      "spy": 9555.78
     },
     {
       "date": "2026-03-24",
       "strategy": 12976.4,
       "qty1": 11488.2,
       "sixteenk": 13037.2,
-      "spy": 9497.76
+      "spy": 9523.7
     },
     {
       "date": "2026-03-25",
       "strategy": 12976.4,
       "qty1": 11488.2,
       "sixteenk": 13037.2,
-      "spy": 9550.69
+      "spy": 9576.77
     },
     {
       "date": "2026-03-26",
       "strategy": 12976.4,
       "qty1": 11488.2,
       "sixteenk": 13037.2,
-      "spy": 9380.13
+      "spy": 9405.74
     },
     {
       "date": "2026-03-27",
       "strategy": 13164.8,
       "qty1": 11582.4,
       "sixteenk": 13645.4,
-      "spy": 9220.18
+      "spy": 9245.36
     },
     {
       "date": "2026-03-30",
       "strategy": 13164.8,
       "qty1": 11582.4,
       "sixteenk": 13645.4,
-      "spy": 9189.35
+      "spy": 9214.45
     },
     {
       "date": "2026-03-31",
       "strategy": 13164.8,
       "qty1": 11582.4,
       "sixteenk": 13645.4,
-      "spy": 9456.46
+      "spy": 9482.29
     },
     {
       "date": "2026-04-01",
       "strategy": 13164.8,
       "qty1": 11582.4,
       "sixteenk": 13645.4,
-      "spy": 9527.71
+      "spy": 9553.74
     },
     {
       "date": "2026-04-02",
       "strategy": 13164.8,
       "qty1": 11582.4,
       "sixteenk": 13645.4,
-      "spy": 9536.29
+      "spy": 9562.34
     },
     {
       "date": "2026-04-06",
       "strategy": 13164.8,
       "qty1": 11582.4,
       "sixteenk": 13645.4,
-      "spy": 9581.37
+      "spy": 9607.54
     },
     {
       "date": "2026-04-07",
       "strategy": 13164.8,
       "qty1": 11582.4,
       "sixteenk": 13645.4,
-      "spy": 9585.59
+      "spy": 9611.77
     },
     {
       "date": "2026-04-08",
       "strategy": 13164.8,
       "qty1": 11582.4,
       "sixteenk": 13645.4,
-      "spy": 9829.73
+      "spy": 9856.57
     },
     {
       "date": "2026-04-09",
       "strategy": 13164.8,
       "qty1": 11582.4,
       "sixteenk": 13645.4,
-      "spy": 9886.44
+      "spy": 9913.44
     },
     {
       "date": "2026-04-10",
       "strategy": 12816.0,
       "qty1": 11408.0,
       "sixteenk": 13031.4,
-      "spy": 9879.89
+      "spy": 9906.88
     },
     {
       "date": "2026-04-13",
       "strategy": 12816.0,
       "qty1": 11408.0,
       "sixteenk": 13031.4,
-      "spy": 9976.44
+      "spy": 10003.69
     },
     {
       "date": "2026-04-14",
       "strategy": 12816.0,
       "qty1": 11408.0,
       "sixteenk": 13031.4,
-      "spy": 10098.01
+      "spy": 10125.58
     },
     {
       "date": "2026-04-15",
       "strategy": 12816.0,
       "qty1": 11408.0,
       "sixteenk": 13031.4,
-      "spy": 10177.69
+      "spy": 10205.48
     },
     {
       "date": "2026-04-16",
       "strategy": 12816.0,
       "qty1": 11408.0,
       "sixteenk": 13031.4,
-      "spy": 10202.7
+      "spy": 10230.56
     },
     {
       "date": "2026-04-17",
       "strategy": 13670.6,
       "qty1": 11835.3,
       "sixteenk": 13966.7,
-      "spy": 10326.0
+      "spy": 10354.21
     },
     {
       "date": "2026-04-20",
       "strategy": 13670.6,
       "qty1": 11835.3,
       "sixteenk": 13966.7,
-      "spy": 10305.36
+      "spy": 10333.5
     },
     {
       "date": "2026-04-21",
       "strategy": 13670.6,
       "qty1": 11835.3,
       "sixteenk": 13966.7,
-      "spy": 10237.89
+      "spy": 10265.85
     },
     {
       "date": "2026-04-22",
       "strategy": 13670.6,
       "qty1": 11835.3,
       "sixteenk": 13966.7,
-      "spy": 10341.56
+      "spy": 10369.81
     },
     {
       "date": "2026-04-23",
       "strategy": 13670.6,
       "qty1": 11835.3,
       "sixteenk": 13966.7,
-      "spy": 10301.43
+      "spy": 10329.57
     },
     {
       "date": "2026-04-24",
       "strategy": 13629.0,
       "qty1": 11814.5,
       "sixteenk": 14534.3,
-      "spy": 10381.26
+      "spy": 10409.61
     },
     {
       "date": "2026-04-27",
       "strategy": 13629.0,
       "qty1": 11814.5,
       "sixteenk": 14534.3,
-      "spy": 10399.15
+      "spy": 10427.55
     },
     {
       "date": "2026-04-28",
       "strategy": 13629.0,
       "qty1": 11814.5,
       "sixteenk": 14534.3,
-      "spy": 10348.54
+      "spy": 10376.81
     },
     {
       "date": "2026-04-29",
       "strategy": 13629.0,
       "qty1": 11814.5,
       "sixteenk": 14534.3,
-      "spy": 10346.94
+      "spy": 10375.2
     },
     {
       "date": "2026-04-30",
       "strategy": 13629.0,
       "qty1": 11814.5,
       "sixteenk": 14534.3,
-      "spy": 10449.89
+      "spy": 10478.43
     },
     {
       "date": "2026-05-01",
       "strategy": 13879.4,
       "qty1": 11939.7,
       "sixteenk": 14915.5,
-      "spy": 10478.83
+      "spy": 10507.45
     },
     {
       "date": "2026-05-04",
       "strategy": 13879.4,
       "qty1": 11939.7,
       "sixteenk": 14915.5,
-      "spy": 10440.44
+      "spy": 10468.96
     },
     {
       "date": "2026-05-05",
       "strategy": 13879.4,
       "qty1": 11939.7,
       "sixteenk": 14915.5,
-      "spy": 10524.2
+      "spy": 10552.94
     },
     {
       "date": "2026-05-06",
       "strategy": 13879.4,
       "qty1": 11939.7,
       "sixteenk": 14915.5,
-      "spy": 10670.48
+      "spy": 10699.62
     },
     {
       "date": "2026-05-07",
       "strategy": 13879.4,
       "qty1": 11939.7,
       "sixteenk": 14915.5,
-      "spy": 10637.76
+      "spy": 10666.81
     },
     {
       "date": "2026-05-08",
       "strategy": 15081.0,
       "qty1": 12540.5,
       "sixteenk": 15943.1,
-      "spy": 10725.59
+      "spy": 10754.88
     },
     {
       "date": "2026-05-11",
       "strategy": 15081.0,
       "qty1": 12540.5,
       "sixteenk": 15943.1,
-      "spy": 10750.01
+      "spy": 10779.37
     },
     {
       "date": "2026-05-12",
       "strategy": 15081.0,
       "qty1": 12540.5,
       "sixteenk": 15943.1,
-      "spy": 10733.73
+      "spy": 10763.04
     },
     {
       "date": "2026-05-13",
       "strategy": 15081.0,
       "qty1": 12540.5,
       "sixteenk": 15943.1,
-      "spy": 10793.78
+      "spy": 10823.26
     },
     {
       "date": "2026-05-14",
       "strategy": 15081.0,
       "qty1": 12540.5,
       "sixteenk": 15943.1,
-      "spy": 10878.99
+      "spy": 10908.7
     },
     {
       "date": "2026-05-15",
       "strategy": 15296.8,
       "qty1": 12648.4,
       "sixteenk": 16028.6,
-      "spy": 10748.12
+      "spy": 10777.48
     },
     {
       "date": "2026-05-18",
       "strategy": 15296.8,
       "qty1": 12648.4,
       "sixteenk": 16028.6,
-      "spy": 10740.56
+      "spy": 10769.9
     },
     {
       "date": "2026-05-19",
       "strategy": 15296.8,
       "qty1": 12648.4,
       "sixteenk": 16028.6,
-      "spy": 10669.02
+      "spy": 10698.16
     },
     {
       "date": "2026-05-20",
       "strategy": 15296.8,
       "qty1": 12648.4,
       "sixteenk": 16028.6,
-      "spy": 10778.37
+      "spy": 10807.81
     },
     {
       "date": "2026-05-21",
       "strategy": 15296.8,
       "qty1": 12648.4,
       "sixteenk": 16028.6,
-      "spy": 10799.74
+      "spy": 10829.24
     },
     {
       "date": "2026-05-22",
       "strategy": 15453.0,
       "qty1": 12726.5,
       "sixteenk": 15687.1,
-      "spy": 10842.2
+      "spy": 10871.81
     },
     {
       "date": "2026-05-26",
       "strategy": 15453.0,
       "qty1": 12726.5,
       "sixteenk": 15687.1,
-      "spy": 10914.18
+      "spy": 10943.99
     },
     {
       "date": "2026-05-27",
       "strategy": 15453.0,
       "qty1": 12726.5,
       "sixteenk": 15687.1,
-      "spy": 10912.29
+      "spy": 10942.09
     },
     {
       "date": "2026-05-28",
       "strategy": 15453.0,
       "qty1": 12726.5,
       "sixteenk": 15687.1,
-      "spy": 10972.49
+      "spy": 11002.46
     },
     {
       "date": "2026-05-29",
       "strategy": 16240.2,
       "qty1": 13120.1,
       "sixteenk": 16600.7,
-      "spy": 10999.83
+      "spy": 11029.87
     },
     {
       "date": "2026-06-01",
       "strategy": 16240.2,
       "qty1": 13120.1,
       "sixteenk": 16600.7,
-      "spy": 11029.78
+      "spy": 11059.9
     },
     {
       "date": "2026-06-02",
       "strategy": 16240.2,
       "qty1": 13120.1,
       "sixteenk": 16600.7,
-      "spy": 11044.76
+      "spy": 11074.92
     },
     {
       "date": "2026-06-03",
       "strategy": 16240.2,
       "qty1": 13120.1,
       "sixteenk": 16600.7,
-      "spy": 10967.25
+      "spy": 10997.21
     },
     {
       "date": "2026-06-04",
       "strategy": 16240.2,
       "qty1": 13120.1,
       "sixteenk": 16600.7,
-      "spy": 11008.7
+      "spy": 11038.76
     },
     {
       "date": "2026-06-05",
       "strategy": 17368.2,
       "qty1": 13684.1,
       "sixteenk": 18308.3,
-      "spy": 10724.57
+      "spy": 10753.86
     },
     {
       "date": "2026-06-08",
       "strategy": 17368.2,
       "qty1": 13684.1,
       "sixteenk": 18308.3,
-      "spy": 10748.85
+      "spy": 10778.21
     },
     {
       "date": "2026-06-09",
       "strategy": 17368.2,
       "qty1": 13684.1,
       "sixteenk": 18308.3,
-      "spy": 10717.3
+      "spy": 10746.57
     },
     {
       "date": "2026-06-10",
       "strategy": 17368.2,
       "qty1": 13684.1,
       "sixteenk": 18308.3,
-      "spy": 10548.33
+      "spy": 10577.14
     },
     {
       "date": "2026-06-11",
       "strategy": 17368.2,
       "qty1": 13684.1,
       "sixteenk": 18308.3,
-      "spy": 10727.62
+      "spy": 10756.92
     },
     {
       "date": "2026-06-12",
       "strategy": 16442.2,
       "qty1": 13221.1,
       "sixteenk": 16779.8,
-      "spy": 10785.64
+      "spy": 10815.1
     },
     {
       "date": "2026-06-15",
       "strategy": 16442.2,
       "qty1": 13221.1,
       "sixteenk": 16779.8,
-      "spy": 10975.83
+      "spy": 11005.81
     },
     {
       "date": "2026-06-16",
       "strategy": 16442.2,
       "qty1": 13221.1,
       "sixteenk": 16779.8,
-      "spy": 10910.4
+      "spy": 10940.2
     },
     {
       "date": "2026-06-17",
       "strategy": 16442.2,
       "qty1": 13221.1,
       "sixteenk": 16779.8,
-      "spy": 10774.15
+      "spy": 10803.58
     },
     {
       "date": "2026-06-18",
       "strategy": 16442.2,
       "qty1": 13221.1,
       "sixteenk": 16779.8,
-      "spy": 10858.2
+      "spy": 10915.9
     },
     {
       "date": "2026-06-22",
       "strategy": 16442.2,
       "qty1": 13221.1,
       "sixteenk": 16779.8,
-      "spy": 10824.03
+      "spy": 10881.55
     },
     {
       "date": "2026-06-23",
       "strategy": 16442.2,
       "qty1": 13221.1,
       "sixteenk": 16779.8,
-      "spy": 10666.84
+      "spy": 10723.53
     },
     {
       "date": "2026-06-24",
       "strategy": 16442.2,
       "qty1": 13221.1,
       "sixteenk": 16779.8,
-      "spy": 10661.9
+      "spy": 10718.56
     },
     {
       "date": "2026-06-25",
       "strategy": 16442.2,
       "qty1": 13221.1,
       "sixteenk": 16779.8,
-      "spy": 10677.31
+      "spy": 10734.05
     },
     {
       "date": "2026-06-26",
       "strategy": 17157.4,
       "qty1": 13578.7,
       "sixteenk": 17771.8,
-      "spy": 10600.1
+      "spy": 10656.43
     },
     {
       "date": "2026-06-29",
       "strategy": 17157.4,
       "qty1": 13578.7,
       "sixteenk": 17771.8,
-      "spy": 10774.73
+      "spy": 10832.0
     },
     {
       "date": "2026-06-30",
       "strategy": 17157.4,
       "qty1": 13578.7,
       "sixteenk": 17771.8,
-      "spy": 10858.63
+      "spy": 10916.34
     },
     {
       "date": "2026-07-01",
       "strategy": 17157.4,
       "qty1": 13578.7,
       "sixteenk": 17771.8,
-      "spy": 10843.95
+      "spy": 10901.58
     },
     {
       "date": "2026-07-02",
       "strategy": 17157.4,
       "qty1": 13578.7,
       "sixteenk": 17771.8,
-      "spy": 10829.7
+      "spy": 10887.25
     },
     {
       "date": "2026-07-03",
       "strategy": 17157.4,
       "qty1": 13578.7,
       "sixteenk": 17771.8,
-      "spy": 10829.7
+      "spy": 10887.25
     },
     {
       "date": "2026-07-06",
       "strategy": 17157.4,
       "qty1": 13578.7,
       "sixteenk": 17771.8,
-      "spy": 10924.21
+      "spy": 10982.27
     },
     {
       "date": "2026-07-07",
       "strategy": 17157.4,
       "qty1": 13578.7,
       "sixteenk": 17771.8,
-      "spy": 10872.3
+      "spy": 10930.08
     },
     {
       "date": "2026-07-08",
       "strategy": 17157.4,
       "qty1": 13578.7,
       "sixteenk": 17771.8,
-      "spy": 10838.71
+      "spy": 10896.31
     },
     {
       "date": "2026-07-09",
       "strategy": 17157.4,
       "qty1": 13578.7,
       "sixteenk": 17771.8,
-      "spy": 10930.47
+      "spy": 10988.55
     },
     {
       "date": "2026-07-10",
       "strategy": 17447.4,
       "qty1": 13723.7,
       "sixteenk": 18132.8,
-      "spy": 10977.58
+      "spy": 11035.92
     },
     {
       "date": "2026-07-13",
       "strategy": 17447.4,
       "qty1": 13723.7,
       "sixteenk": 18132.8,
-      "spy": 10893.53
+      "spy": 10951.42
     },
     {
       "date": "2026-07-14",
       "strategy": 17447.4,
       "qty1": 13723.7,
       "sixteenk": 18132.8,
-      "spy": 10932.21
+      "spy": 10990.31
     },
     {
       "date": "2026-07-15",
       "strategy": 17447.4,
       "qty1": 13723.7,
       "sixteenk": 18132.8,
-      "spy": 10975.54
+      "spy": 11033.87
     },
     {
       "date": "2026-07-16",
       "strategy": 17447.4,
       "qty1": 13723.7,
       "sixteenk": 18132.8,
-      "spy": 10916.07
+      "spy": 10974.08
     },
     {
       "date": "2026-07-17",
       "strategy": 17991.4,
       "qty1": 13995.7,
       "sixteenk": 18260.0,
-      "spy": 10808.03
+      "spy": 10865.47
     },
     {
       "date": "2026-07-20",
       "strategy": 17991.4,
       "qty1": 13995.7,
       "sixteenk": 18260.0,
-      "spy": 10790.58
+      "spy": 10847.93
     },
     {
       "date": "2026-07-21",
       "strategy": 17991.4,
       "qty1": 13995.7,
       "sixteenk": 18260.0,
-      "spy": 10880.59
+      "spy": 10938.41
     },
     {
       "date": "2026-07-22",
       "strategy": 17991.4,
       "qty1": 13995.7,
       "sixteenk": 18260.0,
-      "spy": 10867.94
+      "spy": 10925.7
     },
     {
       "date": "2026-07-23",
       "strategy": 17991.4,
       "qty1": 13995.7,
       "sixteenk": 18260.0,
-      "spy": 10733.73
+      "spy": 10790.77
     },
     {
       "date": "2026-07-24",
       "strategy": 17993.0,
       "qty1": 13996.5,
       "sixteenk": 18535.2,
-      "spy": 10744.63
+      "spy": 10801.74
     },
     {
       "date": "2026-07-27",
       "strategy": 17993.0,
       "qty1": 13996.5,
       "sixteenk": 18535.2,
-      "spy": 10746.96
+      "spy": 10804.07
     },
     {
       "date": "2026-07-28",
       "strategy": 17993.0,
       "qty1": 13996.5,
       "sixteenk": 18535.2,
-      "spy": 10772.7
+      "spy": 10829.95
     },
     {
       "date": "2026-07-29",
       "strategy": 17993.0,
       "qty1": 13996.5,
       "sixteenk": 18535.2,
-      "spy": 10606.93
+      "spy": 10663.3
     },
     {
       "date": "2026-07-30",
       "strategy": 17993.0,
       "qty1": 13996.5,
       "sixteenk": 18535.2,
-      "spy": 10784.77
+      "spy": 10842.08
     },
     {
       "date": "2026-07-31",
       "strategy": 18324.2,
       "qty1": 14162.1,
       "sixteenk": 18761.6,
-      "spy": 10862.42
+      "spy": 10920.14
     },
     {
       "date": "2026-08-03",
       "strategy": 18324.2,
       "qty1": 14162.1,
       "sixteenk": 18761.6,
-      "spy": 11017.13
+      "spy": 11075.68
     },
     {
       "date": "2026-08-04",
       "strategy": 18324.2,
       "qty1": 14162.1,
       "sixteenk": 18761.6,
-      "spy": 11215.76
+      "spy": 11275.36
     },
     {
       "date": "2026-08-05",
       "strategy": 18324.2,
       "qty1": 14162.1,
       "sixteenk": 18761.6,
-      "spy": 11193.36
+      "spy": 11252.85
     },
     {
       "date": "2026-08-06",
       "strategy": 18324.2,
       "qty1": 14162.1,
       "sixteenk": 18761.6,
-      "spy": 11175.48
+      "spy": 11234.87
     },
     {
       "date": "2026-08-07",
       "strategy": 20051.4,
       "qty1": 15025.7,
       "sixteenk": 21603.6,
-      "spy": 11243.82
+      "spy": 11303.57
     },
     {
       "date": "2026-08-10",
       "strategy": 20051.4,
       "qty1": 15025.7,
       "sixteenk": 21603.6,
-      "spy": 11240.48
+      "spy": 11300.21
     },
     {
       "date": "2026-08-11",
       "strategy": 20051.4,
       "qty1": 15025.7,
       "sixteenk": 21603.6,
-      "spy": 11204.56
+      "spy": 11264.11
     },
     {
       "date": "2026-08-12",
       "strategy": 20051.4,
       "qty1": 15025.7,
       "sixteenk": 21603.6,
-      "spy": 11232.62
+      "spy": 11292.32
     },
     {
       "date": "2026-08-13",
       "strategy": 20051.4,
       "qty1": 15025.7,
       "sixteenk": 21603.6,
-      "spy": 11311.0
+      "spy": 11371.11
     },
     {
       "date": "2026-08-14",
       "strategy": 20474.8,
       "qty1": 15237.4,
       "sixteenk": 21989.7,
-      "spy": 11288.61
+      "spy": 11348.6
     },
     {
       "date": "2026-08-17",
       "strategy": 20474.8,
       "qty1": 15237.4,
       "sixteenk": 21989.7,
-      "spy": 11235.24
+      "spy": 11294.95
     },
     {
       "date": "2026-08-18",
       "strategy": 20474.8,
       "qty1": 15237.4,
       "sixteenk": 21989.7,
-      "spy": 11159.34
+      "spy": 11218.64
     },
     {
       "date": "2026-08-19",
       "strategy": 20474.8,
       "qty1": 15237.4,
       "sixteenk": 21989.7,
-      "spy": 11182.75
+      "spy": 11242.18
     },
     {
       "date": "2026-08-20",
       "strategy": 20474.8,
       "qty1": 15237.4,
       "sixteenk": 21989.7,
-      "spy": 11088.82
+      "spy": 11147.75
     },
     {
       "date": "2026-08-21",
-      "strategy": 21857.0,
-      "qty1": 15928.5,
-      "sixteenk": 22167.2,
-      "spy": 11134.18
+      "strategy": 20474.8,
+      "qty1": 15237.4,
+      "sixteenk": 21989.7,
+      "spy": 11193.35
+    },
+    {
+      "date": "2026-08-24",
+      "strategy": 20474.8,
+      "qty1": 15237.4,
+      "sixteenk": 21989.7,
+      "spy": 11160.46
+    },
+    {
+      "date": "2026-08-25",
+      "strategy": 20474.8,
+      "qty1": 15237.4,
+      "sixteenk": 21989.7,
+      "spy": 11196.13
+    },
+    {
+      "date": "2026-08-26",
+      "strategy": 20474.8,
+      "qty1": 15237.4,
+      "sixteenk": 21989.7,
+      "spy": 11198.62
+    },
+    {
+      "date": "2026-08-27",
+      "strategy": 20474.8,
+      "qty1": 15237.4,
+      "sixteenk": 21989.7,
+      "spy": 11272.0
+    },
+    {
+      "date": "2026-08-28",
+      "strategy": 20474.8,
+      "qty1": 15237.4,
+      "sixteenk": 21989.7,
+      "spy": 11246.42
+    },
+    {
+      "date": "2026-08-31",
+      "strategy": 20474.8,
+      "qty1": 15237.4,
+      "sixteenk": 21989.7,
+      "spy": 11212.8
+    },
+    {
+      "date": "2026-09-01",
+      "strategy": 20474.8,
+      "qty1": 15237.4,
+      "sixteenk": 21989.7,
+      "spy": 11135.76
     }
   ],
   "trades": [
@@ -5603,329 +5652,6 @@
       "ground": 0.068603,
       "dkl": 0.0533,
       "kelly_ev": 11.7,
-      "outcome": "WIN"
-    },
-    {
-      "entry": "2026-08-17",
-      "dow": "Mon",
-      "ticker": "GILD",
-      "type": "bear_call",
-      "k_s": 139.0,
-      "k_l": 140.0,
-      "credit": 0.608,
-      "max_loss": 0.392,
-      "spot": 146.12,
-      "qty": 2,
-      "pnl": -78.4,
-      "ground": 0.24485,
-      "dkl": 0.0041,
-      "kelly_ev": 25.5,
-      "outcome": "LOSS"
-    },
-    {
-      "entry": "2026-08-17",
-      "dow": "Mon",
-      "ticker": "SO",
-      "type": "bull_put",
-      "k_s": 92.5,
-      "k_l": 92.0,
-      "credit": 0.34,
-      "max_loss": 0.16,
-      "spot": 88.94,
-      "qty": 2,
-      "pnl": -32.0,
-      "ground": 0.234857,
-      "dkl": 0.037,
-      "kelly_ev": 34.02,
-      "outcome": "LOSS"
-    },
-    {
-      "entry": "2026-08-17",
-      "dow": "Mon",
-      "ticker": "MRK",
-      "type": "bear_call",
-      "k_s": 136.0,
-      "k_l": 137.0,
-      "credit": 0.556,
-      "max_loss": 0.444,
-      "spot": 152.55,
-      "qty": 2,
-      "pnl": -88.8,
-      "ground": 0.124339,
-      "dkl": 0.0451,
-      "kelly_ev": 19.52,
-      "outcome": "LOSS"
-    },
-    {
-      "entry": "2026-08-17",
-      "dow": "Mon",
-      "ticker": "MDT",
-      "type": "bear_call",
-      "k_s": 91.0,
-      "k_l": 92.0,
-      "credit": 0.396,
-      "max_loss": 0.604,
-      "spot": 93.35,
-      "qty": 2,
-      "pnl": -120.8,
-      "ground": 0.100598,
-      "dkl": 0.0123,
-      "kelly_ev": 11.37,
-      "outcome": "LOSS"
-    },
-    {
-      "entry": "2026-08-17",
-      "dow": "Mon",
-      "ticker": "SBUX",
-      "type": "bull_put",
-      "k_s": 108.0,
-      "k_l": 107.0,
-      "credit": 0.524,
-      "max_loss": 0.476,
-      "spot": 107.08,
-      "qty": 2,
-      "pnl": -79.2,
-      "ground": 0.08225,
-      "dkl": 0.0335,
-      "kelly_ev": 11.5,
-      "outcome": "PARTIAL"
-    },
-    {
-      "entry": "2026-08-18",
-      "dow": "Tue",
-      "ticker": "PEP",
-      "type": "bull_put",
-      "k_s": 140.0,
-      "k_l": 139.0,
-      "credit": 0.628,
-      "max_loss": 0.372,
-      "spot": 143.48,
-      "qty": 2,
-      "pnl": 125.6,
-      "ground": 0.410934,
-      "dkl": 0.0021,
-      "kelly_ev": 41.97,
-      "outcome": "WIN"
-    },
-    {
-      "entry": "2026-08-18",
-      "dow": "Tue",
-      "ticker": "PM",
-      "type": "bull_put",
-      "k_s": 187.5,
-      "k_l": 185.0,
-      "credit": 1.32,
-      "max_loss": 1.18,
-      "spot": 188.23,
-      "qty": 2,
-      "pnl": 264.0,
-      "ground": 0.169222,
-      "dkl": 0.0033,
-      "kelly_ev": 17.48,
-      "outcome": "WIN"
-    },
-    {
-      "entry": "2026-08-18",
-      "dow": "Tue",
-      "ticker": "COST",
-      "type": "bear_call",
-      "k_s": 962.5,
-      "k_l": 965.0,
-      "credit": 1.38,
-      "max_loss": 1.12,
-      "spot": 947.74,
-      "qty": 2,
-      "pnl": 276.0,
-      "ground": 0.139368,
-      "dkl": 0.0244,
-      "kelly_ev": 17.79,
-      "outcome": "WIN"
-    },
-    {
-      "entry": "2026-08-18",
-      "dow": "Tue",
-      "ticker": "LOW",
-      "type": "bull_put",
-      "k_s": 215.0,
-      "k_l": 212.5,
-      "credit": 1.3,
-      "max_loss": 1.2,
-      "spot": 216.09,
-      "qty": 2,
-      "pnl": 260.0,
-      "ground": 0.09268,
-      "dkl": 0.0812,
-      "kelly_ev": 20.87,
-      "outcome": "WIN"
-    },
-    {
-      "entry": "2026-08-19",
-      "dow": "Wed",
-      "ticker": "ADP",
-      "type": "bear_call",
-      "k_s": 277.5,
-      "k_l": 280.0,
-      "credit": 1.62,
-      "max_loss": 0.88,
-      "spot": 280.81,
-      "qty": 2,
-      "pnl": -176.0,
-      "ground": 0.455898,
-      "dkl": 0.0026,
-      "kelly_ev": 46.81,
-      "outcome": "LOSS"
-    },
-    {
-      "entry": "2026-08-19",
-      "dow": "Wed",
-      "ticker": "SBUX",
-      "type": "bear_call",
-      "k_s": 105.0,
-      "k_l": 106.0,
-      "credit": 0.628,
-      "max_loss": 0.372,
-      "spot": 107.08,
-      "qty": 2,
-      "pnl": -74.4,
-      "ground": 0.301501,
-      "dkl": 0.0386,
-      "kelly_ev": 44.35,
-      "outcome": "LOSS"
-    },
-    {
-      "entry": "2026-08-19",
-      "dow": "Wed",
-      "ticker": "ISRG",
-      "type": "bear_call",
-      "k_s": 397.5,
-      "k_l": 400.0,
-      "credit": 1.36,
-      "max_loss": 1.14,
-      "spot": 378.81,
-      "qty": 2,
-      "pnl": 272.0,
-      "ground": 0.11185,
-      "dkl": 0.0047,
-      "kelly_ev": 11.72,
-      "outcome": "WIN"
-    },
-    {
-      "entry": "2026-08-19",
-      "dow": "Wed",
-      "ticker": "RTX",
-      "type": "bear_call",
-      "k_s": 220.0,
-      "k_l": 222.5,
-      "credit": 1.26,
-      "max_loss": 1.24,
-      "spot": 209.91,
-      "qty": 2,
-      "pnl": 252.0,
-      "ground": 0.101947,
-      "dkl": 0.0232,
-      "kelly_ev": 12.85,
-      "outcome": "WIN"
-    },
-    {
-      "entry": "2026-08-19",
-      "dow": "Wed",
-      "ticker": "CAT",
-      "type": "bull_put",
-      "k_s": 815.0,
-      "k_l": 810.0,
-      "credit": 2.66,
-      "max_loss": 2.34,
-      "spot": 827.9,
-      "qty": 2,
-      "pnl": 532.0,
-      "ground": 0.099696,
-      "dkl": 0.0097,
-      "kelly_ev": 10.99,
-      "outcome": "WIN"
-    },
-    {
-      "entry": "2026-08-20",
-      "dow": "Thu",
-      "ticker": "ACN",
-      "type": "bear_call",
-      "k_s": 182.5,
-      "k_l": 185.0,
-      "credit": 1.52,
-      "max_loss": 0.98,
-      "spot": 185.28,
-      "qty": 2,
-      "pnl": -196.0,
-      "ground": 0.61198,
-      "dkl": 0.0087,
-      "kelly_ev": 66.78,
-      "outcome": "LOSS"
-    },
-    {
-      "entry": "2026-08-20",
-      "dow": "Thu",
-      "ticker": "TJX",
-      "type": "bull_put",
-      "k_s": 141.0,
-      "k_l": 140.0,
-      "credit": 0.7,
-      "max_loss": 0.3,
-      "spot": 140.53,
-      "qty": 2,
-      "pnl": 23.0,
-      "ground": 0.322493,
-      "dkl": 0.0426,
-      "kelly_ev": 49.37,
-      "outcome": "PARTIAL"
-    },
-    {
-      "entry": "2026-08-20",
-      "dow": "Thu",
-      "ticker": "ABT",
-      "type": "bear_call",
-      "k_s": 114.0,
-      "k_l": 115.0,
-      "credit": 0.66,
-      "max_loss": 0.34,
-      "spot": 116.64,
-      "qty": 2,
-      "pnl": -68.0,
-      "ground": 0.158275,
-      "dkl": 0.1278,
-      "kelly_ev": 56.83,
-      "outcome": "LOSS"
-    },
-    {
-      "entry": "2026-08-20",
-      "dow": "Thu",
-      "ticker": "LOW",
-      "type": "bear_call",
-      "k_s": 217.5,
-      "k_l": 220.0,
-      "credit": 1.22,
-      "max_loss": 1.28,
-      "spot": 216.09,
-      "qty": 2,
-      "pnl": 244.0,
-      "ground": 0.137328,
-      "dkl": 0.0355,
-      "kelly_ev": 19.59,
-      "outcome": "WIN"
-    },
-    {
-      "entry": "2026-08-20",
-      "dow": "Thu",
-      "ticker": "PYPL",
-      "type": "bear_call",
-      "k_s": 62.5,
-      "k_l": 63.0,
-      "credit": 0.236,
-      "max_loss": 0.264,
-      "spot": 61.55,
-      "qty": 2,
-      "pnl": 47.2,
-      "ground": 0.093538,
-      "dkl": 0.1045,
-      "kelly_ev": 26.58,
       "outcome": "WIN"
     }
   ],
@@ -10810,345 +10536,6 @@
           "ground": 0.068603,
           "dkl": 0.0533,
           "kelly_ev": 11.7,
-          "outcome": "WIN"
-        }
-      ]
-    },
-    {
-      "label": "Week of Aug 17, 2026",
-      "start": "2026-08-17",
-      "n_trades": 19,
-      "n_bull_put": 7,
-      "n_bear_call": 12,
-      "direction": -5,
-      "pnl": 1382.2,
-      "credit": 3783.2,
-      "risk": 3016.8,
-      "pre_bank": 20474.8,
-      "post_bank": 21857.0,
-      "max_g": 0.61198,
-      "trades": [
-        {
-          "entry": "2026-08-17",
-          "dow": "Mon",
-          "ticker": "GILD",
-          "type": "bear_call",
-          "k_s": 139.0,
-          "k_l": 140.0,
-          "credit": 0.608,
-          "max_loss": 0.392,
-          "spot": 146.12,
-          "qty": 2,
-          "pnl": -78.4,
-          "ground": 0.24485,
-          "dkl": 0.0041,
-          "kelly_ev": 25.5,
-          "outcome": "LOSS"
-        },
-        {
-          "entry": "2026-08-17",
-          "dow": "Mon",
-          "ticker": "SO",
-          "type": "bull_put",
-          "k_s": 92.5,
-          "k_l": 92.0,
-          "credit": 0.34,
-          "max_loss": 0.16,
-          "spot": 88.94,
-          "qty": 2,
-          "pnl": -32.0,
-          "ground": 0.234857,
-          "dkl": 0.037,
-          "kelly_ev": 34.02,
-          "outcome": "LOSS"
-        },
-        {
-          "entry": "2026-08-17",
-          "dow": "Mon",
-          "ticker": "MRK",
-          "type": "bear_call",
-          "k_s": 136.0,
-          "k_l": 137.0,
-          "credit": 0.556,
-          "max_loss": 0.444,
-          "spot": 152.55,
-          "qty": 2,
-          "pnl": -88.8,
-          "ground": 0.124339,
-          "dkl": 0.0451,
-          "kelly_ev": 19.52,
-          "outcome": "LOSS"
-        },
-        {
-          "entry": "2026-08-17",
-          "dow": "Mon",
-          "ticker": "MDT",
-          "type": "bear_call",
-          "k_s": 91.0,
-          "k_l": 92.0,
-          "credit": 0.396,
-          "max_loss": 0.604,
-          "spot": 93.35,
-          "qty": 2,
-          "pnl": -120.8,
-          "ground": 0.100598,
-          "dkl": 0.0123,
-          "kelly_ev": 11.37,
-          "outcome": "LOSS"
-        },
-        {
-          "entry": "2026-08-17",
-          "dow": "Mon",
-          "ticker": "SBUX",
-          "type": "bull_put",
-          "k_s": 108.0,
-          "k_l": 107.0,
-          "credit": 0.524,
-          "max_loss": 0.476,
-          "spot": 107.08,
-          "qty": 2,
-          "pnl": -79.2,
-          "ground": 0.08225,
-          "dkl": 0.0335,
-          "kelly_ev": 11.5,
-          "outcome": "PARTIAL"
-        },
-        {
-          "entry": "2026-08-18",
-          "dow": "Tue",
-          "ticker": "PEP",
-          "type": "bull_put",
-          "k_s": 140.0,
-          "k_l": 139.0,
-          "credit": 0.628,
-          "max_loss": 0.372,
-          "spot": 143.48,
-          "qty": 2,
-          "pnl": 125.6,
-          "ground": 0.410934,
-          "dkl": 0.0021,
-          "kelly_ev": 41.97,
-          "outcome": "WIN"
-        },
-        {
-          "entry": "2026-08-18",
-          "dow": "Tue",
-          "ticker": "PM",
-          "type": "bull_put",
-          "k_s": 187.5,
-          "k_l": 185.0,
-          "credit": 1.32,
-          "max_loss": 1.18,
-          "spot": 188.23,
-          "qty": 2,
-          "pnl": 264.0,
-          "ground": 0.169222,
-          "dkl": 0.0033,
-          "kelly_ev": 17.48,
-          "outcome": "WIN"
-        },
-        {
-          "entry": "2026-08-18",
-          "dow": "Tue",
-          "ticker": "COST",
-          "type": "bear_call",
-          "k_s": 962.5,
-          "k_l": 965.0,
-          "credit": 1.38,
-          "max_loss": 1.12,
-          "spot": 947.74,
-          "qty": 2,
-          "pnl": 276.0,
-          "ground": 0.139368,
-          "dkl": 0.0244,
-          "kelly_ev": 17.79,
-          "outcome": "WIN"
-        },
-        {
-          "entry": "2026-08-18",
-          "dow": "Tue",
-          "ticker": "LOW",
-          "type": "bull_put",
-          "k_s": 215.0,
-          "k_l": 212.5,
-          "credit": 1.3,
-          "max_loss": 1.2,
-          "spot": 216.09,
-          "qty": 2,
-          "pnl": 260.0,
-          "ground": 0.09268,
-          "dkl": 0.0812,
-          "kelly_ev": 20.87,
-          "outcome": "WIN"
-        },
-        {
-          "entry": "2026-08-19",
-          "dow": "Wed",
-          "ticker": "ADP",
-          "type": "bear_call",
-          "k_s": 277.5,
-          "k_l": 280.0,
-          "credit": 1.62,
-          "max_loss": 0.88,
-          "spot": 280.81,
-          "qty": 2,
-          "pnl": -176.0,
-          "ground": 0.455898,
-          "dkl": 0.0026,
-          "kelly_ev": 46.81,
-          "outcome": "LOSS"
-        },
-        {
-          "entry": "2026-08-19",
-          "dow": "Wed",
-          "ticker": "SBUX",
-          "type": "bear_call",
-          "k_s": 105.0,
-          "k_l": 106.0,
-          "credit": 0.628,
-          "max_loss": 0.372,
-          "spot": 107.08,
-          "qty": 2,
-          "pnl": -74.4,
-          "ground": 0.301501,
-          "dkl": 0.0386,
-          "kelly_ev": 44.35,
-          "outcome": "LOSS"
-        },
-        {
-          "entry": "2026-08-19",
-          "dow": "Wed",
-          "ticker": "ISRG",
-          "type": "bear_call",
-          "k_s": 397.5,
-          "k_l": 400.0,
-          "credit": 1.36,
-          "max_loss": 1.14,
-          "spot": 378.81,
-          "qty": 2,
-          "pnl": 272.0,
-          "ground": 0.11185,
-          "dkl": 0.0047,
-          "kelly_ev": 11.72,
-          "outcome": "WIN"
-        },
-        {
-          "entry": "2026-08-19",
-          "dow": "Wed",
-          "ticker": "RTX",
-          "type": "bear_call",
-          "k_s": 220.0,
-          "k_l": 222.5,
-          "credit": 1.26,
-          "max_loss": 1.24,
-          "spot": 209.91,
-          "qty": 2,
-          "pnl": 252.0,
-          "ground": 0.101947,
-          "dkl": 0.0232,
-          "kelly_ev": 12.85,
-          "outcome": "WIN"
-        },
-        {
-          "entry": "2026-08-19",
-          "dow": "Wed",
-          "ticker": "CAT",
-          "type": "bull_put",
-          "k_s": 815.0,
-          "k_l": 810.0,
-          "credit": 2.66,
-          "max_loss": 2.34,
-          "spot": 827.9,
-          "qty": 2,
-          "pnl": 532.0,
-          "ground": 0.099696,
-          "dkl": 0.0097,
-          "kelly_ev": 10.99,
-          "outcome": "WIN"
-        },
-        {
-          "entry": "2026-08-20",
-          "dow": "Thu",
-          "ticker": "ACN",
-          "type": "bear_call",
-          "k_s": 182.5,
-          "k_l": 185.0,
-          "credit": 1.52,
-          "max_loss": 0.98,
-          "spot": 185.28,
-          "qty": 2,
-          "pnl": -196.0,
-          "ground": 0.61198,
-          "dkl": 0.0087,
-          "kelly_ev": 66.78,
-          "outcome": "LOSS"
-        },
-        {
-          "entry": "2026-08-20",
-          "dow": "Thu",
-          "ticker": "TJX",
-          "type": "bull_put",
-          "k_s": 141.0,
-          "k_l": 140.0,
-          "credit": 0.7,
-          "max_loss": 0.3,
-          "spot": 140.53,
-          "qty": 2,
-          "pnl": 23.0,
-          "ground": 0.322493,
-          "dkl": 0.0426,
-          "kelly_ev": 49.37,
-          "outcome": "PARTIAL"
-        },
-        {
-          "entry": "2026-08-20",
-          "dow": "Thu",
-          "ticker": "ABT",
-          "type": "bear_call",
-          "k_s": 114.0,
-          "k_l": 115.0,
-          "credit": 0.66,
-          "max_loss": 0.34,
-          "spot": 116.64,
-          "qty": 2,
-          "pnl": -68.0,
-          "ground": 0.158275,
-          "dkl": 0.1278,
-          "kelly_ev": 56.83,
-          "outcome": "LOSS"
-        },
-        {
-          "entry": "2026-08-20",
-          "dow": "Thu",
-          "ticker": "LOW",
-          "type": "bear_call",
-          "k_s": 217.5,
-          "k_l": 220.0,
-          "credit": 1.22,
-          "max_loss": 1.28,
-          "spot": 216.09,
-          "qty": 2,
-          "pnl": 244.0,
-          "ground": 0.137328,
-          "dkl": 0.0355,
-          "kelly_ev": 19.59,
-          "outcome": "WIN"
-        },
-        {
-          "entry": "2026-08-20",
-          "dow": "Thu",
-          "ticker": "PYPL",
-          "type": "bear_call",
-          "k_s": 62.5,
-          "k_l": 63.0,
-          "credit": 0.236,
-          "max_loss": 0.264,
-          "spot": 61.55,
-          "qty": 2,
-          "pnl": 47.2,
-          "ground": 0.093538,
-          "dkl": 0.1045,
-          "kelly_ev": 26.58,
           "outcome": "WIN"
         }
       ]

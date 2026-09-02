@@ -154,7 +154,11 @@ def score_year(year, min_entry_after=None):
     spreads.LOW_VIX_BULLPUT_FILTER = False
     spreads.SLIPPAGE_CENTS = 0.0
     bt_config.MIN_OPEN_INTEREST = 100
-    bt_config.CREDIT_BASIS = "mid"
+    # LAST clamped to each leg's BBO (root-backtest canon 2026-05-30), not mid.
+    # The 2026-06-10 mid switch was driven by LIVE intraday LAST prints being
+    # asynchronous across legs; on vendor EOD data both legs come from the same
+    # daily snapshot and clamping to BBO already caps the stale-LAST inflation.
+    bt_config.CREDIT_BASIS = "last_clamped"
     bt_config.CREDIT_SCALE = 1.0
 
     candidates = spreads.build_candidates(df)
@@ -200,7 +204,7 @@ def realize(scored, expiry_close):
         return expiry_close.get((row['ticker'], row['expiry_date']))
     sel['expiry_close'] = sel.apply(lookup, axis=1)
     ok = sel.dropna(subset=['expiry_close']).copy()
-    ok['credit'] = ok['net_credit'] * 0.80  # canonical: realized fills modeled at 0.80 x raw combo mid
+    ok['credit'] = ok['net_credit'] * 0.80  # realized fills modeled at 0.80 x clamped LAST
     ok['width']  = ok['net_credit'] + ok['max_loss']
     ok['max_loss_adj'] = ok['width'] - ok['credit']
     ok['pnl_per_contract'] = ok.apply(lambda r: spreads.calc_pnl(
@@ -504,8 +508,8 @@ payload = {
         'days':       'Mon, Tue, Wed, Thu',
         'expiry':     'Friday (DTE 1-4)',
         'selection':  f'top-5 per day, k={K_VAL:g}, GROUND threshold {bt_config.GROUND_THRESHOLD:g} (all days) — FROZEN canon, no 2026 tuning',
-        'scoring':    'G_rv: RV-implied N(d2) probs in G (canon 2026-06-09); rv_vs_iv DKL (BS d2, 10d RV vs IV); raw combo MID credit',
-        'fill_basis': '0.80×raw combo MID (20% haircut); partial-WIN at 50% intrinsic (pin-risk realistic)',
+        'scoring':    'G_rv: RV-implied N(d2) probs in G (canon 2026-06-09); rv_vs_iv DKL (BS d2, 10d RV vs IV); clamped LAST credit',
+        'fill_basis': '0.80×clamped LAST (20% haircut); partial-WIN at 50% intrinsic (pin-risk realistic)',
         'regime':     'OFF (both directions eligible)',
         'vol_gate':   'OFF',
         'sizing':     'qty=2 per pick (canonical 2026-06-05)',
