@@ -31,7 +31,7 @@
   <a href="{{ url_for('actuals') }}"  class="{% if request.endpoint == 'actuals'      %}active{% endif %}">actuals</a>
   <a href="{{ url_for('backtest') }}" class="{% if request.endpoint == 'backtest'     %}active{% endif %}">backtest</a>
   <a href="{{ url_for('oot') }}"      class="{% if request.endpoint == 'oot'          %}active{% endif %}">oot</a>
-  <a href="{{ url_for('snapshots') }}" class="{% if request.endpoint == 'snapshots'    %}active{% endif %}">snapshots</a>
+  <a href="{{ url_for('snapshots') }}" class="{% if request.endpoint == 'snapshots'    %}active{% endif %}">snap</a>
   <a href="{{ url_for('qr') }}"       class="{% if request.endpoint == 'qr'           %}active{% endif %}">qr</a>
   <a href="{{ url_for('latest_json') }}" class="{% if request.endpoint == 'latest_json' %}active{% endif %}">api</a>
 </div>
