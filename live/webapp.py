@@ -182,6 +182,28 @@ def _find_snapshot_scan(date: str, hhmm: str) -> tuple[dict, dict] | tuple[None,
     return payload, None
 
 
+def _live_status(spread_type: str, spot, short_strike, long_strike):
+    """WINNING / PARTIAL / LOSING from spot vs the strikes.
+
+    Same rule the frozen-tracking path uses below: WINNING requires spot to
+    clear the short strike by >= $0.01, and sitting right AT the strike is
+    PARTIAL because that is where assignment risk lives. Extracted so the
+    Snapshots and Actuals tabs can badge intraday picks the same way instead
+    of showing every open pick as a flat "open".
+    """
+    try:
+        spot = float(spot); ss = float(short_strike); ls = float(long_strike)
+    except (TypeError, ValueError):
+        return None
+    if spread_type == "bull_put":
+        if spot >= ss + 0.01:
+            return "WINNING"
+        return "LOSING" if spot <= ls else "PARTIAL"
+    if spot <= ss - 0.01:
+        return "WINNING"
+    return "LOSING" if spot >= ls else "PARTIAL"
+
+
 def _actuals_rows() -> list[dict]:
     store = _actuals_store()
     rows = []
@@ -230,6 +252,25 @@ def _actuals_rows() -> list[dict]:
                 if _pick_identity(fresh) == _pick_identity(pick):
                     pick = _json_clone(fresh)
                     source_time = f"{str(scan.get('hhmm', ''))[:2]}:{str(scan.get('hhmm', ''))[2:]}"
+            # Snapshot-sourced trades used to render a dash for spot, mark and
+            # P&L: only the frozen branch above ever set last_track/last_marked/
+            # outcome_row, so the template had nothing to show while the trade
+            # was open. track_frozen now marks intraday picks too (pick["live"]),
+            # and settled ones already carry outcome/pnl/expiry_close.
+            live = pick.get("live") or {}
+            if live:
+                live.setdefault("live_status", _live_status(
+                    pick.get("spread_type"), live.get("underlying_price"),
+                    pick.get("short_strike"), pick.get("long_strike")))
+                last_track = live
+                if live.get("current_mark") is not None:
+                    last_marked = live
+            if pick.get("pnl") is not None:
+                outcome_row = {
+                    "result": pick.get("outcome"),
+                    "pnl_per_contract": pick.get("pnl"),
+                    "underlying_price": pick.get("expiry_close"),
+                }
             if not pick.get("fill_targets"):
                 mid_c = float(pick.get("net_credit") or pick.get("entry_credit") or 0)
                 width = float(pick.get("spread_width") or (mid_c + float(pick.get("max_loss") or 0)) or 0)
@@ -636,6 +677,12 @@ def snapshots():
                 hhmm = scan.get("hhmm", "")
                 scan["hhmm_actual"] = hhmm
                 scan["hhmm_round"] = _round_hhmm(hhmm)
+                for pk in scan.get("picks") or []:
+                    lv = pk.get("live")
+                    if lv:
+                        lv.setdefault("live_status", _live_status(
+                            pk.get("spread_type"), lv.get("underlying_price"),
+                            pk.get("short_strike"), pk.get("long_strike")))
             days.append(d)
     # Aggregate settled picks by scan time-of-day, rounded to the half hour.
     by_time = {}
