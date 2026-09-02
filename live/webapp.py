@@ -669,13 +669,34 @@ def _round_hhmm(hhmm: str) -> str:
     return f"{total // 60:02d}{total % 60:02d}"
 
 
+SNAPSHOT_DAYS_DEFAULT = 15   # day cards rendered by default; aggregate is unaffected
+
+
 @app.route("/snapshots")
 def snapshots():
     """Every :01/:31 scan's qualified picks, settled at expiry. Purpose:
     test whether the GROUND threshold picks well at ANY time of day or
     only at the 15:01 freeze that mirrors the backtest's EOD basis."""
     picks_dir = Path(live_config.ROOT_DIR) / "intraday_picks"
-    days = []
+
+    # Day cards are capped; the aggregate below still runs over EVERY day.
+    # The page rendered its whole history as one document: 1.35 MB across 45
+    # days on 2026-09-02, and the 15-minute cron took a day from 13 scans to
+    # 29, so it was heading for ~5 MB in a month and ~46 MB in a year. The
+    # aggregate-by-scan-time table is what the page exists for, so it keeps
+    # full history; only the day-by-day cards are limited.
+    #   ?days=N    show the N most recent days
+    #   ?days=all  show everything (slow, kept for analysis)
+    raw_limit = (request.args.get("days") or "").strip().lower()
+    if raw_limit in ("all", "0"):
+        limit = None
+    else:
+        try:
+            limit = max(int(raw_limit), 1)
+        except ValueError:
+            limit = SNAPSHOT_DAYS_DEFAULT
+
+    all_days = []
     for fp in sorted(picks_dir.glob("*.json"), reverse=True):
         d = _read_json(fp)
         if d:
@@ -683,16 +704,24 @@ def snapshots():
                 hhmm = scan.get("hhmm", "")
                 scan["hhmm_actual"] = hhmm
                 scan["hhmm_round"] = _round_hhmm(hhmm)
-                for pk in scan.get("picks") or []:
-                    lv = pk.get("live")
-                    if lv:
-                        lv.setdefault("live_status", _live_status(
-                            pk.get("spread_type"), lv.get("underlying_price"),
-                            pk.get("short_strike"), pk.get("long_strike")))
-            days.append(d)
+            all_days.append(d)
+
+    total_days = len(all_days)
+    days = all_days if limit is None else all_days[:limit]
+
+    # Only the days actually rendered need a live badge computed.
+    for d in days:
+        for scan in d.get("scans", []):
+            for pk in scan.get("picks") or []:
+                lv = pk.get("live")
+                if lv:
+                    lv.setdefault("live_status", _live_status(
+                        pk.get("spread_type"), lv.get("underlying_price"),
+                        pk.get("short_strike"), pk.get("long_strike")))
+
     # Aggregate settled picks by scan time-of-day, rounded to the half hour.
     by_time = {}
-    for d in days:
+    for d in all_days:
         for scan in d.get("scans", []):
             key = scan["hhmm_round"]
             slot = by_time.setdefault(key, {
@@ -714,7 +743,9 @@ def snapshots():
         s["per_trade"] = round(s["pnl"] / s["settled"], 2) if s["settled"] else None
     import config as backtest_config
     return render_template("snapshots.html", days=days, agg=agg,
-                           thr=backtest_config.GROUND_THRESHOLD)
+                           thr=backtest_config.GROUND_THRESHOLD,
+                           shown_days=len(days), total_days=total_days,
+                           day_limit=limit)
 
 
 @app.route("/history")
