@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import os
 import sys
 import time
@@ -156,13 +157,98 @@ def _weekly_expiries_in_dte_window(
     return expiries
 
 
-def _strike_window(spot: float) -> tuple[float, float]:
-    """Strike band ±7% around spot (maps to 0.35–0.65 delta range).
+_IV_CACHE_PATH = Path(live_config.CACHE_DIR) / "iv_estimates.json"
 
-    Tightened from ±15% to kill far OTM junk while capturing all
-    delta-eligible strikes for canonical strategy.
+
+def _vol_estimate(symbol: str) -> float | None:
+    """Annualized vol for sizing the strike band, needed BEFORE any option is
+    quoted. Prefers IV observed on an earlier scan (persisted by
+    _update_iv_cache); falls back to the RV table with a VRP uplift, since
+    IV runs above RV. Returns None when neither is available — caller then
+    keeps the old flat band.
     """
-    return (0.93 * spot, 1.07 * spot)
+    cached = (_read_json(_IV_CACHE_PATH) or {}).get(symbol)
+    if cached and cached > 0:
+        return float(cached)
+    rv_map = _rv_lookup()
+    rv = rv_map.get(symbol)
+    if rv and rv > 0:
+        return float(rv) * float(live_config.LIVE_STRIKE_BAND_VRP)
+    return None
+
+
+_RV_MEMO: dict | None = None
+
+
+def _rv_lookup() -> dict:
+    """Latest rv_30d per symbol, read once per process.
+
+    Read it per ticker and the 377k-row table costs ~0.23s a call — 12 tickers
+    in a fetcher group would pay ~2.8s for a lookup that never changes during
+    a run.
+    """
+    global _RV_MEMO
+    if _RV_MEMO is not None:
+        return _RV_MEMO
+    try:
+        import pandas as _pd
+        rv = _pd.read_parquet("output/rv_table.parquet",
+                              columns=["Symbol", "DataDate", "rv_30d"])
+        latest = (rv.dropna(subset=["rv_30d"])
+                    .sort_values(["Symbol", "DataDate"])
+                    .groupby("Symbol").tail(1))
+        _RV_MEMO = dict(zip(latest.Symbol, latest.rv_30d))
+    except Exception:
+        _RV_MEMO = {}
+    return _RV_MEMO
+
+
+def _update_iv_cache(rows: list[dict]) -> None:
+    """Persist median observed IV per symbol so the next scan can size its band.
+
+    Not day-scoped like the chain/contract caches — a stale IV from yesterday
+    is a far better band estimate than no estimate at all.
+    """
+    if not rows:
+        return
+    by_sym: dict[str, list[float]] = {}
+    for r in rows:
+        iv = r.get("ImpliedVolatility")
+        if iv and iv > 0:
+            by_sym.setdefault(r["Symbol"], []).append(float(iv))
+    if not by_sym:
+        return
+    payload = _read_json(_IV_CACHE_PATH) or {}
+    for sym, ivs in by_sym.items():
+        ivs.sort()
+        payload[sym] = ivs[len(ivs) // 2]
+    try:
+        _write_json(_IV_CACHE_PATH, payload)
+    except Exception:
+        pass
+
+
+def _strike_window(spot: float, symbol: str | None = None,
+                   dte: int | None = None) -> tuple[float, float]:
+    """Strike band around spot, sized to the expected move to expiry.
+
+    Was a flat ±7%, which is roughly 3x the 1-sigma move at DTE 1-4. Only
+    strikes with |delta| in [DELTA_MIN, DELTA_MAX] can serve as a short leg,
+    and across 105 snapshots (170,507 rows, DTE 1-4) those sat within 1.06
+    sigma of spot. K=1.0 plus a 1% pad for the long leg's adjacent strike
+    covers ~1.45 sigma: 24% fewer contracts, 0 of 38,889 eligible short legs
+    dropped. Clamped to [MIN_PCT, MAX_PCT] so the band can never exceed the
+    old flat one, and falls back to it whenever no vol estimate exists.
+    """
+    band = float(live_config.LIVE_STRIKE_BAND_MAX_PCT)
+    if getattr(live_config, "LIVE_STRIKE_BAND_ENABLED", False) and symbol and dte:
+        iv = _vol_estimate(symbol)
+        if iv and iv > 0:
+            sigma = iv * math.sqrt(max(int(dte), 1) / 365.0)
+            band = float(live_config.LIVE_STRIKE_BAND_K) * sigma + float(live_config.LIVE_STRIKE_BAND_PAD)
+            band = min(max(band, float(live_config.LIVE_STRIKE_BAND_MIN_PCT)),
+                       float(live_config.LIVE_STRIKE_BAND_MAX_PCT))
+    return ((1.0 - band) * spot, (1.0 + band) * spot)
 
 
 # ── Tickers ─────────────────────────────────────────────────────────────────
@@ -217,7 +303,20 @@ async def _qualify_options_for(
     if not target_exps:
         return []
 
-    target_strikes = sorted(float(s) for s in all_strikes if strike_lo <= float(s) <= strike_hi)
+    # Widen by one real strike on each side. The long leg is the strike
+    # ADJACENT to the short leg, so a band that stops exactly at the last
+    # eligible short strike cannot build a spread there. A percentage pad
+    # cannot do this job: one strike interval is ~0.9% of spot on a $500 name
+    # but ~4.5% on F at $11, and a flat 1% pad silently killed BAC, F and T
+    # candidates on the 2026-09-02 12:06 scan.
+    _grid = sorted(float(x) for x in all_strikes)
+    _inside = [i for i, k in enumerate(_grid) if strike_lo <= k <= strike_hi]
+    if _inside:
+        lo_i = max(0, _inside[0] - 1)
+        hi_i = min(len(_grid) - 1, _inside[-1] + 1)
+        target_strikes = _grid[lo_i:hi_i + 1]
+    else:
+        target_strikes = []
     if not target_strikes:
         return []
 
@@ -297,7 +396,15 @@ async def _fetch_one_ticker(
     if not spot or pd.isna(spot):
         return [], f"  [{sym}] no spot price"
 
-    strike_lo, strike_hi = _strike_window(spot)
+    # Widest expiry in the window sets the band — a later expiry needs more room.
+    _dtes = []
+    for _e in expiry_strs:
+        try:
+            _dtes.append((datetime.strptime(_e, "%Y%m%d").date() - today).days)
+        except Exception:
+            pass
+    strike_lo, strike_hi = _strike_window(spot, symbol=sym,
+                                          dte=(max(_dtes) if _dtes else None))
     contracts = await _qualify_options_for(ib, stock, expiry_strs, strike_lo, strike_hi, rights=rights, spot=spot)
     if not contracts:
         return [], f"  [{sym}] spot=${spot:.2f}  no qualified options"
@@ -494,6 +601,8 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = N
         ib.disconnect()
 
     total_elapsed = time.monotonic() - t_start
+    # Feed observed IV back so the next scan can size its strike band.
+    _update_iv_cache(rows)
     print(f"\nfetched {len(rows)} option rows over {len(tickers)} tickers "
           f"in {total_elapsed:.1f}s", flush=True)
     return pd.DataFrame(rows)
