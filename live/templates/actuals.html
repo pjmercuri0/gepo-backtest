@@ -81,15 +81,15 @@
           <td>${{ "%.2f"|format(cr|rd(2)) }}
             {% if p.actual_credit is defined and p.actual_credit is not none %}
               <span class="actual-trade-edit" data-id="{{ row.id }}" data-current="{{ "%.2f"|format(p.actual_credit|rd(2)) }}"
-                    style="color:{% if (p.actual_credit|rd(2)) < (cr|rd(2)) %}#5b9474{% else %}#7ec99a{% endif %};cursor:pointer;border-bottom:1px dotted currentColor"
+                    style="color:{% if (p.actual_credit|rd(2)) < (cr|rd(2)) %}#5b9474{% else %}#7ec99a{% endif %}"
                     title="your actual fill — click to edit">(${{ "%.2f"|format(p.actual_credit|rd(2)) }})</span>
             {% else %}
               <span class="actual-trade-edit" data-id="{{ row.id }}" data-current=""
-                    style="color:#666;cursor:pointer;border-bottom:1px dotted #666"
+                    style="color:#666"
                     title="click to record your actual fill">(+)</span>
             {% endif %}
           </td>
-          <td>${{ "%.2f"|format(ml|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span style="color:#7ec99a">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>
+          <td>${{ "%.2f"|format(ml|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span class="actual-shown" style="color:#7ec99a">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>
           <td>{% if (ml|rd(2)) > 0 %}{{ "%.2f"|format(((cr|rd(2)) / (ml|rd(2)))|rd(2)) }}{% else %}—{% endif %}</td>
           <td class="fw">{% if p.GROUND is not none %}{{ "%.3f"|format((p.GROUND * 100)|rd(3)) }}%{% else %}—{% endif %}</td>
           <td>{% if p.short_delta is defined and p.short_delta is not none %}{{ "%.2f"|format(p.short_delta|rd(2)) }}{% else %}—{% endif %}</td>
