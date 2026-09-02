@@ -95,4 +95,24 @@ Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or 
 <div class="week-card"><div class="week-sub" style="color:#888780;padding:12px">
 nothing captured yet</div></div>
 {% endfor %}
+
+{# Day cards are capped so the page does not grow without bound; the
+   aggregate table above is always computed over the full history. #}
+{% if total_days and shown_days < total_days %}
+  <div class="week-card">
+    <div class="week-sub" style="padding:10px 0">
+      Showing the {{ shown_days }} most recent of {{ total_days }} days.
+      <a href="{{ url_for('snapshots', days=shown_days + 15) }}" style="margin-left:10px">show 15 more</a>
+      <a href="{{ url_for('snapshots', days='all') }}" style="margin-left:14px">show all ({{ total_days }})</a>
+    </div>
+  </div>
+{% elif total_days and day_limit is none and total_days > 15 %}
+  <div class="week-card">
+    <div class="week-sub" style="padding:10px 0">
+      Showing all {{ total_days }} days.
+      <a href="{{ url_for('snapshots') }}" style="margin-left:10px">back to recent 15</a>
+    </div>
+  </div>
+{% endif %}
+
 {% endblock %}
