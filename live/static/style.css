@@ -147,7 +147,13 @@ tr.assignment-risk td:first-child::before {
   .ticker-strip { font-size: 11px; padding: 8px 12px; }
   .ticker-strip .tick { margin-right: 18px; }
   .summary-row { flex-direction: column; gap: 4px; }
-  .nav a { margin-right: 12px; font-size: 12px; }
+  /* Eight tabs (live/history/actuals/backtest/oot/snap/qr/api) wrapped to a
+     second line on a phone, which also overflowed the fixed 48px nav. Tighter
+     gaps + side padding keep them on one row; nowrap stops a re-wrap if a tab
+     is ever renamed longer. */
+  .nav { padding-left: 10px; padding-right: 10px; white-space: nowrap; }
+  .nav a { margin-right: 8px; font-size: 11.5px; }
+  .nav a:last-child { margin-right: 0; }
 }
 
 /* Live-only additions */
