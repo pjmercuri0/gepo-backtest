@@ -118,7 +118,9 @@ LIVE_COMBO_MAX_WIDTH = 1.0
 # book, NOT by how long we wait: batch 25 / wait 12 took 72.9s and returned 56
 # of 130, batch 50 / wait 8 took 24.4s and returned 57. Take the fast one.
 LIVE_COMBO_BATCH     = 50      # bags streamed at once (market-data line budget)
-LIVE_COMBO_WAIT      = 8       # seconds to wait for a batch's books to arrive
+LIVE_COMBO_WAIT      = 8       # hard ceiling per batch
+LIVE_COMBO_MIN_WAIT  = 3.0     # always wait at least this long (first quotes land ~1.0s)
+LIVE_COMBO_STALL     = 1.5     # then stop once no new quote has arrived for this long
 # Which combo price becomes net_credit:
 #   "mid"   - midpoint of the combo book; direct analogue of today's leg mid
 #   "touch" - -ask, what you actually collect buying the combo at market

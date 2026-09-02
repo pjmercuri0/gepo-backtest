@@ -87,10 +87,25 @@ def _quote_batch(ib: IB, bags: list, wait_s: float) -> list:
     burn the full wait, which is why this is batched.
     """
     tickers = [ib.reqMktData(b, "", False, False) for b in bags]
-    deadline = time.monotonic() + wait_s
+    t0 = time.monotonic()
+    deadline = t0 + wait_s
+    min_wait = float(getattr(live_config, "LIVE_COMBO_MIN_WAIT", 3.0))
+    stall_s = float(getattr(live_config, "LIVE_COMBO_STALL", 1.5))
+    best = -1
+    last_change = t0
     while time.monotonic() < deadline:
         ib.sleep(0.25)
-        if all(_has_quote(t) for t in tickers):
+        n = sum(1 for t in tickers if _has_quote(t))
+        if n > best:
+            best, last_change = n, time.monotonic()
+            if n == len(tickers):
+                break
+        elif (time.monotonic() - t0 >= min_wait
+              and time.monotonic() - last_change >= stall_s):
+            # Arrivals have stopped. Waiting out the full budget only idles:
+            # measured 2026-09-02, a 50-bag batch went 0 -> 22 quotes inside
+            # 2.0s and then sat flat at 22 for the remaining 10s, because the
+            # rest simply have no complex-order book.
             break
     out = [(t.bid, t.ask, t.last) for t in tickers]
     for b in bags:
