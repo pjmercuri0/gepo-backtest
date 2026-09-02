@@ -6,7 +6,27 @@
 <div class="subtitle">Trades you added from History or Snapshots.</div>
 
 {% if rows %}
+  {# One card per expiry Friday. Every pick in a group shares an expiry, so the
+     group total is the number that matters for the week: realized where the
+     trade settled, marked where it is still open. #}
+  {% for wk in weeks %}
   <div class="week-card">
+    <div class="week-head">
+      <div class="week-title">Expires {{ wk.expiry_label }}{% if wk.expiry_dow %} ({{ wk.expiry_dow }}){% endif %}</div>
+      <div class="week-pnl {% if wk.total is not none and wk.total > 0 %}pos{% elif wk.total is not none and wk.total < 0 %}neg{% endif %}">
+        {% if wk.total is not none %}${{ '%+.0f'|format(wk.total) }}{% if wk.open %}<span class="live-dot" style="margin-left:6px"></span>{% endif %}{% else %}—{% endif %}
+      </div>
+    </div>
+    <div class="week-sub">
+      {{ wk.n }} trade{{ '' if wk.n == 1 else 's' }}
+      &middot; {{ wk.settled }} settled, {{ wk.open }} open
+      &middot; credit ${{ '%.0f'|format(wk.credit) }}
+      &middot; risk ${{ '%.0f'|format(wk.max_loss) }}
+      {% if wk.pct_of_credit is not none %}&middot; {{ '%+.1f'|format(wk.pct_of_credit) }}% of credit{% endif %}
+      {% if wk.settled and wk.open %}
+        &middot; realized ${{ '%+.0f'|format(wk.realized) }}, marked ${{ '%+.0f'|format(wk.unrealized) }}
+      {% endif %}
+    </div>
     <div class="table-scroll">
     <table>
       <thead><tr>
@@ -16,7 +36,7 @@
         <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th style="text-align:right">P&amp;L</th>
       </tr></thead>
       <tbody>
-      {% for row in rows %}
+      {% for row in wk.rows %}
         {% set p = row.pick %}
         {% set outcome_row = row.outcome_row %}
         {% set last_track = row.last_track %}
@@ -94,6 +114,7 @@
     </table>
     </div>
   </div>
+  {% endfor %}
 {% else %}
   <div class="week-card"><div class="week-sub" style="color:#888780;padding:12px">
     no actual trades added yet
