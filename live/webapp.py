@@ -724,9 +724,84 @@ def history():
                            close_alert=close_alert)
 
 
+def _actuals_row_pnl(row: dict):
+    """Per-contract P&L for one actuals row, realized if settled else marked.
+
+    Same precedence the Actuals table renders: a settled trade's actual fill
+    P&L beats its modelled P&L, and an open trade falls back to the live
+    mark-to-market. Returns (value, is_realized); value is None when the trade
+    has neither an outcome nor a mark.
+    """
+    outcome_row = row.get("outcome_row") or {}
+    if outcome_row.get("actual_pnl_per_contract") is not None:
+        return float(outcome_row["actual_pnl_per_contract"]), True
+    if outcome_row.get("pnl_per_contract") is not None:
+        return float(outcome_row["pnl_per_contract"]), True
+    track = row.get("last_track") or {}
+    if track.get("unrealized_pnl_per_contract") is not None:
+        return float(track["unrealized_pnl_per_contract"]), False
+    return None, False
+
+
+def _actuals_weeks(rows: list[dict]) -> list[dict]:
+    """Group actuals by the Friday they expire on, with a P&L total per week.
+
+    Every pick in a week shares an expiry, so the group total is the number
+    that matters for the week: realized where a trade has settled, marked
+    where it is still open. Weeks sort newest expiry first; a trade missing an
+    expiry_date lands in an "unknown" bucket rather than being dropped.
+    """
+    buckets: dict[str, dict] = {}
+    for row in rows:
+        pick = row.get("pick") or {}
+        expiry = str(pick.get("expiry_date") or "")[:10] or "unknown"
+        wk = buckets.setdefault(expiry, {
+            "expiry": expiry, "rows": [], "n": 0, "settled": 0, "open": 0,
+            "realized": 0.0, "unrealized": 0.0, "total": 0.0,
+            "credit": 0.0, "max_loss": 0.0, "has_pnl": False,
+        })
+        wk["rows"].append(row)
+        wk["n"] += 1
+        qty = int(pick.get("suggested_qty") or 1)
+        tgt = (pick.get("fill_targets") or [{}])[0]
+        wk["credit"] += float(tgt.get("credit") or 0) * 100 * qty
+        wk["max_loss"] += float(tgt.get("max_loss") or 0) * 100 * qty
+        pnl, realized = _actuals_row_pnl(row)
+        if pnl is None:
+            continue
+        wk["has_pnl"] = True
+        pnl *= qty
+        wk["total"] += pnl
+        if realized:
+            wk["settled"] += 1
+            wk["realized"] += pnl
+        else:
+            wk["open"] += 1
+            wk["unrealized"] += pnl
+
+    out = []
+    for wk in buckets.values():
+        try:
+            d = datetime.strptime(wk["expiry"], "%Y-%m-%d")
+            wk["expiry_dow"] = d.strftime("%a")
+            wk["expiry_label"] = d.strftime("%b %-d, %Y")
+        except ValueError:
+            wk["expiry_dow"] = None
+            wk["expiry_label"] = wk["expiry"]
+        for k in ("realized", "unrealized", "total", "credit", "max_loss"):
+            wk[k] = round(wk[k], 2)
+        if not wk["has_pnl"]:
+            wk["total"] = None
+        wk["pct_of_credit"] = (round(100.0 * wk["total"] / wk["credit"], 1)
+                               if wk["total"] is not None and wk["credit"] else None)
+        out.append(wk)
+    return sorted(out, key=lambda w: w["expiry"], reverse=True)
+
+
 @app.route("/actuals")
 def actuals():
-    return render_template("actuals.html", rows=_actuals_rows())
+    rows = _actuals_rows()
+    return render_template("actuals.html", rows=rows, weeks=_actuals_weeks(rows))
 
 
 @app.route("/api/latest.json")
