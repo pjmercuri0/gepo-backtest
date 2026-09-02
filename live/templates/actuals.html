@@ -81,7 +81,7 @@
           <td>${{ "%.2f"|format(cr|rd(2)) }}
             {% if p.actual_credit is defined and p.actual_credit is not none %}
               <span class="actual-trade-edit actual-shown" data-id="{{ row.id }}" data-current="{{ "%.2f"|format(p.actual_credit|rd(2)) }}"
-                    style="color:{% if (p.actual_credit|rd(2)) < (cr|rd(2)) %}#5b9474{% else %}#7ec99a{% endif %}"
+                    style="color:#7ec99a"
                     title="your actual fill — click to edit">(${{ "%.2f"|format(p.actual_credit|rd(2)) }})</span>
             {% else %}
               <span class="actual-trade-edit" data-id="{{ row.id }}" data-current=""
@@ -90,13 +90,18 @@
             {% endif %}
           </td>
           <td>${{ "%.2f"|format(ml|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span class="actual-shown" style="color:#7ec99a">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>
-          {# Modelled ratio, plus the ratio on your real fill once recorded. #}
+          {# Modelled ratio, plus the ratio on your real fill once recorded.
+             All recorded values use the one light green (#7ec99a). History
+             darkens to #5b9474 when a fill came in worse than modelled, but
+             here credit and ratio sat beside an always-light max-loss in the
+             same row, so the shade read as a mismatched colour rather than as
+             a signal. #}
           <td>{% if (ml|rd(2)) > 0 %}{{ "%.2f"|format(((cr|rd(2)) / (ml|rd(2)))|rd(2)) }}{% else %}—{% endif %}
             {%- if p.actual_credit is defined and p.actual_credit is not none
                   and p.actual_max_loss is defined and p.actual_max_loss is not none
                   and (p.actual_max_loss|rd(2)) > 0 %}
               {%- set ar = ((p.actual_credit|rd(2)) / (p.actual_max_loss|rd(2)))|rd(2) %}
-              <span class="actual-shown" style="color:{% if (ml|rd(2)) > 0 and ar < ((cr|rd(2)) / (ml|rd(2)))|rd(2) %}#5b9474{% else %}#7ec99a{% endif %}">({{ "%.2f"|format(ar) }})</span>
+              <span class="actual-shown" style="color:#7ec99a">({{ "%.2f"|format(ar) }})</span>
             {%- endif %}
           </td>
           <td class="fw">{% if p.GROUND is not none %}{{ "%.3f"|format((p.GROUND * 100)|rd(3)) }}%{% else %}—{% endif %}</td>
