@@ -55,6 +55,7 @@ Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or 
         <th>actual</th>
         <th>ticker</th><th>type</th><th>strikes</th><th>mid credit</th>
         <th>entry (0.80&times;)</th><th>&Gamma;</th><th>expiry</th>
+        <th>spot</th><th>mark</th>
         <th>expiry px</th><th>outcome</th><th>P&amp;L</th>
       </tr></thead>
       <tbody>
@@ -68,10 +69,17 @@ Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or 
           <td>${{ '%.2f' % p.entry_credit }}</td>
           <td>{{ '%.4f' % p.GROUND if p.GROUND is not none else '—' }}</td>
           <td>{{ (p.expiry_date or '')[:10] }}</td>
+          {# live mark from track_frozen (pick.live); settled picks show expiry px instead #}
+          <td>{% if p.live and p.live.underlying_price %}${{ '%.2f' % p.live.underlying_price }}{% else %}<span style="color:#888780">—</span>{% endif %}</td>
+          <td>{% if p.live and p.live.current_mark is not none %}${{ '%.2f' % p.live.current_mark }}{% else %}<span style="color:#888780">—</span>{% endif %}</td>
           <td>{% if p.expiry_close is not none %}${{ '%.2f' % p.expiry_close }}{% else %}<span style="color:#888780">—</span>{% endif %}</td>
-          <td>{% if p.outcome %}<span class="badge badge-{{ p.outcome }}">{{ p.outcome }}</span>{% else %}<span style="color:#888780">open</span>{% endif %}</td>
-          <td class="{{ 'pos' if p.pnl is not none and p.pnl > 0 else ('neg' if p.pnl is not none and p.pnl < 0 else '') }}">
-            {% if p.pnl is not none %}${{ '%.0f' % p.pnl }}{% else %}—{% endif %}</td>
+          <td>{% if p.outcome %}<span class="badge badge-{{ p.outcome }}">{{ p.outcome }}</span>
+              {% elif p.live and p.live.live_status %}<span class="badge {% if p.live.live_status == 'WINNING' %}badge-WIN{% elif p.live.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}">{{ p.live.live_status[0] }}</span><span class="live-dot" style="margin-left:6px"></span>
+              {% else %}<span style="color:#888780">open</span>{% endif %}</td>
+          {# realized P&L once settled, otherwise the unrealized mark-to-market #}
+          {% set shown_pnl = p.pnl if p.pnl is not none else (p.live.unrealized_pnl_per_contract if p.live else none) %}
+          <td class="{{ 'pos' if shown_pnl is not none and shown_pnl > 0 else ('neg' if shown_pnl is not none and shown_pnl < 0 else '') }}">
+            {% if shown_pnl is not none %}${{ '%+.0f' % shown_pnl }}{% if p.pnl is none %}<span class="live-dot" style="margin-left:5px"></span>{% endif %}{% else %}—{% endif %}</td>
         </tr>
       {% endfor %}
       </tbody>

@@ -236,6 +236,55 @@ def _atomic_write(path: Path, payload: dict) -> None:
         raise
 
 
+
+def _track_intraday(df: pd.DataFrame, today: date) -> None:
+    """Mark every unsettled intraday-scan pick, same model as frozen picks.
+
+    The Snapshots and Actuals tabs read live/intraday_picks/*.json. Those picks
+    carried an entry credit and, once expired, a settled pnl — but nothing in
+    between, so both tabs showed a dash for anything still open while History
+    showed a live mark. _track_pick already produces that mark from the merged
+    snapshot parquet; it was simply never pointed at these files.
+
+    Stores only the LATEST row on each pick as `live`, not a series. History
+    needs a time series for its chart; these two tabs only ever render the
+    current mark, and at 29 scans a day a per-pick series would bloat every
+    file for nothing.
+    """
+    picks_dir = Path(live_config.ROOT_DIR) / "intraday_picks"
+    if not picks_dir.exists():
+        return
+    marked = files = 0
+    for fp in sorted(picks_dir.glob("*.json")):
+        try:
+            with open(fp) as f:
+                payload = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+        touched = False
+        for scan in payload.get("scans") or []:
+            for pick in scan.get("picks") or []:
+                # Settled picks keep their realized pnl; nothing to mark.
+                if pick.get("pnl") is not None:
+                    continue
+                try:
+                    if pd.Timestamp(pick["expiry_date"]).date() < today:
+                        continue
+                except (KeyError, ValueError, TypeError):
+                    continue
+                row = _track_pick(df, pick)
+                if row is None:
+                    continue
+                pick["live"] = row
+                touched = True
+                marked += 1
+        if touched:
+            _atomic_write(fp, payload)
+            files += 1
+    print(f"Intraday picks: marked {marked} open pick(s) across {files} file(s)",
+          flush=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--snapshot", type=str, default=None,
@@ -262,6 +311,8 @@ def main() -> int:
             continue
         if _is_active(payload):
             active.append((fp, payload))
+
+    _track_intraday(df, today)
 
     if not active:
         print("No active frozen files", flush=True)
