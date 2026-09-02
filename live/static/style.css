@@ -210,4 +210,8 @@ tr.assignment-risk td:first-child::before {
   font: inherit; font-size: inherit; font-weight: inherit;
   cursor: pointer; border-bottom: 1px dotted currentColor;
 }
+/* A recorded value renders exactly like the plain green (max-loss) figure:
+   same font, no underline. Only the (+) placeholder keeps the dotted
+   affordance, so a set value never looks like a different typeface. */
 .actual-shown { font: inherit; font-size: inherit; font-weight: inherit; }
+.actual-trade-edit.actual-shown, .actual-edit.actual-shown { border-bottom: none; }
