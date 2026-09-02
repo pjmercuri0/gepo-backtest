@@ -44,6 +44,24 @@ IB_CONNECT_TIMEOUT      = 15
 IB_CONNECT_ATTEMPTS     = 3
 IB_CONNECT_RETRY_DELAY  = 3
 
+# --- Strike band ---
+# The band was a flat +/-7% of spot, which is ~3x the 1-sigma move at DTE 1-4
+# and made ~70% of every snapshot unusable: only strikes with |delta| in
+# [DELTA_MIN, DELTA_MAX] can be a short leg, and those sit within 1.06 sigma of
+# spot (measured over 105 snapshots / 170,507 rows / DTE 1-4, 2026-09-02).
+# Sizing the band as K x sigma + a fixed pad for the long leg's adjacent strike
+# fetches 24% fewer contracts while losing 0 of 38,889 eligible short legs.
+# sigma = IV x sqrt(DTE/365). Vol estimate comes from IV seen on an earlier
+# scan, else the RV table with a VRP uplift, else the band falls back to MAX.
+LIVE_STRIKE_BAND_ENABLED = True    # verified live 2026-09-02
+LIVE_STRIKE_BAND_K       = 1.0     # sigma multiple; 1.0 + pad ~= 1.45 sigma
+LIVE_STRIKE_BAND_PAD     = 0.0     # percentage pad unused: the band is widened by one
+                                   # REAL strike each side in _qualify_options_for, because one
+                                   # strike is 0.9% of spot on a $500 name and 4.5% on F at $11
+LIVE_STRIKE_BAND_MIN_PCT = 0.020   # never narrower than +/-2%
+LIVE_STRIKE_BAND_MAX_PCT = 0.070   # never wider than the old flat band
+LIVE_STRIKE_BAND_VRP     = 1.25    # IV/RV uplift when falling back to RV
+
 # --- Live DTE window ---
 # Weekly expiry window for live scans. Mon→DTE 4, Tue→DTE 3, Wed→DTE 2,
 # Thu→DTE 1, Fri→DTE 0 for same-week Friday expiry. The upper bound gives
