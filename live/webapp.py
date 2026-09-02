@@ -280,6 +280,12 @@ def _actuals_rows() -> list[dict]:
                                              "max_loss": round(width - entry_credit, 4)}]
                 pick["suggested_qty"] = pick.get("suggested_qty") or 1
 
+        # Both branches above replace `pick` with a fresh copy from its source
+        # file, which would drop a fill the user typed in. Re-apply it last.
+        if item.get("actual_credit") is not None:
+            pick["actual_credit"] = item["actual_credit"]
+            pick["actual_max_loss"] = item.get("actual_max_loss")
+
         rows.append({
             "id": item.get("id"),
             "date": source.get("date") or str(pick.get("entry_date") or "")[:10],
@@ -732,7 +738,29 @@ def _actuals_row_pnl(row: dict):
     mark-to-market. Returns (value, is_realized); value is None when the trade
     has neither an outcome nor a mark.
     """
+    pick = row.get("pick") or {}
+    actual = pick.get("actual_credit")
     outcome_row = row.get("outcome_row") or {}
+
+    # A fill the user typed in wins over the modelled credit everywhere.
+    if actual is not None:
+        spot = outcome_row.get("underlying_price")
+        if spot is not None and pick.get("spread_type"):
+            # Settled: recompute the realized result against the real fill.
+            try:
+                aml = float(pick.get("actual_max_loss") or 0)
+                pps = spreads.calc_pnl(float(spot), float(pick["short_strike"]),
+                                       float(pick["long_strike"]), float(actual),
+                                       aml, pick["spread_type"])
+                return round(float(pps) * 100, 2), True
+            except (KeyError, TypeError, ValueError):
+                pass
+        track = row.get("last_track") or {}
+        mark = track.get("current_mark")
+        if mark is not None:
+            # Open: P&L is what you actually collected minus the cost to close.
+            return round((float(actual) - float(mark)) * 100, 2), False
+
     if outcome_row.get("actual_pnl_per_contract") is not None:
         return float(outcome_row["actual_pnl_per_contract"]), True
     if outcome_row.get("pnl_per_contract") is not None:
@@ -764,8 +792,14 @@ def _actuals_weeks(rows: list[dict]) -> list[dict]:
         wk["n"] += 1
         qty = int(pick.get("suggested_qty") or 1)
         tgt = (pick.get("fill_targets") or [{}])[0]
-        wk["credit"] += float(tgt.get("credit") or 0) * 100 * qty
-        wk["max_loss"] += float(tgt.get("max_loss") or 0) * 100 * qty
+        credit = pick.get("actual_credit")
+        if credit is None:
+            credit = tgt.get("credit")
+            max_loss = tgt.get("max_loss")
+        else:
+            max_loss = pick.get("actual_max_loss")
+        wk["credit"] += float(credit or 0) * 100 * qty
+        wk["max_loss"] += float(max_loss or 0) * 100 * qty
         pnl, realized = _actuals_row_pnl(row)
         if pnl is None:
             continue
@@ -931,6 +965,57 @@ def delete_actual(trade_id: str):
     store["updated_at"] = datetime.now().isoformat(timespec="seconds")
     _atomic_write_json(_actuals_path(), store)
     return jsonify({"ok": True, "removed": trade_id})
+
+
+@app.route("/api/actuals/<path:trade_id>/actual_credit", methods=["POST"])
+def set_actual_trade_credit(trade_id: str):
+    """Set or clear the real fill credit on an Actuals trade.
+
+    Body: {"actual_credit": 0.42} or {"actual_credit": null} to clear.
+
+    Mirrors /api/frozen/<date>/<ticker>/actual_credit but writes to the
+    actuals store instead of a frozen file, because an actuals row may come
+    from a snapshot scan that has no frozen file at all. Stored on the trade's
+    own pick so it survives the row being re-read from its source each render.
+    """
+    body = request.get_json(silent=True) or {}
+    raw = body.get("actual_credit")
+    if raw in (None, ""):
+        new_val = None
+    else:
+        try:
+            new_val = float(raw)
+        except (TypeError, ValueError):
+            return jsonify({"error": "actual_credit must be numeric or null"}), 400
+
+    store = _actuals_store()
+    trade = next((t for t in store.get("trades") or [] if t.get("id") == trade_id), None)
+    if trade is None:
+        abort(404)
+
+    pick = trade.setdefault("pick", {})
+    mid_credit = float(pick.get("net_credit") or pick.get("entry_credit") or 0)
+    mid_ml = float(pick.get("max_loss") or 0)
+    spread_w = float(pick.get("spread_width") or (mid_credit + mid_ml) or 0)
+    if spread_w <= 0:
+        return jsonify({"error": "spread width unknown for this pick"}), 400
+
+    if new_val is None:
+        trade.pop("actual_credit", None)
+        trade.pop("actual_max_loss", None)
+        pick.pop("actual_credit", None)
+        pick.pop("actual_max_loss", None)
+    else:
+        if new_val <= 0 or new_val >= spread_w:
+            return jsonify({"error": f"actual_credit must be between 0 and spread width {spread_w}"}), 400
+        trade["actual_credit"] = pick["actual_credit"] = round(new_val, 4)
+        trade["actual_max_loss"] = pick["actual_max_loss"] = round(spread_w - new_val, 4)
+
+    store["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    _atomic_write_json(_actuals_path(), store)
+    return jsonify({"ok": True, "id": trade_id,
+                    "actual_credit": trade.get("actual_credit"),
+                    "actual_max_loss": trade.get("actual_max_loss")})
 
 
 @app.route("/api/frozen/<date>/<ticker>/actual_credit", methods=["POST"])
