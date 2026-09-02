@@ -202,3 +202,12 @@ tr.assignment-risk td:first-child::before {
 .week-card.unqualified .week-pnl { color: #888780 !important; }
 .week-card.unqualified .week-pnl.pos { color: #6a8a72 !important; }
 .week-card.unqualified .week-pnl.neg { color: #8a6a6a !important; }
+
+/* Editable actual-fill markers on History and Actuals. Font is pinned to
+   inherit so the parenthetical matches the number it sits beside; the dotted
+   underline is the only thing marking it as clickable. */
+.actual-edit, .actual-trade-edit {
+  font: inherit; font-size: inherit; font-weight: inherit;
+  cursor: pointer; border-bottom: 1px dotted currentColor;
+}
+.actual-shown { font: inherit; font-size: inherit; font-weight: inherit; }
