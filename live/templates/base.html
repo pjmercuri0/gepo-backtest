@@ -37,27 +37,6 @@
 </div>
 
 <div id="page-content">
-{# Assignment-risk banner. Renders on every tab because the whole point is
-   that it cannot be missed — a position in its pin zone, or a short leg with
-   no extrinsic left, means real shares get delivered. #}
-{% if assignment_alert %}
-<div class="assign-banner">
-  <div class="assign-title">⚠️ ASSIGNMENT RISK — {{ assignment_alert.n_at_risk }} position{{ '' if assignment_alert.n_at_risk == 1 else 's' }}</div>
-  {% for p in assignment_alert.positions %}
-    <div class="assign-row">
-      <strong>{{ p.ticker }}</strong>
-      {{ 'bull put' if p.spread_type == 'bull_put' else 'bear call' }}
-      {{ '%.2f'|format(p.short_strike) }}/{{ '%.2f'|format(p.long_strike) }}
-      &middot; spot {{ p.spot }}
-      {% if p.extrinsic is not none %}&middot; extrinsic ${{ '%.2f'|format(p.extrinsic) }}{% endif %}
-      {% if p.in_pin_zone %}&middot; <span class="assign-tag">IN PIN ZONE {{ '%.2f'|format(p.pin_zone[0]) }}-{{ '%.2f'|format(p.pin_zone[1]) }}</span>{% endif %}
-      {% for why in p.reasons %}<div class="assign-why">{{ why }}</div>{% endfor %}
-    </div>
-  {% endfor %}
-  <div class="assign-foot">as of {{ assignment_alert.ts[11:16] }} &middot; pin zone = short assigned, long expires worthless, shares delivered</div>
-</div>
-{% endif %}
-
 {% block content %}{% endblock %}
 </div>
 
