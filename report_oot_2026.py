@@ -40,6 +40,16 @@ def parse_args():
                         'subset run never overwrites the published SP100 curve.')
     p.add_argument('--out', default=None,
                    help='Output path override (default live/data/oot_equity.json).')
+    p.add_argument('--thr', type=float, default=None,
+                   help='GROUND threshold override. 0.05 was calibrated on the '
+                        '94-name cross-section; a single-ticker universe needs a '
+                        'different bar. Retags cache and output.')
+    p.add_argument('--any-expiry', action='store_true',
+                   help='Allow ANY expiry weekday, not just Friday. Equities only '
+                        'list weekly Friday expiries, but SPXW expires daily — 163 '
+                        'distinct expiries in the 2026 window across all five '
+                        'weekdays. The Friday-only filter discards four fifths of '
+                        'a daily-expiry product.')
     return p.parse_args()
 
 
@@ -48,11 +58,23 @@ ARGS = parse_args()
 # --symbols restricts the universe AND retags every artefact, so an SPXW-only
 # run cannot overwrite the published SP100 equity curve or poison its picks
 # cache. Both are keyed on the same tag.
+# --thr must be applied BEFORE THRESH_BY_DOW and CACHE_PATH are built, since
+# both read bt_config.GROUND_THRESHOLD.
+if ARGS.thr is not None:
+    bt_config.GROUND_THRESHOLD = ARGS.thr
+    # THRESH_BY_DOW was built at import time from the old value; rebuild it or
+    # the override silently does nothing.
+    THRESH_BY_DOW = {d: ARGS.thr for d in (0, 1, 2, 3)}
+
 UNIVERSE_TAG = 'sp100'
 if ARGS.symbols:
     SP100 = {s.strip().upper() for s in ARGS.symbols.split(',') if s.strip()}
     UNIVERSE_TAG = '-'.join(sorted(SP100)).lower()
     OUT_PATH = f'live/data/oot_equity_{UNIVERSE_TAG}.json'
+if ARGS.thr is not None:
+    OUT_PATH = OUT_PATH.replace('.json', f'_thr{ARGS.thr:g}.json')
+if ARGS.any_expiry:
+    OUT_PATH = OUT_PATH.replace('.json', '_anyexp.json')
 if ARGS.out:
     OUT_PATH = ARGS.out
 
@@ -147,7 +169,12 @@ def score_year(year, min_entry_after=None):
     df['dow']     = df['DataDate'].dt.dayofweek
     df['exp_dow'] = df['ExpirationDate'].dt.dayofweek
     df = df[df['dow'].isin(ACTIVE_DOWS)]
-    df = df[df['exp_dow']==4]
+    # Friday-only by default: equities list weekly Friday expiries, so this is
+    # a no-op for them. It is NOT a no-op for daily-expiry index products —
+    # SPXW has 163 distinct expiries in 2026 spread across all five weekdays,
+    # and this line throws away four fifths of them.
+    if not ARGS.any_expiry:
+        df = df[df['exp_dow']==4]
     df = df[(df['DTE']>=1)&(df['DTE']<=4)]
     df = df[df['LastPrice'].astype(float) > 0]
     df = df[df['DataDate'] >= MIN_ENTRY_DATE]
@@ -234,7 +261,7 @@ def realize(scored, expiry_close):
 
 
 _cache_tag = os.path.splitext(os.path.basename(YEAR_PARQUET))[0].replace('2026_sp500_last_', '')
-CACHE_PATH = f'output/picks_cache_oot2026_{_cache_tag}_{UNIVERSE_TAG}_grv_k{K_VAL:g}_thr{bt_config.GROUND_THRESHOLD:g}_mid.parquet'
+CACHE_PATH = f'output/picks_cache_oot2026_{_cache_tag}_{UNIVERSE_TAG}{"_anyexp" if ARGS.any_expiry else ""}_grv_k{K_VAL:g}_thr{bt_config.GROUND_THRESHOLD:g}_mid.parquet'
 def _cache_key_cols(df):
     cols = ['entry_date_dt', 'ticker', 'expiry_date', 'spread_type', 'short_strike', 'long_strike']
     return [c for c in cols if c in df.columns]
