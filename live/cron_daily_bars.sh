@@ -49,6 +49,16 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
   # existing file untouched. NOT cron_spy.sh — that runs fetch_spy_intraday
   # (tier 1), which pull_now_parallel.sh already does every :01/:31.
   "${GEPO_PYTHON:-python3}" -m live.refresh_spy
+  # Ex-dividend dates from IBKR (MERGE, never wipe). Must run DAILY: IB's
+  # nextDate rolls to the FOLLOWING dividend once the current ex-date arrives,
+  # so a weekly refresh silently misses any date that lands between runs.
+  # Replaces NASDAQ as the source — api.nasdaq.com returned 29 rows for
+  # 2026-09-03 and omitted HD entirely, on the very day IBKR messaged the
+  # account that HD went ex-dividend for $2.33. That left the ranker's ex-div
+  # gate covering 12 of 94 tickers, blind on HD, DE, AMGN, CL, SBUX and DIS
+  # while all six had positions open into the 2026-09-04 expiry.
+  "${GEPO_PYTHON:-python3}" fetch_dividends_ib.py
+
   # Settle expired snapshot picks now (post_close=True): same-day expiries
   # settle this evening off the live IB RTH close, matching the History tab,
   # instead of lagging to the next-day Yahoo "morning after". Settle-only —
