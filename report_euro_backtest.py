@@ -33,9 +33,18 @@ import spreads
 
 
 START_BANKROLL = 10_000.0
-ACTIVE_DOWS = [0, 1, 2, 3]
+ACTIVE_DOWS = [0, 1, 2, 3]  # entry weekdays; overridden by --entry-dows
 DOW_LONG = {0: "Mon", 1: "Tue", 2: "Wed", 3: "Thu", 4: "Fri"}
 SPY_CSV = "data/spy_us_d.csv"
+
+# Two-leg open-interest floor, overridden by --min-oi. Module-level so score_year
+# does not need it threaded through every caller.
+MIN_OI = 100
+# Per-share max-loss cap, overridden by --max-max-loss. inf disables. Written for
+# 5-point strikes: NDX lists 10-point strikes, so its spreads are 10 wide and the
+# $5 cap rejects any of them collecting under $5 credit.
+MAX_ML = 5.0
+DTE_MIN, DTE_MAX = 1, 4  # overridden by --dte-min/--dte-max
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,8 +54,24 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--symbols", default=None,
                    help="Comma-separated root override. Default: config.EURO_INDEX_ROOTS.")
     p.add_argument("--thr", type=float, default=bt_config.GROUND_THRESHOLD)
+    p.add_argument("--dte-min", type=int, default=1)
+    p.add_argument("--dte-max", type=int, default=4,
+                   help="Scoring DTE range. The pool must cover the same range "
+                        "(build_euro_pool.py --dte-max); historical_probs matches DTE exactly.")
+    p.add_argument("--entry-dows", default="0,1,2,3",
+                   help="Entry weekdays, 0=Mon. Default Mon-Thu. Add 4 to enter Fridays "
+                        "(reaches Mon expiry at DTE 3 and Tue at DTE 4).")
+    p.add_argument("--max-max-loss", type=float, default=5.0,
+                   help="Per-share max-loss cap. Pass inf to disable. Binds only where "
+                        "strike spacing exceeds it (NDX, and 64 of 467 equities).")
+    p.add_argument("--min-oi", type=int, default=100,
+                   help="Two-leg open-interest floor. 0 disables. NDX never clears "
+                        "100 (best two-leg OI all year is 49).")
     p.add_argument("--pool", default="output/euro_parquets/euro_pool.parquet")
     p.add_argument("--iv-rank", default="output/euro_parquets/euro_iv_rank.parquet")
+    p.add_argument("--rv-table", default="output/euro_parquets/euro_rv_table.parquet",
+                   help="RV lookup. Defaults to the euro table: output/rv_table.parquet "
+                        "covers only SPXW/RUTW, so SPX/NDX/RUT score nothing against it.")
     p.add_argument("--out", default="live/data/euro/backtest_equity.json")
     p.add_argument("--cache-path", default=None)
     p.add_argument("--cache-suffix", default="")
@@ -143,6 +168,9 @@ def score_year(path: str, symbols: set[str], pool: pd.DataFrame,
 
     df_full["DataDate"] = pd.to_datetime(df_full["DataDate"], errors="coerce")
     df_full["ExpirationDate"] = pd.to_datetime(df_full["ExpirationDate"], errors="coerce")
+    # Known-bad vendor spots would otherwise become both candidate entry prices
+    # and expiry_close settlement values.
+    df_full = bt_config.drop_bad_spot_days(df_full)
     df_full["PutCall"] = df_full["PutCall"].astype(str).str.lower().str.strip()
     for col in [
         "DTE", "LastPrice", "BidPrice", "AskPrice", "Delta", "StrikePrice",
@@ -158,7 +186,7 @@ def score_year(path: str, symbols: set[str], pool: pd.DataFrame,
     df = df_full.copy()
     df["dow"] = df["DataDate"].dt.dayofweek
     df = df[df["dow"].isin(ACTIVE_DOWS)]
-    df = df[df["DTE"].between(1, 4)]
+    df = df[df["DTE"].between(DTE_MIN, DTE_MAX)]
     df = df[df["LastPrice"].astype(float) > 0]
     df = df[df["DataDate"].dt.normalize().isin(spy_dates)]
     df["AbsDelta"] = df["Delta"].abs()
@@ -175,7 +203,8 @@ def score_year(path: str, symbols: set[str], pool: pd.DataFrame,
     spreads.GAP_FILTER = False
     spreads.LOW_VIX_BULLPUT_FILTER = False
     spreads.SLIPPAGE_CENTS = 0.0
-    bt_config.MIN_OPEN_INTEREST = 100
+    bt_config.MIN_OPEN_INTEREST = MIN_OI
+    bt_config.MAX_MAX_LOSS = MAX_ML
     bt_config.CREDIT_BASIS = "last_clamped"
     bt_config.CREDIT_SCALE = 1.0
 
@@ -453,8 +482,25 @@ def main() -> int:
         f"output/euro_parquets/euro_picks_cache_{year_tag}_{symbol_tag}_k{ground.DKL_K:g}_thr{args.thr:g}{_suffix(args.cache_suffix)}.parquet"
     )
 
+    global MIN_OI, MAX_ML, ACTIVE_DOWS, DTE_MIN, DTE_MAX
+    MIN_OI = args.min_oi
+    MAX_ML = args.max_max_loss
+    ACTIVE_DOWS = [int(x) for x in args.entry_dows.split(",") if x.strip()!=""]
+    DTE_MIN, DTE_MAX = args.dte_min, args.dte_max
+    print(f"Two-leg OI floor: {MIN_OI}   max-loss cap: {MAX_ML}   "
+          f"entry dows: {[DOW_LONG[d] for d in ACTIVE_DOWS]}   DTE {DTE_MIN}-{DTE_MAX}", flush=True)
+
     iv_lookup = _lookup_frame(args.iv_rank, ["Symbol", "DataDate", "iv_rank_bucket"])
-    rv_lookup = _lookup_frame("output/rv_table.parquet", ["Symbol", "DataDate", "rv_30d"])
+    rv_lookup = _lookup_frame(args.rv_table, ["Symbol", "DataDate", "rv_30d"])
+    if rv_lookup is not None:
+        have_rv = set(rv_lookup.loc[rv_lookup["rv_30d"].notna(), "Symbol"].unique())
+        missing_rv = sorted(symbols - have_rv)
+        covered = sorted(symbols & have_rv)
+        print(f"RV table {args.rv_table}: covers {', '.join(covered) or 'none'} "
+              f"of the requested roots ({len(have_rv):,} symbols total)", flush=True)
+        if missing_rv:
+            print(f"WARNING: no RV for {', '.join(missing_rv)} — these roots will score nothing",
+                  flush=True)
     pool = er.load_master_pool(args.pool)
     print(f"Loaded euro pool: {len(pool):,} rows from {args.pool}", flush=True)
 

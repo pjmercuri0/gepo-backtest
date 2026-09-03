@@ -59,6 +59,9 @@ def _safe_write(df: pd.DataFrame, path: Path) -> None:
             tmp.unlink()
 
 
+DTE_MIN, DTE_MAX = 1, 4  # overridden by --dte-min/--dte-max
+
+
 def process_year_parquet(path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     df = pd.read_parquet(path)
     df["Symbol"] = df["Symbol"].astype(str).str.upper().str.strip()
@@ -68,6 +71,9 @@ def process_year_parquet(path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     df["DataDate"] = pd.to_datetime(df["DataDate"], errors="coerce")
     df["ExpirationDate"] = pd.to_datetime(df["ExpirationDate"], errors="coerce")
+    # Known-bad vendor spots (config.EURO_BAD_SPOT_DAYS) would otherwise feed
+    # both the outcome labelling and the IV-rank seed.
+    df = config.drop_bad_spot_days(df)
     df["PutCall"] = df["PutCall"].astype(str).str.lower().str.strip()
     df["DTE"] = pd.to_numeric(df["DTE"], errors="coerce")
     df["Delta"] = pd.to_numeric(df["Delta"], errors="coerce")
@@ -85,7 +91,7 @@ def process_year_parquet(path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     expiry_close = (df[df["DataDate"] == df["ExpirationDate"]]
                     .groupby(["Symbol", "ExpirationDate"])["UnderlyingPrice"]
                     .first())
-    pool = df[df["DTE"].between(1, 4)].copy()
+    pool = df[df["DTE"].between(DTE_MIN, DTE_MAX)].copy()
     pool = pool[pool["DataDate"].dt.dayofweek.isin([0, 1, 2, 3])]
     # No Friday-expiry filter here. Daily-expiry index products are the point.
     pool["expiry_close"] = pool.set_index(["Symbol", "ExpirationDate"]).index.map(expiry_close.get)
@@ -121,13 +127,20 @@ def process_year_parquet(path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build euro-only empirical pool")
     p.add_argument("--pattern", default="output/euro_parquets/[0-9][0-9][0-9][0-9]_euro_last*.parquet")
+    p.add_argument("--dte-min", type=int, default=1)
+    p.add_argument("--dte-max", type=int, default=4,
+                   help="Pool DTE range. historical_probs matches DTE exactly, so this "
+                        "must cover every DTE the backtest will score.")
     p.add_argument("--suffix", default="", help="Optional output suffix, never overwrites")
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
 
 
 def main() -> int:
+    global DTE_MIN, DTE_MAX
     args = parse_args()
+    DTE_MIN, DTE_MAX = args.dte_min, args.dte_max
+    print(f"Pool DTE range: {DTE_MIN}-{DTE_MAX}")
     pool_path, iv_rank_path = _output_paths(args.suffix)
     if not args.dry_run:
         for path in (pool_path, iv_rank_path):
