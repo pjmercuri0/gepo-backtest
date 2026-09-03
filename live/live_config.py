@@ -171,7 +171,8 @@ LIVE_EXDIV_GATE_PUTS = False
 # extrinsic (nobody exercises that); a DE short call 52.94 ITM carried ~0.04
 # (anybody would). Extrinsic is read straight off the SAME-STRIKE opposite-side
 # option via put-call parity, so it is measured rather than modelled.
-LIVE_ASSIGN_EXTRINSIC_ALERT = 0.10   # alert when a short leg drops to/below this
+LIVE_ASSIGN_RATE            = 0.045  # short rate used for put carry; verify against the account
+LIVE_ASSIGN_EXTRINSIC_ALERT = 0.10   # retained for reference; the live test is benefit > extrinsic
 LIVE_ASSIGN_CLIENT_ID       = 193    # avoid 100-109 (fetchers), 110 (combo), 11/12
 
 # --- Webapp ---

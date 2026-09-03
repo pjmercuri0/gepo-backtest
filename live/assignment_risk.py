@@ -156,10 +156,21 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
             itm_by = None
 
         reasons = []
-        thresh = float(getattr(live_config, "LIVE_ASSIGN_EXTRINSIC_ALERT", 0.10))
-        if extrinsic is not None and itm_by is not None and itm_by > 0 and extrinsic <= thresh:
-            reasons.append(f"short leg extrinsic {extrinsic:.2f} <= {thresh:.2f} "
-                           f"— early exercise costs the holder almost nothing")
+        # Early exercise is rational only when the BENEFIT of exercising now
+        # exceeds the extrinsic the holder forfeits. A near-zero extrinsic makes
+        # exercise cheap, not worthwhile — the first version of this file tested
+        # extrinsic <= 0.10 alone and would have screamed about a DE short call
+        # with 0.04 of extrinsic and NO dividend before expiry, where exercising
+        # gains nothing at all (early exercise of an American call on a
+        # non-dividend-paying stock is never optimal).
+        #   calls: benefit = the dividend, and only if ex-div lands before expiry
+        #   puts:  benefit = interest earned on the strike proceeds until expiry
+        benefit, basis = _exercise_benefit(p)
+        if (extrinsic is not None and itm_by is not None and itm_by > 0
+                and benefit is not None and benefit > extrinsic):
+            reasons.append(
+                f"early exercise is RATIONAL: {basis} worth {benefit:.2f} exceeds "
+                f"the {extrinsic:.2f} extrinsic the holder would forfeit")
         if in_pin:
             reasons.append(f"spot {spot:.2f} is IN the pin zone {lo:.2f}-{hi:.2f} "
                            f"— short assigned, long expires worthless, real shares delivered")
@@ -172,6 +183,8 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
             "short_itm_by": None if itm_by is None else round(itm_by, 4),
             "in_pin_zone": bool(in_pin),
             "pin_zone": [lo, hi],
+            "exercise_benefit": None if benefit is None else round(benefit, 4),
+            "benefit_basis": basis,
             "at_risk": bool(reasons),
             "reasons": reasons,
         })
@@ -181,6 +194,41 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
             except Exception:
                 pass
     return results
+
+
+def _exercise_benefit(p: dict) -> tuple:
+    """(benefit_per_share, description) of exercising this short leg early.
+
+    For a CALL the benefit is the dividend captured by owning the stock over
+    ex-div, and only when that ex-div falls on or before expiry. For a PUT it is
+    the interest earned by receiving the strike proceeds now instead of at
+    expiry. Returns (None, reason) when it cannot be determined.
+    """
+    exp = p["expiry"]
+    if p["spread_type"] == "bear_call":
+        try:
+            import csv as _csv
+            path = Path(getattr(live_config, "DATA_DIR",
+                                Path(live_config.ROOT_DIR).parent / "data")) / "dividend_calendar.csv"
+            best = None
+            for row in _csv.DictReader(open(path)):
+                if row.get("Symbol") != p["ticker"]:
+                    continue
+                dt = (row.get("ExDividendDate") or "").strip()
+                amt = (row.get("Amount") or "").strip()
+                if dt and dt <= exp and amt:
+                    v = float(amt)
+                    best = v if best is None else max(best, v)
+            return (best or 0.0, f"dividend before {exp}")
+        except Exception:
+            return (None, "dividend unknown")
+    # bull_put — carry on the strike until expiry
+    try:
+        days = max((datetime.strptime(exp, "%Y-%m-%d").date() - date.today()).days, 0)
+        r = float(getattr(live_config, "LIVE_ASSIGN_RATE", 0.045))
+        return (p["short_strike"] * r * days / 365.0, f"carry on {p['short_strike']:g} for {days}d")
+    except Exception:
+        return (None, "carry unknown")
 
 
 def _summarise(r: dict) -> str:
