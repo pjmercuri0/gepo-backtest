@@ -169,11 +169,14 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
         if (extrinsic is not None and itm_by is not None and itm_by > 0
                 and benefit is not None and benefit > extrinsic):
             reasons.append(
-                f"early exercise is RATIONAL: {basis} worth {benefit:.2f} exceeds "
-                f"the {extrinsic:.2f} extrinsic the holder would forfeit")
-        if in_pin:
-            reasons.append(f"spot {spot:.2f} is IN the pin zone {lo:.2f}-{hi:.2f} "
-                           f"— short assigned, long expires worthless, real shares delivered")
+                f"early exercise pays: {basis} {benefit:.2f} > extrinsic {extrinsic:.2f}")
+        # Pin zone only bites at SETTLEMENT. Sitting between the strikes on a
+        # Wednesday is just where the stock happens to be — it carries no
+        # assignment consequence until expiry, and flagging it early trains you
+        # to ignore the flag. Early exercise, by contrast, can happen any day.
+        is_expiry_day = p["expiry"] == date.today().isoformat()
+        if in_pin and is_expiry_day:
+            reasons.append(f"pin zone {lo:.2f}-{hi:.2f}, spot {spot:.2f}")
 
         results.append({
             **p,
@@ -182,6 +185,9 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
             "extrinsic": None if extrinsic is None else round(extrinsic, 4),
             "short_itm_by": None if itm_by is None else round(itm_by, 4),
             "in_pin_zone": bool(in_pin),
+            "pin_live": bool(in_pin and is_expiry_day),
+            "tag": ("PIN" if (in_pin and is_expiry_day) else
+                    ("EXERCISE" if reasons else "")),
             "pin_zone": [lo, hi],
             "exercise_benefit": None if benefit is None else round(benefit, 4),
             "benefit_basis": basis,
@@ -307,6 +313,20 @@ def main() -> int:
         _atomic_write(out, payload)
         print(f"\n  {len(at_risk)} position(s) at risk → wrote {out}", flush=True)
     else:
+        # ALWAYS write, even when clear. Writing only on risk left the morning's
+        # file on disk after the risk cleared, so the webapp kept flashing rows
+        # that were no longer at risk — a warning that does not switch off is a
+        # warning you learn to ignore.
+        ts = datetime.now()
+        out = ALERT_DIR / f"assignment_risk_{ts:%Y-%m-%d}.json"
+        _atomic_write(out, {
+            "type": "assignment-risk",
+            "ts": ts.isoformat(timespec="seconds"),
+            "host": os.uname().nodename,
+            "n_at_risk": 0,
+            "positions": [],
+            "message": "no assignment risk",
+        })
         print(f"\n  no assignment risk across {len(rows)} open position(s)", flush=True)
     return 0
 

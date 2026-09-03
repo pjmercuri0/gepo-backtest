@@ -233,8 +233,12 @@ tr.assignment-risk td:first-child::before {
 tr.assign-flash td { animation: assignFlash 1.1s ease-in-out infinite;
                      border-bottom-color: rgba(220, 80, 80, 0.45); }
 tr.assign-flash td:first-child { box-shadow: inset 3px 0 0 #ff5555; }
-.assign-why { color: #ff9a9a; font-size: 11px; font-weight: 500;
-              white-space: normal; max-width: 320px; margin-top: 3px; }
+/* Compact tag, not a paragraph — the wrapped reason text tripled row height.
+   Full explanation lives in the title attribute. */
+.assign-tag { display: inline-block; background: #7a1f1f; color: #ffdcdc;
+              font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
+              padding: 1px 5px; border-radius: 3px; vertical-align: middle;
+              white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) {
   tr.assign-flash td { animation: none; background: rgba(200, 45, 45, 0.28); }
 }
