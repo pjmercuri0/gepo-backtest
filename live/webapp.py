@@ -623,6 +623,36 @@ def _frozen_history(limit: int = 60) -> list[dict]:
 
 # ── Routes ─────────────────────────────────────────────────────────────────
 
+def _assignment_alert() -> dict | None:
+    """Today's assignment-risk alert, or None.
+
+    live/assignment_risk.py writes live/notifications/assignment_risk_<date>.json
+    every scan when a held position is in its pin zone or its short leg has run
+    out of extrinsic value. That file was previously reachable only through
+    /api/notifications/latest, i.e. not visible anywhere in the UI — an alert
+    you have to curl for does not warn anyone. Surfaced through a context
+    processor so it renders on EVERY tab, since the whole point is that you
+    should not be able to miss it.
+
+    Only today's file counts: a stale alert from a previous expiry would be
+    worse than none.
+    """
+    today = datetime.now().date().isoformat()
+    payload = _read_json(
+        Path(live_config.NOTIFICATIONS_DIR) / f"assignment_risk_{today}.json")
+    if not payload or not (payload.get("positions") or []):
+        return None
+    return payload
+
+
+@app.context_processor
+def _inject_assignment_alert():
+    try:
+        return {"assignment_alert": _assignment_alert()}
+    except Exception:
+        return {"assignment_alert": None}
+
+
 @app.route("/")
 def index():
     return render_template(
