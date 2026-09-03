@@ -16,7 +16,7 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - Before editing on either computer, follow the Git workflow below: inspect status, fetch, and fast-forward. If anything is dirty, ahead, behind in both directions, or divergent, stop and explain it instead of modifying history.
 - At the end of work, test, commit relevant source files, push directly to `origin/main`, and verify synchronization. Never force-push `main`.
 
-For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
+For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **The open work item is §0.16 — European index options and the vendor re-download.** Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
 ## ⚠️ HARD RULE — read first
 
@@ -119,6 +119,149 @@ Still operationally relevant:
 - The Mac mini is the intended production runner for IB Gateway, cron, ranking, tracking, settlement, and Mya upload.
 - A second IBKR username for the Mac mini is still desirable so a manual login does not terminate its Gateway/API session.
 - The historical 2026-08-24 15:31 miss may still be investigated in archived logs if useful, but the top-up code path itself is now integrated and regression-tested.
+
+---
+
+## 0.16 European index options + the vendor re-download (2026-09-03) — NEXT TASK
+
+**This is the open work item.** Everything below is state as of 2026-09-03; nothing
+here is done except where marked DONE.
+
+### Why
+
+The account cannot tolerate assignment. American equity options cannot be made
+assignment-proof by monitoring — only European, cash-settled index options can,
+because they cannot be exercised early and never deliver shares.
+
+### What was found (all verified, not assumed)
+
+**SPXW works, and the reason it looked dead was a filter, not the strategy.**
+`report_oot_2026.py` hard-coded `df = df[df['exp_dow']==4]` — Friday expiries
+only. That is a no-op for equities (they only list weekly Fridays) but throws
+away four fifths of a daily-expiry index product. 2026 OOT, canon threshold
+0.05, `--symbols SPXW`:
+
+| run | final | return | Sharpe | maxDD |
+|---|---|---|---|---|
+| Friday-only | $10,141 | +1.4% | 0.21 | -4.9% |
+| **all expiries** | **$12,214** | **+22.1%** | **1.62** | **-4.9%** |
+| SPY same window | $11,065 | +10.7% | 1.21 | -8.9% |
+
+Beats SPY on return, Sharpe and drawdown — **but on only 12 trades over 165
+trading days.** Threshold sweep peaked at thr=0.04 (18 trades, +42.2%, Sharpe
+2.50), which is in-sample tuning on the OOT window and should NOT be adopted.
+
+**RUTW contributes nothing to the 2026 OOT** — absent from
+`output/2026_sp500_last_oot_combined.parquet` entirely; its `master_pool` data
+stops 2025-10-01. `--symbols SPXW,RUTW` returns a byte-identical result to SPXW
+alone, all 12 trades tagged SPXW.
+
+**The 2026 result is scored against the wrong expiry population.**
+`master_pool.parquet` holds SPXW on Friday expiries ONLY — all 766,898 rows. So
+GROUND scored daily-expiry trades using Friday-expiry empirical probabilities.
+This affects the number above, not just future work.
+
+**2020-2025 cannot be backtested from what is on the Mac mini.**
+`output/2020_sp500_last.parquet` … `2025_sp500_last.parquet` are absent, and
+`master_pool.parquet` cannot substitute: its schema is `Symbol, DataDate,
+ExpirationDate, DTE, putcall_norm, abs_delta, ImpliedVolatility, itm,
+delta_bucket, iv_capped, iv_rank_bucket` — **no BidPrice, AskPrice, LastPrice,
+StrikePrice or UnderlyingPrice.** It is the empirical outcome lookup, not
+pricing data. Do not attempt to synthesise credits from its IV column: `config.py`
+records that BS/MID-based credit strips out the variance risk premium that is
+the strategy's actual edge, so such a backtest would be meaningless.
+
+### Vendor: the daily-expiry data exists and always did — DONE, verified
+
+Current vendor is **Discount Option Data** (`discountoptiondata.com`), files
+arrive as `DG_YYYYMMDD.zip` (`analyze_chain.py:13`). Their public sample
+`Content/SampleData/DG_20220301.zip` was downloaded and inspected on
+2026-09-03. Columns match what `analyze_chain.py` already parses. Root coverage
+in that one day:
+
+| root | present | rows | expiry weekdays |
+|---|---|---|---|
+| SPXW | yes | 12,424 | Mon 1,252 · Tue 716 · Wed 1,694 · Thu 2,496 · Fri 6,266 |
+| RUTW | yes | 6,498 | Mon 640 · Tue 406 · Wed 1,204 · Thu 492 · Fri 3,756 |
+| SPX | yes | 6,982 | Thu 854 · Fri 6,128 |
+| NDX | yes | 7,298 | Thu 742 · Fri 6,556 |
+| OEX, VIX, SPY, QQQ, IWM, RUT | yes | — | — |
+| **XSP, XND, MRUT** | **NO** | 0 | — |
+
+**The Friday-only limitation is OUR preprocessing, not the vendor.** SPXW and
+RUTW daily expiries were in the vendor data in 2022 and were filtered out on
+ingest. So the daily-expiry result IS validatable across 2020-2025.
+
+Pricing seen 2026-09-03: **Bundled 2020-2025 with Greeks $149** (4,552 symbols,
+439M rows, 5.1 GB); all years 2005-2026 with Greeks $295. Vendor FAQ states
+"data includes all option expiration dates".
+
+### THE TASK — in this order
+
+1. **Ingest the re-downloaded vendor files.** Drop the monthly zips into
+   `data/DG_YYYYMonth/` (e.g. `data/DG_2022March/`) — `preprocess.py:28` builds
+   that path as `DG_%Y%B`. Then run the preprocess to produce
+   `output/YYYY_sp500_last.parquet` for 2020-2025.
+   **HARD RULE applies: these are vendor-purchased files. MERGE, never wipe.**
+
+2. **Rebuild `master_pool.parquet` WITHOUT the Friday filter.** Until this is
+   done, GROUND scores daily-expiry trades against Friday-expiry history.
+   `build_production_pool.py` globs `output/[0-9][0-9][0-9][0-9]_sp500_last.parquet`
+   and filters `df[df['Symbol'].isin(SP100)]`, so SPXW/RUTW survive only because
+   they are already in `SP100_TICKERS`. Add NDX if it is to be tested.
+
+3. **Backtest SPXW + RUTW, 2020-2025, all expiries, canon threshold 0.05.**
+   This is the out-of-sample test the 12-trade 2026 result needs. Do not adopt
+   thr=0.04 on the strength of the 2026 sweep.
+
+4. **Regenerate the Backtest tab.** `generate_equity_curve.py` is already on
+   0.80×clamped LAST and needs no code change, but its input
+   `output/sweep_rv_vs_iv_scored_NOREGIME.parquet` is missing and nothing in the
+   repo writes it — it derives from the same year parquets. The published
+   `live/data/backtest_equity.json` is from 2026-06-12 and still reports
+   `0.80×mid`, so the Backtest and OOT tabs are currently on different bases.
+
+5. **Check whether XSP appears in later years.** Absent from the 2022 sample.
+   XSP is the product to TRADE (1/10th SPX, ~775 vs SPX ~7,754, fits a 16.3K
+   account); SPXW is the product to TEST. Economics transfer exactly — same
+   index, same European cash settlement, only the notional differs.
+
+### Tooling already in place — DONE
+
+- `report_oot_2026.py` gained `--symbols`, `--out`, `--thr`, `--any-expiry`.
+  All four retag BOTH the output path and the picks cache, so a subset run can
+  never overwrite the published SP100 curve or reuse the wrong cache.
+- `live/fetcher.py` handles index underlyings: `Index` contract on the index
+  exchange rather than `Stock` on SMART, chain matched on the index exchange,
+  and `tradingClass` set (SPX monthlies and SPXW weeklies share the SPX index).
+  SPXW and RUTW had been in `SP100_TICKERS` since they were added and had failed
+  on EVERY scan with "No security definition has been found ...
+  Stock(symbol='SPXW')".
+- `live_config.LIVE_INDEX_ROOTS` holds all six roots, probed live against the
+  Gateway 2026-09-03 14:19. **Exchanges are not guessable:**
+
+  | root | underlying | exchange | qualifies | spot | chain |
+  |---|---|---|---|---|---|
+  | SPXW | SPX | CBOE | yes | 7,754.08 | 42 exp / 744 strikes |
+  | XSP | XSP | CBOE | yes | 775.38 | 47 exp / 519 strikes |
+  | RUTW | RUT | **RUSSELL** | yes | 2,966.53 | 25 exp / 342 strikes |
+  | MRUT | MRUT | **RUSSELL** | yes | 296.65 | 19 exp / 225 strikes |
+  | NDXP | NDX | NASDAQ | yes | **no data** | 35 exp / 463 strikes |
+  | XND | XND | NASDAQ | yes | **no data** | 27 exp / 198 strikes |
+
+  RUT/MRUT do NOT qualify on CBOE. NDXP/XND need a Nasdaq index market-data
+  subscription the account does not hold — everything else about them works.
+
+- **None of these are in `SP100_TICKERS` beyond SPXW/RUTW.** Adding one changes
+  what the live scan trades. Do not enable without deciding to.
+
+### Do not
+
+- Do not trade this live on the 2026 result. 12 trades, one instrument, scored
+  against the wrong expiry population, no out-of-sample validation.
+- Do not use SPY/QQQ/IWM as the "European" universe. They are American-style,
+  physically settled ETF options — the exact assignment risk being eliminated.
+- Do not adopt thr=0.04 without out-of-sample confirmation.
 
 ---
 
