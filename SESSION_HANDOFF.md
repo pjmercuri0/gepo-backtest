@@ -1,6 +1,6 @@
-# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration)
+# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane)
 
-**Last updated:** 2026-09-01 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state and §0.15 for the Actuals tab. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14 or §0.15 explicitly carries them forward.
+**Last updated:** 2026-09-03 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, and §0.16 for the isolated European index option lane. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, or §0.16 explicitly carries them forward.
 
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
@@ -13,10 +13,13 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
 - The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
+- The European index option research lane is isolated. It writes parquets only under `output/euro_parquets/` and web payloads under `live/data/euro/`; do not add euro-only roots to `SP100_TICKERS` unless intentionally changing live production scans.
 - Before editing on either computer, follow the Git workflow below: inspect status, fetch, and fast-forward. If anything is dirty, ahead, behind in both directions, or divergent, stop and explain it instead of modifying history.
 - At the end of work, test, commit relevant source files, push directly to `origin/main`, and verify synchronization. Never force-push `main`.
 
-For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **The open work item is §0.16 — European index options and the vendor re-download.** Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
+- **Do not delete `data/DG_2025*/` (59.1 GB raw vendor data) yet.** The 2025 euro parquets are built, but a RUT/RUTW `UnderlyingPrice` anomaly is unresolved and may need the original CSVs to diagnose — see §0.17.
+
+For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **The open work item is §0.16 — European index options and the vendor re-download; §0.17 is the current status of that work and supersedes §0.16 where they differ.** Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
 ## ⚠️ HARD RULE — read first
 
@@ -196,30 +199,70 @@ Pricing seen 2026-09-03: **Bundled 2020-2025 with Greeks $149** (4,552 symbols,
 439M rows, 5.1 GB); all years 2005-2026 with Greeks $295. Vendor FAQ states
 "data includes all option expiration dates".
 
-### THE TASK — in this order
+### Current euro scaffold — DONE 2026-09-03
+
+This was added as an isolated lane in the same repo. It does not replace the
+existing GEPO backtest/live pipeline.
+
+- `config.EURO_INDEX_ROOTS` lists the cash-settled index roots to research:
+  `SPX, SPXW, XSP, RUT, RUTW, MRUT, NDX, NDXP, XND`.
+- `preprocess_euro_parquets.py` reads the vendor raw files and writes only
+  `output/euro_parquets/<year>_euro_last.parquet` and
+  `output/euro_parquets/<year>_euro_expiry.parquet`.
+- `build_euro_pool.py` reads only `output/euro_parquets/*_euro_last*.parquet`
+  and writes only `output/euro_parquets/euro_pool.parquet` and
+  `output/euro_parquets/euro_iv_rank.parquet`.
+- `report_euro_backtest.py` reads those euro parquets and writes
+  `live/data/euro/backtest_equity.json`; its picks cache is also under
+  `output/euro_parquets/`.
+- All euro parquet writers refuse to overwrite an existing parquet. Use
+  `--suffix` or `--cache-suffix` for a new run.
+- The Flask app supports `GEPO_APP_PROFILE=euro`; in that mode the Backtest and
+  OOT tabs read `live/data/euro/backtest_equity.json` and
+  `live/data/euro/oot_equity.json`, and the QR page points at
+  `https://gepo-euro-backtest.peter.cloudmallinc.com/` unless `GEPO_SITE_URL`
+  overrides it.
+- Do not depend on resolving the public domains from inside Codex. If working
+  on the server, use the local source checkout such as
+  `/opt/vito/gepo-euro-backtest` or `/opt/vito/user/apps/gepo-euro-backtest`.
+
+Suggested commands after a vendor year is uploaded:
+
+```bash
+python3 preprocess_euro_parquets.py 2025 --dry-run
+python3 preprocess_euro_parquets.py 2025
+python3 build_euro_pool.py
+python3 report_euro_backtest.py --years 2020,2021,2022,2023,2024,2025
+```
+
+If a parquet already exists, do not delete it. Re-run with a suffix:
+
+```bash
+python3 preprocess_euro_parquets.py 2025 --suffix v2
+python3 build_euro_pool.py --suffix v2
+python3 report_euro_backtest.py --pool output/euro_parquets/euro_pool_v2.parquet --iv-rank output/euro_parquets/euro_iv_rank_v2.parquet --cache-suffix v2
+```
+
+### Remaining euro task — in this order
 
 1. **Ingest the re-downloaded vendor files.** Drop the monthly zips into
    `data/DG_YYYYMonth/` (e.g. `data/DG_2022March/`) — `preprocess.py:28` builds
-   that path as `DG_%Y%B`. Then run the preprocess to produce
-   `output/YYYY_sp500_last.parquet` for 2020-2025.
+   that path as `DG_%Y%B`. For the euro lane, use `preprocess_euro_parquets.py`
+   to produce `output/euro_parquets/YYYY_euro_last.parquet` for 2020-2025.
    **HARD RULE applies: these are vendor-purchased files. MERGE, never wipe.**
 
-2. **Rebuild `master_pool.parquet` WITHOUT the Friday filter.** Until this is
-   done, GROUND scores daily-expiry trades against Friday-expiry history.
-   `build_production_pool.py` globs `output/[0-9][0-9][0-9][0-9]_sp500_last.parquet`
-   and filters `df[df['Symbol'].isin(SP100)]`, so SPXW/RUTW survive only because
-   they are already in `SP100_TICKERS`. Add NDX if it is to be tested.
+2. **Build the euro empirical pool WITHOUT the Friday filter.** Use
+   `build_euro_pool.py`, not `build_production_pool.py`. The output is
+   `output/euro_parquets/euro_pool.parquet`.
 
-3. **Backtest SPXW + RUTW, 2020-2025, all expiries, canon threshold 0.05.**
+3. **Backtest the euro roots, 2020-2025, all expiries, canon threshold 0.05.**
    This is the out-of-sample test the 12-trade 2026 result needs. Do not adopt
-   thr=0.04 on the strength of the 2026 sweep.
+   thr=0.04 on the strength of the 2026 sweep. Start with `SPXW,RUTW`; expand
+   to NDX/NDXP/XND/XSP/MRUT only when the uploaded data actually contains them.
 
-4. **Regenerate the Backtest tab.** `generate_equity_curve.py` is already on
-   0.80×clamped LAST and needs no code change, but its input
-   `output/sweep_rv_vs_iv_scored_NOREGIME.parquet` is missing and nothing in the
-   repo writes it — it derives from the same year parquets. The published
-   `live/data/backtest_equity.json` is from 2026-06-12 and still reports
-   `0.80×mid`, so the Backtest and OOT tabs are currently on different bases.
+4. **Regenerate the euro Backtest tab.** Use `report_euro_backtest.py`; it writes
+   `live/data/euro/backtest_equity.json`. Do not replace
+   `live/data/backtest_equity.json` for the main app.
 
 5. **Check whether XSP appears in later years.** Absent from the 2022 sample.
    XSP is the product to TRADE (1/10th SPX, ~775 vs SPX ~7,754, fits a 16.3K
@@ -262,6 +305,96 @@ Pricing seen 2026-09-03: **Bundled 2020-2025 with Greeks $149** (4,552 symbols,
 - Do not use SPY/QQQ/IWM as the "European" universe. They are American-style,
   physically settled ETF options — the exact assignment risk being eliminated.
 - Do not adopt thr=0.04 without out-of-sample confirmation.
+
+---
+
+## 0.17 2025 euro parquets built + first canon backtest (2026-09-03) — CURRENT STATE
+
+### ⚠️ DO NOT DELETE THE 2025 RAW VENDOR DATA YET
+
+User asked whether `data/DG_2025*/` (59.1 GB, 261 trading days) can be deleted now
+that the parquets exist. **Not yet** — see the unresolved RUT anomaly below.
+The HARD RULE at the top of this document applies: this is purchased vendor data.
+
+### What was built
+
+`output/euro_parquets/` (gitignored — regenerate, never expect it from a clone):
+
+- `2025_euro_last.parquet` — 268 MB, **8,788,608 rows**, 22 columns, 260 trading
+  days, 2025-01-01 → 2025-12-31.
+- `2025_euro_expiry.parquet` — 608 rows. NOTE: the build logged **192 missing
+  expiry-day spots, filled from the latest prior spot**. For a daily-expiry
+  product that is a real approximation feeding outcome labelling; review before
+  trusting settlement-dependent results.
+- `euro_pool.parquet` / `euro_iv_rank.parquet` — v1, pre-IV-fix, kept.
+- `euro_pool_v2.parquet` / `euro_iv_rank_v2.parquet` — **use these**, 361,605 rows.
+
+Universe is the 5 genuinely European cash-settled roots present in 2025:
+SPXW 4,273,918 · SPX 2,228,396 · NDX 1,134,236 · RUTW 924,990 · RUT 227,068.
+
+**Excluded on purpose:** `OEX` is cash-settled but **AMERICAN-exercise**, so it can
+be assigned early and fails the assignment-proof requirement (its European twin
+XEO is absent from the vendor data). `VIX`/`VIXW` are European cash-settled but
+settle to an SOQ of VIX futures; `rv_vs_iv` DKL would be comparing vol-of-vol.
+**Absent from all 12 months of 2025:** XSP, XND, NDXP, MRUT, DJX, XEO. This
+answers §0.16 item 5 for 2025: **XSP is not in the vendor data**, so SPXW is the
+only way to test and XSP is traded on transferred economics.
+
+Daily expiries confirmed retained end-to-end: **37.8% of parquet rows are
+non-Friday** (Mon 7.5 / Tue 9.7 / Wed 9.3 / Thu 11.4 / Fri 62.2%).
+
+### First canon backtest — thin, do not act on it
+
+`report_euro_backtest.py --years 2025 --symbols SPX,SPXW,NDX,RUT,RUTW` at canon
+k=10 / thr=0.05, on `euro_pool_v2`:
+
+- **21 picks**, total +$118.40/contract, mean +$5.64, final **$10,237 (+2.4%)** qty=2.
+- 8 of 21 picks (38%) expire Mon/Wed/Thu — the no-Friday-filter change works in
+  the backtest, not just in the parquet.
+- **All 21 picks are SPXW. SPX, NDX, RUT, RUTW produced zero.**
+
+### Three findings that gate the next step
+
+1. **RV gap (the reason 4 of 5 roots scored nothing).** `output/rv_table.parquet`
+   contains only SPXW (258 days) and RUTW (139 days) — **no SPX, NDX or RUT at
+   all** — because those two were the only index roots ever in `SP100_TICKERS`.
+   The euro pipeline only *looks up* `rv_table`; it never derives RV.
+   **This is recoverable without the raw CSVs:** 10-day RV derived from the
+   `UnderlyingPrice` column retained in the parquet reproduces the production
+   table **exactly — corr 1.0000, means identical to 4 dp** for both SPXW and
+   RUTW. Next step is a euro RV table under `output/euro_parquets/`; do **not**
+   merge into `output/rv_table.parquet`, which is live production data.
+
+2. **IV = 0 on 12.8% of rows** (vendor could not solve those strikes; encoded as
+   zero, not real 0% vol). Left in, a fifth of the pool piles on one point and
+   collapses the IV quantile edges, so `empirical_runner.build_window_tables`
+   raises `ValueError: Bin edges must be unique: [0.0, 0.0, ...]`. Filtered in
+   `build_euro_pool.py` only — `empirical_runner.py` is shared with the SP100
+   production pipeline and was deliberately not touched.
+
+3. **UNRESOLVED — RUT/RUTW `UnderlyingPrice` looks corrupted.** Derived 10d RV is
+   ~0.80 annualised (max 7.48) against SPX 0.15 and NDX 0.20, and the spot range
+   runs 1,760–6,638 when the Russell 2000 traded roughly 2,000–2,450 in 2025.
+   Investigation was stopped mid-way. **This also means the production
+   `rv_table.parquet` carries the same bad RUTW values** (corr 1.0000 confirms
+   they match), so it is a live-system issue, not only a euro-lane one.
+   Resolve this before deleting the 2025 raw vendor files, since diagnosis may
+   need the original CSVs.
+
+### Tooling changes made this session
+
+- `preprocess_euro_parquets.py`: retains the **full greek set plus liquidity** —
+  added `Rho`, `Volume`, `AskSize`, `BidSize` (only `OptionKey` omitted, being
+  fully derivable). Added a grep text prefilter before pandas: the symbol filter
+  used to run *after* parsing all ~5,641 symbols, and half the corpus (the 261
+  `OData1` files, A–KZR) cannot contain any index root. Options pass 17:00 → 8:54
+  (1.9x). The expiry pass is unchanged at ~7:40 because it reads only 4 columns
+  and was never parse-bound. Verified byte-identical row counts vs the old path.
+- **`--dte-max` defaults to 8 and must be overridden.** SPX/NDX list Thu/Fri
+  expiries at DTE 18+, so the default silently yields near-zero rows for them.
+  Use `--dte-min 0 --dte-max 4000`.
+- `build_euro_pool.py`: drops non-positive IV from both the pool and the IV-rank
+  seed (see finding 2).
 
 ---
 

@@ -3,7 +3,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0f0f0f">
-  <title>{% block title %}GEPO Live{% endblock %}</title>
+  <title>{% block title %}{% if is_euro_profile %}GEPO Euro{% else %}GEPO Live{% endif %}{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <style>
     #page-content {
