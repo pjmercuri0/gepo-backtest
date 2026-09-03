@@ -46,6 +46,28 @@ EURO_INDEX_ROOTS = [
     "NDX", "NDXP", "XND",
 ]
 
+# Vendor spot errors: (Symbol, DataDate) whose UnderlyingPrice is known bad.
+# 2025-09-24: Greek_20250924_OData2.csv stamps RUT and RUTW with the SPX spot
+# (6637.97 vs SPX's 6637.9702); the Russell 2000 was near 2,400 that day. The
+# resulting ~±1.0 log return poisons ~20 rolling RV windows and inflates RUT RV
+# from 0.237 to 0.785 (max 0.514 -> 7.477). Filtered on read; the raw CSVs and
+# the year parquets are left as the vendor supplied them.
+EURO_BAD_SPOT_DAYS = {
+    ("RUT", "2025-09-24"),
+    ("RUTW", "2025-09-24"),
+}
+
+
+def drop_bad_spot_days(df):
+    """Remove known-bad vendor spot rows. Expects Symbol + DataDate columns."""
+    if df.empty or not EURO_BAD_SPOT_DAYS:
+        return df
+    import pandas as _pd
+    key = list(zip(df["Symbol"].astype(str),
+                   _pd.to_datetime(df["DataDate"]).dt.strftime("%Y-%m-%d")))
+    mask = [k not in EURO_BAD_SPOT_DAYS for k in key]
+    return df[mask]
+
 # ── SPREAD PARAMETERS ─────────────────────────────────────────────────────────
 # Target delta for short leg (paper uses closest to but not exceeding 0.50)
 DELTA_TARGET   = 0.50
