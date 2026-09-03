@@ -52,7 +52,7 @@ from live.regime import current_regime
 _NYSE_HOLIDAY_SET = set(spreads.NYSE_HOLIDAYS)
 
 try:
-    from ib_insync import IB, Stock, Option, util as ib_util
+    from ib_insync import IB, Stock, Index, Option, util as ib_util
 except ImportError as e:
     raise SystemExit("ib_insync not installed. `pip install ib_insync`") from e
 
@@ -251,6 +251,36 @@ def _strike_window(spot: float, symbol: str | None = None,
     return ((1.0 - band) * spot, (1.0 + band) * spot)
 
 
+# ── Index vs equity underlyings ─────────────────────────────────────────────
+
+def _index_spec(symbol: str) -> dict | None:
+    """Exchange + option trading class for a cash-settled index root, else None.
+
+    SPXW and RUTW have sat in SP100_TICKERS since they were added as
+    "cash-settled index options", and have failed on EVERY scan: the fetcher
+    built Stock(sym, "SMART", "USD") for every symbol, and an index is not a
+    stock, so IB answered "No security definition has been found" each time.
+    They were silently dead, not merely unproductive.
+
+    Index options also differ in two further ways that Stock-shaped code gets
+    wrong: their chains are published on the index exchange rather than SMART,
+    and the option's tradingClass distinguishes roots that share an underlying
+    (SPX monthlies vs SPXW weeklies both sit on the SPX index).
+
+    Cash settlement is the reason to care: European exercise means no early
+    assignment and no shares ever delivered.
+    """
+    table = getattr(live_config, "LIVE_INDEX_ROOTS", {}) or {}
+    spec = table.get(symbol.upper())
+    if not spec:
+        return None
+    return {
+        "underlying": spec.get("underlying", symbol.upper()),
+        "exchange": spec.get("exchange", "CBOE"),
+        "trading_class": spec.get("trading_class", symbol.upper()),
+    }
+
+
 # ── Tickers ─────────────────────────────────────────────────────────────────
 
 def _tickers_from_arg(arg_list: list[str] | None) -> list[str]:
@@ -276,6 +306,7 @@ async def _qualify_options_for(
     halving the contract count.
     """
     symbol = stock.symbol
+    idx_spec = _index_spec(symbol)
     chain_path = _cache_path("chain", symbol)
     chain_payload = _read_json(chain_path)
     if chain_payload:
@@ -288,7 +319,18 @@ async def _qualify_options_for(
             print(f"  [{symbol}] reqSecDefOptParams failed: {e}", flush=True)
             return []
 
-        smart = next((c for c in chains if c.exchange == "SMART"), None)
+        # Equity chains come back on SMART; index chains are published on the
+        # index exchange (CBOE for SPX/XSP), and one underlying can carry
+        # several roots, so match the tradingClass too.
+        if idx_spec:
+            smart = next((c for c in chains
+                          if c.exchange == idx_spec["exchange"]
+                          and c.tradingClass == idx_spec["trading_class"]), None)
+            if smart is None:
+                smart = next((c for c in chains
+                              if c.tradingClass == idx_spec["trading_class"]), None)
+        else:
+            smart = next((c for c in chains if c.exchange == "SMART"), None)
         if smart is None:
             return []
         available_exps = set(smart.expirations)
@@ -348,6 +390,12 @@ async def _qualify_options_for(
         payload = cached.get(key)
         if payload and payload.get("conId"):
             qualified_by_key[key] = _payload_to_contract(payload)
+        elif idx_spec:
+            # tradingClass is required: SPX monthlies and SPXW weeklies share
+            # the same underlying and would otherwise be ambiguous.
+            missing.append(Option(idx_spec["underlying"], exp, k, right,
+                                  idx_spec["exchange"],
+                                  tradingClass=idx_spec["trading_class"]))
         else:
             missing.append(Option(symbol, exp, k, right, "SMART"))
 
@@ -384,7 +432,9 @@ async def _fetch_one_ticker(
     can run concurrently on a single IB connection.
     """
     t_start = time.monotonic()
-    stock = Stock(sym, "SMART", "USD")
+    idx = _index_spec(sym)
+    stock = (Index(idx["underlying"], idx["exchange"], "USD") if idx
+             else Stock(sym, "SMART", "USD"))
     try:
         await ib.qualifyContractsAsync(stock)
         [stock_ticker] = await ib.reqTickersAsync(stock)
