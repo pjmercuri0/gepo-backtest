@@ -41,12 +41,17 @@
         {% set outcome_row = row.outcome_row %}
         {% set last_track = row.last_track %}
         {% set last_marked = row.last_marked %}
-        <tr{% if last_track and last_track.get('assignment_risk') %} class="assignment-risk"{% endif %}>
+        {# Red flashing row for anything at risk of assignment: in the pin zone
+           at expiry, or a rational early-exercise case on any day. Reason is
+           spelled out under the ticker so it is not just a colour. #}
+        {% set arisk = row.assign_risk %}
+        <tr class="{% if arisk %}assign-flash{% elif last_track and last_track.get('assignment_risk') %}assignment-risk{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
           <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
           <td>{{ row.source_time or '—' }}</td>
           <td>{{ row.source_label }}</td>
           <td class="fw">{{ p.ticker }}
+            {%- if arisk %}<div class="assign-why">⚠️ {{ arisk.reasons | join('; ') }}</div>{% endif %}
             {% if p.spread_type == 'bull_put' %}
               <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
             {% elif p.spread_type == 'bear_call' %}
