@@ -44,6 +44,32 @@ IB_CONNECT_TIMEOUT      = 15
 IB_CONNECT_ATTEMPTS     = 3
 IB_CONNECT_RETRY_DELAY  = 3
 
+# --- Cash-settled index roots ---
+# European exercise: no early assignment, no pin-zone share delivery, cash
+# settlement. The reason to care is that no amount of monitoring makes an
+# American short leg assignment-proof, whereas these cannot be exercised early
+# at all.
+#
+# SPXW and RUTW have been in SP100_TICKERS since they were added as
+# "cash-settled index options" and have failed on EVERY scan, because the
+# fetcher built Stock(sym, "SMART", "USD") for every symbol and an index is
+# not a stock — "No security definition has been found" in the logs all along.
+#
+#   underlying     the IB index symbol (SPXW options sit on the SPX index)
+#   exchange       index chains publish on the index exchange, not SMART
+#   trading_class  distinguishes roots sharing an underlying (SPX vs SPXW)
+#
+# Sizing: SPX/RUT are full size and one spread's margin would swallow a small
+# account. XSP is 1/10th SPX and XND is 1/100th NDX — those are the ones that
+# fit. Neither is in SP100_TICKERS yet; add them once the live fetch is
+# confirmed and the empirical pool has history for them.
+LIVE_INDEX_ROOTS = {
+    "SPXW": {"underlying": "SPX", "exchange": "CBOE", "trading_class": "SPXW"},
+    "RUTW": {"underlying": "RUT", "exchange": "CBOE", "trading_class": "RUTW"},
+    "XSP":  {"underlying": "XSP", "exchange": "CBOE", "trading_class": "XSP"},
+    "XND":  {"underlying": "XND", "exchange": "NASDAQ", "trading_class": "XND"},
+}
+
 # --- Strike band ---
 # The band was a flat +/-7% of spot, which is ~3x the 1-sigma move at DTE 1-4
 # and made ~70% of every snapshot unusable: only strikes with |delta| in
