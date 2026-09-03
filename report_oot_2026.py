@@ -10,7 +10,7 @@ import config as bt_config
 import spreads, ground
 import empirical_runner as er
 
-SP100 = set(bt_config.SP100_TICKERS)
+SP100 = set(bt_config.SP100_TICKERS)   # may be narrowed by --symbols below
 YEARS = [2026]
 SPY_CSV = 'data/spy_us_d.csv'
 K_VAL = ground.DKL_K
@@ -34,10 +34,27 @@ def parse_args():
                    help='Re-score OOT picks even when the picks cache exists.')
     p.add_argument('--cache-only', action='store_true',
                    help='Use the existing picks cache exactly as-is; do not extend it.')
+    p.add_argument('--symbols', default=None,
+                   help='Comma-separated universe override, e.g. SPXW. Restricts the '
+                        'run to those tickers and tags the cache and output so a '
+                        'subset run never overwrites the published SP100 curve.')
+    p.add_argument('--out', default=None,
+                   help='Output path override (default live/data/oot_equity.json).')
     return p.parse_args()
 
 
 ARGS = parse_args()
+
+# --symbols restricts the universe AND retags every artefact, so an SPXW-only
+# run cannot overwrite the published SP100 equity curve or poison its picks
+# cache. Both are keyed on the same tag.
+UNIVERSE_TAG = 'sp100'
+if ARGS.symbols:
+    SP100 = {s.strip().upper() for s in ARGS.symbols.split(',') if s.strip()}
+    UNIVERSE_TAG = '-'.join(sorted(SP100)).lower()
+    OUT_PATH = f'live/data/oot_equity_{UNIVERSE_TAG}.json'
+if ARGS.out:
+    OUT_PATH = ARGS.out
 
 
 def load_spy_daily():
@@ -217,7 +234,7 @@ def realize(scored, expiry_close):
 
 
 _cache_tag = os.path.splitext(os.path.basename(YEAR_PARQUET))[0].replace('2026_sp500_last_', '')
-CACHE_PATH = f'output/picks_cache_oot2026_{_cache_tag}_grv_k{K_VAL:g}_thr{bt_config.GROUND_THRESHOLD:g}_mid.parquet'
+CACHE_PATH = f'output/picks_cache_oot2026_{_cache_tag}_{UNIVERSE_TAG}_grv_k{K_VAL:g}_thr{bt_config.GROUND_THRESHOLD:g}_mid.parquet'
 def _cache_key_cols(df):
     cols = ['entry_date_dt', 'ticker', 'expiry_date', 'spread_type', 'short_strike', 'long_strike']
     return [c for c in cols if c in df.columns]
@@ -504,7 +521,8 @@ trade_log_rows = [t for w in weeks for t in w['trades']]
 
 payload = {
     'config': {
-        'universe':   'SP100',
+        'universe':   ('SP100' if UNIVERSE_TAG == 'sp100'
+                       else ','.join(sorted(SP100))),
         'days':       'Mon, Tue, Wed, Thu',
         'expiry':     'Friday (DTE 1-4)',
         'selection':  f'top-5 per day, k={K_VAL:g}, GROUND threshold {bt_config.GROUND_THRESHOLD:g} (all days) — FROZEN canon, no 2026 tuning',
