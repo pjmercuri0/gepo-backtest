@@ -761,6 +761,33 @@ def history():
                            close_alert=close_alert)
 
 
+def _assignment_lookup() -> dict:
+    """Today's at-risk positions, keyed for matching against Actuals rows.
+
+    live/assignment_risk.py runs every scan and writes
+    live/notifications/assignment_risk_<date>.json for any HELD position that
+    is either in its pin zone (short assigned, long expires worthless, real
+    shares delivered) or has a rational early-exercise case (the dividend or
+    carry the holder gains exceeds the extrinsic they forfeit).
+
+    Only today's file is read — a stale flag from a previous expiry would be
+    worse than none.
+    """
+    today = datetime.now().date().isoformat()
+    payload = _read_json(
+        Path(live_config.NOTIFICATIONS_DIR) / f"assignment_risk_{today}.json")
+    out = {}
+    for pos in ((payload or {}).get("positions") or []):
+        try:
+            key = (pos["ticker"], pos["spread_type"], str(pos["expiry"])[:10],
+                   round(float(pos["short_strike"]), 4),
+                   round(float(pos["long_strike"]), 4))
+        except (KeyError, TypeError, ValueError):
+            continue
+        out[key] = pos
+    return out
+
+
 def _actuals_row_pnl(row: dict):
     """Per-contract P&L for one actuals row, realized if settled else marked.
 
@@ -866,6 +893,17 @@ def _actuals_weeks(rows: list[dict]) -> list[dict]:
 @app.route("/actuals")
 def actuals():
     rows = _actuals_rows()
+    risk = _assignment_lookup()
+    for r in rows:
+        pk = r.get("pick") or {}
+        try:
+            key = (pk.get("ticker"), pk.get("spread_type"),
+                   str(pk.get("expiry_date"))[:10],
+                   round(float(pk.get("short_strike")), 4),
+                   round(float(pk.get("long_strike")), 4))
+        except (TypeError, ValueError):
+            key = None
+        r["assign_risk"] = risk.get(key) if key else None
     return render_template("actuals.html", rows=rows, weeks=_actuals_weeks(rows))
 
 

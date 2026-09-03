@@ -221,3 +221,20 @@ tr.assignment-risk td:first-child::before {
    affordance, so a set value never looks like a different typeface. */
 .actual-shown { font: inherit; font-size: inherit; font-weight: inherit; }
 .actual-trade-edit.actual-shown, .actual-edit.actual-shown { border-bottom: none; }
+
+/* Assignment-risk rows on the Actuals tab. Flashing on purpose: this is the
+   one state where missing it means taking delivery of stock. Set by
+   live/assignment_risk.py -> notifications/assignment_risk_<date>.json, for
+   either a pin-zone position at expiry or a rational early-exercise case. */
+@keyframes assignFlash {
+  0%, 100% { background: rgba(190, 40, 40, 0.10); }
+  50%      { background: rgba(220, 50, 50, 0.38); }
+}
+tr.assign-flash td { animation: assignFlash 1.1s ease-in-out infinite;
+                     border-bottom-color: rgba(220, 80, 80, 0.45); }
+tr.assign-flash td:first-child { box-shadow: inset 3px 0 0 #ff5555; }
+.assign-why { color: #ff9a9a; font-size: 11px; font-weight: 500;
+              white-space: normal; max-width: 320px; margin-top: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  tr.assign-flash td { animation: none; background: rgba(200, 45, 45, 0.28); }
+}
