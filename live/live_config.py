@@ -166,14 +166,27 @@ DRIFT_AT = None
 # ON since 2026-09-03 (user decision): exclude BOTH sides when an ex-dividend
 # falls in the holding week, not just bear calls.
 #
-# The mechanism differs by side and it is worth being precise. A bear call is
-# gated against dividend-driven EARLY EXERCISE — the holder exercises to
-# capture the dividend when it exceeds the call's remaining extrinsic. A bull
-# put has no such incentive (a put holder long the stock would forfeit the
-# dividend by exercising early, so a dividend DELAYS put exercise). What a bull
-# put is exposed to is the ex-date price drop itself: the stock falls by the
-# dividend mechanically, pushing spot toward and through the short strike, and
-# raising the odds of finishing ITM or in the pin zone.
+# BOTH sides carry dividend-driven assignment risk. The mechanisms differ.
+#
+# Bear call: the holder exercises BEFORE ex-date to capture the dividend, and
+# does so when the dividend exceeds the call's remaining extrinsic.
+#
+# Bull put: the holder exercises AFTER ex-date. A protective-put holder will
+# not exercise early beforehand — selling the stock would forfeit the dividend
+# — so they hold through the ex-date, collect it, then exercise the ITM put.
+# That does not remove the risk, it CONCENTRATES it just after the ex-date.
+# An earlier version of this comment called that a "delay" and treated it as
+# risk-reducing, which is wrong: if the ex-date falls in the holding week, the
+# assignment falls in the holding week.
+#
+# Two things also worsen at that same moment: the stock drops by the dividend,
+# so the short put is deeper ITM, AND its extrinsic shrinks — which is exactly
+# the carry-driven early-exercise condition. Both variables move the wrong way
+# at once. Schwab and Fidelity both warn that short puts are commonly assigned
+# early around the ex-dividend date when ITM with little time value.
+#
+# On top of that, the ex-date drop pushes spot toward and through the short
+# strike, raising the odds of simply finishing ITM or in the pin zone.
 #
 # PEP on 2026-09-04 is the case that forced this: ex-div $1.48 ON expiry day
 # against $1.55 of cushion, leaving $0.07 after the adjustment — a coin flip
