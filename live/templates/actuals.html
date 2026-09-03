@@ -51,7 +51,7 @@
           <td>{{ row.source_time or '—' }}</td>
           <td>{{ row.source_label }}</td>
           <td class="fw">{{ p.ticker }}
-            {%- if arisk %}<div class="assign-why">⚠️ {{ arisk.reasons | join('; ') }}</div>{% endif %}
+            {%- if arisk %} <span class="assign-tag" title="{{ arisk.reasons | join('; ') }}">{{ arisk.tag or 'RISK' }}</span>{% endif %}
             {% if p.spread_type == 'bull_put' %}
               <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
             {% elif p.spread_type == 'bear_call' %}
