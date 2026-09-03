@@ -165,6 +165,15 @@ DRIFT_AT = None
 # the decision can be made on evidence.
 LIVE_EXDIV_GATE_PUTS = False
 
+# --- Assignment risk monitor (live/assignment_risk.py) ---
+# Early exercise is driven by the short leg's EXTRINSIC value, not by how deep
+# ITM it is. 2026-09-03: an AMGN short call 12.80 ITM still carried 0.76 of
+# extrinsic (nobody exercises that); a DE short call 52.94 ITM carried ~0.04
+# (anybody would). Extrinsic is read straight off the SAME-STRIKE opposite-side
+# option via put-call parity, so it is measured rather than modelled.
+LIVE_ASSIGN_EXTRINSIC_ALERT = 0.10   # alert when a short leg drops to/below this
+LIVE_ASSIGN_CLIENT_ID       = 193    # avoid 100-109 (fetchers), 110 (combo), 11/12
+
 # --- Webapp ---
 WEBAPP_HOST = "127.0.0.1"
 WEBAPP_PORT = 5050

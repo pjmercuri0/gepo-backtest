@@ -180,6 +180,13 @@ fi
 echo "Running MTM tracker on active frozen files..."
 "${GEPO_PYTHON:-python3}" -m live.track_frozen 2>&1 | sed "s/^/  [Tracker] /" || echo "  ✗ tracker failed (non-fatal)"
 
+# Assignment-risk watch. Fetches each OPEN POSITION's own strikes directly from
+# IB rather than reading the snapshot: the scan fetches a band around current
+# spot, so a position goes invisible exactly when it moves deep ITM, which is
+# when assignment risk appears. DE's 647.50 strike sat 7.6% from spot on
+# 2026-09-02 and was absent from every snapshot that day.
+"${GEPO_PYTHON:-python3}" -m live.assignment_risk --quiet 2>&1 | sed "s/^/  [Assign] /" || echo "  ✗ assignment check failed (non-fatal)"
+
 # Push to Mya if SSH host configured. Soft-fail so a network blip
 # doesn't kill the cron exit code.
 if [ -n "${MYA_SSH_HOST:-}" ]; then
