@@ -41,6 +41,24 @@ app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.jinja_env.auto_reload = True
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0   # static files served with no-cache
 
+APP_PROFILE = os.environ.get("GEPO_APP_PROFILE", "main").strip().lower()
+IS_EURO_PROFILE = APP_PROFILE in {"euro", "gepo-euro", "gepo_euro"}
+
+
+def _data_path(name: str) -> Path:
+    base = Path(ROOT) / "live" / "data"
+    if IS_EURO_PROFILE:
+        return base / "euro" / name
+    return base / name
+
+
+@app.context_processor
+def _inject_app_profile():
+    return {
+        "app_profile": APP_PROFILE,
+        "is_euro_profile": IS_EURO_PROFILE,
+    }
+
 
 # Half-away-from-zero rounding (NOT Python's banker's rounding). Use this
 # for any monetary display so 172.5 rounds to 173, not 172.
@@ -636,7 +654,7 @@ def backtest():
     """Static backtest tab: equity curve vs SPY (G_rv canon 2026-06-09).
     Data is precomputed and shipped to live/data/backtest_equity.json by
     report_three_sizings.py (rich payload: weeks/trades/sizing arms)."""
-    payload = _read_json(Path(ROOT) / "live" / "data" / "backtest_equity.json")
+    payload = _read_json(_data_path("backtest_equity.json"))
     return render_template("backtest.html", data=payload)
 
 
@@ -644,15 +662,18 @@ def backtest():
 def oot():
     """2026 out-of-time results: frozen canon applied to 2026 data.
     Payload written by report_oot_2026.py to live/data/oot_equity.json."""
-    payload = _read_json(Path(ROOT) / "live" / "data" / "oot_equity.json")
+    payload = _read_json(_data_path("oot_equity.json"))
     return render_template("oot.html", data=payload)
 
 
 @app.route("/qr")
 def qr():
+    default_site = ("https://gepo-euro-backtest.peter.cloudmallinc.com/"
+                    if IS_EURO_PROFILE
+                    else "https://gepo-ticker.peter.cloudmallinc.com/")
     return render_template(
         "qr.html",
-        site_url="https://gepo-ticker.peter.cloudmallinc.com/",
+        site_url=os.environ.get("GEPO_SITE_URL", default_site),
     )
 
 

@@ -37,6 +37,15 @@ SP100_TICKERS = [
     "SPY",  "QQQ",  "IWM",  "SPXW",  "RUTW",
 ]
 
+# European-style, cash-settled index option roots for the assignment-proof
+# research lane. Keep this separate from SP100_TICKERS: adding a root to the
+# live universe changes what production scans may trade.
+EURO_INDEX_ROOTS = [
+    "SPX", "SPXW", "XSP",
+    "RUT", "RUTW", "MRUT",
+    "NDX", "NDXP", "XND",
+]
+
 # ── SPREAD PARAMETERS ─────────────────────────────────────────────────────────
 # Target delta for short leg (paper uses closest to but not exceeding 0.50)
 DELTA_TARGET   = 0.50
