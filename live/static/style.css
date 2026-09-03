@@ -221,14 +221,3 @@ tr.assignment-risk td:first-child::before {
    affordance, so a set value never looks like a different typeface. */
 .actual-shown { font: inherit; font-size: inherit; font-weight: inherit; }
 .actual-trade-edit.actual-shown, .actual-edit.actual-shown { border-bottom: none; }
-
-/* Assignment-risk banner (live/assignment_risk.py -> notifications). Loud on
-   purpose: this is the one alert where missing it means taking delivery of
-   stock the account cannot fund. */
-.assign-banner { border: 1px solid #a33; background: #2a1414; border-radius: 8px;
-                 padding: 12px 14px; margin: 0 0 16px; }
-.assign-title  { color: #ff6b6b; font-weight: 700; font-size: 14px; letter-spacing: 0.3px; }
-.assign-row    { color: #e8e8e8; font-size: 13px; margin-top: 8px; }
-.assign-tag    { color: #ff6b6b; font-weight: 600; }
-.assign-why    { color: #c9a0a0; font-size: 12px; margin-top: 2px; }
-.assign-foot   { color: #8a7070; font-size: 11px; margin-top: 10px; }
