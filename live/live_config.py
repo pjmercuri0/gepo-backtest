@@ -63,11 +63,31 @@ IB_CONNECT_RETRY_DELAY  = 3
 # account. XSP is 1/10th SPX and XND is 1/100th NDX — those are the ones that
 # fit. Neither is in SP100_TICKERS yet; add them once the live fetch is
 # confirmed and the empirical pool has history for them.
+# Probed live against the Gateway 2026-09-03 14:19 — exchanges are NOT
+# guessable: RUT and MRUT qualify on RUSSELL, not CBOE, and their option
+# chains come back on BATS and SMART respectively.
+#
+#   root   underlying  exchange  qualifies  spot        chain
+#   SPXW   SPX         CBOE      yes        7,754.08    42 exp / 744 strikes
+#   XSP    XSP         CBOE      yes          775.38    47 exp / 519 strikes
+#   RUTW   RUT         RUSSELL   yes        2,966.53    25 exp / 342 strikes
+#   MRUT   MRUT        RUSSELL   yes          296.65    19 exp / 225 strikes
+#   NDXP   NDX         NASDAQ    yes        NO DATA     35 exp / 463 strikes
+#   XND    XND         NASDAQ    yes        NO DATA     27 exp / 198 strikes
+#
+# NDXP and XND qualify and expose chains but return no spot: "Requested market
+# data is not subscribed ... NASDAQ 100 Stock Index". They need a Nasdaq index
+# market-data subscription that the account does not currently hold.
+#
+# XSP printed 775.38 against SPX 7,754.08 — exactly 1/10th, confirming it is
+# the same index at a size that fits a small account.
 LIVE_INDEX_ROOTS = {
-    "SPXW": {"underlying": "SPX", "exchange": "CBOE", "trading_class": "SPXW"},
-    "RUTW": {"underlying": "RUT", "exchange": "CBOE", "trading_class": "RUTW"},
-    "XSP":  {"underlying": "XSP", "exchange": "CBOE", "trading_class": "XSP"},
-    "XND":  {"underlying": "XND", "exchange": "NASDAQ", "trading_class": "XND"},
+    "SPXW": {"underlying": "SPX",  "exchange": "CBOE",    "trading_class": "SPXW"},
+    "XSP":  {"underlying": "XSP",  "exchange": "CBOE",    "trading_class": "XSP"},
+    "RUTW": {"underlying": "RUT",  "exchange": "RUSSELL", "trading_class": "RUTW"},
+    "MRUT": {"underlying": "MRUT", "exchange": "RUSSELL", "trading_class": "MRUT"},
+    "NDXP": {"underlying": "NDX",  "exchange": "NASDAQ",  "trading_class": "NDXP"},
+    "XND":  {"underlying": "XND",  "exchange": "NASDAQ",  "trading_class": "XND"},
 }
 
 # --- Strike band ---
