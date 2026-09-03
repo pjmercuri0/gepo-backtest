@@ -163,7 +163,24 @@ DRIFT_AT = None
 # premium — so gating puts may drop trades whose risk you were already paid for.
 # Left OFF pending measurement; the ranker logs what WOULD have been dropped so
 # the decision can be made on evidence.
-LIVE_EXDIV_GATE_PUTS = False
+# ON since 2026-09-03 (user decision): exclude BOTH sides when an ex-dividend
+# falls in the holding week, not just bear calls.
+#
+# The mechanism differs by side and it is worth being precise. A bear call is
+# gated against dividend-driven EARLY EXERCISE — the holder exercises to
+# capture the dividend when it exceeds the call's remaining extrinsic. A bull
+# put has no such incentive (a put holder long the stock would forfeit the
+# dividend by exercising early, so a dividend DELAYS put exercise). What a bull
+# put is exposed to is the ex-date price drop itself: the stock falls by the
+# dividend mechanically, pushing spot toward and through the short strike, and
+# raising the odds of finishing ITM or in the pin zone.
+#
+# PEP on 2026-09-04 is the case that forced this: ex-div $1.48 ON expiry day
+# against $1.55 of cushion, leaving $0.07 after the adjustment — a coin flip
+# that read as safe. The gate could not have caught it before, both because
+# puts were ungated and because the dividend calendar held 12 of 94 tickers
+# until fetch_dividends_ib.py replaced the NASDAQ source that morning.
+LIVE_EXDIV_GATE_PUTS = True
 
 # --- Assignment risk monitor (live/assignment_risk.py) ---
 # Early exercise is driven by the short leg's EXTRINSIC value, not by how deep
