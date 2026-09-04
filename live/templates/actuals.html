@@ -48,16 +48,18 @@
         {# A WATCH is not an alert: extrinsic has collapsed but no rational
            exercise case exists yet. It gets a static amber row, never the
            flash, so a real risk still stands out. #}
-        {# Colour, no tag.
-           RED    = EARLY EXERCISE risk: extrinsic on the short leg has
-                    collapsed (holder gives up nothing by exercising now), or a
-                    rational exercise case where benefit > extrinsic. Can hit
-                    any day, without warning.
-           ORANGE = PIN risk: spot between the strikes, so the short is
-                    assigned and the long expires worthless. Only bites at
-                    settlement, so it is the lesser colour.
+        {# TWO states only.
+           RED    = ASSIGNMENT risk. Extrinsic on the short leg has collapsed,
+                    so the holder gives up nothing by exercising now, or
+                    benefit > extrinsic outright. Can hit on any day.
+           ORANGE = PIN risk. Spot between the strikes, so at settlement the
+                    short is assigned and the long expires worthless and real
+                    shares are delivered. Only bites at expiry.
+           The legacy tracker flag (expiry day, short ITM, long OTM) IS pin
+           risk, so it feeds orange as a fallback when no assignment payload is
+           available rather than being a third style of its own.
            Reason is on the ticker's tooltip. #}
-        <tr class="{% if arisk and (arisk.at_risk or arisk.extrinsic_watch) %}assign-flash{% elif arisk and arisk.in_pin_zone %}assign-watch{% elif last_track and last_track.get('assignment_risk') %}assignment-risk{% endif %}">
+        <tr class="{% if arisk and (arisk.extrinsic_watch or (arisk.at_risk and not arisk.pin_live)) %}assign-flash{% elif (arisk and arisk.in_pin_zone) or (not arisk and last_track and last_track.get('assignment_risk')) %}assign-watch{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
           <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
           <td>{{ row.source_time or '—' }}</td>
