@@ -99,7 +99,12 @@
           {% set ns = namespace(marked=None) %}
           {% for r in track_arr | reverse %}{% if ns.marked is none and r.get('current_mark') is not none %}{% set ns.marked = r %}{% endif %}{% endfor %}
           {% set last_marked = ns.marked %}
-          <tr{% if last_track and last_track.get('assignment_risk') %} class="assignment-risk"{% endif %}>
+          {# No risk highlight here (removed 2026-09-04). History is a record of
+             what was frozen, not a live risk view — the flag it used fired on
+             "expiry day AND short leg ITM", which lit up rows that settled
+             cleanly to cash. Live assignment risk lives on the Actuals tab,
+             which is the only place holdings are tracked. #}
+          <tr>
             <td><button class="actuals-add" data-url="{{ url_for('add_actual_from_frozen', date=day.date, index=loop.index0) }}" title="add this pick to actuals">+</button></td>
             <td>{{ loop.index }}</td>
             <td class="fw">{{ tk }}
