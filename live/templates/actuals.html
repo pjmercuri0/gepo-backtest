@@ -65,7 +65,7 @@
           <td>{{ row.source_time or '—' }}</td>
           {# Source column dropped 2026-09-03 to save width; row.source_label is
              still produced by webapp.py and used elsewhere. #}
-          <td class="fw"{% if arisk and arisk.at_risk %} title="{{ arisk.reasons | join('; ') }}"{% elif arisk and arisk.extrinsic_watch %} title="EARLY EXERCISE risk: extrinsic {{ arisk.extrinsic }} on a short leg {{ arisk.short_itm_by }} ITM"{% elif arisk and arisk.in_pin_zone %} title="PIN risk: spot {{ arisk.spot }} between {{ arisk.pin_zone[0] }} and {{ arisk.pin_zone[1] }}"{% endif %}>{{ p.ticker }}
+          <td class="fw"{% if arisk and arisk.at_risk %} title="{{ arisk.reasons | join('; ') }}"{% elif arisk and arisk.extrinsic_unknown %} title="ASSIGNMENT risk: parity leg not quoting, extrinsic UNKNOWN on a short leg {{ arisk.short_itm_by }} ITM"{% elif arisk and arisk.extrinsic_watch %} title="ASSIGNMENT risk: extrinsic {{ arisk.extrinsic }} on a short leg {{ arisk.short_itm_by }} ITM"{% elif arisk and arisk.in_pin_zone %} title="PIN risk: spot {{ arisk.spot }} between {{ arisk.pin_zone[0] }} and {{ arisk.pin_zone[1] }}"{% endif %}>{{ p.ticker }}
             {% if p.spread_type == 'bull_put' %}
               <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
             {% elif p.spread_type == 'bear_call' %}
@@ -160,6 +160,8 @@
           {% elif arisk and arisk.extrinsic is not none %}
             <td class="fw{% if arisk.extrinsic_watch %} neg{% endif %}"
                 title="short leg {{ arisk.short_itm_by }} ITM">${{ "%.2f"|format(arisk.extrinsic|rd(2)) }}</td>
+          {% elif arisk and arisk.extrinsic_unknown %}
+            <td class="fw neg" title="no quote on the parity leg — extrinsic unknown, short leg {{ arisk.short_itm_by }} ITM">n/a</td>
           {% else %}
             <td>—</td>
           {% endif %}
