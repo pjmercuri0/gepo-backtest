@@ -789,6 +789,10 @@ def history():
                            close_alert=close_alert)
 
 
+# How stale an assignment payload may be before the page ignores it.
+ASSIGN_MAX_AGE_H = 18
+
+
 def _assignment_lookup() -> dict:
     """Today's flagged positions, keyed for matching against Actuals rows.
 
@@ -803,12 +807,32 @@ def _assignment_lookup() -> dict:
     distinguished by pos["at_risk"] being False, and the template renders those
     static amber rather than flashing.
 
-    Only today's file is read — a stale flag from a previous expiry would be
-    worse than none.
+    Today's file first. If it does not exist yet, fall back to the most recent
+    one within ASSIGN_MAX_AGE_H — otherwise the page goes blank every night at
+    midnight and stays blank until the first scan of the new day, losing both
+    the risk colours and the quoted spot exactly when positions are expiring.
+
+    Age-bounded rather than unbounded: a flag from a previous expiry would be
+    worse than none. Position keys include the expiry, so a genuinely old file
+    also fails to match any current row, but the age cap is the explicit guard.
+    The chosen file's ts is returned as _ts so the page can show how fresh it is.
     """
+    dirp = Path(live_config.NOTIFICATIONS_DIR)
     today = datetime.now().date().isoformat()
-    payload = _read_json(
-        Path(live_config.NOTIFICATIONS_DIR) / f"assignment_risk_{today}.json")
+    payload = _read_json(dirp / f"assignment_risk_{today}.json")
+    if payload is None:
+        for fp in sorted(dirp.glob("assignment_risk_*.json"), reverse=True):
+            cand = _read_json(fp)
+            ts = (cand or {}).get("ts")
+            if not ts:
+                continue
+            try:
+                age_h = (datetime.now() - datetime.fromisoformat(ts)).total_seconds() / 3600
+            except ValueError:
+                continue
+            if 0 <= age_h <= ASSIGN_MAX_AGE_H:
+                payload = cand
+                break
     out = {"_ts": (payload or {}).get("ts")}
     for pos in ((payload or {}).get("positions") or []):
         try:
