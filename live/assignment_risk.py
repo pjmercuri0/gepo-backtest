@@ -223,8 +223,16 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
         # you. An alert that lights up on positions you cannot act on is one you
         # learn to ignore, so this raises no tag and no row highlight.
         # The real flags stay: channel 1 (benefit > extrinsic) and the pin zone.
-        extrinsic_watch = bool(extrinsic is not None and itm_by is not None
-                               and itm_by > 0 and extrinsic < watch_floor)
+        # FAIL CLOSED on a missing quote. extrinsic comes from the parity leg,
+        # which is deep OTM when the short leg is deep ITM — exactly when it
+        # stops quoting. Requiring `extrinsic is not None` therefore cleared the
+        # flag on the most exposed position in the book: on 2026-09-04 DE sat
+        # 49.93 ITM with no extrinsic at all and showed no warning, while
+        # shallower positions with real quotes did. Unknown is not safe.
+        extrinsic_unknown = bool(itm_by is not None and itm_by > 0
+                                 and extrinsic is None)
+        extrinsic_watch = bool(itm_by is not None and itm_by > 0
+                               and (extrinsic is None or extrinsic < watch_floor))
         reasons_watch = None
         # Pin zone only bites at SETTLEMENT. Sitting between the strikes on a
         # Wednesday is just where the stock happens to be — it carries no
@@ -254,6 +262,7 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
             "exercise_benefit": None if benefit is None else round(benefit, 4),
             "benefit_basis": basis,
             "extrinsic_watch": extrinsic_watch,
+            "extrinsic_unknown": extrinsic_unknown,
             "at_risk": bool(reasons),
             "reasons": reasons + ([reasons_watch] if reasons_watch else []),
         })
