@@ -33,7 +33,7 @@
         <th></th><th>Date</th><th>Time</th><th>Ticker</th>
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th>
         <th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
-        <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th style="text-align:right">P&amp;L</th>
+        <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>
       </tr></thead>
       <tbody>
       {% for row in wk.rows %}
@@ -48,14 +48,14 @@
         {# A WATCH is not an alert: extrinsic has collapsed but no rational
            exercise case exists yet. It gets a static amber row, never the
            flash, so a real risk still stands out. #}
-        <tr class="{% if arisk and arisk.at_risk %}assign-flash{% elif arisk %}assign-watch{% elif last_track and last_track.get('assignment_risk') %}assignment-risk{% endif %}">
+        <tr class="{% if arisk and arisk.at_risk %}assign-flash{% elif arisk and arisk.in_pin_zone %}assign-watch{% elif last_track and last_track.get('assignment_risk') %}assignment-risk{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
           <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
           <td>{{ row.source_time or '—' }}</td>
           {# Source column dropped 2026-09-03 to save width; row.source_label is
              still produced by webapp.py and used elsewhere. #}
           <td class="fw">{{ p.ticker }}
-            {%- if arisk %} <span class="assign-tag{% if not arisk.at_risk %} assign-tag-watch{% endif %}" title="{{ arisk.reasons | join('; ') }}">{{ arisk.tag or 'RISK' }}</span>{% endif %}
+            {%- if arisk and arisk.tag %} <span class="assign-tag{% if not arisk.at_risk %} assign-tag-watch{% endif %}" title="{{ arisk.reasons | join('; ') }}">{{ arisk.tag }}</span>{% endif %}
             {% if p.spread_type == 'bull_put' %}
               <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
             {% elif p.spread_type == 'bear_call' %}
@@ -129,6 +129,20 @@
             <td>—</td>
           {% elif last_marked %}
             <td>${{ "%.2f"|format(last_marked.current_mark|rd(2)) }}</td>
+          {% else %}
+            <td>—</td>
+          {% endif %}
+          {# Ext = extrinsic on the short leg. Sits beside Mark because the two
+             fail differently: Mark goes blank exactly when a position moves
+             deep ITM and drops out of the scan's strike band (DE, 7.63% from
+             spot, had no mark at all), while assignment_risk fetches each
+             position's own strikes and always has this. Red under the alert
+             floor on an ITM short leg. #}
+          {% if outcome_row %}
+            <td>—</td>
+          {% elif arisk and arisk.extrinsic is not none %}
+            <td class="fw{% if arisk.extrinsic_watch %} neg{% endif %}"
+                title="short leg {{ arisk.short_itm_by }} ITM">${{ "%.2f"|format(arisk.extrinsic|rd(2)) }}</td>
           {% else %}
             <td>—</td>
           {% endif %}
