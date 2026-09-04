@@ -245,7 +245,7 @@ def _actuals_rows() -> list[dict]:
             if day and 0 <= idx < len(day.get("top_picks") or []):
                 fresh = day["top_picks"][idx]
                 if _pick_identity(fresh) == _pick_identity(pick):
-                    pick = _json_clone(fresh)
+                    pick = {**pick, **_json_clone(fresh)}   # merge, see below
                     rbp = (day.get("outcome") or {}).get("results_by_pick") or []
                     if idx < len(rbp):
                         outcome_row = rbp[idx]
@@ -268,7 +268,14 @@ def _actuals_rows() -> list[dict]:
             if scan and 0 <= idx < len(scan.get("picks") or []):
                 fresh = scan["picks"][idx]
                 if _pick_identity(fresh) == _pick_identity(pick):
-                    pick = _json_clone(fresh)
+                    # MERGE, do not replace. Re-reading the source picks up live
+                    # marks and settled outcomes, but intraday_picks held a
+                    # 14-field subset until 2026-09-03 — replacing wholesale
+                    # discarded short_delta, IV and the quote fields that
+                    # backfill_actuals_fields had restored to actuals.json, so
+                    # the column rendered "-" no matter what the store said.
+                    # Fresh values win; stored keys the source lacks survive.
+                    pick = {**pick, **_json_clone(fresh)}
                     source_time = f"{str(scan.get('hhmm', ''))[:2]}:{str(scan.get('hhmm', ''))[2:]}"
             # Snapshot-sourced trades used to render a dash for spot, mark and
             # P&L: only the frozen branch above ever set last_track/last_marked/
