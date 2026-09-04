@@ -929,7 +929,40 @@ def actuals():
                    round(float(pk.get("long_strike")), 4))
         except (TypeError, ValueError):
             key = None
-        r["assign_risk"] = risk.get(key) if key else None
+        ar = risk.get(key) if key else None
+        r["assign_risk"] = ar
+
+        # Single source of truth for spot on an OPEN row. assignment_risk
+        # quotes each position's own underlying every run; last_track carries
+        # the spot from the last SCAN, which can be hours old and goes missing
+        # entirely once a position drifts outside the scan's strike band.
+        #
+        # Overwrite the DATA rather than the display, so everything derived
+        # from spot moves together. Patching only the Spot cell left SBUX
+        # showing 105.80 while its status still read PARTIAL off the stale
+        # 106.25 — the page disagreeing with itself is worse than being stale.
+        if ar and ar.get("spot") and not r.get("outcome_row"):
+            lt = r.get("last_track")
+            if isinstance(lt, dict):
+                lt["underlying_price"] = ar["spot"]
+                st = (r.get("pick") or {}).get("spread_type")
+                ss = (r.get("pick") or {}).get("short_strike")
+                ls = (r.get("pick") or {}).get("long_strike")
+                new_status = _live_status(st, ar["spot"], ss, ls)
+                if new_status:
+                    lt["live_status"] = new_status
+                    # Keep the older tracker flag in step; the template falls
+                    # back to it for the row highlight.
+                    try:
+                        exp_d = datetime.fromisoformat(
+                            str((r.get("pick") or {}).get("expiry_date", ""))).date()
+                    except (ValueError, TypeError):
+                        exp_d = None
+                    today_d = ddate.today()
+                    short_itm = ((st == "bull_put" and ar["spot"] < float(ss)) or
+                                 (st == "bear_call" and ar["spot"] > float(ss)))
+                    lt["assignment_risk"] = bool(
+                        exp_d == today_d and today_d.weekday() == 4 and short_itm)
     return render_template("actuals.html", rows=rows, weeks=_actuals_weeks(rows),
                            assign_ts=risk.get("_ts"))
 
