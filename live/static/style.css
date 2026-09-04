@@ -242,3 +242,11 @@ tr.assign-flash td:first-child { box-shadow: inset 3px 0 0 #ff5555; }
 @media (prefers-reduced-motion: reduce) {
   tr.assign-flash td { animation: none; background: rgba(200, 45, 45, 0.28); }
 }
+
+/* WATCH: extrinsic collapsed on an ITM short leg, but no rational exercise
+   case yet (that is assign-flash). Static amber — a warning you can read past,
+   because a warning that never switches off is one you learn to ignore. */
+tr.assign-watch td { background: rgba(214, 158, 46, 0.14);
+                     border-bottom-color: rgba(214, 158, 46, 0.40); }
+tr.assign-watch td:first-child { box-shadow: inset 3px 0 0 #d69e2e; }
+.assign-tag-watch { background: #6b4c15; color: #ffe9bf; }

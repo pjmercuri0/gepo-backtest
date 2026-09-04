@@ -45,14 +45,17 @@
            at expiry, or a rational early-exercise case on any day. Reason is
            spelled out under the ticker so it is not just a colour. #}
         {% set arisk = row.assign_risk %}
-        <tr class="{% if arisk %}assign-flash{% elif last_track and last_track.get('assignment_risk') %}assignment-risk{% endif %}">
+        {# A WATCH is not an alert: extrinsic has collapsed but no rational
+           exercise case exists yet. It gets a static amber row, never the
+           flash, so a real risk still stands out. #}
+        <tr class="{% if arisk and arisk.at_risk %}assign-flash{% elif arisk %}assign-watch{% elif last_track and last_track.get('assignment_risk') %}assignment-risk{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
           <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
           <td>{{ row.source_time or '—' }}</td>
           {# Source column dropped 2026-09-03 to save width; row.source_label is
              still produced by webapp.py and used elsewhere. #}
           <td class="fw">{{ p.ticker }}
-            {%- if arisk %} <span class="assign-tag" title="{{ arisk.reasons | join('; ') }}">{{ arisk.tag or 'RISK' }}</span>{% endif %}
+            {%- if arisk %} <span class="assign-tag{% if not arisk.at_risk %} assign-tag-watch{% endif %}" title="{{ arisk.reasons | join('; ') }}">{{ arisk.tag or 'RISK' }}</span>{% endif %}
             {% if p.spread_type == 'bull_put' %}
               <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
             {% elif p.spread_type == 'bear_call' %}
