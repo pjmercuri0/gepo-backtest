@@ -62,9 +62,18 @@
               <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600" title="bear-call">▼ BC</span>
             {% endif %}
           </td>
+          {# Spot precedence. A settled row keeps its settlement price. For an
+             OPEN row, assignment_risk's spot wins over the tracker's: it quotes
+             each position's own underlying on every run, whereas last_track
+             carries the spot from the last SCAN, which can be hours old and
+             goes missing entirely once a position drifts outside the scan's
+             strike band. On 2026-09-03 the tracker had HD at 318.07 while the
+             live quote was 318.56, and DE was out by 1.41. #}
           <td>
             {% if outcome_row and outcome_row.underlying_price is defined %}
               ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}
+            {% elif arisk and arisk.spot %}
+              <span title="quoted {{ assign_ts or 'this scan' }}">${{ "%.2f"|format(arisk.spot|rd(2)) }}</span>
             {% elif last_track and 'underlying_price' in last_track and last_track.underlying_price %}
               ${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}
             {% elif p.entry_price is not none %}
