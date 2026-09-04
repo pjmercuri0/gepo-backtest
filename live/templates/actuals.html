@@ -48,24 +48,24 @@
         {# A WATCH is not an alert: extrinsic has collapsed but no rational
            exercise case exists yet. It gets a static amber row, never the
            flash, so a real risk still stands out. #}
-        {# TWO states only.
-           RED    = ASSIGNMENT risk. Extrinsic on the short leg has collapsed,
-                    so the holder gives up nothing by exercising now, or
-                    benefit > extrinsic outright. Can hit on any day.
-           ORANGE = PIN risk. Spot between the strikes, so at settlement the
-                    short is assigned and the long expires worthless and real
-                    shares are delivered. Only bites at expiry.
-           The legacy tracker flag (expiry day, short ITM, long OTM) IS pin
-           risk, so it feeds orange as a fallback when no assignment payload is
-           available rather than being a third style of its own.
+        {# ONE state: RED = ASSIGNMENT risk. Extrinsic on the short leg has
+           collapsed (or cannot be quoted), so the holder gives up nothing by
+           exercising now, or benefit > extrinsic outright. Can hit on any day,
+           without warning, which is why it is worth a colour.
+
+           PIN risk is deliberately NOT shown (removed 2026-09-04). Pin only
+           bites at settlement, and the book is closed every Friday afternoon
+           before that, so it cannot materialise. in_pin_zone / pin_live are
+           still computed and still travel in the payload — only the highlight
+           is gone, so restoring it is a one-line change.
            Reason is on the ticker's tooltip. #}
-        <tr class="{% if arisk and (arisk.extrinsic_watch or (arisk.at_risk and not arisk.pin_live)) %}assign-flash{% elif (arisk and arisk.in_pin_zone) or (not arisk and last_track and last_track.get('assignment_risk')) %}assign-watch{% endif %}">
+        <tr class="{% if arisk and (arisk.extrinsic_watch or (arisk.at_risk and not arisk.pin_live)) %}assign-flash{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
           <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
           <td>{{ row.source_time or '—' }}</td>
           {# Source column dropped 2026-09-03 to save width; row.source_label is
              still produced by webapp.py and used elsewhere. #}
-          <td class="fw"{% if arisk and arisk.at_risk %} title="{{ arisk.reasons | join('; ') }}"{% elif arisk and arisk.extrinsic_unknown %} title="ASSIGNMENT risk: parity leg not quoting, extrinsic UNKNOWN on a short leg {{ arisk.short_itm_by }} ITM"{% elif arisk and arisk.extrinsic_watch %} title="ASSIGNMENT risk: extrinsic {{ arisk.extrinsic }} on a short leg {{ arisk.short_itm_by }} ITM"{% elif arisk and arisk.in_pin_zone %} title="PIN risk: spot {{ arisk.spot }} between {{ arisk.pin_zone[0] }} and {{ arisk.pin_zone[1] }}"{% endif %}>{{ p.ticker }}
+          <td class="fw"{% if arisk and arisk.at_risk %} title="{{ arisk.reasons | join('; ') }}"{% elif arisk and arisk.extrinsic_unknown %} title="ASSIGNMENT risk: parity leg not quoting, extrinsic UNKNOWN on a short leg {{ arisk.short_itm_by }} ITM"{% elif arisk and arisk.extrinsic_watch %} title="ASSIGNMENT risk: extrinsic {{ arisk.extrinsic }} on a short leg {{ arisk.short_itm_by }} ITM"{% endif %}>{{ p.ticker }}
             {% if p.spread_type == 'bull_put' %}
               <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
             {% elif p.spread_type == 'bear_call' %}
