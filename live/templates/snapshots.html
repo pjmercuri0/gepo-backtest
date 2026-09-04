@@ -115,31 +115,4 @@ nothing captured yet</div></div>
   </div>
 {% endif %}
 
-{# Horizontal scroll is per-scan by default, so scrolling one scan's table left
-   the others in the day showing different columns — the 15:45 table on "spot /
-   mark / p&l" while 15:16 still sat on "ticker / strikes". Sync every
-   .table-scroll inside a day card so the whole day moves as one.
-   Scoped per card: days scroll independently of each other, and the aggregate
-   table at the top is untouched because it is the only pane in its card. #}
-<script>
-(function () {
-  document.querySelectorAll('.week-card').forEach(function (card) {
-    var panes = card.querySelectorAll('.table-scroll');
-    if (panes.length < 2) return;
-    var syncing = false;
-    panes.forEach(function (pane) {
-      pane.addEventListener('scroll', function () {
-        if (syncing) return;          // re-entrancy guard: setting scrollLeft
-        syncing = true;               // below fires scroll on every other pane
-        var x = pane.scrollLeft;
-        panes.forEach(function (other) {
-          if (other !== pane && other.scrollLeft !== x) other.scrollLeft = x;
-        });
-        requestAnimationFrame(function () { syncing = false; });
-      }, { passive: true });
-    });
-  });
-})();
-</script>
-
 {% endblock %}
