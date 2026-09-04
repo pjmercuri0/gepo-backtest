@@ -367,48 +367,84 @@ def main() -> int:
         for why in r["reasons"]:
             print(f"      ! {why}", flush=True)
 
-    if at_risk or watching:
-        ts = datetime.now()
-        # Alerts first so the message leads with real risk; watches ride along
-        # so the page can tag them, but they do not inflate n_at_risk.
-        msg = ("⚠️ gepo assignment risk: " + "; ".join(_summarise(r) for r in at_risk)
-               if at_risk else
-               "gepo watch: " + "; ".join(_summarise(r) for r in watching))
-        payload = {
-            "type": "assignment-risk",
-            "ts": ts.isoformat(timespec="seconds"),
-            "host": os.uname().nodename,
-            "n_at_risk": len(at_risk),
-            "n_watch": len(watching),
-            "extrinsic_threshold": float(
-                getattr(live_config, "LIVE_ASSIGN_EXTRINSIC_ALERT", 0.10)),
-            # EVERY assessed row, not just the flagged ones: the Actuals page
-            # shows extrinsic per position, and a column that only populates
-            # after a threshold trips is no use as an early warning. Consumers
-            # must gate on at_risk / extrinsic_watch, never on mere presence.
-            "positions": rows,
-            "message": msg,
-        }
-        out = ALERT_DIR / f"assignment_risk_{ts:%Y-%m-%d}.json"
-        _atomic_write(out, payload)
-        print(f"\n  {len(at_risk)} at risk, {len(watching)} watch → wrote {out}", flush=True)
-    else:
-        # ALWAYS write, even when clear. Writing only on risk left the morning's
-        # file on disk after the risk cleared, so the webapp kept flashing rows
-        # that were no longer at risk — a warning that does not switch off is a
-        # warning you learn to ignore.
-        ts = datetime.now()
-        out = ALERT_DIR / f"assignment_risk_{ts:%Y-%m-%d}.json"
-        _atomic_write(out, {
-            "type": "assignment-risk",
-            "ts": ts.isoformat(timespec="seconds"),
-            "host": os.uname().nodename,
-            "n_at_risk": 0,
-            "n_watch": 0,
-            "positions": rows,
-            "message": "no assignment risk",
-        })
-        print(f"\n  no assignment risk across {len(rows)} open position(s)", flush=True)
+    # --- state file: what the WEBAPP reads ------------------------------------
+    # One filename per day, rewritten in place every scan, and deliberately
+    # CARRYING NO "message" KEY. Mya's notify_watcher.sh de-dups on FILENAME
+    # (grep -qxF "$fname" .processed), so a same-named file notifies at most
+    # once per day — and since this one is rewritten all day, that one shot
+    # would be whatever the 09:30 scan happened to say, almost always "no
+    # assignment risk". The watcher skips a messageless file without sending,
+    # which is exactly what a state file should do.
+    ts = datetime.now()
+    state = {
+        "type": "assignment-risk",
+        "ts": ts.isoformat(timespec="seconds"),
+        "host": os.uname().nodename,
+        "n_at_risk": len(at_risk),
+        "n_watch": len(watching),
+        "extrinsic_threshold": float(
+            getattr(live_config, "LIVE_ASSIGN_EXTRINSIC_ALERT", 0.10)),
+        # EVERY assessed row, not just the flagged ones: the Actuals page shows
+        # extrinsic per position, and a column that only populates after a
+        # threshold trips is no use as an early warning. Consumers must gate on
+        # at_risk / extrinsic_watch, never on mere presence.
+        "positions": rows,
+    }
+    out = ALERT_DIR / f"assignment_risk_{ts:%Y-%m-%d}.json"
+    _atomic_write(out, state)
+
+    # --- alert file: what TELEGRAM reads --------------------------------------
+    # Uniquely named per firing so Mya's filename de-dup cannot suppress it.
+    #
+    # Fire ONCE PER POSITION PER WEEK, not once per scan and not on every change
+    # to the at-risk set. A position that stays flagged all week is the normal
+    # case; re-sending it every 30 minutes is how an alert becomes wallpaper.
+    # The ledger is keyed by the position's own expiry, so it prunes itself as
+    # each week rolls off and a position that reappears next week alerts again.
+    ledger_path = ALERT_DIR / ".assignment_alerted.json"
+    try:
+        ledger = json.loads(ledger_path.read_text())
+        if not isinstance(ledger, dict):
+            ledger = {}
+    except (OSError, json.JSONDecodeError):
+        ledger = {}
+    today_iso = date.today().isoformat()
+    # Drop anything whose expiry has passed — that is the week rolling over.
+    ledger = {k: v for k, v in ledger.items() if str(v) >= today_iso}
+
+    def _key(r):
+        return f"{r['ticker']}|{r['spread_type']}|{r['short_strike']:g}|{r['expiry']}"
+
+    fresh = [r for r in at_risk if _key(r) not in ledger]
+
+    if fresh:
+        alert = dict(state)
+        alert["type"] = "assignment-alert"
+        alert["message"] = "⚠️ gepo assignment risk: " + "; ".join(
+            _summarise(r) for r in fresh)
+        # Only the newly-flagged rows travel in the alert; the full book is in
+        # the state file and would bloat a Telegram payload for no benefit.
+        alert["positions"] = fresh
+        alert["n_at_risk"] = len(fresh)
+        apath = ALERT_DIR / f"assignment_alert_{ts:%Y-%m-%d_%H%M%S}.json"
+        n = 1
+        while apath.exists():          # two firings inside one second
+            apath = ALERT_DIR / f"assignment_alert_{ts:%Y-%m-%d_%H%M%S}_{n}.json"
+            n += 1
+        _atomic_write(apath, alert)
+        for r in fresh:
+            ledger[_key(r)] = r["expiry"]
+        try:
+            _atomic_write(ledger_path, ledger)
+        except OSError:
+            pass
+        print(f"\n  ALERT ({len(fresh)} new) -> {apath.name}", flush=True)
+    elif at_risk:
+        print(f"\n  {len(at_risk)} at risk, all already alerted this week "
+              f"— no new Telegram file", flush=True)
+
+    print(f"\n  {len(at_risk)} at risk, {len(watching)} watch "
+          f"across {len(rows)} open position(s) -> {out.name}", flush=True)
     return 0
 
 
