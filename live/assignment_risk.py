@@ -187,26 +187,43 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
             reasons.append(
                 f"early exercise pays: {basis} {benefit:.2f} > extrinsic {extrinsic:.2f}")
 
-        # CHANNEL 2 — exercise beats SELLING. If the bid sits below intrinsic,
-        # closing by selling realises LESS than exercising, so exercise wins
-        # outright with no dividend and no carry involved. This is the channel
-        # that actually assigns us and it was entirely missing.
+        # CHANNEL 2 — REMOVED 2026-09-03. It tested "bid < intrinsic", which
+        # algebraically IS "extrinsic < half the bid-ask spread":
+        #     intrinsic > bid  <=>  mid - extrinsic > mid - spread/2
+        #                      <=>  extrinsic < spread/2
+        # (verified 6/6 against the live book on 2026-09-03). So it was the
+        # extrinsic test with spread/2 silently substituted for a threshold —
+        # the wider and less reliable the quote, the more eagerly it fired.
+        # It flagged DE (threshold 3.45), PEP and SBUX that evening; none were
+        # at risk. PEP's own mid (0.83) was BELOW its intrinsic (1.00) — an
+        # impossible quote — and channel 2 fired on it. Meanwhile DIS, with
+        # 0.08 of extrinsic and a tight 0.41 book, was missed entirely.
         #
-        # Live case, HD 2026-09-03: short put 320, spot 318.07, intrinsic 1.93,
-        # bid 1.30. Exercising pays the holder 0.63/share (=$63/contract) more
-        # than selling. Channel 1 saw only the 1-day carry on the strike —
-        # 320 x 0.045 x 1/365 = $0.0395 — and stayed silent, because a 4-cent
-        # benefit cannot exceed extrinsic. The 63-cent benefit sitting in the
-        # quote was invisible to it. On a short-dated put channel 1 is dead by
-        # construction; carry over a day or two can never clear extrinsic.
+        # The premise was wrong too: the holder does not sell at the bid, they
+        # sell at the mid, so "exercise beats selling" is not established by a
+        # sagging bid. What decides exercise is benefit > extrinsic, which is
+        # channel 1. The fields below are still RECORDED for diagnostics; they
+        # no longer raise an alert.
         exercise_over_sell = (itm_by - short_bid) if (
             short_bid is not None and itm_by is not None) else None
         below_parity = bool(exercise_over_sell is not None
                             and itm_by > 0 and exercise_over_sell > 0)
-        if below_parity:
-            reasons.append(
-                f"exercise beats selling: bid {short_bid:.2f} < intrinsic "
-                f"{itm_by:.2f} (holder gains {exercise_over_sell:.2f}/sh)")
+
+        # WATCH — extrinsic has collapsed on an ITM short leg. Not a rational
+        # exercise signal on its own (that is channel 1), but holders do
+        # exercise sub-optimally, and a near-zero extrinsic is the only
+        # observable that precedes it: it makes exercise cheap, so a holder who
+        # wants out of the position stops losing anything by exercising.
+        # Deliberately a WATCH, not an alert, so it cannot drown out channel 1.
+        watch_floor = float(getattr(live_config, "LIVE_ASSIGN_EXTRINSIC_ALERT", 0.10))
+        extrinsic_watch = bool(extrinsic is not None and itm_by is not None
+                               and itm_by > 0 and extrinsic < watch_floor
+                               and not reasons)
+        if extrinsic_watch:
+            reasons_watch = (f"extrinsic collapsed to {extrinsic:.2f} "
+                             f"(< {watch_floor:.2f}) with short leg {itm_by:.2f} ITM")
+        else:
+            reasons_watch = None
         # Pin zone only bites at SETTLEMENT. Sitting between the strikes on a
         # Wednesday is just where the stock happens to be — it carries no
         # assignment consequence until expiry, and flagging it early trains you
@@ -228,12 +245,14 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
             "in_pin_zone": bool(in_pin),
             "pin_live": bool(in_pin and is_expiry_day),
             "tag": ("PIN" if (in_pin and is_expiry_day) else
-                    "EXERCISE" if reasons else ""),
+                    "EXERCISE" if reasons else
+                    "WATCH" if extrinsic_watch else ""),
             "pin_zone": [lo, hi],
             "exercise_benefit": None if benefit is None else round(benefit, 4),
             "benefit_basis": basis,
+            "extrinsic_watch": extrinsic_watch,
             "at_risk": bool(reasons),
-            "reasons": reasons,
+            "reasons": reasons + ([reasons_watch] if reasons_watch else []),
         })
         for c in (stock, *legs):
             try:
@@ -283,11 +302,11 @@ def _summarise(r: dict) -> str:
     head = f"{r['ticker']} {r['spread_type']} K={r['short_strike']:g}"
     if r.get("pin_live"):
         return f"{head} in pin zone {r['pin_zone'][0]:g}-{r['pin_zone'][1]:g}"
-    if r.get("below_parity"):
-        return (f"{head} bid {r.get('short_bid')} < intrinsic "
-                f"{r.get('short_itm_by')} — exercise beats selling by "
-                f"{r.get('exercise_over_sell')}/sh")
-    return f"{head} extrinsic {r['extrinsic']}"
+    if r.get("extrinsic_watch"):
+        return (f"{head} WATCH extrinsic {r['extrinsic']} with "
+                f"{r.get('short_itm_by')} ITM")
+    return (f"{head} {r.get('benefit_basis')} {r.get('exercise_benefit')} "
+            f"> extrinsic {r['extrinsic']}")
 
 
 def _atomic_write(path: Path, payload: dict) -> None:
@@ -329,34 +348,43 @@ def main() -> int:
             pass
 
     at_risk = [r for r in rows if r["at_risk"]]
+    # WATCH rows are not alerts, but they must still reach the payload or the
+    # webapp cannot render the tag — the page shows only what this file writes.
+    watching = [r for r in rows if r.get("extrinsic_watch") and not r["at_risk"]]
     for r in rows:
-        if args.quiet and not r["at_risk"]:
+        if args.quiet and not r["at_risk"] and not r.get("extrinsic_watch"):
             continue
         ext = "  n/a" if r["extrinsic"] is None else f"{r['extrinsic']:5.2f}"
         itm = "  n/a" if r["short_itm_by"] is None else f"{r['short_itm_by']:+6.2f}"
-        flag = "  <<< AT RISK" if r["at_risk"] else ""
+        flag = ("  <<< AT RISK" if r["at_risk"]
+                else "  <<< watch" if r.get("extrinsic_watch") else "")
         print(f"  {r['ticker']:<6}{r['spread_type']:<11}"
               f"K={r['short_strike']:<9.2f} spot={r['spot']}  "
               f"short ITM {itm}  extrinsic {ext}{flag}", flush=True)
         for why in r["reasons"]:
             print(f"      ! {why}", flush=True)
 
-    if at_risk:
+    if at_risk or watching:
         ts = datetime.now()
+        # Alerts first so the message leads with real risk; watches ride along
+        # so the page can tag them, but they do not inflate n_at_risk.
+        msg = ("⚠️ gepo assignment risk: " + "; ".join(_summarise(r) for r in at_risk)
+               if at_risk else
+               "gepo watch: " + "; ".join(_summarise(r) for r in watching))
         payload = {
             "type": "assignment-risk",
             "ts": ts.isoformat(timespec="seconds"),
             "host": os.uname().nodename,
             "n_at_risk": len(at_risk),
+            "n_watch": len(watching),
             "extrinsic_threshold": float(
                 getattr(live_config, "LIVE_ASSIGN_EXTRINSIC_ALERT", 0.10)),
-            "positions": at_risk,
-            "message": "⚠️ gepo assignment risk: " + "; ".join(
-                _summarise(r) for r in at_risk),
+            "positions": at_risk + watching,
+            "message": msg,
         }
         out = ALERT_DIR / f"assignment_risk_{ts:%Y-%m-%d}.json"
         _atomic_write(out, payload)
-        print(f"\n  {len(at_risk)} position(s) at risk → wrote {out}", flush=True)
+        print(f"\n  {len(at_risk)} at risk, {len(watching)} watch → wrote {out}", flush=True)
     else:
         # ALWAYS write, even when clear. Writing only on risk left the morning's
         # file on disk after the risk cleared, so the webapp kept flashing rows
@@ -369,6 +397,7 @@ def main() -> int:
             "ts": ts.isoformat(timespec="seconds"),
             "host": os.uname().nodename,
             "n_at_risk": 0,
+            "n_watch": 0,
             "positions": [],
             "message": "no assignment risk",
         })

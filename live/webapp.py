@@ -783,13 +783,18 @@ def history():
 
 
 def _assignment_lookup() -> dict:
-    """Today's at-risk positions, keyed for matching against Actuals rows.
+    """Today's flagged positions, keyed for matching against Actuals rows.
 
     live/assignment_risk.py runs every scan and writes
     live/notifications/assignment_risk_<date>.json for any HELD position that
     is either in its pin zone (short assigned, long expires worthless, real
     shares delivered) or has a rational early-exercise case (the dividend or
     carry the holder gains exceeds the extrinsic they forfeit).
+
+    The payload also carries WATCH rows — ITM short legs whose extrinsic has
+    collapsed below the threshold with no rational exercise case yet. They are
+    distinguished by pos["at_risk"] being False, and the template renders those
+    static amber rather than flashing.
 
     Only today's file is read — a stale flag from a previous expiry would be
     worse than none.
