@@ -320,15 +320,26 @@ def _exercise_benefit(p: dict) -> tuple:
 
 
 def _summarise(r: dict) -> str:
-    """One-line reason for the alert message."""
+    """One line per option for the alert message.
+
+    Telegram renders newlines, so the caller joins these with "\n" — a single
+    run-on line was unreadable once more than one option fired.
+    """
     head = f"{r['ticker']} {r['spread_type']} K={r['short_strike']:g}"
-    if r.get("pin_live"):
-        return f"{head} in pin zone {r['pin_zone'][0]:g}-{r['pin_zone'][1]:g}"
+    itm = r.get("short_itm_by")
+    itm_s = "?" if itm is None else f"{itm:.2f}"
     if r.get("extrinsic_watch"):
-        return (f"{head} WATCH extrinsic {r['extrinsic']} with "
-                f"{r.get('short_itm_by')} ITM")
-    return (f"{head} {r.get('benefit_basis')} {r.get('exercise_benefit')} "
-            f"> extrinsic {r['extrinsic']}")
+        ext = r.get("extrinsic")
+        # extrinsic is None when the parity leg is not quoting, which is the
+        # deep-ITM case. Printing a bare "None" read as a bug, not a warning.
+        detail = ("extrinsic UNKNOWN (parity leg not quoting)" if ext is None
+                  else f"extrinsic {ext:.3f}")
+        return f"{head} - {detail}, short leg {itm_s} ITM"
+    if r.get("pin_live"):
+        return (f"{head} - pin zone {r['pin_zone'][0]:g}-{r['pin_zone'][1]:g}, "
+                f"spot {r.get('spot')}")
+    return (f"{head} - {r.get('benefit_basis')} {r.get('exercise_benefit')} "
+            f"> extrinsic {r.get('extrinsic')}")
 
 
 def _atomic_write(path: Path, payload: dict) -> None:
@@ -439,8 +450,8 @@ def main() -> int:
     if fresh:
         alert = dict(state)
         alert["type"] = "assignment-alert"
-        alert["message"] = "⚠️ gepo assignment risk: " + "; ".join(
-            _summarise(r) for r in fresh)
+        alert["message"] = ("\u26a0\ufe0f gepo assignment risk\n"
+                            + "\n".join("- " + _summarise(r) for r in fresh))
         # Only the newly-flagged rows travel in the alert; the full book is in
         # the state file and would bloat a Telegram payload for no benefit.
         alert["positions"] = fresh
