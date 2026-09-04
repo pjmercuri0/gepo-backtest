@@ -48,14 +48,19 @@
         {# A WATCH is not an alert: extrinsic has collapsed but no rational
            exercise case exists yet. It gets a static amber row, never the
            flash, so a real risk still stands out. #}
-        <tr class="{% if arisk and arisk.at_risk %}assign-flash{% elif arisk and arisk.pin_live %}assign-flash{% elif last_track and last_track.get('assignment_risk') %}assignment-risk{% endif %}">
+        {# Colour, no tag. RED: a real flag — a rational early-exercise case
+           (benefit > extrinsic) or the pin zone at expiry, the only shape that
+           delivers shares. ORANGE: extrinsic on the short leg has collapsed
+           below the alert floor; worth seeing, not worth shouting about, since
+           it also lights up on spreads already run to max loss. The reason is
+           on the ticker's tooltip so the colour is explainable on hover. #}
+        <tr class="{% if arisk and (arisk.at_risk or arisk.pin_live) %}assign-flash{% elif arisk and (arisk.extrinsic_watch or arisk.in_pin_zone) %}assign-watch{% elif last_track and last_track.get('assignment_risk') %}assignment-risk{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
           <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
           <td>{{ row.source_time or '—' }}</td>
           {# Source column dropped 2026-09-03 to save width; row.source_label is
              still produced by webapp.py and used elsewhere. #}
-          <td class="fw">{{ p.ticker }}
-            {%- if arisk and arisk.tag %} <span class="assign-tag{% if not arisk.at_risk %} assign-tag-watch{% endif %}" title="{{ arisk.reasons | join('; ') }}">{{ arisk.tag }}</span>{% endif %}
+          <td class="fw"{% if arisk and (arisk.at_risk or arisk.pin_live) %} title="{{ arisk.reasons | join('; ') }}"{% elif arisk and arisk.in_pin_zone %} title="in the pin zone {{ arisk.pin_zone[0] }}-{{ arisk.pin_zone[1] }}, spot {{ arisk.spot }} — bites at expiry"{% elif arisk and arisk.extrinsic_watch %} title="extrinsic {{ arisk.extrinsic }} on a short leg {{ arisk.short_itm_by }} ITM"{% endif %}>{{ p.ticker }}
             {% if p.spread_type == 'bull_put' %}
               <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
             {% elif p.spread_type == 'bear_call' %}
