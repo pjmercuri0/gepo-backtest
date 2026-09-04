@@ -614,10 +614,20 @@ def _frozen_history(limit: int = 60) -> list[dict]:
             except (ValueError, TypeError):
                 exp_d = None
             today_d = ddate.today()
+            # Short ITM alone is NOT assignment risk. When the LONG leg is ITM
+            # too the legs exercise against each other and settle to cash — no
+            # shares are delivered. Only short-ITM-with-long-OTM, i.e. spot
+            # inside the strikes, puts stock in the account. Without the second
+            # test this lit up on 2026-09-04 for SBUX, AMGN and DE, all of which
+            # were 0.2 to 43 points through their long strike and settling
+            # cleanly, while HD was the one position actually pinned.
             short_itm = (stype == "bull_put" and spot < ss) or \
                         (stype == "bear_call" and spot > ss)
+            long_otm = (stype == "bull_put" and spot > ls) or \
+                       (stype == "bear_call" and spot < ls)
             target_row["assignment_risk"] = bool(
-                exp_d == today_d and today_d.weekday() == 4 and short_itm
+                exp_d == today_d and today_d.weekday() == 4
+                and short_itm and long_otm
             )
         total = None
         latest_ts = None
@@ -990,10 +1000,15 @@ def actuals():
                     except (ValueError, TypeError):
                         exp_d = None
                     today_d = ddate.today()
+                    # Same rule as the tracker flag above: short ITM AND long
+                    # OTM. Both legs ITM settles to cash and is not a delivery.
                     short_itm = ((st == "bull_put" and ar["spot"] < float(ss)) or
                                  (st == "bear_call" and ar["spot"] > float(ss)))
+                    long_otm = ((st == "bull_put" and ar["spot"] > float(ls)) or
+                                (st == "bear_call" and ar["spot"] < float(ls)))
                     lt["assignment_risk"] = bool(
-                        exp_d == today_d and today_d.weekday() == 4 and short_itm)
+                        exp_d == today_d and today_d.weekday() == 4
+                        and short_itm and long_otm)
     return render_template("actuals.html", rows=rows, weeks=_actuals_weeks(rows),
                            assign_ts=risk.get("_ts"))
 
