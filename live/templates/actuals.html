@@ -59,7 +59,7 @@
            still computed and still travel in the payload — only the highlight
            is gone, so restoring it is a one-line change.
            Reason is on the ticker's tooltip. #}
-        <tr class="{% if arisk and (arisk.extrinsic_watch or (arisk.at_risk and not arisk.pin_live)) %}assign-flash{% endif %}">
+        <tr class="{% if arisk and arisk.at_risk %}assign-flash{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
           <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
           <td>{{ row.source_time or '—' }}</td>

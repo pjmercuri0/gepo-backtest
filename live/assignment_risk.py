@@ -233,14 +233,24 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
                                  and extrinsic is None)
         extrinsic_watch = bool(itm_by is not None and itm_by > 0
                                and (extrinsic is None or extrinsic < watch_floor))
+        if extrinsic_watch:
+            reasons.append(
+                "assignment risk: extrinsic "
+                + ("UNKNOWN (parity leg not quoting)" if extrinsic is None
+                   else f"{extrinsic:.3f} < {watch_floor:.2f}")
+                + f" on a short leg {itm_by:.2f} ITM")
         reasons_watch = None
         # Pin zone only bites at SETTLEMENT. Sitting between the strikes on a
         # Wednesday is just where the stock happens to be — it carries no
         # assignment consequence until expiry, and flagging it early trains you
         # to ignore the flag. Early exercise, by contrast, can happen any day.
+        # Pin is RECORDED, not alerted (2026-09-04). It only bites at
+        # settlement and the book is closed every Friday afternoon before that,
+        # so it cannot materialise — alerting on it is a push about something
+        # already scheduled to be dealt with. in_pin_zone / pin_live still
+        # travel in the payload; they simply no longer enter `reasons`, which
+        # is what sets at_risk and therefore what fires Telegram.
         is_expiry_day = p["expiry"] == date.today().isoformat()
-        if in_pin and is_expiry_day:
-            reasons.append(f"pin zone {lo:.2f}-{hi:.2f}, spot {spot:.2f}")
 
         results.append({
             **p,
