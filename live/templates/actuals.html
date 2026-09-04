@@ -48,7 +48,7 @@
         {# A WATCH is not an alert: extrinsic has collapsed but no rational
            exercise case exists yet. It gets a static amber row, never the
            flash, so a real risk still stands out. #}
-        <tr class="{% if arisk and arisk.at_risk %}assign-flash{% elif arisk and arisk.in_pin_zone %}assign-watch{% elif last_track and last_track.get('assignment_risk') %}assignment-risk{% endif %}">
+        <tr class="{% if arisk and arisk.at_risk %}assign-flash{% elif arisk and arisk.pin_live %}assign-flash{% elif last_track and last_track.get('assignment_risk') %}assignment-risk{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
           <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
           <td>{{ row.source_time or '—' }}</td>
@@ -72,10 +72,8 @@
           <td>
             {% if outcome_row and outcome_row.underlying_price is defined %}
               ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}
-            {% elif arisk and arisk.spot %}
-              <span title="quoted {{ assign_ts or 'this scan' }}">${{ "%.2f"|format(arisk.spot|rd(2)) }}</span>
             {% elif last_track and 'underlying_price' in last_track and last_track.underlying_price %}
-              ${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}
+              <span{% if arisk and arisk.spot %} title="quoted {{ assign_ts }}"{% endif %}>${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}</span>
             {% elif p.entry_price is not none %}
               ${{ "%.2f"|format(p.entry_price|rd(2)) }}
             {% else %}

@@ -216,11 +216,15 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
         # wants out of the position stops losing anything by exercising.
         # Deliberately a WATCH, not an alert, so it cannot drown out channel 1.
         watch_floor = float(getattr(live_config, "LIVE_ASSIGN_EXTRINSIC_ALERT", 0.10))
+        # Recorded, never alerted. A collapsed extrinsic on an ITM short leg is
+        # worth SEEING — it is the Ext column on the Actuals page — but it fired
+        # on every spread that had run to max loss (DE 43 points through its long
+        # strike, DIS, SBUX), which is information the P&L column already gives
+        # you. An alert that lights up on positions you cannot act on is one you
+        # learn to ignore, so this raises no tag and no row highlight.
+        # The real flags stay: channel 1 (benefit > extrinsic) and the pin zone.
         extrinsic_watch = bool(extrinsic is not None and itm_by is not None
                                and itm_by > 0 and extrinsic < watch_floor)
-        if extrinsic_watch:
-            reasons.append(f"extrinsic collapsed to {extrinsic:.2f} "
-                           f"(< {watch_floor:.2f}) with short leg {itm_by:.2f} ITM")
         reasons_watch = None
         # Pin zone only bites at SETTLEMENT. Sitting between the strikes on a
         # Wednesday is just where the stock happens to be — it carries no
@@ -242,9 +246,10 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
                                    else round(exercise_over_sell, 4)),
             "in_pin_zone": bool(in_pin),
             "pin_live": bool(in_pin and is_expiry_day),
+            # Tag ONLY on a real flag. extrinsic_watch is recorded for the Ext
+            # column but never labels a row.
             "tag": ("PIN" if (in_pin and is_expiry_day) else
-                    "EXERCISE" if reasons else
-                    "WATCH" if extrinsic_watch else ""),
+                    "EXERCISE" if reasons else ""),
             "pin_zone": [lo, hi],
             "exercise_benefit": None if benefit is None else round(benefit, 4),
             "benefit_basis": basis,
