@@ -30,7 +30,7 @@
     <div class="table-scroll">
     <table>
       <thead><tr>
-        <th></th><th>Date</th><th>Time</th><th>Source</th><th>Ticker</th>
+        <th></th><th>Date</th><th>Time</th><th>Ticker</th>
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th>
         <th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
         <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th style="text-align:right">P&amp;L</th>
@@ -49,7 +49,8 @@
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
           <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
           <td>{{ row.source_time or '—' }}</td>
-          <td>{{ row.source_label }}</td>
+          {# Source column dropped 2026-09-03 to save width; row.source_label is
+             still produced by webapp.py and used elsewhere. #}
           <td class="fw">{{ p.ticker }}
             {%- if arisk %} <span class="assign-tag" title="{{ arisk.reasons | join('; ') }}">{{ arisk.tag or 'RISK' }}</span>{% endif %}
             {% if p.spread_type == 'bull_put' %}

@@ -106,6 +106,12 @@ def _mid(t) -> float | None:
     return None
 
 
+def _bid(t) -> float | None:
+    """Raw bid — what the holder actually RECEIVES for selling the option."""
+    b = getattr(t, "bid", None)
+    return float(b) if b is not None and b == b and b > 0 else None
+
+
 def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
     """Quote each position's own strikes and score its risk."""
     if not positions:
@@ -145,6 +151,7 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
             spot = ts.close
         extrinsic = _mid(t_opp)          # parity: opposite side at same strike
         short_mid = _mid(t_short)
+        short_bid = _bid(t_short)        # what the holder gets for SELLING
 
         ss, ls = p["short_strike"], p["long_strike"]
         lo, hi = min(ss, ls), max(ss, ls)
@@ -165,11 +172,41 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
         # non-dividend-paying stock is never optimal).
         #   calls: benefit = the dividend, and only if ex-div lands before expiry
         #   puts:  benefit = interest earned on the strike proceeds until expiry
+        # A holder of the long side has THREE choices, and exercise can beat
+        # either alternative. The old code only tested one of them.
+        #
+        #   HOLD     -> keeps intrinsic + extrinsic
+        #   SELL     -> receives the BID
+        #   EXERCISE -> receives intrinsic, plus dividend/carry going forward
+        #
+        # CHANNEL 1 — exercise beats HOLDING. Dividend (calls) or carry (puts)
+        # exceeds the extrinsic given up. This is the classic textbook test.
         benefit, basis = _exercise_benefit(p)
         if (extrinsic is not None and itm_by is not None and itm_by > 0
                 and benefit is not None and benefit > extrinsic):
             reasons.append(
                 f"early exercise pays: {basis} {benefit:.2f} > extrinsic {extrinsic:.2f}")
+
+        # CHANNEL 2 — exercise beats SELLING. If the bid sits below intrinsic,
+        # closing by selling realises LESS than exercising, so exercise wins
+        # outright with no dividend and no carry involved. This is the channel
+        # that actually assigns us and it was entirely missing.
+        #
+        # Live case, HD 2026-09-03: short put 320, spot 318.07, intrinsic 1.93,
+        # bid 1.30. Exercising pays the holder 0.63/share (=$63/contract) more
+        # than selling. Channel 1 saw only the 1-day carry on the strike —
+        # 320 x 0.045 x 1/365 = $0.0395 — and stayed silent, because a 4-cent
+        # benefit cannot exceed extrinsic. The 63-cent benefit sitting in the
+        # quote was invisible to it. On a short-dated put channel 1 is dead by
+        # construction; carry over a day or two can never clear extrinsic.
+        exercise_over_sell = (itm_by - short_bid) if (
+            short_bid is not None and itm_by is not None) else None
+        below_parity = bool(exercise_over_sell is not None
+                            and itm_by > 0 and exercise_over_sell > 0)
+        if below_parity:
+            reasons.append(
+                f"exercise beats selling: bid {short_bid:.2f} < intrinsic "
+                f"{itm_by:.2f} (holder gains {exercise_over_sell:.2f}/sh)")
         # Pin zone only bites at SETTLEMENT. Sitting between the strikes on a
         # Wednesday is just where the stock happens to be — it carries no
         # assignment consequence until expiry, and flagging it early trains you
@@ -182,12 +219,16 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
             **p,
             "spot": None if spot is None or spot != spot else round(float(spot), 4),
             "short_mid": None if short_mid is None else round(short_mid, 4),
+            "short_bid": None if short_bid is None else round(short_bid, 4),
             "extrinsic": None if extrinsic is None else round(extrinsic, 4),
             "short_itm_by": None if itm_by is None else round(itm_by, 4),
+            "below_parity": below_parity,
+            "exercise_over_sell": (None if exercise_over_sell is None
+                                   else round(exercise_over_sell, 4)),
             "in_pin_zone": bool(in_pin),
             "pin_live": bool(in_pin and is_expiry_day),
             "tag": ("PIN" if (in_pin and is_expiry_day) else
-                    ("EXERCISE" if reasons else "")),
+                    "EXERCISE" if reasons else ""),
             "pin_zone": [lo, hi],
             "exercise_benefit": None if benefit is None else round(benefit, 4),
             "benefit_basis": basis,
@@ -240,8 +281,12 @@ def _exercise_benefit(p: dict) -> tuple:
 def _summarise(r: dict) -> str:
     """One-line reason for the alert message."""
     head = f"{r['ticker']} {r['spread_type']} K={r['short_strike']:g}"
-    if r["in_pin_zone"]:
+    if r.get("pin_live"):
         return f"{head} in pin zone {r['pin_zone'][0]:g}-{r['pin_zone'][1]:g}"
+    if r.get("below_parity"):
+        return (f"{head} bid {r.get('short_bid')} < intrinsic "
+                f"{r.get('short_itm_by')} — exercise beats selling by "
+                f"{r.get('exercise_over_sell')}/sh")
     return f"{head} extrinsic {r['extrinsic']}"
 
 
