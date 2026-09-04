@@ -802,7 +802,7 @@ def _assignment_lookup() -> dict:
     today = datetime.now().date().isoformat()
     payload = _read_json(
         Path(live_config.NOTIFICATIONS_DIR) / f"assignment_risk_{today}.json")
-    out = {}
+    out = {"_ts": (payload or {}).get("ts")}
     for pos in ((payload or {}).get("positions") or []):
         try:
             key = (pos["ticker"], pos["spread_type"], str(pos["expiry"])[:10],
@@ -930,7 +930,8 @@ def actuals():
         except (TypeError, ValueError):
             key = None
         r["assign_risk"] = risk.get(key) if key else None
-    return render_template("actuals.html", rows=rows, weeks=_actuals_weeks(rows))
+    return render_template("actuals.html", rows=rows, weeks=_actuals_weeks(rows),
+                           assign_ts=risk.get("_ts"))
 
 
 @app.route("/api/latest.json")
