@@ -30,6 +30,17 @@ PICK_FIELDS = [
     "ticker", "spread_type", "short_strike", "long_strike",
     "net_credit", "max_loss", "spread_width", "credit_ratio",
     "GROUND", "G", "DKL", "entry_price", "expiry_date", "DTE",
+    # Added 2026-09-03. A snapshot pick copied into Actuals used to arrive with
+    # no delta at all — the key was absent, so the page showed "—" forever and
+    # nothing downstream could recover it, since the value was never persisted.
+    # Frozen picks carry ~34 more fields than this; deliberately taking only the
+    # ones with display or risk value and leaving the combo_* book and the
+    # probability internals (p/q/ro/w_star/EV) out, because intraday_picks holds
+    # every scan of every day and the file should not grow for fields nothing
+    # reads.
+    "short_delta", "long_delta", "IV", "long_IV",
+    "short_bid", "short_ask", "long_bid", "long_ask",
+    "short_oi", "long_oi",
 ]
 
 
