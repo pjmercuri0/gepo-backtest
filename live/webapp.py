@@ -972,6 +972,9 @@ def actuals():
             key = None
         ar = risk.get(key) if key else None
         r["assign_risk"] = ar
+        # The card header sums _actuals_row_pnl; give the template the SAME
+        # number so a row can never disagree with the total above it.
+        r["row_pnl"], r["row_pnl_realized"] = _actuals_row_pnl(r)
 
         # Single source of truth for spot on an OPEN row. assignment_risk
         # quotes each position's own underlying every run; last_track carries
