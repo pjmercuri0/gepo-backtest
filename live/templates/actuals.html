@@ -165,13 +165,17 @@
           {% else %}
             <td>—</td>
           {% endif %}
-          {% if outcome_row and outcome_row.pnl_per_contract is defined %}
-            {% set pnl = outcome_row.actual_pnl_per_contract if outcome_row.actual_pnl_per_contract is defined else outcome_row.pnl_per_contract %}
-            <td class="fw {% if pnl > 0 %}pos{% elif pnl < 0 %}neg{% endif %}" style="text-align:right">${{ "%+.0f"|format(pnl|rd) }}</td>
-          {% elif p.pnl is defined and p.pnl is not none %}
-            <td class="{% if p.pnl > 0 %}pos{% elif p.pnl < 0 %}neg{% endif %}" style="text-align:right">${{ "%.0f"|format(p.pnl|rd) }}</td>
-          {% elif last_track and last_track.unrealized_pnl_per_contract is defined and last_track.unrealized_pnl_per_contract is not none %}
-            <td class="{% if last_track.unrealized_pnl_per_contract > 0 %}pos{% elif last_track.unrealized_pnl_per_contract < 0 %}neg{% endif %}" style="text-align:right">${{ "%+.0f"|format(last_track.unrealized_pnl_per_contract|rd) }}</td>
+          {# One source of truth: row.row_pnl is _actuals_row_pnl, the same
+             function the card header sums. The old chain ended at
+             last_track.unrealized_pnl_per_contract, which the tracker computes
+             against the MODELLED entry (0.80 x mid) rather than the fill you
+             recorded — so on 2026-09-08 the Sep 11 card read -49 while its
+             three rows showed -11 / +2 / +24, and ABT and ISRG rendered as
+             winners when both were losses. #}
+          {% if row.row_pnl is not none %}
+            <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}"
+                style="text-align:right"
+                title="{{ 'realized' if row.row_pnl_realized else 'marked' }}{% if p.actual_credit is not none %} against your fill {{ p.actual_credit }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
           {% else %}
             <td style="text-align:right">—</td>
           {% endif %}
