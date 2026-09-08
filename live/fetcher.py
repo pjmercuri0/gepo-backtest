@@ -104,6 +104,14 @@ def _contract_to_payload(c: Option) -> dict:
     }
 
 
+def _quote_exchange() -> str:
+    """Exchange for single-leg option QUOTES (execution is unaffected).
+
+    See live_config.LIVE_QUOTE_EXCHANGE. Defaults to SMART.
+    """
+    return getattr(live_config, "LIVE_QUOTE_EXCHANGE", "SMART") or "SMART"
+
+
 def _payload_to_contract(d: dict) -> Option:
     c = Option(
         d["symbol"],
@@ -397,7 +405,7 @@ async def _qualify_options_for(
                                   idx_spec["exchange"],
                                   tradingClass=idx_spec["trading_class"]))
         else:
-            missing.append(Option(symbol, exp, k, right, "SMART"))
+            missing.append(Option(symbol, exp, k, right, _quote_exchange()))
 
     if missing:
         try:
@@ -405,6 +413,27 @@ async def _qualify_options_for(
         except Exception as e:
             print(f"  [{symbol}] qualifyContracts(options) failed: {e}", flush=True)
             qualified_missing = []
+        # A pinned quote venue does not list every contract. Anything it could
+        # not qualify is retried on SMART rather than silently dropped — losing
+        # the quote entirely is far worse than quoting it off the consolidated
+        # book. No-op while LIVE_QUOTE_EXCHANGE is SMART.
+        if _quote_exchange() != "SMART":
+            got = {(c.lastTradeDateOrContractMonth, float(c.strike), c.right)
+                   for c in qualified_missing if c.conId}
+            retry = [Option(m.symbol, m.lastTradeDateOrContractMonth,
+                            float(m.strike), m.right, "SMART")
+                     for m in missing
+                     if (m.lastTradeDateOrContractMonth, float(m.strike), m.right) not in got
+                     and not getattr(m, "tradingClass", "")]
+            if retry:
+                try:
+                    extra = await ib.qualifyContractsAsync(*retry)
+                    qualified_missing = list(qualified_missing) + [c for c in extra if c.conId]
+                    print(f"  [{symbol}] {len(retry)} contract(s) not on "
+                          f"{_quote_exchange()}; {len([c for c in extra if c.conId])} "
+                          f"recovered on SMART", flush=True)
+                except Exception as e:
+                    print(f"  [{symbol}] SMART fallback failed: {e}", flush=True)
         changed = False
         for c in qualified_missing:
             if not c.conId:

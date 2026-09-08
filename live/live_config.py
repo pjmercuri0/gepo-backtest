@@ -150,6 +150,20 @@ LIVE_CREDIT_SCALE = 1.0
 # scored 0.620 credit off a 50-lot 1.68 offer sitting against a 994-lot 0.41
 # bid, and ranked #1 on a 1.63 credit ratio. IBKR's combo book was -0.91/-0.06,
 # i.e. 0.06 actually openable. See live/combo_quotes.py.
+# Exchange used when QUOTING single-leg equity options. Execution is separate
+# and unaffected — this only sets the contract's exchange field for market data.
+#
+# "SMART" is the default and is what was measured best on 2026-09-08 during
+# market hours. Naming CBOE, PHLX or AMEX returned quotes byte-identical to
+# SMART on every contract tested, so those are no-ops. ISE differed on 2 of 4
+# and was WIDER both times — KO 100P 11.25/12.80 against SMART's 11.45/12.60,
+# HD 355P 35.95/39.40 against 36.15/39.20. A single venue is inside-or-worse
+# than the consolidated book, and the loss lands on the wide names that matter.
+#
+# Set a venue here to pin quotes to it. Contracts that venue does not list fall
+# back to SMART rather than losing their quote entirely.
+LIVE_QUOTE_EXCHANGE = "SMART"
+
 LIVE_COMBO_ENABLED   = True    # verified live 2026-09-01
 LIVE_COMBO_CLIENT_ID = 110     # avoid 100-109 (fetchers), 11 (default), 12 (SPY)
 LIVE_COMBO_TIMEOUT   = 60      # wall-clock budget for the whole combo pass
