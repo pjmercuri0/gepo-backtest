@@ -162,7 +162,7 @@ LIVE_CREDIT_SCALE = 1.0
 #
 # Set a venue here to pin quotes to it. Contracts that venue does not list fall
 # back to SMART rather than losing their quote entirely.
-LIVE_QUOTE_EXCHANGE = "SMART"
+LIVE_QUOTE_EXCHANGE = "ISE"
 
 LIVE_COMBO_ENABLED   = True    # verified live 2026-09-01
 LIVE_COMBO_CLIENT_ID = 110     # avoid 100-109 (fetchers), 11 (default), 12 (SPY)
