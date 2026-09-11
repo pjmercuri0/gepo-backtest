@@ -240,24 +240,26 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
                                  and extrinsic is None)
         extrinsic_watch = bool(itm_by is not None and itm_by > 0
                                and (extrinsic is None or extrinsic < watch_floor))
-        if extrinsic_watch:
-            reasons.append(
-                "assignment risk: extrinsic "
-                + ("UNKNOWN (parity leg not quoting)" if extrinsic is None
-                   else f"{extrinsic:.3f} < {watch_floor:.2f}")
-                + f" on a short leg {itm_by:.2f} ITM")
+        # Extrinsic collapse is RECORDED, not warned on (2026-09-11). It fired
+        # on every spread that had run deep ITM — which is where the Ext column
+        # already shows it and where the P&L already says so — and on a book
+        # closed every Friday afternoon it never became an action. The Ext
+        # column keeps the number; it simply no longer raises anything.
         reasons_watch = None
         # Pin zone only bites at SETTLEMENT. Sitting between the strikes on a
         # Wednesday is just where the stock happens to be — it carries no
         # assignment consequence until expiry, and flagging it early trains you
         # to ignore the flag. Early exercise, by contrast, can happen any day.
-        # Pin is RECORDED, not alerted (2026-09-04). It only bites at
-        # settlement and the book is closed every Friday afternoon before that,
-        # so it cannot materialise — alerting on it is a push about something
-        # already scheduled to be dealt with. in_pin_zone / pin_live still
-        # travel in the payload; they simply no longer enter `reasons`, which
-        # is what sets at_risk and therefore what fires Telegram.
+        # PIN is the warning (2026-09-11). It is the only configuration that
+        # delivers real shares: short assigned, long expires worthless. Flagged
+        # whenever spot is inside the strikes, not only on expiry day — sitting
+        # in the zone on a Wednesday is the advance notice that matters when
+        # the plan is to close before settlement.
         is_expiry_day = p["expiry"] == date.today().isoformat()
+        if in_pin:
+            reasons.append(
+                f"pin risk: spot {spot:.2f} inside {lo:.2f}-{hi:.2f}"
+                + (" (EXPIRY TODAY)" if is_expiry_day else ""))
 
         results.append({
             **p,
@@ -273,8 +275,7 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
             "pin_live": bool(in_pin and is_expiry_day),
             # Tag ONLY on a real flag. extrinsic_watch is recorded for the Ext
             # column but never labels a row.
-            "tag": ("PIN" if (in_pin and is_expiry_day) else
-                    "EXERCISE" if reasons else ""),
+            "tag": "PIN" if in_pin else ("EXERCISE" if reasons else ""),
             "pin_zone": [lo, hi],
             "exercise_benefit": None if benefit is None else round(benefit, 4),
             "benefit_basis": basis,
@@ -300,6 +301,7 @@ def _exercise_benefit(p: dict) -> tuple:
     expiry. Returns (None, reason) when it cannot be determined.
     """
     exp = p["expiry"]
+    today_iso = date.today().isoformat()
     if p["spread_type"] == "bear_call":
         try:
             import csv as _csv
@@ -311,7 +313,13 @@ def _exercise_benefit(p: dict) -> tuple:
                     continue
                 dt = (row.get("ExDividendDate") or "").strip()
                 amt = (row.get("Amount") or "").strip()
-                if dt and dt <= exp and amt:
+                # Must be IN FRONT of us. Only "dt <= exp" was tested, so a
+                # dividend that had already gone ex still counted as a benefit
+                # — GM on 2026-09-11 reported 0.18 from an ex-date of
+                # 2026-09-04, a week past, and tripped channel 1 on a benefit
+                # nobody could capture. You cannot exercise today to collect a
+                # dividend that paid last week.
+                if dt and today_iso <= dt <= exp and amt:
                     v = float(amt)
                     best = v if best is None else max(best, v)
             return (best or 0.0, f"dividend before {exp}")
