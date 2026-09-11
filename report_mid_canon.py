@@ -1,13 +1,16 @@
 """Generate backtest_equity.json + oot_equity.json under the mid-basis canon
-(2026-06-10): selection on raw combo mid, k=10, thr=0.07, fills 0.80 x mid.
+(2026-06-10): selection on raw combo mid, k=10, thr=0.05, fills 0.80 x mid.
+Canon short leg switched to 20-delta (band 0.10-0.30) on 2026-09-11.
 
-Reads the sweep caches (output/sweep_midmkt_*.parquet — already scored and
-realized at all fill fractions, partial-WIN haircut applied) so no rescoring
-is needed. Payload structure mirrors report_three_sizings.py exactly
+Reads the delta-20 sweep caches (output/sweep_delta20_*.parquet — scored and
+realized, partial-WIN haircut applied). If a cache lacks the pnl_80 column it
+is computed here from net_credit/width/expiry_close so either cache schema
+works. Payload structure mirrors report_three_sizings.py exactly
 (summary/points/weeks/trades + qty1/strategy/sixteenk/spy variants).
 """
 import math, json, os
 import numpy as np, pandas as pd
+import config as bt_config
 
 K_VAL = 10.0
 THR = 0.05
@@ -15,7 +18,34 @@ FILL_FRAC = 0.80
 PNL_COL = 'pnl_80'
 START_BANKROLL = 10_000.0
 SPY_CSV = 'data/spy_us_d.csv'
+# Short-leg delta, read live from config.py so the params header can never
+# drift from the actual selection param (canon switched to 0.20 on 2026-09-11).
+DELTA_LABEL = (f'{bt_config.DELTA_TARGET:g}Δ short leg '
+               f'(band {bt_config.DELTA_MIN:g}–{bt_config.DELTA_MAX:g})')
 DOW_LONG = {0:'Mon',1:'Tue',2:'Wed',3:'Thu',4:'Fri'}
+
+
+def _compute_pnl80(sel):
+    """Piecewise bull-put/bear-call payoff at FILL_FRAC x mid, per contract,
+    with the canon partial-WIN 50% intrinsic haircut. Mirrors
+    backtest_midsel_sweep / spreads.calc_pnl exactly so a cache without a
+    precomputed pnl_80 column yields identical numbers."""
+    credit = sel['net_credit'] * FILL_FRAC
+    ml = sel['width'] - credit
+
+    def _one(r):
+        sp, ss, ls = r['expiry_close'], r['short_strike'], r['long_strike']
+        c, m = credit.loc[r.name], ml.loc[r.name]
+        if r['spread_type'] == 'bull_put':
+            pnl = c if sp >= ss else (-m if sp <= ls else c - (ss - sp))
+        else:
+            pnl = c if sp <= ss else (-m if sp >= ls else c - (sp - ss))
+        return pnl * 100
+
+    pnl = sel.apply(_one, axis=1)
+    mask = (sel['_outcome'] == 'PARTIAL') & (pnl > 0)
+    pnl[mask] *= 0.5
+    return pnl
 
 
 def select_picks(cache_path):
@@ -33,7 +63,7 @@ def select_picks(cache_path):
            .groupby('entry_date').head(5)).copy()
     sel['credit'] = (sel['net_credit'] * FILL_FRAC).round(4)
     sel['max_loss_adj'] = (sel['width'] - sel['credit']).round(4)
-    sel['pnl_per_contract'] = sel[PNL_COL]
+    sel['pnl_per_contract'] = sel[PNL_COL] if PNL_COL in sel.columns else _compute_pnl80(sel)
     sel['max_loss_dollar'] = sel['max_loss_adj'] * 100
     sel['realize_date'] = pd.to_datetime(sel['expiry_date'])
     sel['entry_date_dt'] = sel['entry_date']
@@ -189,6 +219,7 @@ def build_payload(picks, end_year, label):
             'days':       'Mon, Tue, Wed, Thu',
             'expiry':     'Friday (DTE 1-4)',
             'selection':  f'top-5 per day, k={K_VAL:g}, GROUND threshold {THR:g} (all days)',
+            'delta':      DELTA_LABEL,
             'scoring':    'G_rv: RV-implied N(d2) probs in G; rv_vs_iv DKL (BS d2, 10d RV vs IV); raw combo MID credit (canon 2026-06-10)',
             'fill_basis': f'{FILL_FRAC:.2f}\u00d7mid (real fills ~0.82\u00d7mid, n=5); partial-WIN at 50% intrinsic',
             'regime':     'OFF (both directions eligible)',
@@ -209,13 +240,13 @@ def build_payload(picks, end_year, label):
 
 
 if __name__ == '__main__':
-    bt = select_picks('output/sweep_midmkt_v2_2020_25.parquet')
+    bt = select_picks('output/sweep_delta20_2020_25.parquet')
     payload = build_payload(bt, 2025, 'backtest 2020-25')
     with open('live/data/backtest_equity.json', 'w') as f:
         json.dump(payload, f, indent=2)
     print('Wrote live/data/backtest_equity.json')
 
-    oot = select_picks('output/sweep_midmkt_v2_oot2026.parquet')
+    oot = select_picks('output/sweep_delta20_oot2026.parquet')
     payload = build_payload(oot, 2026, 'OOT 2026')
     with open('live/data/oot_equity.json', 'w') as f:
         json.dump(payload, f, indent=2)

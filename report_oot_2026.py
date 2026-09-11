@@ -553,6 +553,9 @@ payload = {
         'days':       'Mon, Tue, Wed, Thu',
         'expiry':     'Friday (DTE 1-4)',
         'selection':  f'top-5 per day, k={K_VAL:g}, GROUND threshold {bt_config.GROUND_THRESHOLD:g} (all days) — FROZEN canon, no 2026 tuning',
+        # Short-leg delta read live from config.py so the header can't drift
+        # from the actual selection param (canon switched to 0.20 on 2026-09-11).
+        'delta':      f'{bt_config.DELTA_TARGET:g}Δ short leg (band {bt_config.DELTA_MIN:g}–{bt_config.DELTA_MAX:g})',
         'scoring':    'G_rv: RV-implied N(d2) probs in G (canon 2026-06-09); rv_vs_iv DKL (BS d2, 10d RV vs IV); clamped LAST credit',
         'fill_basis': '0.80×clamped LAST (20% haircut); partial-WIN at 50% intrinsic (pin-risk realistic)',
         'regime':     'OFF (both directions eligible)',
