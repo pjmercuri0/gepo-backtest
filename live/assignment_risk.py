@@ -155,7 +155,14 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
 
         ss, ls = p["short_strike"], p["long_strike"]
         lo, hi = min(ss, ls), max(ss, ls)
-        in_pin = spot is not None and spot == spot and lo < spot < hi
+        # INCLUSIVE of both strikes. A strict "lo < spot < hi" called KO safe on
+        # 2026-09-11 with spot exactly 88.00 against a 87/88 zone, and the
+        # long-strike end is worse: settling exactly AT the long strike leaves
+        # the short assigned while the long sits exactly ATM, misses the $0.01
+        # auto-exercise threshold, expires worthless, and delivers shares. The
+        # short-strike end is one cent from the same outcome. A boundary is
+        # where a risk monitor should fail closed, not open.
+        in_pin = spot is not None and spot == spot and lo <= spot <= hi
 
         if spot is not None and spot == spot:
             itm_by = (ss - spot) if p["spread_type"] == "bull_put" else (spot - ss)
