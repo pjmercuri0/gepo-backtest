@@ -1,6 +1,6 @@
-# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane)
+# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew)
 
-**Last updated:** 2026-09-03 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, and §0.16 for the isolated European index option lane. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, or §0.16 explicitly carries them forward.
+**Last updated:** 2026-09-11 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, and **§0.19 for IV skew, which is the open research task.** Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16 or §0.18 explicitly carries them forward.
 
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
@@ -13,6 +13,14 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
 - The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
+- **The open research task is §0.19: IV skew as a directional feature.** It is measured
+  and significant on 2026 OOT and NOT yet validated on 2020-2025. Nothing in canon uses it.
+- Assignment/pin monitoring was rebuilt on 2026-09-11 (§0.18). The Actuals tab shows ONE
+  warning colour: yellow = pin risk. Extrinsic collapse is displayed in the Ext column but
+  no longer warns. Telegram fires once per option per expiry.
+- `live_config.LIVE_QUOTE_EXCHANGE = "ISE"` pins single-leg option QUOTES to ISE.
+  Execution is unaffected and still SMART. Measured cost: ISE is wider than SMART on some
+  names. Revert is one line.
 - The European index option research lane is isolated. It writes parquets only under `output/euro_parquets/` and web payloads under `live/data/euro/`; do not add euro-only roots to `SP100_TICKERS` unless intentionally changing live production scans.
 - Before editing on either computer, follow the Git workflow below: inspect status, fetch, and fast-forward. If anything is dirty, ahead, behind in both directions, or divergent, stop and explain it instead of modifying history.
 - At the end of work, test, commit relevant source files, push directly to `origin/main`, and verify synchronization. Never force-push `main`.
@@ -125,10 +133,13 @@ Still operationally relevant:
 
 ---
 
-## 0.16 European index options + the vendor re-download (2026-09-03) — NEXT TASK
+## 0.16 European index options + the vendor re-download (2026-09-03) — BACKGROUND, superseded by §0.17
 
-**This is the open work item.** Everything below is state as of 2026-09-03; nothing
-here is done except where marked DONE.
+**No longer the open work item** — §0.19 (IV skew) is. Everything below is state
+as of 2026-09-03 and is superseded by §0.17 where they differ; nothing here is
+done except where marked DONE. Retained because the product research (which
+roots are European, which are AM-settled, what the vendor carries) is still the
+reference for the euro lane.
 
 ### Why
 
@@ -395,6 +406,263 @@ k=10 / thr=0.05, on `euro_pool_v2`:
   Use `--dte-min 0 --dte-max 4000`.
 - `build_euro_pool.py`: drops non-positive IV from both the pool and the IV-rank
   seed (see finding 2).
+
+---
+
+## 0.19 IV skew as a directional feature (2026-09-11) — **OPEN RESEARCH TASK**
+
+**This is the open research item.** Measured, significant on one year, NOT
+validated out of sample. Nothing in canon uses it. Do not enable it live.
+
+### Why
+
+GEPO has no directional signal. `GROUND = g − k·DKL` is a volatility score, so
+whether a day's book ends up bullish or bearish is a side effect of which
+candidate ranked higher. The euro lane showed what that costs: the same SPXW
+`bear_call` rule won 58% in 2025 and 34% in 2024, and pooled to exactly 50%
+over three years — a 50-delta short with no directional information in it.
+
+### The feature
+
+25-delta risk reversal, per (Symbol, DataDate):
+
+    skew = median IV(puts  |delta| 0.20-0.30)
+         − median IV(calls |delta| 0.20-0.30)
+
+Positive = puts richer than calls = the market is paying for downside.
+A **band** median, not the single nearest strike — matching one strike lets
+vendor IV outliers through and produced skews of ±9 before filtering.
+
+Computable from data already fetched: every scan pulls both rights across the
+chain, and `master_pool.parquet` carries `ImpliedVolatility`, `abs_delta` and
+`putcall_norm`, so this is available back to 2020 with no new download.
+
+### Result on 2026 OOT — the only test run so far
+
+Built every candidate the OOT scorer would see (17,736), realized them, joined
+skew. **Deliberately unconditioned**: no GROUND scoring, no top-5 selection, so
+the sample is not already filtered by the signal skew is meant to add to.
+13,399 realized and skew-matched (76% coverage).
+
+Quintiled by skew, Q5 (high) minus Q1 (low):
+
+| | P&L/contract | t | breach rate | t |
+|---|---|---|---|---|
+| bull_put  | **−10.47** | **−2.64** | +2.87pp (48.6→51.5) | +1.43 |
+| bear_call | **+9.05**  | **+2.53** | **−4.54pp** (53.3→48.8) | **−2.44** |
+
+Both P&L gradients significant, and **they point opposite ways**, which is what
+they must do if skew carries directional information. Read as one story: high
+skew predicts a DOWN move, so short puts get breached more and short calls
+less. Two samples, opposite signs, same underlying claim — harder to get by
+chance than either gradient alone.
+
+### What is NOT established
+
+- **One year only.** The euro lane looked exactly this convincing on 2025
+  (+114%) and collapsed to a 50% win rate once 2024 and 2023 were added. Treat
+  2026-only significance as a hypothesis.
+- **No incremental lift measured.** Every skew bucket has NEGATIVE mean P&L
+  (−7 to −22) because this is the whole candidate universe, not GROUND's
+  selection. The open question is whether skew adds anything ON TOP of GROUND
+  or merely re-expresses what GROUND already extracts from IV. A hint on the
+  182 GROUND-selected picks that matched a skew: `bear_call` win rate ran
+  67% / 56% / 54% across skew terciles — n=39 per bucket, suggestive only.
+
+### Next steps, in this order
+
+1. **Recompute skew from `master_pool.parquet` for 2020-2025** and re-run the
+   quintile test. If the gradient does not survive, stop here.
+2. **Measure incremental lift**, not raw predictive power: score candidates
+   with GROUND, then bucket the QUALIFYING picks by skew. That is the only test
+   that answers "does this improve GEPO".
+3. Only then consider wiring it in — as a sixth bucket dimension on the
+   empirical pool (`skew_rank_bucket`, ranked per ticker against its own
+   trailing history exactly like `iv_rank_bucket`), so `p` becomes
+   `P(breach | delta, IV, DTE, iv_rank, skew_rank)`.
+
+### Do not
+
+- Do NOT build a separate directional model and multiply its probability into
+  the ranking. GEPO's `p, q, ro` from `historical_probs.empirical_lookup_probs`
+  ALREADY estimate `P(short leg breached)`. Multiplying two probabilities each
+  fitted on the same outcome double-counts and will flatter in sample.
+- Do NOT skip the IV hygiene. The vendor IV column is badly contaminated: at
+  DTE 3-7 the 99th percentile is 4.22 and the max is 51.0. Unfiltered, the
+  extremes are nonsense (KHC puts at 180% vol against 26% calls). The euro lane
+  filters non-positive IV in `build_euro_pool.py`; **the SP100 production pool
+  does not**, and the equity data is worse — 14.1% of rows have IV <= 0 against
+  the euro lane's 12.8%.
+- Do NOT expect a sixth bucket dimension to be free.
+  `empirical_runner.build_window_tables` already raises
+  `ValueError: Bin edges must be unique` when a dimension degenerates; more
+  dimensions thin every cell. Expect to need fewer skew buckets (3, not 5).
+
+### Adjacent finding — `DELTA_TARGET` has never been swept
+
+`config.DELTA_TARGET = 0.50` is inherited from the source paper ("closest to
+but not exceeding 0.50") and there is **no delta sweep among the ~40 backtest
+scripts in the repo**. At 0.50 every short leg is at the money: maximum
+premium, maximum pin exposure, and a structural ~50% win rate. This is a
+first-order untested parameter and arguably a larger lever than any directional
+feature, because it changes pin risk, win rate and the direction problem at
+once. Worth sweeping before or alongside skew.
+
+---
+
+## 0.18 Assignment monitor + Actuals rebuild (2026-09-11) — CURRENT STATE
+
+Live-ops session. No canon or strategy change. All of it is detection and
+display; `live/assignment_risk.py` never places or closes an order.
+
+### Assignment monitoring — the rule now
+
+ONE warning: **pin risk**, rendered yellow on the Actuals tab.
+
+    pin = short leg ITM AND long leg OTM, i.e. spot INSIDE the strikes
+
+That is the only configuration that delivers real shares — the short is
+assigned and the long expires worthless. Both legs ITM is NOT this case: they
+exercise against each other and settle to cash.
+
+Fixes behind that one line, each of which was a live false positive or miss:
+
+- **The pin test is INCLUSIVE of both strikes** (`lo <= spot <= hi`). A strict
+  test called KO safe on 2026-09-11 with spot exactly 88.00 against an 87/88
+  zone. The long-strike end is the expensive one: settling exactly AT the long
+  strike leaves the short assigned while the long sits ATM, misses the $0.01
+  auto-exercise threshold and expires worthless — a full delivery the strict
+  test reported as clear.
+- **The legacy expiry-day flag now requires the long leg OTM too.** It tested
+  "expiry day AND short leg ITM", was dormant every other day, and on
+  2026-09-04 lit up SBUX, AMGN and DE — all 0.2 to 43 points THROUGH their long
+  strike and settling cleanly to cash — while HD, the only genuinely pinned
+  position, was one of several flagged identically.
+- **A past dividend is not a benefit.** `_exercise_benefit` tested only
+  `dt <= exp` and never checked the ex-date was still ahead, so GM on
+  2026-09-11 reported 0.18 from an ex-date of 2026-09-04 and tripped channel 1
+  on a benefit nobody could capture. Now requires `today <= ex_date <= expiry`.
+- **Extrinsic fails CLOSED when unquotable.** `extrinsic` comes from the parity
+  leg, which is deep OTM exactly when the short leg is deep ITM — so it stops
+  quoting precisely when the position is most exposed. Requiring
+  `extrinsic is not None` cleared the flag on DE at 49.93 ITM, $69,861
+  notional, with no warning at all.
+
+### Removed deliberately
+
+- **Channel 2 ("bid < intrinsic")** is gone. It is algebraically identical to
+  `extrinsic < half the bid-ask spread` — verified 6/6 against the live book —
+  so its threshold was never a chosen constant, it floated with market width.
+  DE got a 3.45 threshold and PEP 0.17. It fired on PEP whose own mid (0.83)
+  sat BELOW its own intrinsic (1.00), an impossible quote, and missed DIS at
+  0.08 extrinsic with a tight book.
+- **Extrinsic collapse no longer warns.** It fired on every spread that had run
+  deep ITM — which the Ext column and the P&L column already say — and on a
+  book closed every Friday afternoon it never became an action. The value is
+  still computed and still displayed.
+
+### Telegram alerts
+
+`notify_watcher.sh` on Mya de-dups on FILENAME (`grep -qxF "$fname" .processed`),
+so the old one-file-per-day payload notified at most once per day: whatever the
+09:30 scan happened to say, almost always "no assignment risk". Split in two:
+
+- `assignment_risk_<date>.json` — state for the webapp, rewritten in place,
+  deliberately carries **no `message` key** so the watcher skips it silently.
+- `assignment_alert_<date>_<HHMMSS>.json` — one per firing, uniquely named,
+  `message` present. A new filename is never in `.processed`, so it always
+  sends.
+
+Fires **once per option per expiry**. The ledger
+(`.assignment_alerted.json`) is keyed `ticker|spread_type|short_strike|expiry`
+and pruned by expiry, so it self-cleans weekly. Message is a header plus one
+line per option.
+
+### Actuals tab
+
+- **Row P&L is now the number the card header sums.** They used different
+  sources: the header priced against `actual_credit` (your recorded fill), the
+  rows against the MODELLED 0.80×mid entry. On 2026-09-08 the Sep 11 card read
+  −49 while its rows showed −11/+2/+24, and ABT and ISRG rendered as WINNERS
+  when both were losses. The error always flattered — a worse-than-modelled
+  fill was invisible.
+- **Spot is the freshly-quoted price**, not the last scan's. The scan fetches a
+  strike band around current spot, so a position drops out of tracking exactly
+  when it moves deep ITM. `assignment_risk` quotes each position's own
+  underlying every run. The /actuals route overwrites `last_track` and
+  recomputes `live_status` from it, so Spot, Status and the week totals cannot
+  drift apart.
+- **Ext column** added beside Mark. The two fail in opposite directions: Mark
+  goes blank when a position moves deep ITM (DE had `current_mark: None`),
+  which is when Ext is most informative. `n/a` in red means the parity leg is
+  not quoting.
+- **The page no longer goes blank at midnight.** `_assignment_lookup` read
+  strictly today's payload, so from 00:00 until the first scan the page lost
+  every colour AND fell back to a stale spot. Now falls back to the most recent
+  payload within `ASSIGN_MAX_AGE_H = 18`.
+- **`_actuals_rows` MERGES the source pick** instead of replacing it.
+  `pick = _json_clone(fresh)` discarded fields the narrower source lacked.
+- History tab: assignment highlight removed entirely. Live risk belongs on
+  Actuals, the only tab that tracks holdings.
+
+### Snapshot picks lost their deltas — fixed and backfilled
+
+`snapshot_picks.PICK_FIELDS` was a 14-field allowlist, so a pick copied into
+Actuals from the Snapshots tab arrived with **no `short_delta` at all** — the
+key absent, not null. All 8 positions open on 2026-09-04 came in that way and
+the column rendered "—" permanently.
+
+- Forward: `PICK_FIELDS` gains `short_delta`, `long_delta`, `IV`, `long_IV`,
+  `short_bid/ask`, `long_bid/ask`, `short_oi`, `long_oi`. Deliberately NOT the
+  `combo_*` book or the probability internals — `intraday_picks/` holds every
+  scan of every day.
+- Backfill: `live/backfill_actuals_fields.py`. The values survive in
+  `live/ranked/<date>_<hhmm>.json`, and each Actuals trade records the source
+  date and hhmm. Searches exact-scan first, then same-day NEAREST-scan — delta
+  drifts intraday, and ordering by proximity moved HD from 0.4453 to the
+  correct 0.4738. Dry run by default, `--apply` to write, backs up
+  `actuals.json` first. 10/10 resolved.
+
+### Quote exchange
+
+`live_config.LIVE_QUOTE_EXCHANGE` added and set to **"ISE"** at user direction.
+Quotes only; execution is unaffected and still SMART.
+
+Measured live 2026-09-08: CBOE, PHLX and AMEX return quotes byte-identical to
+SMART (no-ops). ISE differed on 2 of 4 deep-ITM contracts and was WIDER both
+times — KO 100P 11.25/12.80 against SMART's 11.45/12.60. Coverage is fine: 53
+of 54 real chain strikes qualify on ISE, and the one miss fails on SMART too.
+Anything ISE cannot qualify is retried on SMART and logged, so a venue gap
+costs a wider quote rather than losing the contract from the scan.
+
+### Euro lane additions (2026-09-03/04)
+
+- `build_euro_rv_table.py` (NEW) — derives the euro RV table from the
+  `UnderlyingPrice` retained in the euro parquets, reusing
+  `rv_table.compute_rv_table`. Reproduces production to 9.9e-16 on SPXW.
+  Without it SPX/NDX/RUT score nothing, since `output/rv_table.parquet` only
+  ever covered `SP100_TICKERS`.
+- `config.EURO_BAD_SPOT_DAYS` + `drop_bad_spot_days()` — purely additive.
+  `Greek_20250924_OData2.csv` stamps RUT and RUTW with the SPX spot
+  (6637.97 vs SPX's 6637.9702) on a day the Russell traded near 2,400,
+  inflating RUT RV from 0.237 to 0.785. Filtered on read; raw CSVs and year
+  parquets untouched. 2023 and 2024 scanned and clean — this is the only bad
+  day in three years.
+- **`output/rv_table.parquet` still carries the same bad RUTW values**, and
+  RUTW is in `SP100_TICKERS`, so live scans score it on corrupted RV.
+  Deliberately untouched — production data, separate change. STILL OPEN.
+- `build_euro_pool.py` / `report_euro_backtest.py` gained `--dte-min/--dte-max`,
+  `--min-oi`, `--max-max-loss`, `--entry-dows`, `--rv-table`.
+  **`historical_probs` matches DTE exactly**, so a pool built at 1-4 silently
+  drops every DTE 5+ candidate at the GROUND stage rather than erroring.
+- 2023, 2024 and 2025 euro parquets are built. Tuning universe/OI/entry
+  days/DTE against 2025 alone reached +114%; adding 2024 and 2023 took SPXW to
+  a 50% win rate over 157 trades, and at MID pricing the three-year book is
+  −$7,534 because credits book +$0.683/share above mid under
+  `CREDIT_BASIS="last_clamped"`. **The fill basis, not the selection, carried
+  the apparent edge.**
+
+---
 
 ---
 
