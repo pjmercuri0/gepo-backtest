@@ -7,7 +7,7 @@
   {% set c = data.config %}
 
   <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">GEPO 2026 Out-of-Time</h1>
-  <div class="subtitle">Frozen canon (adopted 2026-06-10 on 2020-25 data) applied to 2026 — zero 2026 tuning · G_rv · rv_vs_iv DKL · raw-mid credit · k=10 · thr=0.05 · fills 0.80×mid · top-5/day · qty=2</div>
+  <div class="subtitle">Frozen canon applied to 2026 — zero 2026 tuning · G_rv · rv_vs_iv DKL · clamped-LAST credit · k=10 · thr=0.05 · 20Δ short leg · fills 0.80×LAST · top-5/day · qty=2</div>
 
   <div class="params-row">
     <span class="chip"><span class="chip-k">range</span><span class="chip-v">{{ s.window_start }} → {{ s.window_end }}</span></span>
@@ -17,6 +17,7 @@
     <span class="chip"><span class="chip-k">universe</span><span class="chip-v">{{ c.universe }}</span></span>
     <span class="chip"><span class="chip-k">days</span><span class="chip-v">{{ c.days }}</span></span>
     <span class="chip"><span class="chip-k">expiry</span><span class="chip-v">{{ c.expiry }}</span></span>
+    <span class="chip"><span class="chip-k">delta</span><span class="chip-v">{{ c.delta }}</span></span>
     <span class="chip"><span class="chip-k">selection</span><span class="chip-v">{{ c.selection }}</span></span>
     <span class="chip"><span class="chip-k">fill</span><span class="chip-v">{{ c.fill_basis }}</span></span>
     <span class="chip"><span class="chip-k">regime</span><span class="chip-v">{{ c.regime }}</span></span>
