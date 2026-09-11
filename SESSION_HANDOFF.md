@@ -1,6 +1,6 @@
-# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew)
+# GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-11 EDT. Strategy canon unchanged since 2026-06-12 (k=10, thr=0.05 — §0). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, and **§0.19 for IV skew, which is the open research task.** Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16 or §0.18 explicitly carries them forward.
+**Last updated:** 2026-09-11 EDT. Current production canon is k=10, GROUND threshold 0.05, and short-leg delta target 0.20 with eligible band 0.10-0.30 (§0.20). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
@@ -9,6 +9,7 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - GitHub `origin/main` is the source of truth. At this update, the MacBook and Mac mini histories have been fully reconciled and pushed; there are no seven-commit or eleven-commit transfers left to perform.
 - GitHub SSH authentication works on both machines. Any later statement that GitHub authentication is broken, a token must be fixed, or commits still need to be transferred is historical and obsolete.
 - The Mac mini at `/Users/securio/Downloads/gepo-backtest` is the production runner. The MacBook is the development machine.
+- Production strategy canon now uses `DELTA_TARGET=0.20`, `DELTA_MIN=0.10`, `DELTA_MAX=0.30`, `DKL_K=10`, and `GROUND_THRESHOLD=0.05`.
 - The web app has an `actuals` tab for manually tracked real trades. It is populated only by pressing `+` on History or Snapshots rows; it does not place trades and does not require IBKR API write access.
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
@@ -28,6 +29,32 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - **Do not delete `data/DG_2025*/` (59.1 GB raw vendor data) yet.** The 2025 euro parquets are built, but a RUT/RUTW `UnderlyingPrice` anomaly is unresolved and may need the original CSVs to diagnose — see §0.17.
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **The open work item is §0.16 — European index options and the vendor re-download; §0.17 is the current status of that work and supersedes §0.16 where they differ.** Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
+
+## 0.20 Delta-target canon changed to 0.20 (2026-09-11) — CURRENT STATE
+
+Production canon changed from ATM-ish 50-delta shorts to lower-delta shorts:
+
+- `DELTA_TARGET = 0.20`
+- `DELTA_MIN = 0.10`
+- `DELTA_MAX = 0.30`
+- `DKL_K = 10`
+- `GROUND_THRESHOLD = 0.05`
+- selection remains threshold-qualified top 5 per entry day
+
+Reason: the old 50-delta target created maximum pin/assignment exposure and a structural near-50% win profile. The 0.20 target materially improved win rate, drawdown, and fill-stressed results.
+
+Validation summary from the exact-equivalent candidate builder:
+
+- 2020-2025, 0.20 / 0.10-0.30 at 0.80 x mid: 1,483 trades, 90.0% win rate, +$58.9k P&L, -2.58% max drawdown, weekly Sharpe 3.55.
+- 2020-2025, old 0.50 / 0.35-0.65 at 0.80 x mid: 2,250 trades, 57.0% win rate, +$40.8k P&L, -5.82% max drawdown, weekly Sharpe 2.45.
+- 2026 OOT, 0.20 / 0.10-0.30 at 0.80 x mid: 138 trades, 93.5% win rate, +$6.1k P&L.
+- 2026 OOT, old 0.50 / 0.35-0.65 at 0.80 x mid: 182 trades, 57.7% win rate, +$3.1k P&L.
+
+Fill stress:
+
+- 2020-2025 0.20 stays positive at 0.70 x mid (+$47.9k) and 0.60 x mid (+$36.8k).
+- 2026 OOT 0.20 stays positive at 0.70 x mid (+$5.1k), 0.60 x mid (+$4.1k), and natural (+$1.5k).
+- Do not chase fills. Live orders should use disciplined limits near mid; do not treat bad fills as acceptable just because the ranker likes a spread.
 
 ## ⚠️ HARD RULE — read first
 
@@ -498,7 +525,7 @@ chance than either gradient alone.
   `ValueError: Bin edges must be unique` when a dimension degenerates; more
   dimensions thin every cell. Expect to need fewer skew buckets (3, not 5).
 
-### Adjacent finding — `DELTA_TARGET` has never been swept
+### Historical adjacent finding — `DELTA_TARGET` had not been swept
 
 `config.DELTA_TARGET = 0.50` is inherited from the source paper ("closest to
 but not exceeding 0.50") and there is **no delta sweep among the ~40 backtest
@@ -506,7 +533,8 @@ scripts in the repo**. At 0.50 every short leg is at the money: maximum
 premium, maximum pin exposure, and a structural ~50% win rate. This is a
 first-order untested parameter and arguably a larger lever than any directional
 feature, because it changes pin risk, win rate and the direction problem at
-once. Worth sweeping before or alongside skew.
+once. This was swept on 2026-09-11; §0.20 supersedes this note and makes
+0.20 / 0.10-0.30 the current canon.
 
 ---
 

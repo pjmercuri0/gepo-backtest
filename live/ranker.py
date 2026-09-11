@@ -503,6 +503,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
         "config": {
             "DTE_MIN":          dte_min,
             "DTE_MAX":          dte_max,
+            "DELTA_TARGET":     backtest_config.DELTA_TARGET,
             "DELTA_MIN":        backtest_config.DELTA_MIN,
             "DELTA_MAX":        backtest_config.DELTA_MAX,
             "MIN_CREDIT_RATIO": backtest_config.MIN_CREDIT_RATIO,

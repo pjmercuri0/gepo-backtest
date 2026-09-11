@@ -69,10 +69,12 @@ def drop_bad_spot_days(df):
     return df[mask]
 
 # ── SPREAD PARAMETERS ─────────────────────────────────────────────────────────
-# Target delta for short leg (paper uses closest to but not exceeding 0.50)
-DELTA_TARGET   = 0.50
-DELTA_MIN      = 0.35   # eligible range lower bound
-DELTA_MAX      = 0.65   # eligible range upper bound
+# Target delta for short leg. Canonical 2026-09-11: move away from ATM
+# 50-delta spreads to reduce pin/assignment exposure and improve fill-stressed
+# OOT results. Validated on 2020-25 and 2026 OOT at k=10, GROUND>=0.05.
+DELTA_TARGET   = 0.20
+DELTA_MIN      = 0.10   # eligible range lower bound
+DELTA_MAX      = 0.30   # eligible range upper bound
 
 # Days to expiry: target nearest weekly expiry (4-6 days from entry)
 DTE_MIN = 3    # minimum days to expiry
