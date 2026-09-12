@@ -14,6 +14,10 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
 - The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
+- **CURRENT SCORING CANON is §0.21 ("52:10")**: DKL = D(P_emp‖Q_iv) with outcomes
+  counted directly from realized spreads, keyed (ticker, $width) with pooled
+  fallback, 52-expiry causal window, k=10. `rv_vs_iv` is dead. The LIVE path is
+  NOT yet switched over — see the "NOT DONE" note at the end of §0.21.
 - **The open research task is §0.19: IV skew as a directional feature.** It is measured
   and significant on 2026 OOT and NOT yet validated on 2020-2025. Nothing in canon uses it.
 - Assignment/pin monitoring was rebuilt on 2026-09-11 (§0.18). The Actuals tab shows ONE
@@ -433,6 +437,101 @@ k=10 / thr=0.05, on `euro_pool_v2`:
   Use `--dte-min 0 --dte-max 4000`.
 - `build_euro_pool.py`: drops non-positive IV from both the pool and the IV-rank
   seed (see finding 2).
+
+---
+
+## 0.21 52:10 canon — DKL rebuilt on measured outcomes (2026-09-12) — CURRENT CANON
+
+**This supersedes the DKL half of canon. `rv_vs_iv` is dead.**
+
+    GROUND = (exp(G) - 1) * exp(-k * DKL),  k = 10
+    DKL    = D(P_emp || Q_iv)
+    P_emp  = WIN/LOSS/PARTIAL frequencies COUNTED from realized spreads,
+             keyed on the name's own (ticker, dollar-width) history,
+             pooled (DTE, delta, width) only as fallback
+    window = 52 weekly expiries, trailing and causal
+
+Results (delta-20, mid basis, 0.80x fill, top-5/day, thr 0.05):
+
+| | in-sample 2020-25 | 2026 OOT |
+|---|---|---|
+| qty1 final | $77,417 (+674%) | $16,254 (+62.5%) |
+| Sharpe (wk) | +3.69 | +5.82 |
+| MaxDD | -5.8% | -2.6% |
+| trades | 1,785 | 166 |
+
+Prior canon (`rv_vs_iv`, k=10, 210d) was $68,891 / Sh 3.53 / DD -2.6% in-sample.
+
+### Why rv_vs_iv was wrong at 20-delta
+
+It compared two Black-Scholes laws (RV-vol vs IV-vol) — same N(d2) both sides,
+so the divergence only re-expressed vol level. Measured consequences:
+
+- The RV-implied triple **saturated to (1,0,0) on 51% of candidates**. 10-day RV
+  fed into a 1-4 DTE BS says the strike is unreachable. That is a numerical
+  artifact, not a belief.
+- **DKL correlated POSITIVELY with P&L (+0.142)**, so `exp(-k*DKL)` was
+  penalising the VRP edge, not risk. IV exceeds RV ~96% of the time, so a large
+  unsigned divergence nearly always means "overpaid", not "dangerous".
+- The k-sweep fell monotonically in return; k>0 only ever bought drawdown.
+
+### What the fix actually changed
+
+`ro` was previously derived as `P(short ITM) - P(long ITM)` from a single-leg
+table with 0.1-wide delta buckets. At 20-delta the legs sit a median **0.089**
+delta apart — inside one bucket — so both legs returned the same p_itm and
+**ro collapsed to exactly 0 on 19.5% of candidates**; a further 7.8% of rows
+have a BACKWARDS delta gap (vendor artifact) that the clamp also sent to 0.
+Counting outcomes directly drops ro=0 to 4.9%, near the true pin rate.
+
+### Design decisions, each tested not assumed
+
+- **Long leg is NOT delta-matched.** It is whatever the ladder gives
+  ($0.50/$1/$2.50/$5). A spread is specified by short leg + width.
+- **Width bucketed by DOLLAR ladder, not % of spot.** Dollar won on Sharpe
+  (3.78 vs 3.63). Sigma-normalised (width / expected move) was worst — the
+  theoretically cleanest option lost.
+- **ticker-first, pool as backstop** (user direction): pooling for everyone
+  makes each name's estimate drift with the pool's composition rather than with
+  the name. Pool is used only where a ticker lacks data.
+- IV is NOT in the key. Spread-level samples are ~40x scarcer than leg-level.
+- Pure per-ticker CONVERGES to pooled as N grows ($72k@N=8 -> $81.8k@N=100) and
+  never beats it, i.e. no standalone name effect in breach behaviour.
+
+### KNOWN TENSION — read before extending
+
+On **2026 OOT, pooled beat ticker_w on every metric**: $16,654 / Sh 6.64 /
+DD -1.6% (k=8) against ticker_w's $16,254 / 5.82 / -2.6% (k=10). ticker_w was
+selected on in-sample drawdown, and that edge did not survive. A k=0 control
+gives Sh 5.11 / DD -4.1%, so **the DKL penalty itself validates out of sample**
+— it is the ticker-vs-pool choice that OOT contradicts, not the construction.
+ticker_w is canon by explicit user preference (estimates should not move with
+pool composition). Revisit if live behaviour disappoints.
+
+Over 200 cells were searched on one in-sample window (delta, credit gate, k, T,
+window type, N, bucket width, width definition, pooled/ticker/blend) and the
+whole band was Sharpe ~3.4-3.9. Treat single-cell margins as noise.
+
+### Files
+
+- `spread_triple.py` (NEW) — the canonical lookup. `install_window(asof)` then
+  `lookup(ticker, dte, short_delta, width)`.
+- `build_spread_outcome_table.py` (NEW) — builds `output/spread_outcomes.parquet`
+  (127,666 realized spreads, 300 expiries; WIN 83.9 / LOSS 8.37 / PARTIAL 7.73).
+- `report_52_10_canon.py` (NEW) — regenerates both webapp payloads.
+- `ground.py` — `DKL_REFERENCE = "empirical_vs_iv"`, new branch calling
+  `spread_triple`. `DKL_K = 10`.
+- `historical_probs.py` — added `DELTA_BUCKET_MULT` (default 10, unused by canon).
+- `live/templates/backtest.html`, `oot.html` — added `DKL` and `window` chips.
+
+### NOT DONE — live path still on the old window
+
+`empirical_runner.TRAIL_DAYS` is still **210 calendar days** and
+`live/ranker.py:44` still calls `install_latest_cached()`. The live scan has NOT
+been switched to `spread_triple`. Do that, with a cache key that includes the
+window spec, before relying on live scores. `output/empirical_window_cache.pkl`
+is keyed only on pool mtime + date, so a semantics change would otherwise serve
+stale tables silently. Nothing was deployed to Mya in this session.
 
 ---
 

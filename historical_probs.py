@@ -110,6 +110,10 @@ def _norm_cdf(x: float) -> float:
 # {'put': df, 'call': df} (current canonical).
 _EMPIRICAL_TABLE = None
 _EMPIRICAL_IV_BINS = None
+# Delta-bucket resolution for the empirical lookup: bucket = int(|delta| * MULT),
+# so MULT=10 gives 0.1-wide buckets (legacy), MULT=20 gives 0.05, MULT=40 gives
+# 0.025. Whoever builds the window tables MUST group by the same multiplier.
+DELTA_BUCKET_MULT = 10
 
 
 def load_empirical_table(path='output/empirical_probs.parquet',
@@ -144,7 +148,13 @@ def _lookup_p_itm_empirical(dte, abs_delta, iv, spread_type=None, iv_rank_bucket
     if tbl is None: return None
     import numpy as np
     dte_int = int(min(max(dte, 1), 4))
-    delta_bucket = int(min(max(abs_delta * 10, 0), 9))
+    # DELTA_BUCKET_MULT=10 -> 0.1-wide buckets (legacy). Finer widths let the two
+    # legs of a narrow spread land in different cells: at delta-20 the legs sit a
+    # median 0.089 delta apart, inside one 0.1 bucket, so both legs returned the
+    # SAME p_itm and ro collapsed to 0 on 19.5% of candidates. Must match the
+    # multiplier used when the window tables were grouped.
+    _m = DELTA_BUCKET_MULT
+    delta_bucket = int(min(max(abs_delta * _m, 0), _m - 1))
     iv_capped = min(iv, 3.0)
     iv_bucket = int(np.clip(np.digitize(iv_capped, _EMPIRICAL_IV_BINS) - 1, 0, len(_EMPIRICAL_IV_BINS) - 2))
 
