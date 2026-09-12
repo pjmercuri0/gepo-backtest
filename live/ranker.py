@@ -32,20 +32,36 @@ import config as backtest_config
 import spreads
 import ground
 import empirical_runner as er
+import spread_triple as st
 from live import live_config
 from live.regime import current_regime
 
 
-# ── Empirical pool: install latest window at module import ─────────────────
-# Required for the canonical empirical-DKL scoring (DKL_REFERENCE="empirical_vs_delta").
-# Without this, ground falls back to uniform DKL. Uses the same-day window
-# cache so half-hourly firings skip the 15M-row pool load.
+# ── Empirical window: install at module import ─────────────────────────────
+# 52:10 canon (2026-09-12): DKL_REFERENCE="empirical_vs_iv" needs the
+# spread_triple window (realized WIN/LOSS/PARTIAL counts over the last 52
+# weekly expiries, keyed on the name's own (ticker, $width) history with a
+# pooled fallback). Without it ground falls back to the max-entropy reference.
+# Cached per (population mtime, window spec, day) so half-hourly firings are cheap.
+#
+# empirical_runner is still installed too: other DKL_REFERENCE modes and the
+# USE_EMPIRICAL probability path read its single-leg table. Harmless when unused.
 try:
-    _asof = er.install_latest_cached()
-    print(f"[ranker] empirical window installed (asof {_asof.date()})", flush=True)
+    _asof = st.install_latest_cached()
+    print(f"[ranker] spread_triple window installed "
+          f"(asof {_asof.date()}, {st.N_EXPIRIES} expiries, "
+          f"newest realized {st.latest_expiry().date()})", flush=True)
 except Exception as e:
-    print(f"[ranker] WARN: empirical pool not available ({e}). "
-          f"GROUND will use uniform-DKL fallback.", flush=True)
+    print(f"[ranker] WARN: spread-outcome population not available ({e}). "
+          f"GROUND will use the max-entropy DKL fallback. "
+          f"Run refresh_spread_outcomes.py.", flush=True)
+
+try:
+    _asof_leg = er.install_latest_cached()
+    print(f"[ranker] legacy single-leg window installed (asof {_asof_leg.date()})", flush=True)
+except Exception as e:
+    print(f"[ranker] note: legacy empirical pool unavailable ({e}); "
+          f"not required under 52:10 canon.", flush=True)
 
 
 # ── Snapshot discovery ──────────────────────────────────────────────────────

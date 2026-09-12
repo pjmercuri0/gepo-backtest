@@ -18,5 +18,9 @@ LOG=live/logs/pool_refresh.log
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
   "${GEPO_PYTHON:-python3}" monthly_pool_refresh.py
+  # 52:10 canon: the DKL window reads realized spread outcomes, so this
+  # population must stay current or live scores drift onto stale history.
+  # Merge-only; never rewrites the frozen 2020-2025 file.
+  "${GEPO_PYTHON:-python3}" refresh_spread_outcomes.py
   echo ""
 } >> "$LOG" 2>&1

@@ -153,3 +153,57 @@ def lookup(ticker, dte, short_delta, width):
     if out is None:
         return None, None, None, None
     return out[0], out[1], out[2], 'global'
+
+
+# ── Live path ───────────────────────────────────────────────────────────────
+# The population is rebuilt from vendor year-parquets weekly (see
+# refresh_spread_outcomes.py, wired into cron_pool_refresh.sh). The installed
+# artifact is small and only changes when that file changes, so half-hourly
+# cron firings reuse a cache instead of re-reading the population.
+
+WINDOW_CACHE_PATH = 'output/spread_triple_window_cache.pkl'
+# Vendor data lags real time; warn rather than fail, but make the lag visible.
+MAX_STALE_DAYS = 45
+
+
+def latest_expiry():
+    load_population()
+    return pd.Timestamp(_EXPIRIES[-1])
+
+
+def install_latest_cached(n_expiries=N_EXPIRIES, today=None):
+    """Install the most recent window for live scoring. Returns the as-of date.
+
+    Cache key includes the population mtime AND the window spec, so changing
+    N_EXPIRIES or rebuilding the population invalidates it. (The old
+    empirical_runner cache keyed only on mtime+date, which would have served
+    stale tables silently across a semantics change.)"""
+    import pickle
+    global _TW, _POOLED, _ASOF
+    mt = max(os.path.getmtime(p) for p in POP_PATHS if os.path.exists(p))
+    today = pd.Timestamp(today or pd.Timestamp.today().normalize())
+    key = (mt, int(n_expiries), str(today.date()), DELTA_MULT, tuple(DOLLAR_BINS))
+    try:
+        with open(WINDOW_CACHE_PATH, 'rb') as f:
+            c = pickle.load(f)
+        if c.get('key') == key:
+            _TW, _POOLED, _ASOF = c['tw'], c['pooled'], c['asof']
+            return _ASOF
+    except Exception:
+        pass
+    # asof = the day AFTER the newest expiry, so that expiry is included
+    newest = latest_expiry()
+    asof = max(today, newest + pd.Timedelta(days=1))
+    if not install_window(asof, n_expiries):
+        raise RuntimeError('spread_triple: could not build a window from the population')
+    lag = (today - newest).days
+    if lag > MAX_STALE_DAYS:
+        print(f'[spread_triple] WARNING: population newest expiry {newest.date()} is '
+              f'{lag} days stale (>{MAX_STALE_DAYS}). Run refresh_spread_outcomes.py.',
+              flush=True)
+    try:
+        with open(WINDOW_CACHE_PATH, 'wb') as f:
+            pickle.dump({'key': key, 'tw': _TW, 'pooled': _POOLED, 'asof': _ASOF}, f)
+    except Exception:
+        pass
+    return _ASOF
