@@ -9,7 +9,10 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - GitHub `origin/main` is the source of truth. At this update, the MacBook and Mac mini histories have been fully reconciled and pushed; there are no seven-commit or eleven-commit transfers left to perform.
 - GitHub SSH authentication works on both machines. Any later statement that GitHub authentication is broken, a token must be fixed, or commits still need to be transferred is historical and obsolete.
 - The Mac mini at `/Users/securio/Downloads/gepo-backtest` is the production runner. The MacBook is the development machine.
-- Production strategy canon now uses `DELTA_TARGET=0.20`, `DELTA_MIN=0.10`, `DELTA_MAX=0.30`, `DKL_K=10`, and `GROUND_THRESHOLD=0.05`.
+- Production strategy canon is the **D_ent** canon of 2026-09-13 (§0.33-0.35):
+  `DELTA_TARGET=0.55`, `DELTA_MIN=0.50`, `DELTA_MAX=0.60`, `DKL_K=1.0`,
+  `GROUND_THRESHOLD=0.01`, `PROB_BASIS="realized"`, `DKL_REFERENCE="entropy_uniform"`.
+  (The 20-delta canon of 2026-09-11, §0.20, lasted one day and is superseded.)
 - The web app has an `actuals` tab for manually tracked real trades. It is populated only by pressing `+` on History or Snapshots rows; it does not place trades and does not require IBKR API write access.
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
@@ -34,7 +37,7 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 - **Do not delete `data/DG_2025*/` (59.1 GB raw vendor data) yet.** The 2025 euro parquets are built, but a RUT/RUTW `UnderlyingPrice` anomaly is unresolved and may need the original CSVs to diagnose — see §0.17.
 
-For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **The open work item is §0.16 — European index options and the vendor re-download; §0.17 is the current status of that work and supersedes §0.16 where they differ.** Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
+For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
 ## 0.20 Delta-target canon changed to 0.20 (2026-09-11) — CURRENT STATE
 
@@ -905,6 +908,80 @@ costs a wider quote rather than losing the contract from the scan.
   −$7,534 because credits book +$0.683/share above mid under
   `CREDIT_BASIS="last_clamped"`. **The fill basis, not the selection, carried
   the apparent edge.**
+
+---
+
+---
+
+## 0.36 Mac mini readied for the D_ent canon (2026-09-13) — CURRENT STATE
+
+Pulled `d274db7`. `build_daily_closes.py` run once, as §0.35 requires.
+
+### daily_closes coverage — the seeder only found ONE source file
+
+**Amended same day:** `477f2d4` dropped `ent_canon.MIN_OBS` from 120 to 1, so a
+name is no longer unscored for thin history — P_real now uses whatever it has,
+leaning on the 0.5 pseudo-count. That removes the hard blocker described below.
+The backfill is still worth having: P_real over 53 sessions is a far noisier
+estimate than over 252 (`WINDOW = 252`), and the verification finding about
+adjusted closes stands regardless.
+
+`build_daily_closes.py` globs `output/20??_sp500_last.parquet` plus the 2026 OOT
+combined file. **The 2020-2025 year parquets are not on the Mac mini** (§0.16),
+so the glob matched nothing and the store seeded from 2026 alone: 14,356 rows,
+98 tickers, 2026-01-01 -> 2026-08-18. `live.closes.load_closes()` unions the
+store with the live snapshots, which carries it to 2026-09-11.
+
+That left **13 equity tickers under the 120 sessions `P_real` then required** — ten at
+exactly 53 sessions (AON APD BDX CB CCI DUK ITW LIN SYK WM ZTS), NSC at 98, MMC
+at 4. On a Thursday snapshot that cost 25 of 63 candidates, dropped as unscored.
+
+Filled from the Yahoo chart API (`indicators.quote[0].close`, the RAW close, not
+`adjclose`), one year per ticker, **verified against the vendor before writing**:
+11 of 12 matched the vendor EXACTLY (median and max diff 0.0000% across 655
+overlapping rows).
+
+- **BDX was the exception** and is why the verification mattered: a constant
+  21.3836% gap on 2026-01-08..01-16, ratio 0.7862, then exact from 2026-02-12.
+  That is a corporate action Yahoo back-adjusted and the vendor did not. An
+  adjusted close is the WRONG series for `P_real`, which measures realized
+  exceedance of strikes quoted in unadjusted terms. Only BDX rows from
+  2026-02-12 were appended.
+- 2,347 rows added. Every equity ticker that can trade now clears 120 sessions.
+
+**Always verify a price backfill against the vendor on overlapping dates before
+appending.** `data/spy_us_d.csv` has the same disease in the opposite place —
+its `Close` is dividend-adjusted while its OHLC is raw, so 87.6% of 2025 rows
+have `Close` outside `[Low, High]`.
+
+### MMC is a dead symbol, not a data gap
+
+MMC fails qualification on Yahoo (404) AND on IBKR ("No security definition has
+been found"), appears in **0 of 205** September snapshots, and logs
+`[MMC] no spot price` on every scan. Its 4 store rows are January vendor data.
+It can never produce a candidate and burns a fetcher slot every run. Worth
+removing from `SP100_TICKERS`; harmless otherwise.
+
+### Verified the ranker runs under D_ent on this machine
+
+Thursday snapshot 2026-09-10/1545: smile fit on 76 chains, 63 candidates -> 32
+ranked, 0 above the 0.01 threshold on that particular snapshot.
+
+**Two traps when testing offline:** the IBKR combo book is dead outside market
+hours, so every candidate fails `credit>0` and the run looks broken — set
+`live_config.LIVE_COMBO_ENABLED = False` to isolate. And Friday snapshots are
+DTE 0 (`LIVE_DTE_MIN=0`), where delta is a step function (25th pct 0.922, median
+0.996), so no delta band finds anything. Fridays produced 6-7 picks under every
+canon tried; that is structural, not a regression. Test on Mon-Thu snapshots.
+
+### Ranker no longer crashes when nothing ranks
+
+`_serialize` did `ranked["GROUND"] > 0` without the empty guard the line above
+already used. An empty frame has no columns, so it raised `KeyError: 'GROUND'`
+on the exact path that prints "nothing ranked; writing empty payload anyway".
+`latest.json` was never written and the live page froze on the last good scan —
+observed 2026-09-11, stale from 14:33 to 15:23 while three scans appeared to
+succeed. Latent for a long time, harmless while some candidate always ranked.
 
 ---
 
