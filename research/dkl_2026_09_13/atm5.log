@@ -1,0 +1,21 @@
+
+
+
+
+
+
+D_vrp_neg reward, 50-60 delta, comm $1.30 — fill sensitivity (k=0 vs k=12)
+  fill 1.00: IS  0.26 ->  0.39 ($11,611 -> $14,940, DD -53.9 -> -53.3) | OOT  0.42 ->  0.85 (DD -18.8 -> -11.0)
+  fill 1.04: IS  0.77 ->  0.91 ($23,775 -> $27,818, DD -25.8 -> -26.2) | OOT  1.21 ->  1.69 (DD -11.6 -> -8.1)
+  fill 1.08: IS  1.25 ->  1.36 ($35,917 -> $40,675, DD -18.0 -> -16.5) | OOT  1.97 ->  2.49 (DD -8.1 -> -6.9)
+  fill 1.12: IS  1.66 ->  1.76 ($48,018 -> $53,490, DD -13.9 -> -13.2) | OOT  2.71 ->  3.26 (DD -6.8 -> -5.7)
+
+by direction and DTE, k=0 vs k=12 (IS Sharpe / OOT Sharpe):
+  bull_put : IS  1.17 ->  1.26 | OOT  2.18 ->  2.23
+  bear_call: IS  0.12 ->  0.17 | OOT -0.16 -> -0.19
+  DTE1     : IS  0.75 ->  0.80 | OOT  0.88 ->  0.88
+  DTE2     : IS  0.99 ->  1.12 | OOT  1.54 ->  1.83
+  DTE3     : IS  1.08 ->  1.36 | OOT  1.66 ->  2.41
+  DTE4     : IS  0.78 ->  0.73 | OOT  0.39 ->  0.62
+
+selected book: median realized exceedance 0.291 -> 0.310; median IV 0.314 -> 0.306; med credit/width 0.504 -> 0.504; names/yr 81 -> 83

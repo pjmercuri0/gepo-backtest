@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-11 EDT. Current production canon is k=10, GROUND threshold 0.05, and short-leg delta target 0.20 with eligible band 0.10-0.30 (§0.20). The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-13 EDT. Current canon is D_ent (§0.33-0.35): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit. The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
@@ -14,7 +14,9 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
 - The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
-- **CURRENT SCORING CANON is §0.21 ("52:10")**: DKL = D(P_emp‖Q_iv) with outcomes
+- **CURRENT CANON is §0.33-0.35 ("D_ent", 2026-09-13)**: 50-60 delta by fitted delta, G on P_real, D_ent = ln3 − H(Q_bs)
+  (paper eq. 19) discounted with k=1, thr 0.01, smile-fit credit, fills 1.08× model. §0.21 below is superseded.
+- **OLD (superseded) SCORING CANON §0.21 ("52:10")**: DKL = D(P_emp‖Q_iv) with outcomes
   counted directly from realized spreads, keyed (ticker, $width) with pooled
   fallback, 52-expiry causal window, k=10. `rv_vs_iv` is dead. The LIVE path is
   NOT yet switched over — see the "NOT DONE" note at the end of §0.21.
@@ -437,6 +439,121 @@ k=10 / thr=0.05, on `euro_pool_v2`:
   Use `--dte-min 0 --dte-max 4000`.
 - `build_euro_pool.py`: drops non-positive IV from both the pool and the IV-rank
   seed (see finding 2).
+
+---
+
+## 0.22 DKL research 2026-09-12/13 — WHAT WAS TRIED AND WHY IT FAILED
+
+**Read this before attempting DKL work again.** A full session was spent trying to
+make `exp(-k*DKL)` earn a positive k at delta-20. Eleven formulations were tested.
+None survived verification. The failures are characterised below so they are not
+repeated.
+
+### State of the tree — IMPORTANT
+
+Uncommitted edits are sitting in the working tree:
+
+- `ground.py` — `DKL_REFERENCE = "empirical_vs_iv"`, `PROB_BASIS` touched, new branch added
+- `config.py` — `MIN_CREDIT_RATIO = 0.0`, `MAX_SHORT_OTM_PCT = 5.0`, `MAX_SPREAD_WIDTH = 2.50`
+- `spreads.py` — OTM cap and width cap enforced in `_build_spread`
+
+Mya is still serving the OLD `$77,417` backtest numbers, which this session showed
+are overstated. Decide whether to commit, revert, or cherry-pick before trading.
+
+### The strategy findings that DID hold (independent of DKL)
+
+| finding | evidence |
+|---|---|
+| 30% of canon's gated picks had NO BID on the short leg | vs 2.2% ungated; they supplied 31% of backtest P&L |
+| `MIN_CREDIT_RATIO=0.30` is a contamination magnet | gated picks averaged 2.91x fair value; 13x enriched for zero-bid |
+| Vendor IV inflates far-OTM strikes | median IV 1.40 at >8% OTM vs 0.19 at <1%; delta is derived from it, so a worthless strike reads ~0.19 delta |
+| `MAX_SHORT_OTM_PCT=5.0` fixes it | drops 9% of candidates, removes 92% of IV>1.0 rows |
+| Band 0.15-0.25 beats 0.10-0.30 / 0.22-0.30 / 0.30-0.40 | Sh 2.70 vs 2.61 / 1.88 / 0.78 |
+| Delta overstates loss probability | d_long implies 10.7%, realised 8.37% |
+| EMPIRICAL-fair credit >> delta-fair credit | IS $100,013 / Sh 4.23 / DD -4.7% vs $47,305 / 2.02 / -9.9% |
+| Win probability = 1 - d_short is well calibrated | predicts 79.7%, realised 81.7-83.9% |
+| Break-even fill is 0.78x fair; real fills are 1.08x | from 19 actual trades on the Actuals tab |
+| Drawdown is CORRELATED-week risk, not per-trade | p99 week has 45% losers; independence predicts 0.2 such weeks, observed 1 |
+| The GROUND threshold is inert | thr 0 -> 0.02 changes nothing; OOT rows byte-identical |
+| Window N=13 is disqualified | DD -8.5% vs -4.0% at N>=26 |
+
+### The eleven DKL attempts
+
+| # | DKL(P\|\|Q) | outcome | why |
+|---|---|---|---|
+| 1 | `D(P_rv \|\| Q_iv)` (canon) | k>0 loses money monotonically | RV-implied triple SATURATES to (1,0,0) on 51% of candidates; corr(DKL,pnl)=+0.142, so the penalty discounts the VRP edge, not risk |
+| 2 | one-sided `D(P_rv\|\|Q_iv)` | inert | fires on 14%; IV exceeds RV ~96% of the time so "reality worse than priced" is structurally rare |
+| 3 | `D(Q_cert \|\| P_emp) = -ln(p_emp)` | cannot beat k=0 | `p_emp` is already inside G — double-counting, can only dilute |
+| 4 | #3 x severity `(max_loss/width)` | same | `sev` spans only 0.824-0.834; contributes no discrimination. Magnitude belongs in `b`, already in Kelly |
+| 5 | `D(P_short \|\| P_long)` ambiguity | right properties, too small | corr(EV)=+0.013 (genuinely orthogonal!) but median 0.017 nats = 3% haircut; k-response was noise |
+| 6 | `D(P_emp \|\| Q_target)` | ranks risk, still loses | loss% monotone 6.87->11.93 (IS) and 7.24->12.94 (OOT) — a REAL risk measure — but corr(EV)=-0.45, so the penalty strips more EV than risk |
+| 7 | `D(P_emp \|\| Q_delta)` full | redundant | corr(EV)=+0.467 |
+| 8 | signed versions of #7 | inert | zero on 83-94%; delta overstates risk so the signed branch rarely fires |
+| 9 | direction-split `D(P_dir \|\| P_other)` | conceptually wrong | unsigned — large when this side is SAFER as well as riskier |
+| 10 | fragility `D(Q_shock \|\| P)` / `D(P_shock \|\| Q_delta)` | fails verification | k=2 is an isolated spike (OOT 5.33 -> 5.90 -> 5.11); loss% quintiles not monotone. Also 0.86-0.99 correlated with the other shock variants — one signal, not several |
+| 11 | PIT `D(P_binned \|\| uniform)` over returns | OOT only | solves the magnitude problem (median 0.090 nats, corr(EV)=-0.005) but costs $9k and worsens IS drawdown to -7.5% |
+
+A systematic search over **72 ordered distribution pairs x 5 k values x 2 windows
+(360 cells)** found 29 that beat k=0 on Sharpe in both windows. Every one either
+fails a monotonicity check or is `iv|unif`.
+
+### The ONE thing that survived: maxent reference
+
+`D(Q_iv \|\| uniform) = ln3 - H(Q_iv)` — negative entropy, essentially the
+framework's original `maxent_ro` reference. At k=16:
+
+| | IS | OOT |
+|---|---|---|
+| final | $95,627 (base $99,923) | $15,277 (base $14,739) |
+| Sharpe | **+4.284** (base 4.236) | **+5.990** (base 5.377) |
+| MaxDD | **-3.87%** (base -4.65%) | -1.88% (base -1.94%) |
+
+OOT Sharpe rises monotonically k=8->16 (5.380, 5.600, 5.871, 5.990) and
+`corr(EV)=+0.009`. `D(Q_delta\|\|uniform)` gives nearly identical numbers, which is
+a robustness signal — two independent references agreeing.
+
+**BUT**: penalising `ln3 - H` means REWARDING entropy, and the loss-rate quintiles
+run 9.27, 9.77, 9.33, 8.80, **7.13** — high DKL is SAFER. So it improves Sharpe by
+selecting higher-entropy (closer-to-money, richer-premium) trades, NOT by avoiding
+risk. It is a return enhancer wearing a risk measure's clothes. Do not describe it
+as risk reduction without resolving this.
+
+### Why nothing worked — the structural argument
+
+1. **Unsigned divergences measure disagreement, and in this market disagreement is
+   MISPRICING, which is edge.** Penalising it removes profit.
+2. **Signed divergences have nothing to fire on.** IV and delta both overstate
+   per-trade risk (delta: 10.7% implied vs 8.37% realised), so "reality is worse
+   than the model" is rare by construction — 10-17% of candidates.
+3. **Risk and EV are coupled** (`corr = -0.45`). Any multiplicative penalty on risk
+   removes proportionally more EV than the risk it avoids.
+4. **At delta-20 the outcome triple is nearly degenerate.** p_emp ~ 0.845, and the
+   triple carries 0.529 nats against a ln3 = 1.099 maximum — **48% of available
+   entropy**. A KL divergence is bounded by the entropy of what it compares, so
+   every 3-state divergence here is capped around 0.02 nats and cannot move a
+   top-5 selection. **This is the deepest reason, and it is delta-dependent.**
+5. **Putting the empirical triple into G closes the gap DKL exists to fill.** With
+   `PROB_BASIS="empirical"`, G already knows reality, so there is no model error
+   left to correct. With G on the model instead, EV collapses to ~0 because the
+   delta-derived credit IS the EV=0 price under the delta triple.
+
+### The most promising untested direction
+
+Point 4 is delta-dependent and therefore testable: **re-run the DKL sweep at
+DELTA_TARGET=0.50**, where the published k=10 result was obtained. At 50-delta
+p ~ 0.47, the triple is near maximum entropy, and divergences have room to be
+large. If k>0 earns its place there and not at 20-delta, the result is a clean
+boundary condition — *the entropic discount is load-bearing near the money and
+degenerate in the wings* — which reconciles the paper with this session rather
+than contradicting it. That test was never run.
+
+### Artifacts
+
+Research scripts live in the session scratchpad (not committed). Reusable caches:
+`/tmp/gepo_pairs*.parquet` (vectorised candidate pairs — 4 min for 6 years vs
+264 min for the per-band loop), `/tmp/srch_{IS,OOT}.parquet` (96k/10k candidates
+with all 72 pairwise divergences precomputed). `output/spread_outcomes.parquet`
+(127,666 realised spreads) and `spread_triple.py` ARE committed.
 
 ---
 
@@ -1983,3 +2100,435 @@ Current stage is testing money, not full production bankroll. User has about CAD
 ## 13. Tone
 
 User is invested in GROUND (it's their invention). When proposing alternatives that REPLACE GROUND's structure, flag that clearly. When changes preserve GROUND while improving inputs (like IV-rank or rv_vs_iv DKL), they're fair game. User wants critique not flattery; verify numbers before claiming; acknowledge errors directly. Error counter remains visible — read `feedback_error_counter.md` early.
+
+---
+
+## 0.23 DKL works at MARKET credit — §0.22's negative result was an artifact (2026-09-13)
+
+**Read with §0.22.** The 360-cell search in §0.22 booked every trade at a SYNTHETIC
+credit of `1.1 x width x (q_emp + ro_emp/2)`. IV never entered the credit, so any
+divergence against Q_iv had nothing to act on. Re-run in the real canon world
+(market mid credit, 0.80x fill, band 0.10-0.30, OTM<=5%, width<=2.5, OI>=100,
+bid>0, G on the empirical (ticker,$width) triple, 52-expiry window, top-5/day,
+thr 0.05), the canon `D(P_emp || Q_iv)` earns k monotonically:
+
+| k | IS n | IS final | IS Sh | IS DD | IS loss% | OOT Sh | OOT DD |
+|---|---|---|---|---|---|---|---|
+| 0 | 3373 | $38.0k | 2.21 | -9.1% | 13.7 | 2.36 | -6.2% |
+| 8 | 1677 | $43.6k | 2.80 | -4.3% | 12.3 | 4.38 | -3.2% |
+| 16 | 1123 | $41.5k | 3.06 | -1.7% | 10.8 | 4.22 | -1.4% |
+| 24 | 839 | $38.0k | 3.10 | -1.1% | 9.5 | 4.46 | -2.1% |
+
+Sharpe rises with k in every IS year (2022: 0.00 -> 3.11; 2023: -0.01 -> 4.60).
+Survives fill stress to 0.60x mid (k=0 loses money, k=16 Sh 2.6).
+
+- **Baseline is $38k, not $77k.** The $77,417 on Mya came from MIN_CREDIT_RATIO=0.30
+  selecting zero-bid quotes (§0.22). Clean real-credit k=0 is $38k / Sh 2.21.
+- **Raw loss rate is FLAT across D(P_emp||Q_iv) quintiles.** What rises monotonically
+  is realized-minus-P_emp-predicted loss share (2.8pp -> 8.8pp). It measures how
+  over-optimistic the history triple is, not how risky the trade is.
+- **`D(Q_cert || Q_iv) = -ln(p_iv)`** (market's surprise at a WIN) IS monotone in raw
+  loss (IS quintiles 9.0/11.3/11.6/11.7/11.6%, OOT 8.0/11.0/12.0/13.1/13.2%) and
+  gives the same book quality at k=3: IS Sh 2.96 / DD -1.9% / $41.8k, OOT Sh 4.77.
+  Its scale is ~7x larger, so k in 2-4 corresponds to k 12-24 above. Not double
+  counting: G is on P_emp, Q_iv is new information to GROUND.
+- **Equal-trade-count control:** k=0 with the EV threshold raised to match n gives
+  IS Sh 2.73-2.87 and OOT Sh 2.4-2.8; k>0 at thr 0.05 gives IS 2.8-3.1, OOT 4.2-4.5,
+  and 2pp lower loss rate. The penalty carries information beyond EV selectivity,
+  mostly out of sample. Trade count falls ~65-75%: much of the IS gain is the
+  threshold refusing days where market and history disagree.
+- **Pure re-ranking (thr=0, always 5/day)** is NOT monotone and collapses IS past k~12.
+  Do not run DKL without the threshold.
+- 60% of candidates are dropped at the G stage: 55% negative Kelly EV (correct),
+  5% because the ticker cell has ZERO losses (q=0 -> G=None). Those q=0 names lose
+  6.4% realized, the SAFEST group. Shrinking the ticker triple toward the pooled
+  width cell (alpha=20 pseudo-counts) fixes it and alone improves OOT (Sh 2.36 -> 2.96).
+- Epistemic divergences (estimation 1/n, ticker-vs-pool shrinkage distance,
+  recent-vs-window shift per ticker and market-wide, recent breach-at-strike) are all
+  orthogonal to EV but NONE predicts loss. Breach rates at fixed delta are stationary.
+
+Scripts + logs: `research/dkl_2026_09_13/` (untracked). Caches:
+`/tmp/gepo_sel_10_30.parquet` (IS), scratchpad `oot_sel_10_30.parquet` (2026 with
+quotes, built by `build_oot.py`; SPY csv on the MacBook ends 2026-05-28 so it uses
+the parquet's own calendar). Nothing committed, nothing deployed.
+
+## 0.24 Synthetic (fillable) credit — the delta-20 edge does not survive it (2026-09-13)
+
+**Supersedes the conclusion of §0.23.** The user rejected vendor mid AND natural as
+credit bases (both are bad EOD quotes). A synthetic credit was built and validated:
+
+- Per chain (Symbol, DataDate, Expiry): robust weighted quadratic smile in ATM-vol
+  standardized moneyness (|y| <= 2.5 sigma, bid>0, weights 1/(1+rel width), MAD trims).
+  Legs priced by Black-Scholes at the FITTED IV. `research/dkl_2026_09_13/synth_credit.py`.
+- Validation on the live IBKR chains (610 snapshots, May-Aug 2026): model credit =
+  0.675x the IBKR quoted mid of the ranked picks (IQR 0.60-0.74). The 19 real fills
+  were 0.73x quoted, i.e. fills ~1.08x model. **The model IS the fillable price.**
+- Stage 2 (`reselect.py`) also picks the short strike by FITTED delta, not vendor delta.
+
+Result at 1.0x model credit, band 0.10-0.30 by fitted delta, top-5/day, thr 0.05:
+
+| | IS 2020-25 | OOT 2026 |
+|---|---|---|
+| k=0 trades | 1,939 | 296 |
+| k=0 final | $10,894 (+9% in 6 yrs) | $10,087 |
+| k=0 Sharpe / DD | 0.19 / -31% | 0.30 / -10% |
+| 1.1x model (≈ real fills) | Sh 0.89, $16.8k | Sh 1.33 |
+| 0.9x model | Sh -0.50, $4.9k | Sh -0.71 |
+
+Every slice of the candidate universe has NEGATIVE mean P&L at fillable credit
+(by market risk quintile, IV rank, DTE, direction). Realized loss share 13.1% vs
+market-implied 16.1% vs P_emp 12.1%: the market's Q_iv is closer to reality than
+the empirical triple on the candidates that get selected (selection picks cells
+where P_emp is low, and P_emp is wrong there — excess loss 4-8pp).
+
+DKL at fillable credit: `D(P_emp||Q_iv)` at k>=8 turns the book flat-to-slightly
+positive but with 67 trades in 6 years. No form makes a tradeable book. **There is
+no DKL to find because there is no edge at a fillable price.** The $38k (§0.23)
+and $77k (Mya) books were quote inflation: at k=0, 34% of the vendor-mid picks had
+natural credit <= 0, at k=16 66%.
+
+Files: `research/dkl_2026_09_13/{synth_credit,reselect,eval_synth,live_synth}.py`,
+logs `eval_synth.log` (vendor-delta strikes), `eval_resel.log` (fitted-delta strikes),
+`live_vs_vendor.parquet`, `live_synth.parquet`. Nothing committed or deployed.
+
+## 0.25 Calibrated-market belief (2026-09-13) — what "the market is right" implies
+
+Built after §0.24. Belief P_cal = fitted-surface Q_iv scaled by realized/market
+loss and partial ratios learned causally in the market's own buckets (fitted short
+delta x DTE x IV-rank tercile, trailing 52 expiries; pooled fallback). It is
+calibrated to the third decimal: realized loss share 0.131, P_cal 0.131 (market
+0.162, 52:10 P_emp 0.121). `research/dkl_2026_09_13/calib_market.py`, frame `featC.parquet`.
+
+At fillable (model) credit, G on P_cal, top-5/day, k=0:
+
+| fill x model | thr | IS n | IS final | IS Sh | IS DD | OOT n | OOT final | OOT Sh |
+|---|---|---|---|---|---|---|---|---|
+| 1.0 | 0.05 | 322 | $10,331 | 0.32 | -8.6% | 9 | $10,311 | 3.15 |
+| 1.0 | 0.01 | 3,023 | $11,259 | 0.18 | -31.7% | 470 | $13,736 | 3.24 |
+| 1.1 (≈ real fills) | 0.01 | 3,023 | $18,359 | 0.94 | -17.0% | 470 | $15,096 | 4.26 |
+
+Year by year at 1.1x / thr 0.01: 2020 Sh 1.19, 2021 1.53, 2022 -0.07, 2023 0.98,
+2024 1.74, 2025 0.74, 2026 4.26. The edge is the aggregate VRP on 1-4 DTE
+20-delta spreads: ~3pp of loss share, about $3.5/contract at real fills. 2026 has
+been unusually good; 2020-25 averages Sh ~0.9 at 1.1x and ~0.2 at 1.0x.
+
+- **thr 0.05 is wrong for a calibrated belief.** It was set on inflated P_emp EVs;
+  under P_cal it passes 322 trades in six years. thr 0.01 is the working level.
+- **No DKL against P_cal is monotone in both windows.** D(P_cal||Q_iv) unsigned and
+  reversed, signed variants, D(P_emp||P_cal), -ln(p_iv): all tested (calib_market.log).
+  D(P_emp||P_cal) signed (calibrated market riskier than the name's history) lifts
+  IS Sh 0.94 -> 1.10 at k=8 and is flat OOT. With a calibrated belief there is little
+  model error left for a divergence to price, which is the correct version of
+  §0.22's point 5.
+- G on raw Q_iv gives EV~0 everywhere (7 trades). G on 52:10 P_emp gives 1,939
+  trades at Sh 0.19 because its EV is invented.
+
+## 0.26 Realized-only belief and divergences (2026-09-13) — user constraint: DKL must use real data
+
+User direction: smile fit is ONLY for the fill credit; G and DKL must use realized data,
+no IV, delta, models or calibration. Built (`research/dkl_2026_09_13/real.py`, `real2.py`):
+
+- **P_real** = fraction of the name's own realized DTE-matched moves over the trailing 252
+  trading days that would have breached today's exact short / long strikes (+0.5 pseudo-count).
+  Calibration: realized loss share 0.131 vs P_real 0.147 (conservative overall, but +6pp
+  optimistic on the EV-selected top-5, the usual winner's curse).
+- G on P_real at 1.1x model credit (≈ real fills), thr 0.01, k=0: **IS 4,300 trades,
+  $26,478, Sh 1.23, DD -21.5%; OOT Sh 1.08.** Beats 52:10 P_emp in-sample (Sh 1.05,
+  $22.1k) and the calibrated market (0.94, $18.4k); OOT is weaker than both (1.30, 4.26).
+  At 1.0x: IS Sh 0.52, OOT 0.15.
+
+Realized-data divergences tested against P_real, P_emp and their mix (all k sweeps at
+fill 1.1 / thr 0.02, quintile loss rates in real.log / real2.log):
+
+| DKL | what it measures | result |
+|---|---|---|
+| D(P_recent20 ‖ P_year), signed/unsigned | name's realized regime shift at these strikes | loss flat by quintile; Sharpe falls with k |
+| D(P_year ‖ P_3yr) | this year vs long-run realized | inert |
+| market-wide median of the above | realized vol regime | flat; Sharpe falls |
+| D(P_emp ‖ P_real) both directions, signed "tight" | usual 20-delta placement vs today's strikes | loss flat; ±0.05 Sharpe noise |
+| signed loss-share gap P_real − P_emp | same, linear | inert |
+
+**Conclusion:** in this product no realized-data divergence carries loss information
+beyond a realized-data belief. Every quintile table is flat. The only variable that
+predicts loss beyond a name's history is the market's price of risk (fitted IV/delta;
+loss 5.9% -> 17.9% across market-risk deciles), which the user has excluded from DKL.
+Under that constraint the k=0 book with P_real is the best real-data configuration found,
+and its drawdowns (-17% to -33% at Sh ~1) are a correlated-week problem that a per-trade
+divergence does not address.
+
+## 0.27 DKL between two MARKET predictions (2026-09-13) — the directional question
+
+User direction: market price of risk IS allowed in DKL; measure DKL between two market
+predictions. Regression on all candidates: realized loss share = -0.02 + 0.16*P_real + 0.80*Q_iv.
+The market carries ~80% of the outcome information, realized history ~16%.
+Scripts `mkt2.py` (today vs yesterday, smile vs flat), `mkt4.py` (this wing vs mirrored wing),
+`term.py` (front vs next expiry), `union.py` (max-pessimism reference), `direction.py` log.
+
+**Every market-vs-market divergence is strongly monotone in loss, in the SAFE direction.**
+When the market prices this wing richer than its other view (richer than flat vol, richer
+than the mirrored wing, richer than yesterday, richer than the next expiry), realized loss
+FALLS: smile-vs-flat quintiles IS 16.9% -> 4.7%, OOT 14.8% -> 4.5%; mirrored wing IS
+13.3% -> 5.7%. The extra premium is the variance premium; the feared side is the safer side
+to sell. exp(-k*D) therefore penalises the edge and Sharpe falls with k for all of them.
+
+**Mirror-signed forms** (fire when this wing is priced CHEAPER than the other market view)
+are risk-increasing but tiny (median 0.001-0.005 nats). Best: the max-pessimism reference
+D_max = D(Q_ref||Q_smile), Q_ref = the market's most pessimistic view of the spread among
+{smile, flat, mirror, yesterday, next expiry}. G on 52:10 P_emp, fill 1.1x model, thr 0.01:
+IS Sh 1.27 -> 1.36 (k=4) -> 1.40 (k=8) -> 1.43 (k=16), DD -14.7% -> -12.3%; equal-trade-count
+control k=0 gives 1.26, so the in-sample gain is real. OOT: 1.48 -> 1.56 (k=4) -> 1.32 (k=8)
+-> 1.21 (k=16). Not robust out of sample beyond k~4. Year-by-year (mirror form): better in
+2022/24/25/26, worse in 2020/23.
+
+**Directional question ("does the DKL between the put wing and the call wing tell us
+which way the market thinks the stock goes?").** The smile slope c1 (puts richer = market
+fears DOWN) does not predict direction: corr(slope, realized return) = -0.04 IS, -0.01 OOT;
+P(up) 0.54 vs 0.50 across slope quintiles. It does predict breaches, inversely: the wing the
+market pays MORE for breaches LESS (bull_put IS 8.7% -> 7.2%, bear_call 9.1% -> 6.6%; OOT
+same shape). The market's directional fear is over-paid on average, not informative about
+the sign of the move. This is the 6-year answer to §0.19, which was one year.
+
+**Structural conclusion for GROUND.** At a fillable credit, D(belief || market) and
+D(market view A || market view B) both measure how much premium the market adds, and added
+premium is edge. A multiplicative discount on that quantity is backwards for a
+premium-selling strategy. The only DKLs that increase with realized risk are the
+mirror-signed "cheap wing" forms, whose magnitude is too small to reorder a top-5 book
+without k in the tens, where the gain is in-sample only.
+
+## 0.28 REWARD form works: GROUND = EV * exp(+k * D_rich) (2026-09-13) — the result of the day
+
+User authorised testing the reward sign. `research/dkl_2026_09_13/reward.py`, log `reward.log`.
+
+    D_rich = D( Q_smile || Q_min ),  Q_min = the market's most OPTIMISTIC view of this spread
+             among {flat ATM vol, mirrored wing, yesterday's surface, next-expiry level},
+             fired only when this wing is priced RICHER than that view (87.6% of candidates,
+             median 0.0099 nats).  Loss falls monotonically with it: IS 13.4% -> 7.7%,
+             OOT 12.5% -> 8.6% across quintiles.  It measures how much premium the market
+             adds to this wing beyond its own cheapest view = the variance premium.
+
+G on 52:10 P_emp, fill 1.1x model (≈ real fills), thr 0.01, top-5/day:
+
+| k | IS n | IS final | IS Sh | IS DD | IS loss% | OOT n | OOT final | OOT Sh | OOT DD |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | 5485 | $25.3k | 1.27 | -14.7% | 12.7 | 596 | $12.3k | 1.48 | -13.5% |
+| 4 | 5544 | $30.2k | 1.60 | -15.0% | 12.1 | 597 | $13.1k | 1.96 | -9.9% |
+| 8 | 5567 | $31.0k | 1.68 | -13.8% | 11.9 | 597 | $13.5k | 2.18 | -8.8% |
+| 16 | 5593 | $30.6k | 1.69 | -11.2% | 11.7 | 600 | $13.3k | 2.09 | -8.2% |
+| 32 | 5619 | $31.5k | 1.76 | -10.3% | 11.3 | 600 | $12.6k | 1.61 | -8.1% |
+| 64 | 5651 | $33.1k | 1.97 | -10.9% | 10.3 | 600 | $11.6k | 0.96 | -14.8% |
+
+IS Sharpe monotone k=0..64; OOT monotone to k=8, holds to 16, degrades past 32.
+**Working range k = 8-16.** Equal-trade-count control (k=0 with threshold lowered to the
+same n): IS 1.32 / OOT 1.48 vs reward k=8 1.68 / 2.18 — the gain is the ranking, not the
+count. Year by year at k=8 vs k=0: 2020 3.59 vs 3.53, 2021 2.02 vs 2.20, 2022 0.52 vs 0.16,
+2023 0.11 vs -0.35, 2024 2.15 vs 1.07, 2025 1.28 vs 0.70, 2026 2.18 vs 1.48. Drawdown
+better in 5 of 7 years. At 1.0x fill: IS 0.15 -> 0.62 (k=8), OOT 0.37 -> 0.96.
+Component check: smile-vs-flat alone (D_rich_flat) gives IS 1.27 -> 1.61 (k=8), OOT 1.94;
+mirror and yesterday each add a little; the skew component carries most of it.
+With G on P_real: IS monotone to k=128 (1.23 -> 2.10), OOT noisy (1.0-1.6).
+
+Interpretation: at a fillable price the growth term G finds the candidates with positive
+EV under history, and the divergence between the market's own views of the wing measures
+how much variance premium the market has loaded onto it. Rewarding that premium is
+rewarding the edge; discounting it (the paper's sign) was removing the edge. This is the
+sign flip §0.27 predicted. Nothing committed or deployed; canon unchanged.
+
+## 0.29 The simple version (2026-09-13) — wing IV vs ATM IV, reward sign
+
+User asked for something simpler than §0.28. Two Black-Scholes triples for the same strikes:
+
+    Q_wing = N(d2) triple at the smile-fitted IV of each leg     (what the credit is priced at)
+    Q_atm  = N(d2) triple at the chain's ATM IV
+    D      = D(Q_wing || Q_atm), zero when the wing is priced below ATM
+    GROUND = EV * exp(+k * D),  G on the 52:10 empirical belief, k = 8
+
+Fill 1.1x model, thr 0.01, top-5/day (`simple_fit.log`): IS Sh 1.27 -> 1.61 (k=8) -> 1.74
+(k=32), monotone; OOT 1.48 -> 1.94 (k=8), 1.72 (k=16), degrades past 24; DD IS -14.7% -> -15.6%
+(k=8) / -10.4% (k=32), OOT -13.5% -> -10.4%. Equal-count control k=0: IS 1.32, OOT 1.48.
+Year by year at k=8 vs 0: better in 2020-2025 every year except flat 2020; 2026 1.48 -> 1.94.
+The RAW vendor-IV version (`simple.py`) is not monotone and 2025 collapses (0.70 -> 0.09):
+the strike-level raw IV is the same noisy number that broke the quotes; the smile fit is
+required to read the wing IV, exactly as it is for the credit. This is the recommended form.
+
+## 0.30 Delta-band sweep with the full method (2026-09-13) — where the edge is
+
+Method: strikes by FITTED delta, credit = smile-fit model, belief = P_real (name's realized
+DTE-matched moves vs the exact strikes, 252d; valid at any delta), reward DKL D(Q_wing||Q_atm)
+k=0 and 8, thr 0.01, top-5/day, commission $1.30/spread. `band_sweep.py`, `band2.py`,
+`band_checks.py`, logs `band*.log`. Caveat: the pairs file caps OTM at 5%, which biases the
+low-delta bands toward low-vol names.
+
+20-60 delta, fill 1.1x, commission in (IS Sh / OOT Sh): 0.15-0.25 0.60/0.17; 0.20-0.30 0.08/-0.24;
+0.25-0.35 -0.19/0.29; 0.30-0.40 -0.12/-0.84; 0.35-0.45 -0.05/-0.68; 0.40-0.50 0.40/0.07;
+0.45-0.55 1.06/1.03; **0.50-0.60 1.46/2.33**; 0.40-0.60 1.30/2.05. Everything 20-45 delta is
+flat-to-negative after commissions. Only the at-the-money band earns.
+
+0.50-0.60 detail (k irrelevant here: the wing-vs-ATM divergence is ~0 at the money):
+fill 1.00 IS Sh 0.26 / OOT 0.42; 1.04 0.77 / 1.21; **1.08 (measured fill ratio) 1.25 / 1.97,
+$35.9k, DD -18% / -8%**; 1.10 1.46 / 2.35; 1.15 1.94 / 3.24. Break-even fill ~1.03x model.
+Year by year at 1.08: 2020 2.22, 2021 1.13, 2022 1.46, 2023 -0.04, 2024 2.29, 2025 1.15, 2026 1.97;
+worst weeks -7% to -13%. By DTE: 2-3 best (Sh ~1.0-1.1 IS, 1.5-1.7 OOT), DTE 4 worst OOT.
+By direction: bull_put IS 1.17 / OOT 2.18; bear_call 0.12 / -0.16 — the edge is in puts.
+
+10-delta looked best on paper (IS 3.5 / OOT 6.6 with commission) but on real IBKR chains
+only 1.2% of 10-delta spreads are fillable at the model credit (median credit $0.10 vs a
+$0.12 short-leg bid-ask); user excluded it. Validation on IBKR chains by band: model credit =
+IBKR mid to within 2% at every band 15-60 delta (unselected contracts); natural sits far below.
+
+## 0.31 DKL at the money (50-60 delta), fill 1.08x, commission $1.30 (2026-09-13)
+
+`atm_dkl.py`, `atm_cert_checks.log`, `atm_wing.log`. Base k=0: IS Sh 1.25 / $35.9k / DD -18%,
+OOT 1.97 / DD -8.1%. Loss quintiles are FLAT (0.42-0.45) for every divergence: at the money
+the market and realized history agree, so there is nothing for a divergence to price.
+
+| DKL | discount side (k<0) | reward side (k>0) | verdict |
+|---|---|---|---|
+| D(P_real ‖ Q_iv), both directions, signed | IS 1.29-1.32, OOT 1.8-2.35 | IS 1.24-1.29, OOT 1.9-2.6 | noise, not monotone |
+| today vs yesterday (D_jump, up/dn) | ±0.05 | ±0.05 | inert |
+| front vs next expiry (D_term) | ±0.03 (18% coverage) | ±0.03 | inert |
+| put wing vs call wing, spread's own strikes (D_mirror) | flat | k=256: IS 1.34, OOT 2.35 | median 1e-5 nats; needs k in the hundreds; sign of loss gradient flips IS vs OOT |
+| risk reversal at 1 sigma, signed by side sold (D_rr) | flat | flat | loss gradient IS 0.46->0.40, OOT 0.39->0.48: contradictory |
+| -ln p_iv rewarded | -- | k=8: IS 1.41 / $45.9k, OOT 2.34; beats equal-count control (1.24 / 1.94) | corr 0.88 with delta; delta-only control reaches IS 1.46: it is "sell 55-60 delta", not information |
+
+Conclusion: at the money no DKL adds information beyond the delta itself. The put-wing vs
+call-wing divergence (user's request) does not predict direction over six years (§0.27) and
+at the money its magnitude is too small to reorder a book without k in the hundreds, where the
+in-sample and out-of-sample loss gradients disagree. The reward DKL of §0.28-0.29 is a
+20-delta result; at 50-delta the selection is G alone.
+
+## 0.32 A DKL that contributes at the money (2026-09-13) — realized-vs-implied exceedance, rewarded
+
+After §0.31 the user required a DKL that contributes in either direction. Tested at 50-60 delta,
+fill 1.08x model, commission $1.30, thr 0.01 (`atm2.py`..`atm5.log`): repaired term structure
+(still 18% coverage, inert), IV-rank divergence (inert), realized drift vs driftless market
+(discount side helps OOT only; IS gain = trade-count reduction per matched control), and:
+
+    p_exceed = trailing-252d frequency (DTE-matched) that |ln move| > 1 ATM-sigma of TODAY's IV
+    q_iv     = 2*(1 - N(1)) = 0.317, the lognormal law's exceedance
+    D_vrp_neg = D( Bern(p_exceed) || Bern(q_iv) ), fired only when p_exceed > q_iv
+               (the name has been moving MORE than its implied vol says)
+    GROUND   = EV * exp(+k * D_vrp_neg),  k = 8-12   (REWARD sign)
+
+| k | IS Sh | matched k=0 | IS DD | OOT Sh | matched k=0 | OOT DD |
+|---|---|---|---|---|---|---|
+| 0 | 1.25 | 1.25 | -18.0% | 1.97 | 1.97 | -8.1% |
+| 4 | 1.31 | 1.25 | -18.7% | 2.05 | 2.07 | -8.9% |
+| 8 | 1.32 | 1.23 | -16.9% | 2.38 | 1.95 | -6.8% |
+| 12 | 1.36 | 1.26 | -16.5% | 2.49 | 2.00 | -6.9% |
+| 16 | 1.36 | 1.25 | -17.7% | 2.47 | 1.92 | -7.6% |
+| 24 | 1.25 | 1.26 | -19.8% | 2.41 | 1.89 | -8.3% |
+
+Monotone k=0..12 in both windows, beats the equal-count control at k=8-16, fades past 16.
+Year deltas at k=12: 2020 -0.03, 2021 +0.47, 2022 -0.26, 2023 +0.25, 2024 +0.37, 2025 -0.12,
+2026 +0.52 (4 of 7 up, 2 flat, 2022 down). Holds at every fill 1.00-1.12 (IS +0.10-0.14,
+OOT +0.43-0.55). Works through bull puts and DTE 2-3 (DTE3: IS 1.08 -> 1.36, OOT 1.66 -> 2.41).
+Loss quintiles are flat (0.41-0.43): it is not a risk measure; it reorders within equal risk.
+Mechanism NOT established: the selected book's realized exceedance moves 0.291 -> 0.310 with
+IV, credit and name count unchanged. Treat as a modest, plausible-but-unexplained tilt, not
+a validated signal. Magnitude ~+0.1 Sharpe IS, +0.5 OOT (2026 is 560 trades).
+
+## 0.33 At-the-money DKL that contributes: sold-tail reward + entropy discount (2026-09-13)
+
+Logs `atm6.log`..`atm9.log`, frame `featATM6.parquet`. 50-60 delta, fill 1.08x model, commission
+$1.30, thr 0.01, G on P_real. Names for reference:
+
+- **D_wing** (20-delta result, §0.28/0.29): D(Q_wing || Q_atm), rewarded.
+- **D_tail** ("sold-tail divergence", 3-state): order the name's realized DTE-matched moves over
+  the trailing 252d into (adverse tail, middle, favourable tail) at ONE IMPLIED SIGMA of today's
+  ATM IV, adverse = the direction that hurts the side sold. Q = the normal law (0.159, 0.683, 0.159).
+  D_tail = D(P || Q) fired only when the adverse tail is fatter than 0.159 (39% of candidates).
+  Rewarded: IS 1.25 -> 1.38 at k=16 (matched control 1.24), OOT 1.97 -> 2.32 (1.93), monotone k=0..16.
+- **D_ent** ("entropy discount"): D(Q_bs || uniform) = ln3 - H(Q_bs), the user's uniform-reference
+  suggestion. Loss rises 32% -> 51% across its quintiles: a genuine risk measure at the money.
+  Discounted. Alone: IS ~= control, OOT +0.5 at k=0.8. The 2-state strike-specific and
+  (0.5,0,0.5)-reference variants behave the same way (all in atm6/atm8 logs).
+
+Combined ("tail-entropy GROUND"):
+
+    GROUND = EV * exp( +k1 * D_tail  -  k2 * D_ent )
+
+| k1 | k2 | IS n | IS Sh | ctrl | IS DD | ctrl | OOT Sh | ctrl | OOT DD | years up (of 7) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | 0 | 4184 | 1.25 | 1.25 | -18.0 | -18.0 | 1.97 | 1.97 | -8.1 | - |
+| 8 | 0.8 | 4258 | 1.36 | 1.23 | -15.7 | -19.0 | 2.63 | 2.05 | -6.3 | 6 |
+| 16 | 0.8 | 4379 | 1.47 | 1.24 | -15.4 | -20.0 | 2.42 | 1.95 | -8.4 | 6 |
+| 12 | 1.2 | 4261 | 1.42 | 1.23 | -15.2 | -19.0 | 2.59 | 2.05 | -5.9 | 5 |
+| 16 | 1.6 | 4234 | 1.47 | 1.24 | -15.3 | -18.3 | 2.00 | 2.07 | -8.4 | 4 |
+
+Recommended cell (8, 0.8) or (16, 0.8). Fill sensitivity at (16, 1.6): IS +0.20-0.25 at every
+fill 1.00-1.12; OOT flat there (k2 too high for OOT). Caveats: D_tail's mechanism is not
+explained (rewarding a fat adverse tail); the strike-specific 2-state forms do NOT reproduce
+it (it is a chain-level property); 2026 is 560 trades. Nothing committed or deployed.
+
+**D_ent ALONE (atm10.log)** — the simplest form, the paper's sign, and risk-monotone:
+GROUND = EV * exp(-k * D_ent), D_ent = D(Q_bs || uniform) = ln3 - H(Q_bs), 50-60 delta, fill 1.08, comm $1.30.
+k: 0 -> 0.4 -> 0.8 -> 1.2: IS Sh 1.25 -> 1.32 -> 1.35 -> 1.40 (matched ctrl 1.25 / 1.30 / 1.34 / 1.37), IS DD -18.0 -> -14.0;
+OOT 1.97 -> 2.26 -> 2.43 -> 2.27 (ctrl ~1.95 / 1.85), OOT DD -8.1 -> -6.6. Year deltas at k=0.8: all seven >= 0
+(+0.01, +0.11, +0.28, +0.04, +0.33, +0.05, +0.46); at k=1.2 all seven >= +0.09. Holds at fills 1.00-1.12.
+In-sample the gain over the matched control is +0.01 to +0.05 (it works through gating fewer trades);
+out of sample +0.4-0.5 over control. Working k = 0.8-1.2. Recommended as the default over the combination:
+one parameter, discount sign, loss monotone in D (32% -> 51%).
+Note: D_ent IS the paper's risk measure. Mercurio, Wu, Xie, Entropy 2020, 22, 805, Eq. (19):
+D_KL(R_Q || U_m) = log(m) - H(R_Q), "the risk of an option strategy portfolio ... relative entropy with
+respect to the uniform distribution". With m=3 spread states and Q_bs as the return law it is exactly
+what worked at the money. k=1.0 row: IS 1.35 (ctrl 1.36) DD -14.9%, OOT 2.38 (ctrl 1.96) DD -6.6%, 6/7 years >= 0.
+
+## 0.34 Band x k x N sweep for GROUND = EV(P_real) * exp(-k * D_ent) (2026-09-13) — `band_ent.log`
+
+Fill 1.08x model, comm $1.30, thr 0.01, top-5/day, P_real window W=252. IS Sh / OOT Sh:
+15-25: 0.32/0.08 (k0) .. 0.59/0.42 (k2.4); 20-45 delta: negative to flat at every k; 40-50: 0.19/-0.24;
+45-55: 0.80/0.62 -> 0.79/0.92 (k0.8; ctrl 0.87/0.49); **50-60: 1.25/1.97 -> 1.32/2.26 (k0.4) -> 1.35/2.43
+(k0.8; ctrl 1.34/1.95) -> 1.35/2.38 (k1.0) -> 1.40/2.27 (k1.2; ctrl 1.37/1.85) -> 1.35/2.01 (k1.6)**,
+IS DD -18.0 -> -14.0; 40-60: 1.04/1.69 -> 1.17/1.55 (k0.8). Working k = 0.8-1.2 on 50-60 only.
+N = P_real window W on 50-60 (k=0 -> k=1): W=126 1.17/2.18 -> 1.19/2.42; W=252 1.25/1.97 -> 1.35/2.38;
+**W=504 1.37/3.00 -> 1.40/2.90** (n 3470 -> 3223: names need 2 years of history, so 2020-21 coverage drops).
+On 40-60, W=252 is best. Recommendation: 50-60 delta, k = 1, W = 252 (or 504 once the history exists), G on P_real.
+
+**NEW CANON (user, 2026-09-13): D_ent.** 50-60 delta by fitted delta, G on P_real (W=252), GROUND = EV*exp(-1.0*D_ent),
+D_ent = ln3 - H(Q_bs) (paper Eq. 19), thr 0.01 (0.015 conservative), top-5/day, smile-fit credit, fill 1.08x, comm $1.30.
+IS 2020-25: 3,997 trades, $38.3k, Sh 1.35, DD -14.9%. OOT 2026: 544 trades, $14.4k, Sh 2.38, DD -6.6%.
+By DTE (`canon_dte.log`), each DTE as its own book k=0 -> k=1: IS DTE1 0.75->0.87, DTE2 0.99->1.09, DTE3 1.08->1.24,
+DTE4 0.78->0.85; OOT DTE1 0.88->1.23, DTE2 1.54->1.86, DTE3 1.66->1.66, DTE4 0.39->0.59. k=1 helps every DTE in both
+windows. DTE 4 is the weak leg (loss 44-46%, lowest P&L/contract); DTE 1-3 book: IS ~1.35 / OOT 2.6 (DTE1-2) - 2.1 (DTE2-3).
+Selected book mix IS: DTE1 17%, DTE2 24%, DTE3 30%, DTE4 29%. Not committed, not deployed; live path still on old canon.
+**Execution rule (user, 2026-09-13):** at 50-60 delta the model prices the median spread at credit/width = 0.51
+(credit/max-loss 1.0); break-even fill is 0.965x model = credit/width ~0.49. Target credit/width >= 0.50 as the
+floor (never less), aim 0.53-0.56 (= 1.04-1.10x model, IS Sh 1.1-1.7). Prefer limit = model_credit x 1.04+ per
+spread over a flat ratio, since a 60-delta short carries a higher fair ratio than a 50-delta one. `canon_fill.log`.
+**Delta -> target credit/width (`delta_credit_targets.log`, all 50-60 delta candidates 2020-26, smile-fit fair):**
+fitted short delta 0.50-0.52: fair 0.437, floor(0.965x) 0.42, min(1.04x) 0.46, good(1.06x) 0.46, obs(1.08x) 0.47, great(1.10x) 0.48;
+0.52-0.54: fair 0.477 -> 0.46 / 0.50 / 0.51 / 0.52 / 0.53;  0.54-0.56: fair 0.508 -> 0.49 / 0.53 / 0.54 / 0.55 / 0.56;
+0.56-0.58: fair 0.520 -> 0.50 / 0.54 / 0.55 / 0.56 / 0.57;  0.58-0.60: fair 0.526 -> 0.51 / 0.55 / 0.56 / 0.57 / 0.58.
+Fair ratio rises ~0.01-0.02 from DTE1 to DTE4 and is flat across the $0.50/$1/$2.50 width rungs. A flat 0.50 floor
+rejects fair-or-better 50-52 delta fills and accepts fair 56-60 delta fills: use the per-delta targets.
+**Credit-target formula for the tracker (`credit_formula.log`, fit on 43,479 candidates 2020-26, median |err| 0.025):**
+  fair(d, DTE) = 0.4022 + 2.3485*(d-0.5) - 12.464*(d-0.5)^2 + 0.0077*(DTE-1)      d = fitted short delta in [0.50, 0.60]
+  y  (min credit/width)   = 1.04 * fair      break-even = 0.965 * fair
+  (y1, y2) target range   = (1.06 * fair, 1.10 * fair)
+e.g. d=0.55 DTE 3: fair 0.504, min 0.524, target (0.534, 0.554). When the smile-fit model credit for the exact spread is
+available, use model_credit x {1.04, 1.06, 1.10} instead; the formula is the cross-sectional average.
+
+## 0.35 D_ent canon IMPLEMENTED (2026-09-13) — code, payloads, site
+
+Single source of truth: `ent_canon.py` (smile fit, model credit, P_real, D_ent, Kelly, credit
+targets, CANON_LABELS). Used by:
+- `report_ent_canon.py` -> `live/data/backtest_equity.json`, `oot_equity.json` (IS 2020-07-14..2025:
+  3,997 trades, qty1 $38,347 Sh 1.35 DD -14.9%; OOT 2026-01-02..09-11: 544 trades, qty1 $14,446 Sh 2.34
+  DD -6.6%). Reads `research/dkl_2026_09_13/featATM6.parquet` (gitignored, 1.4 GB dir; rebuild from
+  the research scripts). IS starts July 2020 because P_real needs 120 sessions of history.
+- `live/ranker.py`: fits smiles on the full snapshot, prices candidates, P_real from `live/closes.py`
+  (`output/daily_closes.parquet` seeded by `build_daily_closes.py` + last snapshot of each day),
+  GROUND = EV*exp(-k*D_ent), thr from config (0.01). Emits model_credit, quoted_credit (IBKR),
+  dfit_*, D_ent, credit_targets{min/target_lo/target_hi (credit & c/w), fair_cw, basis}.
+  spread_triple / empirical_runner no longer loaded. Verified on live/snapshots/2026-08-19/1531:
+  4 qualified picks, e.g. CSCO 112/111 bull_put quoted 0.49 model 0.505 target 0.54-0.56.
+- `live/credit_basis.py`: entry credit = actual fill, else 1.08 x model_credit, else 0.80 x mid (pre-canon picks).
+- `live/webapp.py`: `_attach_targets` on every pick (history, actuals, live payload); fill graded
+  below-min / ok / target / great; History P&L entry credit now via credit_basis.
+- Templates: Min / Target column on History and Actuals; live cards show quoted vs model credit and
+  targets; chips + subtitles on live/backtest/oot updated; headers renamed real:/bs:/D_ent.
+- `config.py`: DELTA 0.55 (0.50-0.60), GROUND_THRESHOLD 0.01. `ground.py`: DKL_K 1.0,
+  DKL_REFERENCE "entropy_uniform", PROB_BASIS "realized" (row p_real/q_real/ro_real).
+Deploy: code rsync + gunicorn HUP to Mya (webapp.py, templates, ent_canon.py, credit_basis.py, data
+JSON). The LIVE tab on Mya shows new fields only once the Mac mini pulls main and its ranker runs.
+Not done: fetch_daily_bars does not yet append to daily_closes (snapshots cover it day-to-day).

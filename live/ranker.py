@@ -31,38 +31,17 @@ if str(ROOT) not in sys.path:
 import config as backtest_config
 import spreads
 import ground
-import empirical_runner as er
-import spread_triple as st
 from live import live_config
 from live.regime import current_regime
 
 
-# ── Empirical window: install at module import ─────────────────────────────
-# 52:10 canon (2026-09-12): DKL_REFERENCE="empirical_vs_iv" needs the
-# spread_triple window (realized WIN/LOSS/PARTIAL counts over the last 52
-# weekly expiries, keyed on the name's own (ticker, $width) history with a
-# pooled fallback). Without it ground falls back to the max-entropy reference.
-# Cached per (population mtime, window spec, day) so half-hourly firings are cheap.
-#
-# empirical_runner is still installed too: other DKL_REFERENCE modes and the
-# USE_EMPIRICAL probability path read its single-leg table. Harmless when unused.
-try:
-    _asof = st.install_latest_cached()
-    print(f"[ranker] spread_triple window installed "
-          f"(asof {_asof.date()}, {st.N_EXPIRIES} expiries, "
-          f"newest realized {st.latest_expiry().date()})", flush=True)
-except Exception as e:
-    print(f"[ranker] WARN: spread-outcome population not available ({e}). "
-          f"GROUND will use the max-entropy DKL fallback. "
-          f"Run refresh_spread_outcomes.py.", flush=True)
-
-try:
-    _asof_leg = er.install_latest_cached()
-    print(f"[ranker] legacy single-leg window installed (asof {_asof_leg.date()})", flush=True)
-except Exception as e:
-    print(f"[ranker] note: legacy empirical pool unavailable ({e}); "
-          f"not required under 52:10 canon.", flush=True)
-
+# ── D_ent canon (2026-09-13) ─────────────────────────────────────────────────
+# Scoring no longer uses the spread_triple / empirical_runner windows. The belief is
+# P_real (the name's realized DTE-matched moves vs the exact strikes, from daily closes),
+# the credit is the smile-fit model credit, and the risk term is D_ent = ln3 - H(Q_bs),
+# the paper's eq. 19. See SESSION_HANDOFF.md §0.33 and ent_canon.py.
+import ent_canon as entc   # not "ec": the earnings block below binds a local `ec`
+from live.closes import load_closes
 
 # ── Snapshot discovery ──────────────────────────────────────────────────────
 
@@ -166,6 +145,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     """Run the full backtest-canonical ranking pipeline on a live snapshot."""
     if df.empty:
         return pd.DataFrame()
+    df_full = df.copy()   # the smile fit wants every liquid strike, before the OI gate
 
     # Liquidity gate. Live uses live_config.LIVE_MIN_OPEN_INTEREST (default 0,
     # since IBKR returns NaN for OI mid-session and the assembler defaults to 0).
@@ -331,23 +311,36 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if candidates.empty:
         return pd.DataFrame()
 
-    # Score with GROUND. score_candidates adds {p, q, ro, w_star, G, DKL, EV}
-    # per row; the intrinsic GROUND = E · exp(−k·DKL) is computed directly from
-    # G and DKL on each row (no per-week reference needed under canonical form).
-    scored = ground.score_candidates(candidates)
-
-    import math
-    def _intrinsic_ground(row):
-        G = row.get("G")
-        DKL = row.get("DKL")
-        if G is None or pd.isna(G) or DKL is None or pd.isna(DKL):
-            return float("nan")
-        return (math.exp(G) - 1.0) * math.exp(-ground.DKL_K * DKL)
-
-    scored["GROUND"] = scored.apply(_intrinsic_ground, axis=1)
-
-    # Drop rows where GROUND couldn't be computed (e.g. extreme probabilities,
-    # growth-negative candidates).
+    # ── D_ent canon scoring ───────────────────────────────────────────────────
+    # 1) fit one IV smile per (Symbol, DataDate, ExpirationDate) on the FULL snapshot chain
+    #    (liquid strikes only, robust), 2) price both legs off the fit -> model_credit, the
+    #    market triple Q_bs and D_ent, 3) belief P_real from daily closes, 4) Kelly growth on
+    #    the model credit, GROUND = (e^G - 1) * exp(-k * D_ent).
+    # The IBKR quoted credit (net_credit, combo-priced when available) is KEPT for display
+    # and for the tracker; selection and the fill targets use the model credit.
+    fits = entc.fit_smiles(df_full)
+    print(f"  smile fit: {len(fits)} chains", flush=True)
+    candidates = candidates.rename(columns={"spread_width": "width"}) if "width" not in candidates.columns else candidates
+    priced = entc.price_spreads(candidates, fits)
+    n_unpriced = int(priced["model_credit"].isna().sum())
+    if n_unpriced:
+        print(f"  {n_unpriced} candidate(s) without a smile fit dropped", flush=True)
+    priced = priced[priced["model_credit"].notna() & (priced["model_credit"] > 0.01)].copy()
+    if priced.empty:
+        return pd.DataFrame()
+    closes = load_closes()
+    scored = entc.score(priced, closes, k=ground.DKL_K, thr=backtest_config.GROUND_THRESHOLD)
+    scored["quoted_credit"] = scored["net_credit"]
+    scored["spread_width"] = scored["width"]
+    # market triple for display (p_hat / q_hat / ro_hat = WIN / LOSS / PARTIAL under Q_bs)
+    scored["p_hat"], scored["q_hat"], scored["ro_hat"] = scored["q_win"], scored["q_loss"], scored["q_part"]
+    n_nobelief = int(scored["EV"].isna().sum())
+    if n_nobelief:
+        print(f"  {n_nobelief} candidate(s) lack {entc.MIN_OBS} sessions of history (no P_real) and are unscored", flush=True)
+    for i, r in scored.iterrows():
+        tg = entc.credit_targets(r["dfit_short"], r["DTE"], width=r["width"], model_credit=r["model_credit"])
+        for k_, v_ in tg.items():
+            scored.at[i, f"tgt_{k_}"] = v_
     ranked = scored.dropna(subset=["GROUND"]).copy()
 
     # One direction per ticker (2026-06-10): bull_put and bear_call on the same
@@ -358,13 +351,9 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if len(ranked) < before:
         print(f"  per-ticker dedupe: {before} -> {len(ranked)} rows", flush=True)
 
-    # Canonical 2026-06-12 (corrected solver): DKL=rv_vs_iv, k=10 (via ground.DKL_K),
-    # threshold 0.05 across all dows (config.GROUND_THRESHOLD). Top-5 per dow.
+    # D_ent canon: GROUND >= config.GROUND_THRESHOLD (0.01), top-5 per day.
     thr = backtest_config.GROUND_THRESHOLD
-    PER_DOW_THRESHOLDS = {0: thr, 1: thr, 2: thr, 3: thr}
-    entry_dows = pd.to_datetime(ranked.get("entry_date")).dt.dayofweek
-    thresholds = entry_dows.map(PER_DOW_THRESHOLDS).fillna(thr)
-    ranked["qualified"] = ranked["GROUND"] >= thresholds
+    ranked["qualified"] = ranked["GROUND"] >= thr
 
     # Sort by GROUND descending (qualified first, then below-threshold).
     ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
@@ -502,6 +491,16 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "long_bid_size":    _int(r.get("long_bid_size")),
             "long_ask_size":    _int(r.get("long_ask_size")),
             "IV":               _num(r.get("IV")),
+            # D_ent canon fields (2026-09-13)
+            "model_credit":     _num(r.get("model_credit")),
+            "quoted_credit":    _num(r.get("quoted_credit")),
+            "iv_fit_short":     _num(r.get("iv_fit_short")),
+            "iv_fit_long":      _num(r.get("iv_fit_long")),
+            "dfit_short":       _num(r.get("dfit_short")),
+            "dfit_long":        _num(r.get("dfit_long")),
+            "D_ent":            _num(r.get("D_ent")),
+            "credit_targets":   {k_[4:]: (_num(r.get(k_)) if not isinstance(r.get(k_), str) else r.get(k_))
+                                 for k_ in r.index if k_.startswith("tgt_")},
             "DTE":              _int(r.get("DTE")),
             "p":                _num(r.get("p")),
             "q":                _num(r.get("q")),
@@ -548,8 +547,14 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
                 else backtest_config.GROUND_THRESHOLD
             ),
             "TOP_N":            live_config.TOP_N_DISPLAY,
-            "DKL_K":            getattr(ground, "DKL_K", 50.0),
+            "DKL_K":            getattr(ground, "DKL_K", 1.0),
             "ALPHA":            "(b-1)/(2b)",
+            "DKL_REF":          "D_ent = ln3 − H(Q_bs) (paper eq. 19)",
+            "BELIEF":           f"P_real: {entc.WINDOW} sessions of realized moves vs the strikes",
+            "CREDIT_MODEL":     "smile-fit model credit (selection); IBKR quote shown",
+            "FILL_MULT":        entc.FILL_MULT,
+            "COMMISSION":       entc.COMMISSION,
+            "TARGETS":          entc.CANON_LABELS["targets"],
         },
         "regime":    current_regime(),
         "vol_gate":  gate,

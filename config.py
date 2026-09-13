@@ -72,9 +72,13 @@ def drop_bad_spot_days(df):
 # Target delta for short leg. Canonical 2026-09-11: move away from ATM
 # 50-delta spreads to reduce pin/assignment exposure and improve fill-stressed
 # OOT results. Validated on 2020-25 and 2026 OOT at k=10, GROUND>=0.05.
-DELTA_TARGET   = 0.20
-DELTA_MIN      = 0.10   # eligible range lower bound
-DELTA_MAX      = 0.30   # eligible range upper bound
+# D_ent canon 2026-09-13: at-the-money short leg. The 20-45 delta range is flat-to-negative at a
+# FILLABLE credit (smile-fit model x1.08, $1.30 commission); only 50-60 delta earns
+# (SESSION_HANDOFF.md §0.30). Strike is chosen by FITTED delta in ent_canon; these bounds also
+# gate the vendor/IBKR delta pre-filter in spreads.py.
+DELTA_TARGET   = 0.55
+DELTA_MIN      = 0.50   # eligible range lower bound
+DELTA_MAX      = 0.60   # eligible range upper bound
 
 # Days to expiry: target nearest weekly expiry (4-6 days from entry)
 DTE_MIN = 3    # minimum days to expiry
@@ -103,7 +107,23 @@ CREDIT_SCALE = 1.0
 # A spread with credit/max_loss < this gets rejected at candidate construction.
 # 0.30 means: must collect at least 30 cents per $1 of risk.
 # Set to 0.0 to disable the filter.
-MIN_CREDIT_RATIO = 0.30
+# DISABLED 2026-09-12. At 20-delta the FAIR ratio is ~0.25 (= d/(1-d)), so a
+# 0.30 floor demanded better-than-fair odds on every trade and therefore
+# selected quote errors rather than edge: gated picks averaged 2.91x fair value
+# and 30.2% of them had NO BID on the short leg (vs 2.2% ungated) — a 13x
+# enrichment for unfillable contracts. The floor was a contamination magnet.
+MIN_CREDIT_RATIO = 0.0
+
+# Maximum TRUE distance out-of-the-money for the short strike, as % of spot.
+# Added 2026-09-12. Vendor IV is inflated for far-OTM strikes (median IV 1.40 at
+# >8% OTM vs 0.19 at <1%), and delta is computed FROM that IV, so a nearly
+# worthless strike gets reported as ~0.19 delta and the 0.20-delta selector
+# picks it. Those strikes have no bid 31% of the time (vs 0.7% at 2-3% OTM), so
+# the backtest was booking ask/2 as real premium on unfillable contracts.
+# Delta cannot catch this because it reads ~0.19-0.22 at EVERY moneyness.
+# 5% is >2 sigma for a 1-4 DTE spread (3-day expected move ~2.3% at IV 0.25).
+# Set to None to disable.
+MAX_SHORT_OTM_PCT = 5.0
 
 # Maximum credit-to-max-loss ratio. Comparison is strict `>` — kept
 # iff b ≤ MAX_CREDIT_RATIO, filtered iff b > MAX_CREDIT_RATIO.
@@ -114,6 +134,14 @@ BACKTEST_MAX_CREDIT_RATIO = float("inf")
 
 # Hard cap on per-share max loss. Spreads where max_loss > $5/share are
 # rejected at candidate construction (canonical: $5/share).
+# Hard cap on spread WIDTH (short-to-long strike distance, per share).
+# Added 2026-09-12. Width was uncontrolled — set by whatever the exchange's
+# strike ladder offered — so risk per trade varied 14x across names at identical
+# delta. The $5-wide bucket was 2.6% of trades but supplied EVERY one of the
+# largest losses (NFLX/UNH/LIN/COST all -$390 to -$427 on a single breach,
+# ~13 wins each). 2.50 keeps the $0.50/$1.00/$2.50 ladder rungs.
+MAX_SPREAD_WIDTH = 2.50
+
 MAX_MAX_LOSS = 5.0
 
 # Theta-to-credit ratio floor. Canonical = -inf (filter off).
@@ -156,7 +184,8 @@ LOG_BASE = _math.e
 # so a 0.0010 cutoff = 0.10% per-trade hurdle on variance-adjusted EV
 # after the entropic ambiguity discount. See paper §7 for the threshold
 # sweep and the comparison against the legacy top-N=5 rule.
-GROUND_THRESHOLD = 0.05  # canonical 2026-06-12 (corrected solver, k=10; growth-optimal cell of the sweep)
+GROUND_THRESHOLD = 0.01  # D_ent canon 2026-09-13: 0.05 was set on inflated EVs and passes 0.35 trades/day at fillable
+                         # credit; 0.01 = 3.8/day (0.015 conservative). SESSION_HANDOFF.md §0.33.
 
 # ── SELECTION ────────────────────────────────────────────────────────────────
 # Number of top-ranked candidates entered each week. Under the canonical

@@ -28,7 +28,9 @@ if str(ROOT) not in sys.path:
 from live import live_config
 from live.regime import current_regime
 from live import trading_calendar
+from live import credit_basis
 import spreads
+import ent_canon as ec
 
 
 app = Flask(
@@ -124,6 +126,26 @@ def _actuals_path() -> Path:
 
 def _json_clone(obj):
     return json.loads(json.dumps(obj))
+
+
+def _attach_targets(pick: dict) -> None:
+    """D_ent canon (2026-09-13): min / target credit for the spread, from the smile-fit model
+    credit when the ranker supplied one, else from the cross-sectional fair(d, DTE) formula.
+    Also grades a recorded fill against them. IBKR quotes on the pick are left untouched."""
+    try:
+        d = pick.get("dfit_short")
+        if d is None:
+            d = pick.get("short_delta")
+        width = pick.get("spread_width") or ((pick.get("net_credit") or 0) + (pick.get("max_loss") or 0))
+        mc = pick.get("model_credit")
+        tg = ec.credit_targets(abs(float(d)) if d is not None else None, pick.get("DTE"),
+                               width=float(width) if width else None,
+                               model_credit=float(mc) if mc is not None else None)
+        pick["credit_targets"] = tg
+        pick["fill_grade"] = ec.grade_fill(pick.get("actual_credit"), float(width) if width else None, tg)
+    except (TypeError, ValueError):
+        pick["credit_targets"] = None
+        pick["fill_grade"] = None
 
 
 def _actuals_store() -> dict:
@@ -310,6 +332,7 @@ def _actuals_rows() -> list[dict]:
         if item.get("actual_credit") is not None:
             pick["actual_credit"] = item["actual_credit"]
             pick["actual_max_loss"] = item.get("actual_max_loss")
+        _attach_targets(pick)
 
         rows.append({
             "id": item.get("id"),
@@ -381,9 +404,15 @@ def _enrich_pick(pick: dict, tracking_rows: list = None, credit_frac: float = 1.
     # (history page) so displayed credit/max-loss bound the P&L, which is
     # computed from the 0.80×mid entry. actual_credit overrides in fill view.
     actual_c = pick.get("actual_credit")
+    model_c = pick.get("model_credit")
     if credit_frac != 1.0 and actual_c is not None:
         c0 = round(float(actual_c), 4)
         basis = "ACTUAL"
+    elif model_c is not None and float(model_c) > 0:
+        # D_ent canon: the smile-fit model credit is the selection basis; the fill view books
+        # FILL_MULT x model (measured on 19 real fills). The IBKR quote stays on the pick.
+        c0 = round(float(model_c) * (credit_basis.MODEL_FILL_MULT if credit_frac != 1.0 else 1.0), 4)
+        basis = "MODEL" if credit_frac == 1.0 else f"{credit_basis.MODEL_FILL_MULT:.2f}×MODEL"
     else:
         c0 = round(base_mid * credit_frac, 4)
         if credit_frac != 1.0:
@@ -404,6 +433,7 @@ def _enrich_pick(pick: dict, tracking_rows: list = None, credit_frac: float = 1.
     ]
     pick["suggested_qty"] = suggested_qty
     pick["suggested_capital"] = round(suggested_qty * ml_dollar, 2)
+    _attach_targets(pick)
 
 
 def _enrich_payload(payload: dict) -> None:
@@ -555,17 +585,9 @@ def _frozen_history(limit: int = 60) -> list[dict]:
             # combo mid (canon 2026-06-10; real fills ran ~0.82×mid, n=5).
             # Quote-derived mid also fixes OLD frozen picks whose stored
             # net_credit is the phantom LAST-clamped credit.
-            actual_c = pick.get("actual_credit")
-            if actual_c is not None:
-                entry_credit = float(actual_c)
-            else:
-                fsb = pick.get("short_bid"); fsa = pick.get("short_ask")
-                flb = pick.get("long_bid");  fla = pick.get("long_ask")
-                if None not in (fsb, fsa, flb, fla) and float(fsa) > 0 and float(fla) > 0:
-                    qmid = (float(fsb) + float(fsa)) / 2.0 - (float(flb) + float(fla)) / 2.0
-                    entry_credit = min(max(qmid, 0.0), spread_w) * 0.80
-                else:
-                    entry_credit = min(mid_c * 0.80, spread_w)
+            # One source of truth (live/credit_basis.py): actual fill, else FILL_MULT x model
+            # credit (D_ent canon), else 0.80 x quote-derived mid for pre-canon picks.
+            entry_credit = credit_basis.entry_credit(pick)
 
             # Close debit: TRUST the tracker's mark (canonical 2026-06-04: BS_theo).
             # If the latest tick has no current_mark (legs missing from snapshot —

@@ -1,0 +1,11 @@
+/Users/mercurio/Downloads/gepo-backtest/./live/closes.py:66: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  merged = pd.concat([cur, new], ignore_index=True).drop_duplicates(['ticker', 'date'], keep='first')
+output/2020_sp500_last.parquet: 23,511 closes, 23,511 new
+output/2021_sp500_last.parquet: 23,544 closes, 23,544 new
+output/2022_sp500_last.parquet: 23,711 closes, 23,711 new
+output/2023_sp500_last.parquet: 23,531 closes, 23,531 new
+output/2024_sp500_last.parquet: 23,629 closes, 23,629 new
+output/2025_sp500_last.parquet: 23,294 closes, 23,294 new
+output/2026_sp500_last.parquet: 9,818 closes, 9,818 new
+output/2026_sp500_last_oot_combined.parquet: 14,647 closes, 4,829 new
+store /Users/mercurio/Downloads/gepo-backtest/output/daily_closes.parquet: +155,867 rows

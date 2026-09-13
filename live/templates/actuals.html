@@ -32,6 +32,7 @@
       <thead><tr>
         <th></th><th>Date</th><th>Time</th><th>Ticker</th>
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th>
+        <th title="D_ent canon execution rule: min = 1.04 x fair credit, target = 1.06-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">Min / Target ($/sh)</th>
         <th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
         <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>
       </tr></thead>
@@ -114,6 +115,20 @@
                     title="click to record your actual fill">(+)</span>
             {% endif %}
           </td>
+          {# Min / target credit from the model (D_ent canon). The recorded fill is graded
+             against it: red below the minimum, amber between min and target, green in or
+             above the target range. IBKR quotes are untouched. #}
+          {% set tg = p.credit_targets %}
+          {% if tg and tg.min_credit is defined %}
+            <td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }}); breakeven ${{ '%.2f'|format(tg.breakeven_credit) }}">
+              <span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span>
+              <span style="opacity:0.6"> / </span>
+              <span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>
+              {% if p.fill_grade %}<br><span style="font-size:10px;font-weight:600;color:{% if p.fill_grade == 'below-min' %}#e0645a{% elif p.fill_grade == 'ok' %}#c9a227{% else %}#7ec99a{% endif %}">fill {{ p.fill_grade }}</span>{% endif %}
+            </td>
+          {% else %}
+            <td>—</td>
+          {% endif %}
           <td>${{ "%.2f"|format(ml|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span class="actual-shown" style="color:#7ec99a">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>
           {# Modelled ratio, plus the ratio on your real fill once recorded.
              All recorded values use the one light green (#7ec99a). History
