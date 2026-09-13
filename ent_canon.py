@@ -223,15 +223,19 @@ def kelly(p, q, ro, b):
 
 
 # ── 5. score ────────────────────────────────────────────────────────────────
-def score(C: pd.DataFrame, closes: pd.DataFrame, k: float = K, thr: float = THR) -> pd.DataFrame:
-    """C must already carry model_credit + D_ent (price_spreads). Adds p,q,ro,w_star,G,EV,DKL,GROUND,qualified."""
+def score(C: pd.DataFrame, closes: pd.DataFrame, k: float = K, thr: float = THR, credit_col: str = 'model_credit') -> pd.DataFrame:
+    """C must already carry model_credit + D_ent (price_spreads). Adds p,q,ro,w_star,G,EV,DKL,GROUND,qualified.
+
+    credit_col: the credit the Kelly growth is computed on. 'model_credit' (backtest canon) or
+    'net_credit' (live: IBKR quoted mid, user decision 2026-09-13 — uncapped)."""
     C = C.copy()
     P = p_real(C, closes)
     C['p'], C['q'], C['ro'] = P[:, 0], P[:, 1], P[:, 2]
     width = (C.short_strike - C.long_strike).abs().values.astype(float)
-    ml = width - C.model_credit.values
+    cr = C[credit_col].values.astype(float)
+    ml = width - cr
     with np.errstate(invalid='ignore', divide='ignore'):
-        b = np.where(ml > 0, C.model_credit.values / ml, np.nan)
+        b = np.where(ml > 0, cr / ml, np.nan)
     w, ell = kelly(np.nan_to_num(C.p.values, nan=0), np.nan_to_num(C.q.values, nan=0), np.nan_to_num(C.ro.values, nan=0), np.nan_to_num(b, nan=0))
     bad = ~np.isfinite(b) | ~np.isfinite(C.p.values)
     ell[bad] = np.nan; w[bad] = np.nan

@@ -329,7 +329,9 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if priced.empty:
         return pd.DataFrame()
     closes = load_closes()
-    scored = entc.score(priced, closes, k=ground.DKL_K, thr=backtest_config.GROUND_THRESHOLD)
+    sel_credit = "net_credit" if getattr(live_config, "LIVE_SELECTION_CREDIT", "quoted") == "quoted" else "model_credit"
+    print(f"  selection credit: {'IBKR quoted mid (uncapped)' if sel_credit == 'net_credit' else 'smile-fit model'}", flush=True)
+    scored = entc.score(priced, closes, k=ground.DKL_K, thr=backtest_config.GROUND_THRESHOLD, credit_col=sel_credit)
     scored["quoted_credit"] = scored["net_credit"]
     scored["spread_width"] = scored["width"]
     # market triple for display (p_hat / q_hat / ro_hat = WIN / LOSS / PARTIAL under Q_bs)
@@ -339,7 +341,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if n_nobelief:
         print(f"  {n_nobelief} candidate(s) have NO close history (no P_real) and are unscored", flush=True)
     if n_neg:
-        print(f"  {n_neg} candidate(s) growth-negative at the model credit (Kelly w* <= 0) and are unranked", flush=True)
+        print(f"  {n_neg} candidate(s) growth-negative at the selection credit (Kelly w* <= 0) and are unranked", flush=True)
     for i, r in scored.iterrows():
         tg = entc.credit_targets(r["dfit_short"], r["DTE"], width=r["width"], model_credit=r["model_credit"])
         for k_, v_ in tg.items():
@@ -554,7 +556,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "ALPHA":            "(b-1)/(2b)",
             "DKL_REF":          "D_ent = ln3 − H(Q_bs) (paper eq. 19)",
             "BELIEF":           f"P_real: {entc.WINDOW} sessions of realized moves vs the strikes",
-            "CREDIT_MODEL":     "smile-fit model credit (selection); IBKR quote shown",
+            "CREDIT_MODEL":     ("selection on IBKR quoted mid (uncapped); model credit for targets" if getattr(live_config, "LIVE_SELECTION_CREDIT", "quoted") == "quoted" else "smile-fit model credit (selection); IBKR quote shown"),
             "FILL_MULT":        entc.FILL_MULT,
             "COMMISSION":       entc.COMMISSION,
             "TARGETS":          entc.CANON_LABELS["targets"],

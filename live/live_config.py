@@ -272,3 +272,11 @@ WEBAPP_POLL_SECONDS = 900         # browser polls /api/latest.json this often
                                   # (15 min — matches the fetcher cadence; no
                                   # point polling more often than new data arrives)
 TOP_N_DISPLAY = 5                 # canonical top-N picks
+
+# --- D_ent canon: selection credit (2026-09-13, user decision) ---
+# "quoted": Kelly growth (and therefore GROUND) is computed on the IBKR credit — the combo
+#           mid when a book exists, else the leg mids — UNCAPPED. The backtest canon selected
+#           on the smile-fit model credit; the user chose to rank live on the broker quote.
+# "model":  rank on the smile-fit model credit (backtest-consistent).
+# The model credit is still computed on every pick for the min / target execution cells.
+LIVE_SELECTION_CREDIT = "quoted"

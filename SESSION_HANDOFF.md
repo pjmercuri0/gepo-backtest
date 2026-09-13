@@ -2609,3 +2609,12 @@ targets, CANON_LABELS). Used by:
 Deploy: code rsync + gunicorn HUP to Mya (webapp.py, templates, ent_canon.py, credit_basis.py, data
 JSON). The LIVE tab on Mya shows new fields only once the Mac mini pulls main and its ranker runs.
 Not done: fetch_daily_bars does not yet append to daily_closes (snapshots cover it day-to-day).
+
+**Live selection credit = IBKR quoted mid, UNCAPPED (user decision 2026-09-13, "do 2").**
+`live_config.LIVE_SELECTION_CREDIT = "quoted"`: the live ranker's Kelly growth runs on the IBKR
+combo mid (leg mids without a book), not the smile-fit model credit the backtest selected on.
+Stated risk: on the 610 live snapshots the old ranker's picks carried quoted mids 1.3-1.5x the
+model with natural ~$0.05, so ranking on the quote favours inflated quotes and diverges from the
+backtest. Model credit is still computed on every pick and drives the min / target cells; History
+and Actuals still book 1.08x model. Set the flag to "model" to restore backtest-consistent selection.
+On 2026-08-19/1531: 9 qualified on the quote vs 4 on the model; ISRG 400/402.5 quoted 1.55 vs model 1.17.
