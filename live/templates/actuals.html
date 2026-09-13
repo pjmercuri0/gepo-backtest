@@ -115,16 +115,15 @@
                     title="click to record your actual fill">(+)</span>
             {% endif %}
           </td>
-          {# Min / target credit from the model (D_ent canon). The recorded fill is graded
-             against it: red below the minimum, amber between min and target, green in or
-             above the target range. IBKR quotes are untouched. #}
+          {# Min / target credit from the model (D_ent canon): min is 1.00x this
+             spread's model credit, target 1.06-1.10x. Shown as reference only --
+             the fill-grade tag was dropped 2026-09-13. IBKR quotes are untouched. #}
           {% set tg = p.credit_targets %}
           {% if tg and tg.min_credit is defined %}
             <td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }}); breakeven ${{ '%.2f'|format(tg.breakeven_credit) }}">
               <span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span>
               <span style="opacity:0.6"> / </span>
               <span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>
-              {% if p.fill_grade %}<br><span style="font-size:10px;font-weight:600;color:{% if p.fill_grade == 'below-min' %}#e0645a{% elif p.fill_grade == 'ok' %}#c9a227{% else %}#7ec99a{% endif %}">fill {{ p.fill_grade }}</span>{% endif %}
             </td>
           {% else %}
             <td>—</td>
