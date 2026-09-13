@@ -408,11 +408,12 @@ def _enrich_pick(pick: dict, tracking_rows: list = None, credit_frac: float = 1.
     if credit_frac != 1.0 and actual_c is not None:
         c0 = round(float(actual_c), 4)
         basis = "ACTUAL"
-    elif model_c is not None and float(model_c) > 0:
-        # D_ent canon: the smile-fit model credit is the selection basis; the fill view books
-        # FILL_MULT x model (measured on 19 real fills). The IBKR quote stays on the pick.
-        c0 = round(float(model_c) * (credit_basis.MODEL_FILL_MULT if credit_frac != 1.0 else 1.0), 4)
-        basis = "MODEL" if credit_frac == 1.0 else f"{credit_basis.MODEL_FILL_MULT:.2f}×MODEL"
+    elif model_c is not None and float(model_c) > 0 and credit_frac != 1.0:
+        # D_ent canon fill view (History / Actuals): book FILL_MULT x the smile-fit model credit
+        # (measured on 19 real fills). The selection view (credit_frac 1.0, live tab) keeps the
+        # IBKR quoted credit, which is what the live ranker selects on (user decision 2026-09-13).
+        c0 = round(float(model_c) * credit_basis.MODEL_FILL_MULT, 4)
+        basis = f"{credit_basis.MODEL_FILL_MULT:.2f}×MODEL"
     else:
         c0 = round(base_mid * credit_frac, 4)
         if credit_frac != 1.0:

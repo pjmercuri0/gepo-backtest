@@ -37,7 +37,7 @@
         <th>Strikes</th>
         <th>Δ</th>
         <th>DTE</th>
-        <th title="smile-fit model credit (selection basis); IBKR quote in the card">Credit ($/sh)</th>
+        <th title="IBKR quoted credit (combo mid, else leg mids) — the live selection basis; model credit in the card">Credit ($/sh)</th>
         <th title="min 1.04×model, target 1.06–1.10×model">Min / Target</th>
         <th>Max-Loss ($/sh)</th>
         <th>Ratio</th>
@@ -260,8 +260,8 @@ function renderTopPicks(picks, maxGround, kVal) {
       <div class="table-scroll"><table>
         <thead><tr>
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
-          <th title="IBKR quoted credit (combo mid when available)">quoted ($/sh)</th>
-          <th title="smile-fit model credit: what the spread is worth on the fitted surface (selection basis)">model ($/sh)</th>
+          <th title="IBKR quoted credit (combo mid when available) — the live selection basis">quoted ($/sh)</th>
+          <th title="smile-fit model credit: what the spread is worth on the fitted surface (basis for min / target)">model ($/sh)</th>
           <th title="execution rule: min 1.04×model, target 1.06–1.10×model">min / target</th>
           <th>max-loss ($/sh)</th><th>ratio</th>
           <th title="P_real: realized-move belief at the strikes (used in G)">real: p / r₀ / q</th>
