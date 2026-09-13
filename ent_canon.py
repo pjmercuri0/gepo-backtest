@@ -27,7 +27,8 @@ DELTA_TARGET, DELTA_MIN, DELTA_MAX = 0.55, 0.50, 0.60
 K            = 1.0        # exp(-K * D_ent)
 THR          = 0.01       # GROUND threshold (0.015 = conservative)
 WINDOW       = 252        # sessions of realized moves behind P_real
-MIN_OBS      = 120        # valid returns required for P_real
+MIN_OBS      = 1          # use whatever history the name has (user 2026-09-13); the 0.5 pseudo-count per
+                          # state is the only regularisation, so a name with very few sessions scores near the prior
 FILL_MULT    = 1.08       # measured on 19 real fills vs model credit
 COMMISSION   = 1.30       # $ per spread per contract, opening only (IBKR ~$0.65/leg)
 TOP_N        = 5
