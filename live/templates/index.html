@@ -265,7 +265,7 @@ function renderTopPicks(picks, maxGround, kVal) {
       <div class="table-scroll"><table>
         <thead><tr>
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
-          <th title="IBKR quoted credit (combo mid when available) — the live selection basis">quoted ($/sh)</th>
+          <th title="IBKR credit — combo last, else combo mid (narrow book), else leg mids — the live selection basis">quoted ($/sh)</th>
           <th title="smile-fit model credit: what the spread is worth on the fitted surface (basis for min / target)">model ($/sh)</th>
           <th title="execution rule: min 1.04×model, target 1.06–1.10×model">min / target</th>
           <th>max-loss ($/sh)</th><th>ratio</th>
@@ -278,7 +278,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${fmtNum(p.short_delta, 3)}</td>
           <td>${fmtNum(p.long_delta, 3)}</td>
           <td>${fmtPct(p.IV)}</td>
-          <td>${p.quoted_credit != null ? fmtMoney(p.quoted_credit) : fmtMoney(p.net_credit)}</td>
+          <td>${p.quoted_credit != null ? fmtMoney(p.quoted_credit) : fmtMoney(p.net_credit)}${p.credit_source ? `<br><span style="opacity:0.6;font-size:10px">${p.credit_source.replace('_',' ')}</span>` : ''}</td>
           <td class="fw">${p.model_credit != null ? fmtMoney(p.model_credit) : "—"}</td>
           <td>${tgtCell(p)}</td>
           <td>${fmtMoney(mmMaxLoss(p))}</td>

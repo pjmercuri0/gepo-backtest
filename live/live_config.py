@@ -185,7 +185,7 @@ LIVE_COMBO_STALL     = 1.5     # then stop once no new quote has arrived for thi
 #   "mid"   - midpoint of the combo book; direct analogue of today's leg mid
 #   "touch" - -ask, what you actually collect buying the combo at market
 #   "last"  - the combo's last trade: the number shown on the TWS order ticket
-LIVE_COMBO_BASIS     = "mid"
+LIVE_COMBO_BASIS     = "last>mid>legs"   # user 2026-09-13: combo last, then combo mid (narrow book), then leg mids
 
 # --- Vol gate ---
 # DISABLED 2026-05-30 after re-test on LAST credit / Mon+Thu canon:
