@@ -16,14 +16,15 @@
 
 <div id="stale-banner"></div>
 
-<div class="params-row" id="params-row"></div>
+<details class="params-fold">
+  <summary><span class="chip-k">params</span><span class="chip-v">canon settings</span></summary>
+  <div class="params-row" id="params-row"></div>
+</details>
 
 <div class="ticker-strip" id="ticker-strip">loading ranked candidates...</div>
 
-<div class="section-label" id="top-label">Top 5 by GROUND rank (updates every {{ poll_seconds }}s)</div>
 <div id="vol-gate-banner"></div>
 <div id="weekly-totals"></div>
-<div id="top-picks"></div>
 
 <div class="section-label">All ranked candidates (top 5 highlighted)</div>
 <div class="week-card">
@@ -38,7 +39,7 @@
         <th>Δ</th>
         <th>DTE</th>
         <th title="IBKR quoted credit (combo mid, else leg mids) — the live selection basis; model credit in the card">Credit ($/sh)</th>
-        <th title="min 1.04×model, target 1.06–1.10×model">Min / Target</th>
+        <th title="min 1.00× model credit, target 1.06–1.10×">Min / Target</th>
         <th>Max-Loss ($/sh)</th>
         <th>Ratio</th>
         <th title="P_real above (realized-move belief, used in G); Q_bs below (market law, D_ent reference)">real: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">bs below</span></th>
@@ -51,6 +52,9 @@
   </table>
   </div>
 </div>
+
+<div class="section-label" id="top-label">Top 5 by GROUND rank (updates every {{ poll_seconds }}s)</div>
+<div id="top-picks"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -169,7 +173,7 @@ function renderParams(cfg) {
     ["belief",         cfg.BELIEF || `P_real: 252 sessions of realized moves vs the strikes`],
     ["credit",         cfg.CREDIT_MODEL || `smile-fit model credit; IBKR quote shown`],
     ["fill",           cfg.FILL_MULT != null ? `${cfg.FILL_MULT}× model, $${cfg.COMMISSION} comm` : `—`],
-    ["targets",        cfg.TARGETS || `min 1.04×fair, target 1.06–1.10×fair`],
+    ["targets",        cfg.TARGETS || `min 1.00× model credit, target 1.06–1.10×`],
     ["exec gate",      cfg.EXEC_GATE || `qualified only if the IBKR credit ≥ min`],
     ["regime gate",    `OFF (both directions eligible)`],
   ];
