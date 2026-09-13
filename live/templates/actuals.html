@@ -144,7 +144,7 @@
               <span class="actual-shown" style="color:#7ec99a">({{ "%.2f"|format(ar) }})</span>
             {%- endif %}
           </td>
-          <td class="fw">{% if p.GROUND is not none %}{{ "%.3f"|format((p.GROUND * 100)|rd(3)) }}%{% else %}—{% endif %}</td>
+          <td class="fw">{% if p.GROUND is not none %}{{ "%.2f"|format((p.GROUND * 100)|rd(2)) }}%{% else %}—{% endif %}</td>
           <td>{% if p.short_delta is defined and p.short_delta is not none %}{{ "%.2f"|format(p.short_delta|rd(2)) }}{% else %}—{% endif %}</td>
           <td>{{ p.DTE if p.DTE is not none else '—' }}</td>
           {% if outcome_row and outcome_row.result %}

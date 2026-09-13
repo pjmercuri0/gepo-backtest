@@ -67,7 +67,7 @@ Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or 
           <td>${{ '%.2f' % p.short_strike }} / ${{ '%.2f' % p.long_strike }}</td>
           <td>${{ '%.2f' % p.net_credit }}</td>
           <td>${{ '%.2f' % p.entry_credit }}</td>
-          <td>{{ '%.4f' % p.GROUND if p.GROUND is not none else '—' }}</td>
+          <td>{{ '%.2f%%' % (p.GROUND * 100) if p.GROUND is not none else '—' }}</td>
           <td>{{ (p.expiry_date or '')[:10] }}</td>
           {# live mark from track_frozen (pick.live); settled picks show expiry px instead #}
           <td>{% if p.live and p.live.underlying_price %}${{ '%.2f' % p.live.underlying_price }}{% else %}<span style="color:#888780">—</span>{% endif %}</td>
