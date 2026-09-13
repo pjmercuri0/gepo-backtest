@@ -57,9 +57,13 @@ a:hover { text-decoration: underline; }
 .week-sub { font-size: 13px; color: #888780; margin-top: 4px; }
 .week-pnl { font-size: 22px; font-weight: 700; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
+/* Headers WRAP (2026-09-13). They were nowrap, which made every column at
+   least as wide as its longest header word-for-word — "Max-Loss ($/sh)" and
+   "Min / Target ($/sh)" alone forced the table far past the viewport. Cells
+   stay nowrap so a number never breaks across lines. */
 th { text-align: left; color: #888780; font-weight: 500; font-size: 11px;
       text-transform: lowercase; padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.08);
-      white-space: nowrap; }
+      white-space: normal; overflow-wrap: break-word; vertical-align: bottom; }
 td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); white-space: nowrap; }
 tr:last-child td { border-bottom: none; }
 td.fw { font-weight: 600; }
@@ -114,7 +118,11 @@ tr.assignment-risk td:first-child::before {
 
 /* Horizontal scroll wrapper for wide tables on narrow viewports */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.table-scroll table { min-width: 880px; }
+/* No min-width: the table sizes to its CONTENT and only scrolls when it
+   genuinely does not fit. The old flat 880px floor forced a horizontal scroll
+   on every table regardless of how few columns it had. width:100% still lets a
+   narrow table fill the card. */
+.table-scroll table { width: 100%; }
 
 /* ── Mobile breakpoints ─────────────────────────────────────────────── */
 @media (max-width: 700px) {
@@ -267,7 +275,7 @@ details.fill-sens[open] > summary::after { content: "▴"; }
 details.fill-sens > summary:hover { background: rgba(255,255,255,0.07); }
 details.fill-sens .table-scroll { margin-top: 8px; }
 table.fs-table { font-size: 11px; }
-table.fs-table th { white-space: nowrap; font-weight: 500; color: #888780; }
+table.fs-table th { white-space: normal; font-weight: 500; color: #888780; }
 table.fs-table td { white-space: nowrap; }
 tr.fs-canon td { background: rgba(255,255,255,0.05); font-weight: 600; }
 .fs-tag { font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
