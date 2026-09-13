@@ -170,6 +170,7 @@ function renderParams(cfg) {
     ["credit",         cfg.CREDIT_MODEL || `smile-fit model credit; IBKR quote shown`],
     ["fill",           cfg.FILL_MULT != null ? `${cfg.FILL_MULT}× model, $${cfg.COMMISSION} comm` : `—`],
     ["targets",        cfg.TARGETS || `min 1.04×fair, target 1.06–1.10×fair`],
+    ["exec gate",      cfg.EXEC_GATE || `qualified only if the IBKR credit ≥ min`],
     ["regime gate",    `OFF (both directions eligible)`],
   ];
   return chips.map(([k, v]) =>
@@ -181,7 +182,11 @@ function renderParams(cfg) {
 function tgtCell(p) {
   const t = p.credit_targets;
   if (!t || t.min_credit == null) return "—";
-  return `<span style="color:#c9a227">${fmtMoney(t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${fmtMoney(t.target_lo_credit)}–${fmtMoney(t.target_hi_credit)}</span>`;
+  // above_min: the IBKR credit on the table clears the min (execution gate, part of "qualified").
+  const gate = p.above_min == null ? "" : (p.above_min
+    ? ` <span class="pos" title="IBKR credit ≥ min">✓</span>`
+    : ` <span class="neg" title="IBKR credit below min — not qualified">✗ below min</span>`);
+  return `<span style="color:#c9a227">${fmtMoney(t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${fmtMoney(t.target_lo_credit)}–${fmtMoney(t.target_hi_credit)}</span>${gate}`;
 }
 // Midmid credit/max_loss: prefer fill_targets[0] (set by webapp from leg bid/ask),
 // fall back to mid net_credit/max_loss when bid/ask isn't yet available.
