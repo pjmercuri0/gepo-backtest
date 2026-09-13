@@ -4,6 +4,13 @@
 {% block content %}
 <h1>Actuals</h1>
 <div class="subtitle">Trades you added from History or Snapshots.</div>
+{% if fill_stats and fill_stats.n_fills %}
+<div class="subtitle" title="median of your recorded fills divided by the smile-fit model credit and by the IBKR quoted credit. If fill / quoted stays under ~0.95, the quote the ranker selects on is inflated: set LIVE_SELECTION_CREDIT back to model.">
+  fills vs model: <strong>{{ fill_stats.fill_over_model if fill_stats.fill_over_model is not none else '—' }}×</strong>
+  &middot; fills vs quoted: <strong>{{ fill_stats.fill_over_quoted if fill_stats.fill_over_quoted is not none else '—' }}×</strong>
+  &middot; {{ fill_stats.n_fills }} fills, {{ fill_stats.below_min }} below min
+</div>
+{% endif %}
 
 {% if rows %}
   {# One card per expiry Friday. Every pick in a group shares an expiry, so the

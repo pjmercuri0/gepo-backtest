@@ -2872,3 +2872,8 @@ live tab shows ✓ / "✗ below min" in the min/target cell; chip "exec gate". O
 gate and the live tab all use that credit. A too-wide book with no last now falls back to leg mids instead of
 dropping the row. Offline snapshots carry no combo book, so every offline test shows `leg_mid`; the combo
 branches only exercise during market hours on the Mac mini.
+**Floor restored (user 2026-09-13, "im good with all those"):** `MULT_MIN` back to 1.04x model (break-even is
+~1.03x after commission; 1.00x is fair value, now `MULT_WALKAWAY` = the walk-away line, `walkaway_credit` in
+targets). The execution gate therefore requires the IBKR credit >= 1.04x model. Actuals page shows median
+fill/model and fill/quoted over recorded fills plus the count below min: if fill/quoted runs < ~0.95 for a couple
+of weeks, set `LIVE_SELECTION_CREDIT = "model"`.

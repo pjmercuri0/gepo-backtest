@@ -1006,6 +1006,32 @@ def _actuals_weeks(rows: list[dict]) -> list[dict]:
     return sorted(out, key=lambda w: w["expiry"], reverse=True)
 
 
+def _fill_stats(rows: list[dict]) -> dict:
+    """Your fills against the model and the IBKR quote (D_ent canon, 2026-09-13). This is the
+    number that decides the live selection basis: if fill/quoted runs under ~0.95 for a couple of
+    weeks, the quote is inflated and LIVE_SELECTION_CREDIT should go back to "model"."""
+    import statistics
+    fm, fq, below = [], [], 0
+    for r in rows:
+        p = r.get("pick") or {}
+        a = p.get("actual_credit")
+        if a is None:
+            continue
+        try:
+            a = float(a)
+        except (TypeError, ValueError):
+            continue
+        mc = p.get("model_credit"); qc = p.get("quoted_credit") or p.get("net_credit")
+        if mc: fm.append(a / float(mc))
+        if qc: fq.append(a / float(qc))
+        tg = p.get("credit_targets") or {}
+        if tg.get("min_credit") is not None and a < float(tg["min_credit"]): below += 1
+    return {"n_fills": len(fq), "n_model": len(fm),
+            "fill_over_model": round(statistics.median(fm), 3) if fm else None,
+            "fill_over_quoted": round(statistics.median(fq), 3) if fq else None,
+            "below_min": below}
+
+
 @app.route("/actuals")
 def actuals():
     rows = _actuals_rows()
@@ -1061,7 +1087,8 @@ def actuals():
                     lt["assignment_risk"] = bool(
                         exp_d == today_d and today_d.weekday() == 4
                         and short_itm and long_otm)
-    return render_template("actuals.html", rows=rows, weeks=_actuals_weeks(rows),
+    fill_stats = _fill_stats(rows)
+    return render_template("actuals.html", fill_stats=fill_stats, rows=rows, weeks=_actuals_weeks(rows),
                            assign_ts=risk.get("_ts"))
 
 

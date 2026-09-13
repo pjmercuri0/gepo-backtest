@@ -46,7 +46,8 @@ MULT_BREAKEVEN = 0.965
 # selling the spread for less than it is worth, so that is the floor. Target
 # keeps its original 1.06-1.10x band. 3dp on the ratios so no two levels round
 # together, which is what made 1.04x and 1.06x both print 0.49.
-MULT_MIN, MULT_TARGET_LO, MULT_TARGET_HI = 1.00, 1.06, 1.10
+MULT_MIN, MULT_TARGET_LO, MULT_TARGET_HI = 1.04, 1.06, 1.10
+MULT_WALKAWAY = 1.00   # fair value: below this the trade is a coin flip that pays the broker (break-even ~1.03x after commission)
 # cross-sectional fair credit/width by delta and DTE (fit on 43,479 candidates 2020-26, med |err| 0.025)
 FAIR_COEF = (0.4022, 2.3485, -12.464, 0.0077)
 
@@ -280,11 +281,11 @@ def credit_targets(short_delta, dte, width=None, model_credit=None) -> dict:
     # fair because it is a property of THIS spread, not an execution target.
     # 3dp on the ratios so two adjacent levels can never round together.
     out = {'basis': basis, 'fair_cw': round(fair, 3),
-           'breakeven_cw': round(fair * MULT_BREAKEVEN, 3), 'min_cw': round(fair * MULT_MIN, 3),
+           'breakeven_cw': round(fair * MULT_BREAKEVEN, 3), 'walkaway_cw': round(fair * MULT_WALKAWAY, 3), 'min_cw': round(fair * MULT_MIN, 3),
            'target_lo_cw': round(fair * MULT_TARGET_LO, 3), 'target_hi_cw': round(fair * MULT_TARGET_HI, 3)}
     if width:
         W = float(width)
-        out.update({'width': round(W, 2), 'min_credit': round(out['min_cw'] * W, 2),
+        out.update({'width': round(W, 2), 'min_credit': round(out['min_cw'] * W, 2), 'walkaway_credit': round(out['walkaway_cw'] * W, 2),
                     'target_lo_credit': round(out['target_lo_cw'] * W, 2), 'target_hi_credit': round(out['target_hi_cw'] * W, 2),
                     'breakeven_credit': round(out['breakeven_cw'] * W, 2)})
     return out
