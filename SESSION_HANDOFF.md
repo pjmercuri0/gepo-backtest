@@ -2622,3 +2622,8 @@ On 2026-08-19/1531: 9 qualified on the quote vs 4 on the model; ISRG 400/402.5 q
 table (net_credit: combo mid / combo last / leg mids) >= its min credit (1.04 x model). Payload field `above_min`;
 live tab shows ✓ / "✗ below min" in the min/target cell; chip "exec gate". On 2026-08-19/1531 it removed RTX
 (quoted 1.205 vs min 1.25) and CSCO (0.49 vs 0.53): 7 qualified.
+**Live credit priority (user 2026-09-13): combo LAST > combo MID (book narrower than LIVE_COMBO_MAX_WIDTH x width) > leg mids.**
+`live/ranker._reprice_on_combos` sets `net_credit` and `credit_source` accordingly; selection, the execution
+gate and the live tab all use that credit. A too-wide book with no last now falls back to leg mids instead of
+dropping the row. Offline snapshots carry no combo book, so every offline test shows `leg_mid`; the combo
+branches only exercise during market hours on the Mac mini.
