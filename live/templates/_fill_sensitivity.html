@@ -1,0 +1,52 @@
+{# Fill sensitivity of the D_ent canon. Identical on backtest and OOT because it
+   is a property of the whole method, not of one window — so it lives here and
+   both pages include it. Collapsed by default: it is reference, not headline.
+
+   The credit/width column is why the execution targets are where they are:
+   min 0.50 c/w is the 0.98x fill row, target 0.53-0.56 spans 1.04x-1.10x. #}
+<details class="fill-sens">
+  <summary><span class="chip-k">fill sensitivity</span><span class="chip-v">0.90× – 1.10× model</span></summary>
+  <div class="table-scroll">
+    <table class="fs-table">
+      <thead>
+        <tr>
+          <th>fill × model</th><th>med credit / max loss</th><th>credit / width</th>
+          <th>IS final</th><th>IS Sharpe</th><th>IS maxDD</th>
+          <th>OOT final</th><th>OOT Sharpe</th><th>OOT maxDD</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in [
+          ('0.90','0.83','0.46','-$8.8k','0.16','-180%','$7.6k','-1.24','-30%'),
+          ('0.94','0.90','0.48','$2.8k','-0.05','-85%','$9.3k','-0.30','-20%'),
+          ('0.96','0.93','0.49','$8.7k','0.13','-57%','$10.1k','0.16','-16%'),
+          ('0.98','0.97','0.50','$14.5k','0.39','-41%','$11.0k','0.61','-14%'),
+          ('1.00','1.01','0.51','$20.3k','0.64','-28%','$11.8k','1.05','-12%'),
+          ('1.02','1.05','0.52','$26.1k','0.89','-21%','$12.6k','1.48','-10%'),
+          ('1.04','1.10','0.53','$31.9k','1.11','-17%','$13.5k','1.90','-8.5%'),
+          ('1.06','1.14','0.54','$37.7k','1.33','-15%','$14.3k','2.31','-6.8%'),
+          ('1.08','1.19','0.55','$43.5k','1.53','-14%','$15.2k','2.72','-6.0%'),
+          ('1.10','1.24','0.56','$49.3k','1.72','-13%','$16.0k','3.11','-5.3%')
+      ] %}
+        <tr class="{% if r[0] == '1.08' %}fs-canon{% endif %}">
+          <td class="fw">{{ r[0] }}{% if r[0] == '1.08' %} <span class="fs-tag">canon</span>{% endif %}</td>
+          <td>{{ r[1] }}</td><td>{{ r[2] }}</td>
+          <td class="{% if r[3].startswith('-') %}neg{% else %}pos{% endif %}">{{ r[3] }}</td>
+          <td class="{% if r[4].startswith('-') %}neg{% endif %}">{{ r[4] }}</td>
+          <td class="neg">{{ r[5] }}</td>
+          <td class="pos">{{ r[6] }}</td>
+          <td class="{% if r[7].startswith('-') %}neg{% endif %}">{{ r[7] }}</td>
+          <td class="neg">{{ r[8] }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="fs-note">
+    Every row is the same trade list repriced at a different fill. The edge is
+    roughly linear in the fill and changes sign near 0.94×, so fill quality is
+    not a detail of the method — below about 0.96× the in-sample book does not
+    survive. Execution targets read off the credit/width column: min 0.50 is the
+    0.98× row, target 0.53–0.56 spans 1.04×–1.10×.
+  </div>
+</details>
