@@ -1,0 +1,8 @@
+output/2020_sp500_last.parquet 29073 [4s]
+output/2021_sp500_last.parquet 30060 [9s]
+output/2022_sp500_last.parquet 26572 [16s]
+output/2023_sp500_last.parquet 27344 [23s]
+output/2024_sp500_last.parquet 28113 [35s]
+output/2025_sp500_last.parquet 27635 [44s]
+output/2026_sp500_last_oot_combined.parquet 22469 [49s]
+wrote 191266

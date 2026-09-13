@@ -37,17 +37,22 @@ USE_SKEW_ADJ  = False
 SKEW_ALPHA    = 0.5  # scale factor for the skew adjustment to p
 USE_ND2       = False  # if True, use N(d2) instead of delta for P(ITM). More correct than N(d1)=delta.
 USE_EMPIRICAL = False  # if True, use historical lookup table (build via build_empirical_probs.py).
-DKL_REFERENCE = "empirical_vs_iv"  # CANONICAL 2026-09-12: D(P_empirical || Q_iv) on a
+DKL_REFERENCE = "entropy_uniform"  # D_ent CANON 2026-09-13: D(Q_bs || U3) = ln3 - H(Q_bs), the paper's eq. 19
+                       # (Mercurio, Wu, Xie 2020). Q_bs = N(d2) at the smile-fit IVs (row iv_fit_short/long when
+                       # present, else row IV). SESSION_HANDOFF.md §0.33. Previous: "empirical_vs_iv" (2026-09-12: D(P_empirical || Q_iv) on a
                        # 4-expiry (28d) trailing window. Replaces "rv_vs_iv" (canon
                        # 2026-06-05 -> 2026-09-12), which compared two BS laws and at
                        # delta-20 penalised the VRP edge instead of risk. Measured at
                        # delta-20 k=10: $72,762 / Sh(wk) 3.92 / DD -1.9% / win 92.3%
                        # vs rv_vs_iv $68,891 / 3.53 / -2.6% / 90.0%. IN-SAMPLE 2020-25.
-PROB_BASIS    = "rv"   # canonical 2026-06-09: RV-implied N(d2) (p,q,ro) in G — same P as DKL's belief side.
+PROB_BASIS    = "realized"   # D_ent CANON 2026-09-13: P_real = the name's realized DTE-matched moves vs the exact
+                       # strikes (row p_real/q_real/ro_real, set by ent_canon.p_real). Previous: "empirical" (2026-09-12: same P_emp the DKL measures
+                       # against Q_iv, so GROUND's numerator and denominator agree.
+                       # Was "rv" (canonical 2026-06-09: RV-implied N(d2) (p,q,ro) in G — same P as DKL's belief side.
                        # Full 2020-25 count-matched: $26.37 vs $22.76/pick, WR 48.4% vs 45.7%, Sh 2.17 vs 2.04;
                        # robust to k∈[5,20], RV window/estimator, fill 0.70-0.90 (backtest_g_probs*.py).
                        # (The 2026-06-04 "rv worse" result was under OLD canon: pre-rv_vs_iv DKL + regime gate.)
-DKL_K         = 10.0   # Canonical 2026-09-12 ("52:10"): k=10 with the empirical_vs_iv
+DKL_K         = 1.0    # D_ent CANON 2026-09-13: k=1 (working range 0.8-1.2, §0.33). Previous: 10.0 (2026-09-12 "52:10": k=10 with the empirical_vs_iv
                        # reference on a 52-expiry window. Prior note (k=10 growth-optimal
                        # under rv_vs_iv) kept below for history.
                        # Was: Canonical 2026-06-12 (corrected solver): k=10 w/ thr=0.05 = the GROWTH-OPTIMAL cell on the plateau — selection criterion matches the framework objective (max expected growth). Was briefly 16 (Calmar pick, reverted same day: DD is a path statistic, criterion-shopped).
@@ -174,7 +179,28 @@ def _score_row(row: pd.Series) -> pd.Series:
     # RV < IV on average (variance risk premium), RV-implied p_win is
     # HIGHER than IV-implied → G higher → more permissive selection.
     # Bets the VRP gap persists ~80% of the time.
-    if PROB_BASIS == "rv" and 'rv_30d' in row.index:
+    if PROB_BASIS == "empirical":
+        # CANONICAL with DKL_REFERENCE="empirical_vs_iv": G must use the SAME
+        # belief P that DKL measures against the market, or the numerator and
+        # denominator of GROUND run on different probabilities. Measured
+        # 2024-08-13 under PROB_BASIS='rv': the RV-implied q averaged 0.0021
+        # against the empirical 0.0468 on the same spreads — a 23x disagreement
+        # (CSCO bull_put 0.0003 vs 0.0462, 154x) which drove w* to 0.99.
+        import spread_triple as _st
+        _p, _q, _ro, _src = _st.lookup(
+            ticker      = row.get("ticker"),
+            dte         = int(row["DTE"]),
+            short_delta = row["short_delta"],
+            width       = abs(float(row["short_strike"]) - float(row["long_strike"])),
+        )
+        if _p is not None and _q is not None and _ro is not None and _p > 0:
+            p, q, ro = _p, _q, _ro
+    elif PROB_BASIS == "realized" and 'p_real' in row.index:
+        # D_ent canon: belief = realized-move triple at the exact strikes (ent_canon.p_real).
+        _pr, _qr, _ror = row.get("p_real"), row.get("q_real"), row.get("ro_real")
+        if _pr is not None and not pd.isna(_pr) and _pr > 0 and _qr > 0:
+            p, q, ro = float(_pr), float(_qr), float(_ror)
+    elif PROB_BASIS == "rv" and 'rv_30d' in row.index:
         rv = row.get('rv_30d')
         if rv is not None and not pd.isna(rv) and rv > 0:
             rv = min(max(float(rv), 0.05), 2.0)  # clip pathological values
@@ -320,6 +346,26 @@ def _score_row(row: pd.Series) -> pd.Series:
             if ro_emp > 0 and ro > 0: dkl += ro_emp * lg(ro_emp / ro)
             if q_emp  > 0 and q  > 0: dkl += q_emp  * lg(q_emp  / q)
             DKL_chosen = max(0.0, dkl)
+    elif DKL_REFERENCE == "entropy_uniform":
+        # D_ent canon 2026-09-13 — paper eq. 19: D(R || U_3) = ln 3 - H(R) with R = the market's
+        # (WIN, LOSS, PARTIAL) law at the smile-fit IVs. Risk-monotone at the money (loss 32% -> 51%
+        # across quintiles, §0.33); discounted with k=1.
+        _ivs = row.get("iv_fit_short"); _ivl = row.get("iv_fit_long")
+        if _ivs is None or pd.isna(_ivs): _ivs = float(row["IV"])
+        if _ivl is None or pd.isna(_ivl): _ivl = float(row.get("long_IV", row["IV"]))
+        p_iv = None
+        try:
+            p_iv, q_iv, ro_iv, _ = hp.nd2_probs_for_spread(
+                short_strike=float(row["short_strike"]), long_strike=float(row["long_strike"]),
+                spot=float(row["entry_price"]), iv_short=float(_ivs), iv_long=float(_ivl),
+                dte_days=int(row["DTE"]), spread_type=row["spread_type"])
+        except (KeyError, TypeError, ValueError):
+            pass
+        if p_iv is None:
+            H_chosen = h(p) + h(ro) + h(q)
+        else:
+            H_chosen = h(p_iv) + h(ro_iv) + h(q_iv)
+        DKL_chosen = max(0.0, lg(3.0) - H_chosen)
     elif DKL_REFERENCE == "empirical_vs_iv":
         # CANONICAL 2026-09-12 ("52:10"). P = realized WIN/LOSS/PARTIAL
         # frequencies COUNTED directly from historical spreads (spread_triple),

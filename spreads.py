@@ -185,6 +185,23 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
     short_row = eligible.loc[eligible["dist"].idxmin()]
     short_strike = short_row["StrikePrice"]
 
+    # TRUE moneyness cap (2026-09-12). Delta cannot police this: vendor IV is
+    # inflated far OTM, delta is derived from it, so a strike 8%+ OTM still reads
+    # ~0.19 delta and the 0.20 selector picks it. Those contracts have no bid 31%
+    # of the time, and the backtest then books ask/2 as premium on something that
+    # was never fillable. Measured zero-bid rate by true distance OTM:
+    #   <1% 1.1% | 1-2% 0.8% | 2-3% 0.7% | 3-5% 1.8% | 5-8% 7.1% | >8% 31.2%
+    _max_otm = getattr(config, "MAX_SHORT_OTM_PCT", None)
+    if _max_otm is not None:
+        spot = float(opts["UnderlyingPrice"].iloc[0])
+        if spot > 0:
+            if spread_type == "bull_put":
+                otm_pct = 100.0 * (spot - short_strike) / spot
+            else:
+                otm_pct = 100.0 * (short_strike - spot) / spot
+            if otm_pct > _max_otm:
+                return None
+
     short_idx_arr = np.where(all_strikes == short_strike)[0]
     if len(short_idx_arr) == 0:
         return None
@@ -247,6 +264,10 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
     short_mid = short_mid_raw
     long_mid  = long_mid_raw
     spread_width = round(abs(short_strike - long_strike), 4)
+    _maxw = getattr(config, "MAX_SPREAD_WIDTH", None)
+    if _maxw is not None and spread_width > _maxw + 1e-9:
+        return None
+
     max_loss     = round(spread_width - net_credit, 4)
 
     if net_credit <= 0 or max_loss <= 0:

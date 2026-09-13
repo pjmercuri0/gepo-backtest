@@ -24,6 +24,7 @@ vertical; it clamped to width and produced an entry credit of 4.00 (P&L
 from __future__ import annotations
 
 FILL_FRAC = 0.80
+MODEL_FILL_MULT = 1.08   # D_ent canon: fill = 1.08 x smile-fit model credit (ent_canon.FILL_MULT)
 
 
 def spread_width(pick: dict) -> float:
@@ -44,6 +45,17 @@ def entry_credit(pick: dict) -> float:
             return min(round(float(actual), 4), round(width, 4))
         except (TypeError, ValueError):
             pass  # fall through to the quote-derived basis
+
+    # D_ent canon (2026-09-13): picks scored by the new ranker carry the smile-fit model
+    # credit; the measured fill is FILL_MULT x model (19 real fills). Takes precedence over
+    # the quote-derived 0.80 x mid, which was calibrated on 5 fills against inflated mids.
+    mc = pick.get("model_credit")
+    if mc is not None:
+        try:
+            if float(mc) > 0:
+                return min(round(float(mc) * MODEL_FILL_MULT, 4), round(width, 4))
+        except (TypeError, ValueError):
+            pass
 
     sb, sa = pick.get("short_bid"), pick.get("short_ask")
     lb, la = pick.get("long_bid"), pick.get("long_ask")

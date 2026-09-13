@@ -78,7 +78,7 @@
         <thead><tr>
           <th>Actual</th>
           <th>Rank</th><th>Ticker</th>
-          <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th><th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
+          <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th><th title="D_ent canon execution rule: min = 1.04 x fair credit, target = 1.06-1.10 x fair (fair = smile-fit model credit, else fair(delta, DTE)).">Min / Target ($/sh)</th><th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
           <th>Δ short</th><th>DTE</th>
           <th>Status</th><th>Mark</th><th style="text-align:right">P&amp;L</th>
         </tr></thead>
@@ -146,6 +146,8 @@
               {# Credit always green: bright #7ec99a if actual >= target, dull #5b9474 if worse. #}
               <td>${{ "%.2f"|format(mm_c|rd(2)) }} {% if p.actual_credit is defined and p.actual_credit is not none %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-current="{{ "%.2f"|format(p.actual_credit|rd(2)) }}" style="color:{% if (p.actual_credit | rd(2)) < (mm_c | rd(2)) %}#5b9474{% else %}#7ec99a{% endif %};cursor:pointer;border-bottom:1px dotted currentColor" title="click to edit actual fill">(${{ "%.2f"|format(p.actual_credit|rd(2)) }})</span>{% else %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-current="" style="color:#666;cursor:pointer;border-bottom:1px dotted #666" title="click to record actual fill">(+)</span>{% endif %}</td>
               {# Max-loss always red: bright #ff6b6b if actual <= target (less risk), dull #c46868 if actual > target. #}
+              {% set tg = p.credit_targets %}
+              {% if tg and tg.min_credit is defined %}<td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }})"><span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>{% if p.fill_grade %}<br><span style="font-size:10px;font-weight:600;color:{% if p.fill_grade == 'below-min' %}#e0645a{% elif p.fill_grade == 'ok' %}#c9a227{% else %}#7ec99a{% endif %}">fill {{ p.fill_grade }}</span>{% endif %}</td>{% else %}<td>—</td>{% endif %}
               <td>${{ "%.2f"|format(mm_l|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span style="color:{% if (p.actual_max_loss | rd(2)) > (mm_l | rd(2)) %}#c46868{% else %}#ff6b6b{% endif %}">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>
               {# Ratio always green: bright #7ec99a if actual >= target, dull #5b9474 if worse. #}
               <td>{% if (mm_l | rd(2)) > 0 %}{{ "%.2f"|format(((mm_c | rd(2)) / (mm_l | rd(2)))|rd(2)) }}{% else %}—{% endif %}{% if p.actual_credit is defined and p.actual_credit is not none and p.actual_max_loss is defined and p.actual_max_loss is not none and (p.actual_max_loss | rd(2)) > 0 and (mm_l | rd(2)) > 0 %}{% set ar = ((p.actual_credit | rd(2)) / (p.actual_max_loss | rd(2))) | rd(2) %}{% set tr = ((mm_c | rd(2)) / (mm_l | rd(2))) | rd(2) %} <span style="color:{% if ar < tr %}#5b9474{% else %}#7ec99a{% endif %}">({{ "%.2f"|format(ar) }})</span>{% endif %}</td>

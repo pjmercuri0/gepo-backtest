@@ -1,0 +1,340 @@
+pairs IS 1,203,470 OOT 130,477  [9s]
+band 0.05-0.15 done [15s]
+band 0.10-0.20 done [21s]
+band 0.15-0.25 done [26s]
+band 0.20-0.30 done [31s]
+band 0.25-0.35 done [37s]
+band 0.30-0.40 done [42s]
+band 0.35-0.45 done [47s]
+band 0.40-0.60 done [54s]
+
+===== fill 1.1x model, k=0 (thr 0.01, top-5/day) =====
+     band  tgt  cands  cred_w  raw_win  is_n  is_fin  is_sh  is_dd  is_loss  oot_n  oot_fin  oot_sh  oot_dd
+0.05-0.15 0.10  92778   0.043    0.930  3717   33027   3.01  -10.8      3.2    520    13394    5.07    -2.6
+0.10-0.20 0.15 103114   0.074    0.880  3772   30613   2.25   -9.4      6.3    560    12306    1.82   -12.0
+0.15-0.25 0.20 101655   0.114    0.826  3804   19417   0.81  -32.2     12.0    573    10977    0.67   -22.0
+0.20-0.30 0.25  96443   0.157    0.768  3910   10929   0.22  -55.7     18.0    572    10445    0.32   -15.1
+0.25-0.35 0.30  89452   0.204    0.713  3938   10469   0.16  -41.5     22.5    573    10356    0.18   -18.3
+0.30-0.40 0.35  84127   0.254    0.659  4006    9548   0.11  -51.6     27.6    575     8206   -0.30   -29.3
+0.35-0.45 0.40  80381   0.306    0.605  4103   11082   0.21  -41.1     32.9    571     9504   -0.28   -23.8
+0.40-0.60 0.50 113481   0.406    0.499  4659   42232   1.49  -15.9     37.0    596    15225    2.40   -10.1
+
+===== fill 1.1x model, k=8 (thr 0.01, top-5/day) =====
+     band  tgt  cands  cred_w  raw_win  is_n  is_fin  is_sh  is_dd  is_loss  oot_n  oot_fin  oot_sh  oot_dd
+0.05-0.15 0.10  92778   0.043    0.930  4095   37782   4.30   -7.9      2.4    534    14119    7.63    -1.7
+0.10-0.20 0.15 103114   0.074    0.880  3943   32021   2.54   -8.7      5.8    563    12756    2.38    -9.0
+0.15-0.25 0.20 101655   0.114    0.826  3857   21194   1.00  -24.4     11.5    573    10850    0.60   -21.2
+0.20-0.30 0.25  96443   0.157    0.768  3936   10300   0.19  -56.9     18.0    573    10146    0.16   -16.3
+0.25-0.35 0.30  89452   0.204    0.713  3949    9932   0.13  -43.8     22.4    574    11045    0.63   -15.7
+0.30-0.40 0.35  84127   0.254    0.659  4011   10148   0.14  -50.1     27.4    576     7871   -0.59   -32.8
+0.35-0.45 0.40  80381   0.306    0.605  4103   11019   0.20  -40.2     32.9    571     9282   -0.36   -26.9
+0.40-0.60 0.50 113481   0.406    0.499  4660   42896   1.51  -15.8     36.9    596    15203    2.39   -10.1
+
+===== fill 1.0x model, k=0 (thr 0.01, top-5/day) =====
+     band  tgt  cands  cred_w  raw_win  is_n  is_fin  is_sh  is_dd  is_loss  oot_n  oot_fin  oot_sh  oot_dd
+0.05-0.15 0.10  92778   0.043    0.930  3717   28907   2.47  -12.8      3.2    520    12756    4.20    -2.9
+0.10-0.20 0.15 103114   0.074    0.880  3772   24570   1.63  -13.0      6.3    560    11282    1.03   -14.7
+0.15-0.25 0.20 101655   0.114    0.826  3804   10928   0.19  -42.1     12.0    573     9487   -0.17   -27.0
+0.20-0.30 0.25  96443   0.157    0.768  3910    -685   0.53 -128.1     18.0    572     8397   -0.78   -25.1
+0.25-0.35 0.30  89452   0.204    0.713  3938   -3798   0.62 -139.6     22.5    573     7909   -0.85   -32.9
+0.30-0.40 0.35  84127   0.254    0.659  4006   -8033   0.09 -170.6     27.6    575     5369   -1.31   -54.0
+0.35-0.45 0.40  80381   0.306    0.605  4103  -10152   0.34 -190.3     32.9    571     6180   -1.65   -45.4
+0.40-0.60 0.50 113481   0.406    0.499  4661   11526   0.24  -38.3     37.0    596    10997    0.57   -23.4
+
+===== fill 1.0x model, k=8 (thr 0.01, top-5/day) =====
+     band  tgt  cands  cred_w  raw_win  is_n  is_fin  is_sh  is_dd  is_loss  oot_n  oot_fin  oot_sh  oot_dd
+0.05-0.15 0.10  92778   0.043    0.930  4095   33535   3.68   -9.2      2.4    534    13515    6.74    -1.9
+0.10-0.20 0.15 103114   0.074    0.880  3943   26091   1.90  -10.6      5.8    563    11791    1.56   -11.3
+0.15-0.25 0.20 101655   0.114    0.826  3857   12818   0.34  -32.7     11.5    573     9421   -0.22   -25.9
+0.20-0.30 0.25  96443   0.157    0.768  3936   -1292   0.08 -129.3     18.0    573     8107   -0.91   -28.5
+0.25-0.35 0.30  89452   0.204    0.713  3949   -4294  -0.44 -143.9     22.4    574     8602   -0.47   -29.6
+0.30-0.40 0.35  84127   0.254    0.659  4011   -7422  -0.16 -165.5     27.4    576     5043   -1.50   -57.3
+0.35-0.45 0.40  80381   0.306    0.605  4103  -10207   0.47 -190.8     32.9    571     5964   -1.68   -47.6
+0.40-0.60 0.50 113481   0.406    0.499  4662   12176   0.27  -36.7     37.0    596    10987    0.56   -23.4
+===== A. COMMISSION STRESS (per spread per contract, opening only; IBKR ~$0.65/leg) — fill 1.1, k=8, thr 0.01 =====
+  tgt 0.10 fill 1.1 comm $0.00: IS n=4095 $  37,782 Sh  4.30 DD   -7.9% worst wk  -4.8% | OOT $ 14,119 Sh  7.63 DD   -1.7%
+  tgt 0.10 fill 1.1 comm $1.30: IS n=4095 $  32,458 Sh  3.51 DD   -9.7% worst wk  -5.5% | OOT $ 13,425 Sh  6.57 DD   -2.0%
+  tgt 0.10 fill 1.1 comm $2.60: IS n=4095 $  27,135 Sh  2.69 DD  -11.8% worst wk  -6.4% | OOT $ 12,731 Sh  5.38 DD   -2.3%
+  tgt 0.10 fill 1.0 comm $0.00: IS n=4095 $  33,535 Sh  3.68 DD   -9.2% worst wk  -5.4% | OOT $ 13,515 Sh  6.74 DD   -1.9%
+  tgt 0.10 fill 1.0 comm $1.30: IS n=4095 $  28,212 Sh  2.87 DD  -11.3% worst wk  -6.2% | OOT $ 12,821 Sh  5.57 DD   -2.2%
+  tgt 0.10 fill 1.0 comm $2.60: IS n=4095 $  22,888 Sh  2.03 DD  -15.6% worst wk  -7.3% | OOT $ 12,127 Sh  4.28 DD   -2.5%
+  tgt 0.15 fill 1.1 comm $0.00: IS n=3943 $  32,021 Sh  2.54 DD   -8.7% worst wk  -6.4% | OOT $ 12,756 Sh  2.38 DD   -9.0%
+  tgt 0.15 fill 1.1 comm $1.30: IS n=3943 $  26,895 Sh  1.98 DD  -10.3% worst wk  -7.4% | OOT $ 12,024 Sh  1.76 DD  -10.7%
+  tgt 0.15 fill 1.1 comm $2.60: IS n=3943 $  21,769 Sh  1.41 DD  -14.1% worst wk  -8.6% | OOT $ 11,292 Sh  1.13 DD  -12.7%
+  tgt 0.15 fill 1.0 comm $0.00: IS n=3943 $  26,091 Sh  1.90 DD  -10.6% worst wk  -7.5% | OOT $ 11,791 Sh  1.56 DD  -11.3%
+  tgt 0.15 fill 1.0 comm $1.30: IS n=3943 $  20,965 Sh  1.32 DD  -15.0% worst wk  -8.8% | OOT $ 11,059 Sh  0.93 DD  -13.3%
+  tgt 0.15 fill 1.0 comm $2.60: IS n=3943 $  15,839 Sh  0.74 DD  -23.9% worst wk -10.6% | OOT $ 10,328 Sh  0.31 DD  -15.4%
+  tgt 0.20 fill 1.1 comm $0.00: IS n=3857 $  21,194 Sh  1.00 DD  -24.4% worst wk  -7.1% | OOT $ 10,850 Sh  0.60 DD  -21.2%
+  tgt 0.20 fill 1.1 comm $1.30: IS n=3857 $  16,180 Sh  0.60 DD  -29.5% worst wk  -8.6% | OOT $ 10,105 Sh  0.17 DD  -23.6%
+  tgt 0.20 fill 1.1 comm $2.60: IS n=3857 $  11,166 Sh  0.21 DD  -37.3% worst wk -11.8% | OOT $  9,360 Sh -0.25 DD  -26.1%
+  tgt 0.20 fill 1.0 comm $0.00: IS n=3857 $  12,818 Sh  0.34 DD  -32.7% worst wk -10.5% | OOT $  9,421 Sh -0.22 DD  -25.9%
+  tgt 0.20 fill 1.0 comm $1.30: IS n=3857 $   7,803 Sh -0.04 DD  -52.9% worst wk -15.4% | OOT $  8,676 Sh -0.63 DD  -28.7%
+  tgt 0.20 fill 1.0 comm $2.60: IS n=3857 $   2,789 Sh -0.25 DD  -87.7% worst wk -28.0% | OOT $  7,931 Sh -1.04 DD  -31.7%
+  tgt 0.50 fill 1.1 comm $0.00: IS n=4660 $  42,896 Sh  1.51 DD  -15.8% worst wk -11.8% | OOT $ 15,203 Sh  2.39 DD  -10.1%
+  tgt 0.50 fill 1.1 comm $1.30: IS n=4660 $  36,838 Sh  1.30 DD  -18.1% worst wk -12.1% | OOT $ 14,428 Sh  2.05 DD  -11.0%
+  tgt 0.50 fill 1.1 comm $2.60: IS n=4660 $  30,780 Sh  1.07 DD  -20.7% worst wk -12.4% | OOT $ 13,654 Sh  1.71 DD  -12.3%
+  tgt 0.50 fill 1.0 comm $0.00: IS n=4662 $  12,176 Sh  0.27 DD  -36.7% worst wk -13.8% | OOT $ 10,987 Sh  0.56 DD  -23.4%
+  tgt 0.50 fill 1.0 comm $1.30: IS n=4662 $   6,115 Sh  0.02 DD  -64.0% worst wk -21.6% | OOT $ 10,212 Sh  0.23 DD  -26.9%
+  tgt 0.50 fill 1.0 comm $2.60: IS n=4662 $      55 Sh -0.04 DD -107.4% worst wk -386.5% | OOT $  9,437 Sh -0.09 DD  -30.5%
+
+===== C. 10-delta band, fill 1.1, k=8: year by year and worst weeks =====
+  2020: n= 163 final $ 11,325 Sh  4.84 DD   -2.2% worst week  -2.2%   (comm $1.30)
+  2021: n= 736 final $ 16,100 Sh 10.82 DD   -1.6% worst week  -1.6%   (comm $1.30)
+  2022: n= 827 final $  9,795 Sh -0.05 DD  -16.1% worst week  -9.5%   (comm $1.30)
+  2023: n= 720 final $ 13,905 Sh  4.35 DD   -5.2% worst week  -5.2%   (comm $1.30)
+  2024: n= 933 final $ 16,861 Sh  6.06 DD   -4.8% worst week  -4.8%   (comm $1.30)
+  2025: n= 716 final $ 14,443 Sh  4.89 DD   -3.9% worst week  -2.9%   (comm $1.30)
+  2026: n= 534 final $ 13,425 Sh  6.57 DD   -2.0% worst week  -2.0%   (comm $1.30)
+  five worst expiry weeks (IS): [('2022-11-11', -975), ('2022-10-28', -823), ('2024-08-02', -702), ('2022-05-27', -623), ('2023-07-21', -623)]
+  10-delta book: median credit $9/contract, median max loss $95, share credit < $0.05/share 23.5%, median OTM 4.03%
+
+===== B. FILLABILITY at 10-delta on REAL IBKR chains (15:31 snapshots): smile-fit model credit vs IBKR mid / natural =====
+  chain rows 1,045 for 79 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 99.3%; med model 0.837 vs vendor mid 0.790; med fit_n 13 rmse 0.0025  [0s]
+  chain rows 807 for 79 chains  [0s]
+  fitted 75 chains  [0s]
+  candidates with model credit 98.4%; med model 0.934 vs vendor mid 0.900; med fit_n 10 rmse 0.0047  [0s]
+  chain rows 1,138 for 79 chains  [0s]
+  fitted 78 chains  [0s]
+  candidates with model credit 99.7%; med model 0.788 vs vendor mid 0.750; med fit_n 15 rmse 0.0017  [0s]
+  chain rows 1,123 for 79 chains  [0s]
+  fitted 78 chains  [0s]
+  candidates with model credit 99.7%; med model 0.817 vs vendor mid 0.777; med fit_n 15 rmse 0.0015  [0s]
+  chain rows 1,037 for 79 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 99.3%; med model 0.860 vs vendor mid 0.797; med fit_n 12 rmse 0.0025  [0s]
+  chain rows 1,031 for 79 chains  [0s]
+  fitted 76 chains  [0s]
+  candidates with model credit 98.8%; med model 0.838 vs vendor mid 0.800; med fit_n 11 rmse 0.0044  [0s]
+  chain rows 811 for 78 chains  [0s]
+  fitted 72 chains  [0s]
+  candidates with model credit 96.9%; med model 0.947 vs vendor mid 0.883; med fit_n 10 rmse 0.0035  [0s]
+  chain rows 1,174 for 78 chains  [0s]
+  fitted 76 chains  [0s]
+  candidates with model credit 99.4%; med model 0.851 vs vendor mid 0.825; med fit_n 15 rmse 0.0011  [0s]
+  chain rows 1,125 for 78 chains  [0s]
+  fitted 75 chains  [0s]
+  candidates with model credit 99.2%; med model 0.813 vs vendor mid 0.800; med fit_n 15 rmse 0.0008  [0s]
+  chain rows 1,124 for 78 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 99.7%; med model 0.858 vs vendor mid 0.850; med fit_n 15 rmse 0.0012  [0s]
+  chain rows 1,040 for 77 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 100.0%; med model 0.826 vs vendor mid 0.820; med fit_n 13 rmse 0.0010  [0s]
+  chain rows 1,010 for 76 chains  [0s]
+  fitted 72 chains  [0s]
+  candidates with model credit 98.6%; med model 0.885 vs vendor mid 0.850; med fit_n 13 rmse 0.0025  [0s]
+  chain rows 1,069 for 78 chains  [0s]
+  fitted 76 chains  [0s]
+  candidates with model credit 99.3%; med model 0.844 vs vendor mid 0.800; med fit_n 14 rmse 0.0031  [0s]
+  chain rows 804 for 76 chains  [0s]
+  fitted 72 chains  [0s]
+  candidates with model credit 97.9%; med model 0.934 vs vendor mid 0.875; med fit_n 11 rmse 0.0039  [0s]
+  chain rows 793 for 76 chains  [0s]
+  fitted 67 chains  [0s]
+  candidates with model credit 96.2%; med model 0.957 vs vendor mid 0.895; med fit_n 11 rmse 0.0043  [0s]
+  chain rows 1,148 for 77 chains  [0s]
+  fitted 76 chains  [0s]
+  candidates with model credit 99.7%; med model 0.829 vs vendor mid 0.775; med fit_n 14 rmse 0.0007  [0s]
+  chain rows 1,189 for 78 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 99.7%; med model 0.823 vs vendor mid 0.765; med fit_n 16 rmse 0.0008  [0s]
+  chain rows 1,116 for 77 chains  [0s]
+  fitted 76 chains  [0s]
+  candidates with model credit 99.7%; med model 0.792 vs vendor mid 0.743; med fit_n 15 rmse 0.0013  [0s]
+  chain rows 1,266 for 57 chains  [0s]
+  fitted 57 chains  [0s]
+  candidates with model credit 100.0%; med model 0.548 vs vendor mid 0.525; med fit_n 21 rmse 0.0011  [0s]
+  chain rows 1,137 for 50 chains  [0s]
+  fitted 50 chains  [0s]
+  candidates with model credit 100.0%; med model 0.692 vs vendor mid 0.660; med fit_n 24 rmse 0.0012  [0s]
+  chain rows 975 for 50 chains  [0s]
+  fitted 48 chains  [0s]
+  candidates with model credit 99.8%; med model 0.739 vs vendor mid 0.700; med fit_n 20 rmse 0.0032  [0s]
+  chain rows 988 for 50 chains  [0s]
+  fitted 50 chains  [0s]
+  candidates with model credit 100.0%; med model 0.749 vs vendor mid 0.720; med fit_n 18 rmse 0.0027  [0s]
+  chain rows 1,806 for 77 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 100.0%; med model 0.533 vs vendor mid 0.525; med fit_n 23 rmse 0.0019  [0s]
+  chain rows 1,814 for 77 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 100.0%; med model 0.536 vs vendor mid 0.547; med fit_n 24 rmse 0.0023  [0s]
+  chain rows 1,240 for 59 chains  [0s]
+  fitted 57 chains  [0s]
+  candidates with model credit 99.7%; med model 0.485 vs vendor mid 0.500; med fit_n 22 rmse 0.0026  [0s]
+  chain rows 574 for 25 chains  [0s]
+  fitted 25 chains  [0s]
+  candidates with model credit 100.0%; med model 0.479 vs vendor mid 0.505; med fit_n 23 rmse 0.0033  [0s]
+  chain rows 1,202 for 64 chains  [0s]
+  fitted 64 chains  [0s]
+  candidates with model credit 100.0%; med model 0.615 vs vendor mid 0.592; med fit_n 18 rmse 0.0038  [0s]
+  chain rows 1,262 for 67 chains  [0s]
+  fitted 67 chains  [0s]
+  candidates with model credit 100.0%; med model 0.580 vs vendor mid 0.565; med fit_n 19 rmse 0.0038  [0s]
+  chain rows 1,399 for 58 chains  [0s]
+  fitted 58 chains  [0s]
+  candidates with model credit 100.0%; med model 0.607 vs vendor mid 0.600; med fit_n 25 rmse 0.0006  [0s]
+  chain rows 1,269 for 50 chains  [0s]
+  fitted 50 chains  [0s]
+  candidates with model credit 100.0%; med model 0.640 vs vendor mid 0.645; med fit_n 25 rmse 0.0007  [0s]
+  chain rows 1,438 for 62 chains  [0s]
+  fitted 62 chains  [0s]
+  candidates with model credit 100.0%; med model 0.616 vs vendor mid 0.605; med fit_n 24 rmse 0.0010  [0s]
+  chain rows 1,428 for 62 chains  [0s]
+  fitted 62 chains  [0s]
+  candidates with model credit 100.0%; med model 0.616 vs vendor mid 0.600; med fit_n 23 rmse 0.0010  [0s]
+  chain rows 1,359 for 62 chains  [0s]
+  fitted 62 chains  [0s]
+  candidates with model credit 100.0%; med model 0.613 vs vendor mid 0.590; med fit_n 23 rmse 0.0009  [0s]
+  chain rows 1,593 for 73 chains  [0s]
+  fitted 72 chains  [0s]
+  candidates with model credit 99.9%; med model 0.594 vs vendor mid 0.563; med fit_n 21 rmse 0.0013  [0s]
+  chain rows 1,578 for 73 chains  [0s]
+  fitted 73 chains  [0s]
+  candidates with model credit 100.0%; med model 0.618 vs vendor mid 0.575; med fit_n 22 rmse 0.0019  [0s]
+  chain rows 878 for 43 chains  [0s]
+  fitted 43 chains  [0s]
+  candidates with model credit 100.0%; med model 0.621 vs vendor mid 0.605; med fit_n 22 rmse 0.0027  [0s]
+  chain rows 1,224 for 65 chains  [0s]
+  fitted 65 chains  [0s]
+  candidates with model credit 100.0%; med model 0.613 vs vendor mid 0.605; med fit_n 20 rmse 0.0026  [0s]
+  chain rows 1,607 for 71 chains  [0s]
+  fitted 71 chains  [0s]
+  candidates with model credit 100.0%; med model 0.566 vs vendor mid 0.555; med fit_n 23 rmse 0.0007  [0s]
+  chain rows 1,573 for 71 chains  [0s]
+  fitted 71 chains  [0s]
+  candidates with model credit 100.0%; med model 0.568 vs vendor mid 0.560; med fit_n 23 rmse 0.0007  [0s]
+  chain rows 1,530 for 70 chains  [0s]
+  fitted 70 chains  [0s]
+  candidates with model credit 100.0%; med model 0.532 vs vendor mid 0.535; med fit_n 22 rmse 0.0012  [0s]
+  chain rows 1,541 for 70 chains  [0s]
+  fitted 70 chains  [0s]
+  candidates with model credit 100.0%; med model 0.531 vs vendor mid 0.525; med fit_n 20 rmse 0.0013  [0s]
+  chain rows 1,439 for 70 chains  [0s]
+  fitted 69 chains  [0s]
+  candidates with model credit 99.8%; med model 0.562 vs vendor mid 0.550; med fit_n 22 rmse 0.0020  [0s]
+  chain rows 1,409 for 70 chains  [0s]
+  fitted 69 chains  [0s]
+  candidates with model credit 99.8%; med model 0.544 vs vendor mid 0.535; med fit_n 21 rmse 0.0018  [0s]
+  chain rows 1,253 for 70 chains  [0s]
+  fitted 68 chains  [0s]
+  candidates with model credit 99.7%; med model 0.598 vs vendor mid 0.583; med fit_n 18 rmse 0.0031  [0s]
+  chain rows 1,245 for 70 chains  [0s]
+  fitted 67 chains  [0s]
+  candidates with model credit 99.4%; med model 0.590 vs vendor mid 0.555; med fit_n 18 rmse 0.0031  [0s]
+  chain rows 1,793 for 76 chains  [0s]
+  fitted 76 chains  [0s]
+  candidates with model credit 100.0%; med model 0.604 vs vendor mid 0.585; med fit_n 23 rmse 0.0005  [0s]
+  chain rows 1,799 for 76 chains  [0s]
+  fitted 76 chains  [0s]
+  candidates with model credit 100.0%; med model 0.606 vs vendor mid 0.585; med fit_n 24 rmse 0.0007  [0s]
+  chain rows 1,727 for 77 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 100.0%; med model 0.588 vs vendor mid 0.600; med fit_n 21 rmse 0.0007  [0s]
+  chain rows 1,774 for 77 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 100.0%; med model 0.584 vs vendor mid 0.580; med fit_n 20 rmse 0.0007  [0s]
+  chain rows 1,668 for 77 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 100.0%; med model 0.575 vs vendor mid 0.575; med fit_n 22 rmse 0.0011  [0s]
+  chain rows 1,641 for 77 chains  [0s]
+  fitted 77 chains  [0s]
+  candidates with model credit 100.0%; med model 0.587 vs vendor mid 0.580; med fit_n 20 rmse 0.0013  [0s]
+  chain rows 1,354 for 75 chains  [0s]
+  fitted 74 chains  [0s]
+  candidates with model credit 99.8%; med model 0.606 vs vendor mid 0.578; med fit_n 19 rmse 0.0030  [0s]
+  chain rows 1,408 for 76 chains  [0s]
+  fitted 75 chains  [0s]
+  candidates with model credit 99.8%; med model 0.594 vs vendor mid 0.575; med fit_n 19 rmse 0.0030  [0s]
+  result = getattr(ufunc, method)(*inputs, **kwargs)
+  result = getattr(ufunc, method)(*inputs, **kwargs)
+  10-delta spreads on IBKR chains: 8,284 from 53 snapshots
+  model credit median $0.101; IBKR mid median $0.090; IBKR natural median $-0.020
+  model / IBKR mid: [0.63, 0.85, 1.02, 1.37, 4.36]
+  share where IBKR natural >= model credit (fillable at model without improvement): 1.2%
+  share where IBKR natural >= 0.8 x model: 8.6%;  share short-leg bid <= $0.01: 1.0%;  share model credit < $0.05: 17.6%
+  short-leg bid-ask width median $0.12 vs model credit $0.101
+this side richer than the other side on 41.2% (bull_put 66.6%, bear_call 10.4%); median D_rr 0.0022, D_mirror 0.00001
+
+rr_signed (this side minus other side, all candidates): IS n=38049 x [-0.0632, -0.0274, -0.0083, 0.0112, 0.038] loss [0.461, 0.446, 0.43, 0.421, 0.396] EV [0.0095, 0.0041, 0.0047, 0.0052, 0.0045]
+                                                     OOT n=5430 x [-0.0722, -0.0323, -0.0102, 0.0101, 0.0415] loss [0.391, 0.414, 0.444, 0.456, 0.475] EV [0.0101, 0.0045, 0.0043, 0.0045, 0.0044]
+
+=== 50-60 delta, DKL = D_rr  (k<0 discount, k>0 reward) ===
+ IS : n=38049 x [0.0001, 0.0008, 0.0022, 0.0048, 0.0176] loss [0.425, 0.423, 0.43, 0.432, 0.444] EV [0.0053, 0.0046, 0.0044, 0.0044, 0.0093]
+ OOT: n=5430 x [0.0001, 0.0009, 0.0026, 0.0063, 0.022] loss [0.46, 0.436, 0.442, 0.423, 0.419] EV [0.0043, 0.0045, 0.0043, 0.0051, 0.0094]
+  k  is_n  is_fin  is_sh  is_dd  oot_n  oot_fin  oot_sh  oot_dd
+-64  3448   36572   1.22  -22.0    453    12781    1.13   -11.7
+-16  3993   38037   1.28  -16.9    534    13720    1.92   -10.8
+ -4  4137   37147   1.28  -18.1    556    14366    2.13    -8.1
+  0  4183   35760   1.24  -18.0    560    14068    1.97    -8.1
+  4  4220   35542   1.24  -18.3    565    14514    2.16    -8.0
+ 16  4317   36118   1.26  -16.5    579    13247    1.60   -10.7
+ 64  4591   37028   1.27  -15.8    597    13309    1.63    -8.7
+256  5009   33074   1.18  -16.5    600    11551    0.90    -9.6
+
+=== 50-60 delta, DKL = D_rr_rich  (k<0 discount, k>0 reward) ===
+ IS : n=15747 x [0.0001, 0.0005, 0.0015, 0.0035, 0.0107] loss [0.416, 0.424, 0.414, 0.402, 0.388] EV [0.0055, 0.0054, 0.0049, 0.0045, 0.0042]
+ OOT: n=2160 x [0.0001, 0.0005, 0.0017, 0.0041, 0.0139] loss [0.481, 0.428, 0.461, 0.463, 0.495] EV [0.0048, 0.0042, 0.0046, 0.0046, 0.004]
+  k  is_n  is_fin  is_sh  is_dd  oot_n  oot_fin  oot_sh  oot_dd
+-64  4102   36537   1.29  -16.0    551    13511    1.86    -7.7
+-16  4158   36856   1.28  -16.4    557    13552    1.77    -8.4
+ -4  4178   36350   1.25  -17.7    559    14184    2.03    -8.1
+  0  4184   35917   1.25  -18.0    560    14068    1.97    -8.1
+  4  4193   36545   1.26  -18.2    561    13933    1.94    -8.3
+ 16  4212   35660   1.23  -18.3    565    13601    1.75    -8.7
+ 64  4291   38169   1.26  -17.2    573    13929    2.06   -13.1
+256  4546   44437   1.37  -21.5    595    10967    0.53   -29.0
+
+=== 50-60 delta, DKL = D_rr_cheap  (k<0 discount, k>0 reward) ===
+ IS : n=22301 x [0.0002, 0.001, 0.0027, 0.006, 0.022] loss [0.43, 0.435, 0.448, 0.453, 0.465] EV [0.0049, 0.0043, 0.0041, 0.0045, 0.0129]
+ OOT: n=3270 x [0.0002, 0.0012, 0.0035, 0.0081, 0.0266] loss [0.445, 0.45, 0.39, 0.393, 0.405] EV [0.0039, 0.0045, 0.0047, 0.0054, 0.0127]
+  k  is_n  is_fin  is_sh  is_dd  oot_n  oot_fin  oot_sh  oot_dd
+-64  3575   37310   1.20  -26.5    473    12885    1.10   -13.7
+-16  4021   37052   1.23  -20.2    538    13669    1.87   -10.9
+ -4  4143   37041   1.28  -18.4    557    14444    2.17    -8.1
+  0  4183   35760   1.24  -18.0    560    14068    1.97    -8.1
+  4  4211   34839   1.22  -18.2    564    14771    2.25    -8.1
+ 16  4290   35622   1.24  -16.1    575    13843    1.81   -10.6
+ 64  4519   36416   1.30  -15.2    593    13301    1.64    -8.2
+256  4894   34578   1.25  -20.9    600    12040    0.93   -23.3
+
+=== 50-60 delta, DKL = D_mirror  (k<0 discount, k>0 reward) ===
+ IS : n=38049 x [0.0, 0.0, 0.0, 0.0001, 0.0029] loss [0.457, 0.462, 0.451, 0.432, 0.351] EV [0.005, 0.0044, 0.0043, 0.0047, 0.0097]
+ OOT: n=5430 x [0.0, 0.0, 0.0, 0.0001, 0.0025] loss [0.482, 0.462, 0.459, 0.426, 0.352] EV [0.0041, 0.0038, 0.0043, 0.0046, 0.0109]
+  k  is_n  is_fin  is_sh  is_dd  oot_n  oot_fin  oot_sh  oot_dd
+-64  4083   37272   1.28  -17.5    546    14195    2.04    -8.5
+-16  4157   36673   1.27  -18.1    556    13998    1.92    -8.3
+ -4  4178   36457   1.26  -17.8    560    14065    1.97    -8.1
+  0  4184   35917   1.25  -18.0    560    14068    1.97    -8.1
+  4  4189   35613   1.24  -18.0    560    14219    2.05    -8.1
+ 16  4203   35955   1.25  -18.0    561    14719    2.28    -6.5
+ 64  4253   37385   1.30  -16.8    567    14822    2.23    -8.0
+256  4371   38571   1.34  -16.3    577    14997    2.35    -6.9
+
+=== 50-60 delta, DKL = D_mirror_rich  (k<0 discount, k>0 reward) ===
+ IS : n=15747 x [0.0, 0.0, 0.0, 0.0, 0.0004] loss [0.451, 0.446, 0.42, 0.39, 0.337] EV [0.0057, 0.0054, 0.0048, 0.0045, 0.0039]
+ OOT: n=2160 x [0.0, 0.0, 0.0, 0.0, 0.0003] loss [0.505, 0.456, 0.47, 0.491, 0.407] EV [0.0049, 0.0039, 0.0046, 0.0049, 0.0039]
+  k  is_n  is_fin  is_sh  is_dd  oot_n  oot_fin  oot_sh  oot_dd
+-64  4182   35962   1.25  -18.1    560    14170    2.03    -8.1
+-16  4184   35917   1.25  -18.0    560    14068    1.97    -8.1
+ -4  4184   35917   1.25  -18.0    560    14068    1.97    -8.1
+  0  4184   35917   1.25  -18.0    560    14068    1.97    -8.1
+  4  4184   35917   1.25  -18.0    560    14068    1.97    -8.1
+ 16  4184   36132   1.25  -18.0    560    14068    1.97    -8.1
+ 64  4187   36330   1.26  -18.3    560    14135    2.01    -8.1
+256  4197   36084   1.25  -19.8    561    14325    2.10    -8.2
+
+=== 50-60 delta, DKL = D_mirror_cheap  (k<0 discount, k>0 reward) ===
+ IS : n=22302 x [0.0, 0.0, 0.0, 0.0001, 0.0047] loss [0.466, 0.474, 0.477, 0.463, 0.352] EV [0.0044, 0.0036, 0.0039, 0.0054, 0.0133]
+ OOT: n=3270 x [0.0, 0.0, 0.0, 0.0001, 0.004] loss [0.463, 0.459, 0.453, 0.362, 0.346] EV [0.0037, 0.0034, 0.0041, 0.0056, 0.0145]
+  k  is_n  is_fin  is_sh  is_dd  oot_n  oot_fin  oot_sh  oot_dd
+-64  4085   37135   1.27  -17.4    546    14093    1.99    -8.5
+-16  4157   36727   1.27  -18.1    556    13998    1.92    -8.3
+ -4  4178   36457   1.26  -17.8    560    14065    1.97    -8.1
+  0  4184   35917   1.25  -18.0    560    14068    1.97    -8.1
+  4  4189   35613   1.24  -18.0    560    14411    2.17    -6.3
+ 16  4203   35739   1.24  -18.0    561    14719    2.28    -6.5
+ 64  4250   36899   1.28  -16.5    567    14822    2.23    -8.0
+256  4361   38108   1.33  -15.9    577    14966    2.35    -6.7

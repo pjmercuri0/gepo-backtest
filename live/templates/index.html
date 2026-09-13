@@ -37,16 +37,17 @@
         <th>Strikes</th>
         <th>Δ</th>
         <th>DTE</th>
-        <th>Credit ($/sh)</th>
+        <th title="smile-fit model credit (selection basis); IBKR quote in the card">Credit ($/sh)</th>
+        <th title="min 1.04×model, target 1.06–1.10×model">Min / Target</th>
         <th>Max-Loss ($/sh)</th>
         <th>Ratio</th>
-        <th title="RV-implied P above (belief — used in G and DKL), IV-implied Q below (market reference)">rv: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">iv below</span></th>
+        <th title="P_real above (realized-move belief, used in G); Q_bs below (market law, D_ent reference)">real: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">bs below</span></th>
         <th>Kelly EV</th>
-        <th>exp(k·DKL)</th>
+        <th>exp(k·D_ent)</th>
         <th>Γᵢ</th>
       </tr>
     </thead>
-    <tbody id="ranked-tbody"><tr><td colspan="13" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
+    <tbody id="ranked-tbody"><tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
   </table>
   </div>
 </div>
@@ -115,8 +116,7 @@ function fmtKellyEV(g, dec=2) {
   const cls  = ev >= 0 ? "pos" : "neg";
   return `<span class="${cls}">${sign}${ev.toFixed(dec)}%</span>`;
 }
-// Entropic risk multiplier denom = exp(k·DKL). Canonical 2026-06-10:
-// rv_vs_iv DKL (BS d2, 10d RV vs IV), k=10 (growth-optimal canon 2026-06-12), IV-rank-stratified empirical pool.
+// Entropic risk multiplier denom = exp(k·D_ent). D_ent canon 2026-09-13: D(Q_bs‖U₃) = ln3 − H(Q_bs), k=1.
 // Kept parametric so a k-sweep can be visualised.
 function denom(r, k) {
   if (r == null || r.DKL == null) return null;
@@ -165,7 +165,11 @@ function renderParams(cfg) {
     ["α",              `(b−1)/(2b)`],
     ["top-N",          `${cfg.TOP_N}`],
     ["thr",            `${cfg.GROUND_THRESHOLD ?? "—"} (all days)`],
-    ["DKL ref",        `rv_vs_iv (BS d2, 10d RV vs IV)`],
+    ["DKL",            cfg.DKL_REF || `D_ent = ln3 − H(Q_bs) (paper eq. 19)`],
+    ["belief",         cfg.BELIEF || `P_real: 252 sessions of realized moves vs the strikes`],
+    ["credit",         cfg.CREDIT_MODEL || `smile-fit model credit; IBKR quote shown`],
+    ["fill",           cfg.FILL_MULT != null ? `${cfg.FILL_MULT}× model, $${cfg.COMMISSION} comm` : `—`],
+    ["targets",        cfg.TARGETS || `min 1.04×fair, target 1.06–1.10×fair`],
     ["regime gate",    `OFF (both directions eligible)`],
   ];
   return chips.map(([k, v]) =>
@@ -173,6 +177,12 @@ function renderParams(cfg) {
   ).join("");
 }
 
+// D_ent canon execution targets (set by webapp._attach_targets on every pick).
+function tgtCell(p) {
+  const t = p.credit_targets;
+  if (!t || t.min_credit == null) return "—";
+  return `<span style="color:#c9a227">${fmtMoney(t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${fmtMoney(t.target_lo_credit)}–${fmtMoney(t.target_hi_credit)}</span>`;
+}
 // Midmid credit/max_loss: prefer fill_targets[0] (set by webapp from leg bid/ask),
 // fall back to mid net_credit/max_loss when bid/ask isn't yet available.
 function mmCredit(p)  { return (p.fill_targets && p.fill_targets[0]) ? Number(p.fill_targets[0].credit)   : Number(p.net_credit || 0); }
@@ -250,17 +260,22 @@ function renderTopPicks(picks, maxGround, kVal) {
       <div class="table-scroll"><table>
         <thead><tr>
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
-          <th>credit ($/sh)</th><th>max-loss ($/sh)</th><th>ratio</th>
-          <th title="RV-implied P (belief — used in G and DKL)">rv: p / r₀ / q</th>
-          <th title="IV-implied Q (market reference in DKL)">iv: p̂ / r̂₀ / q̂</th>
-          <th>G</th><th>Kelly EV</th><th>DKL</th><th>exp(k·DKL)</th><th>Γᵢ (risk-adj)</th>
+          <th title="IBKR quoted credit (combo mid when available)">quoted ($/sh)</th>
+          <th title="smile-fit model credit: what the spread is worth on the fitted surface (selection basis)">model ($/sh)</th>
+          <th title="execution rule: min 1.04×model, target 1.06–1.10×model">min / target</th>
+          <th>max-loss ($/sh)</th><th>ratio</th>
+          <th title="P_real: realized-move belief at the strikes (used in G)">real: p / r₀ / q</th>
+          <th title="Q_bs: market law at the fitted IVs (D_ent reference)">bs: p̂ / r̂₀ / q̂</th>
+          <th>G</th><th>Kelly EV</th><th title="D_ent = ln3 − H(Q_bs)">D_ent</th><th>exp(k·D_ent)</th><th>Γᵢ (risk-adj)</th>
         </tr></thead>
         <tbody><tr>
           <td>${fmtMoney(p.entry_price)}</td>
           <td>${fmtNum(p.short_delta, 3)}</td>
           <td>${fmtNum(p.long_delta, 3)}</td>
           <td>${fmtPct(p.IV)}</td>
-          <td class="fw">${fmtMoney(mmCredit(p))}</td>
+          <td>${p.quoted_credit != null ? fmtMoney(p.quoted_credit) : fmtMoney(p.net_credit)}</td>
+          <td class="fw">${p.model_credit != null ? fmtMoney(p.model_credit) : "—"}</td>
+          <td>${tgtCell(p)}</td>
           <td>${fmtMoney(mmMaxLoss(p))}</td>
           <td>${rd(mmMaxLoss(p) > 0 ? mmCredit(p)/mmMaxLoss(p) : 0, 2).toFixed(2)}</td>
           <td>${fmtNum(p.p, 2)} / ${fmtNum(p.ro, 2)} / ${fmtNum(p.q, 2)}</td>
@@ -279,7 +294,7 @@ function renderTopPicks(picks, maxGround, kVal) {
 
 function renderRanked(rows, maxGround, kVal) {
   if (!rows || rows.length === 0) {
-    return `<tr><td colspan="13" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
+    return `<tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
   }
   return rows.map((r, i) => {
     // Bright = top-5 ranked AND qualified (meets per-DOW GROUND threshold).
@@ -294,10 +309,11 @@ function renderRanked(rows, maxGround, kVal) {
       <td>${fmtNum(r.short_delta, 2)}</td>
       <td>${r.DTE ?? "—"}</td>
       <td>${fmtMoney(mmCredit(r))}</td>
+      <td>${tgtCell(r)}</td>
       <td>${fmtMoney(mmMaxLoss(r))}</td>
       <td>${rd(mmMaxLoss(r) > 0 ? mmCredit(r)/mmMaxLoss(r) : 0, 2).toFixed(2)}</td>
       <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}<br>
-          <span style="opacity:0.7;font-size:11px">${r.p_hat != null ? `iv ${fmtNum(r.p_hat,2)} / ${fmtNum(r.ro_hat,2)} / ${fmtNum(r.q_hat,2)}` : "—"}</span></td>
+          <span style="opacity:0.7;font-size:11px">${r.p_hat != null ? `bs ${fmtNum(r.p_hat,2)} / ${fmtNum(r.ro_hat,2)} / ${fmtNum(r.q_hat,2)}` : "—"}</span></td>
       <td>${fmtKellyEV(r.G)}</td>
       <td>${fmtNum(denom(r, kVal), 4)}</td>
       <td class="fw">${groundBar(r.GROUND, maxGround)}${fmtGround(r.GROUND)}</td>

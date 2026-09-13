@@ -7,7 +7,7 @@
   {% set c = data.config %}
 
   <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">{% if is_euro_profile %}GEPO Euro Index Backtest{% else %}GEPO Credit Spread Backtest{% endif %}</h1>
-  <div class="subtitle">{% if is_euro_profile %}Cash-settled European index options · G_rv/DKL canon · all expiry weekdays · fills 0.80×clamped LAST · no regime gate · qty=2{% else %}G_rv: RV-implied N(d2) probs in G · rv_vs_iv DKL (BS d2, 10d RV vs IV) · raw-mid credit · k=10 · thr=0.05 · top-5 per day · 20Δ short leg · D(P_emp‖Q_iv) on 52 expiries · fills 0.80×mid · no regime gate · qty=2 (52:10 canon 2026-09-12){% endif %}</div>
+  <div class="subtitle">{% if is_euro_profile %}Cash-settled European index options · G_rv/DKL canon · all expiry weekdays · fills 0.80×clamped LAST · no regime gate · qty=2{% else %}D_ent canon (2026-09-13) · 0.55Δ short leg by fitted delta (band 0.50–0.60) · G on P_real (252-session realized moves vs the strikes) · D_ent = ln3 − H(Q_bs) (paper eq. 19) · k=1 · GROUND ≥ 0.01 · top-5/day · smile-fit credit, fills 1.08×model, $1.30/spread commission · no regime gate · qty=2{% endif %}</div>
 
   <div class="params-row">
     <span class="chip"><span class="chip-k">range</span><span class="chip-v">{{ s.window_start }} → {{ s.window_end }}</span></span>
@@ -22,6 +22,9 @@
     {% if c.window %}<span class="chip"><span class="chip-k">window</span><span class="chip-v">{{ c.window }}</span></span>{% endif %}
     <span class="chip"><span class="chip-k">selection</span><span class="chip-v">{{ c.selection }}</span></span>
     <span class="chip"><span class="chip-k">fill</span><span class="chip-v">{{ c.fill_basis }}</span></span>
+    {% if c.credit_basis %}<span class="chip"><span class="chip-k">credit</span><span class="chip-v">{{ c.credit_basis }}</span></span>{% endif %}
+    {% if c.targets %}<span class="chip"><span class="chip-k">targets</span><span class="chip-v">{{ c.targets }}</span></span>{% endif %}
+    {% if c.scoring %}<span class="chip"><span class="chip-k">scoring</span><span class="chip-v">{{ c.scoring }}</span></span>{% endif %}
     <span class="chip"><span class="chip-k">regime</span><span class="chip-v">{{ c.regime }}</span></span>
     <span class="chip"><span class="chip-k">sizing</span><span class="chip-v">{{ c.sizing }}</span></span>
   </div>

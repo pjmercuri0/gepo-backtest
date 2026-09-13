@@ -1,0 +1,4 @@
+  chain rows 1,986,283 for 76,898 chains  [107s]
+  fitted 76,655 chains  [208s]
+  candidates with model credit 99.7%; med model 0.124 vs vendor mid 0.135; med fit_n 17 rmse 0.0193  [210s]
+wrote research/dkl_2026_09_13/is_synth.parquet 135509

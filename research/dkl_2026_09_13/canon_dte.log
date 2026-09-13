@@ -1,0 +1,41 @@
+
+
+
+
+
+
+CANON: 50-60 delta, G on P_real (W=252), GROUND = EV*exp(-1.0*D_ent), thr 0.01, top-5/day, fill 1.08x model, comm $1.30
+
+--- IS 2020-25: composition of the SELECTED book by DTE (share of trades, win/partial/loss, mean P&L per contract) ---
+        n  share    win  partial   loss    pnl  credit  D_ent
+DTE                                                          
+1     662  0.166  0.418    0.236  0.346  5.952   0.553  0.072
+2     977  0.244  0.447    0.158  0.395  7.638   0.590  0.100
+3    1190  0.298  0.450    0.137  0.413  8.399   0.618  0.115
+4    1170  0.293  0.443    0.118  0.439  5.939   0.617  0.128
+--- IS 2020-25: each DTE run as its OWN book (top-5/day within that DTE), k=1 vs k=0 ---
+   DTE 1: n= 662  k=0 Sh  0.75 DD   -8.6%  ->  k=1 Sh  0.87 DD   -7.7%  final $13,940  worst wk -3.5%
+   DTE 2: n= 977  k=0 Sh  0.99 DD  -12.1%  ->  k=1 Sh  1.09 DD   -9.4%  final $17,463  worst wk -5.2%
+   DTE 3: n=1190  k=0 Sh  1.08 DD  -12.5%  ->  k=1 Sh  1.24 DD  -10.9%  final $19,995  worst wk -4.2%
+   DTE 4: n=1168  k=0 Sh  0.78 DD  -18.8%  ->  k=1 Sh  0.85 DD  -15.2%  final $16,949  worst wk -4.7%
+   DTE 1-2         : n=1639  k=1 Sh  1.29 DD  -10.4%  final $21,403
+   DTE 2-3         : n=2167  k=1 Sh  1.35 DD  -13.1%  final $27,458
+   DTE 3-4         : n=2358  k=1 Sh  1.17 DD  -17.9%  final $26,944
+   DTE 1-4 (canon) : n=3997  k=1 Sh  1.35 DD  -14.9%  final $38,347
+
+--- OOT 2026: composition of the SELECTED book by DTE (share of trades, win/partial/loss, mean P&L per contract) ---
+       n  share    win  partial   loss     pnl  credit  D_ent
+DTE                                                          
+1    124  0.228  0.387    0.250  0.363   6.228   0.606  0.058
+2    135  0.248  0.467    0.200  0.333  11.734   0.628  0.090
+3    140  0.257  0.457    0.157  0.386  11.193   0.624  0.137
+4    145  0.267  0.400    0.145  0.455   3.604   0.738  0.130
+--- OOT 2026: each DTE run as its OWN book (top-5/day within that DTE), k=1 vs k=0 ---
+   DTE 1: n= 124  k=0 Sh  0.88 DD   -6.0%  ->  k=1 Sh  1.23 DD   -4.7%  final $10,772  worst wk -1.9%
+   DTE 2: n= 135  k=0 Sh  1.54 DD   -5.3%  ->  k=1 Sh  1.86 DD   -2.7%  final $11,584  worst wk -2.5%
+   DTE 3: n= 140  k=0 Sh  1.66 DD   -8.2%  ->  k=1 Sh  1.66 DD   -5.5%  final $11,567  worst wk -4.0%
+   DTE 4: n= 145  k=0 Sh  0.39 DD   -6.2%  ->  k=1 Sh  0.59 DD   -5.5%  final $10,523  worst wk -3.5%
+   DTE 1-2         : n= 259  k=1 Sh  2.59 DD   -4.7%  final $12,356
+   DTE 2-3         : n= 275  k=1 Sh  2.08 DD   -7.6%  final $13,151
+   DTE 3-4         : n= 285  k=1 Sh  1.36 DD   -7.1%  final $12,090
+   DTE 1-4 (canon) : n= 544  k=1 Sh  2.38 DD   -6.6%  final $14,446
