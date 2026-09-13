@@ -334,9 +334,12 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     scored["spread_width"] = scored["width"]
     # market triple for display (p_hat / q_hat / ro_hat = WIN / LOSS / PARTIAL under Q_bs)
     scored["p_hat"], scored["q_hat"], scored["ro_hat"] = scored["q_win"], scored["q_loss"], scored["q_part"]
-    n_nobelief = int(scored["EV"].isna().sum())
+    n_nobelief = int(scored["p"].isna().sum())
+    n_neg = int(scored["EV"].isna().sum()) - n_nobelief
     if n_nobelief:
-        print(f"  {n_nobelief} candidate(s) lack {entc.MIN_OBS} sessions of history (no P_real) and are unscored", flush=True)
+        print(f"  {n_nobelief} candidate(s) have NO close history (no P_real) and are unscored", flush=True)
+    if n_neg:
+        print(f"  {n_neg} candidate(s) growth-negative at the model credit (Kelly w* <= 0) and are unranked", flush=True)
     for i, r in scored.iterrows():
         tg = entc.credit_targets(r["dfit_short"], r["DTE"], width=r["width"], model_credit=r["model_credit"])
         for k_, v_ in tg.items():
