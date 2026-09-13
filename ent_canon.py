@@ -35,7 +35,13 @@ TOP_N        = 5
 PRIOR        = 0.5        # pseudo-count per state in P_real
 
 # execution targets, as multiples of fair (model) credit
-MULT_BREAKEVEN, MULT_MIN, MULT_TARGET_LO, MULT_TARGET_HI = 0.965, 1.04, 1.06, 1.10
+MULT_BREAKEVEN = 0.965
+# Execution thresholds are ABSOLUTE credit/width, not multiples of fair (user
+# 2026-09-13). As multiples they collapsed under rounding: at fair_cw 0.467,
+# 1.04x = 0.4853 and 1.06x = 0.4946, and both round to 0.49 at 2dp — min and
+# target_lo printed identical on the site. Fixed levels also make the ask
+# legible: "I want at least half the width, and 0.53-0.56 is a good fill."
+MIN_CW, TARGET_LO_CW, TARGET_HI_CW = 0.50, 0.53, 0.56
 # cross-sectional fair credit/width by delta and DTE (fit on 43,479 candidates 2020-26, med |err| 0.025)
 FAIR_COEF = (0.4022, 2.3485, -12.464, 0.0077)
 
@@ -265,9 +271,12 @@ def credit_targets(short_delta, dte, width=None, model_credit=None) -> dict:
     else:
         fair = fair_cw(d, dte)
         basis = 'formula'
+    # min/target are absolute credit/width levels; breakeven stays relative to
+    # fair because it is a property of THIS spread, not an execution target.
+    # 3dp on the ratios so two adjacent levels can never round together.
     out = {'basis': basis, 'fair_cw': round(fair, 3),
-           'breakeven_cw': round(fair * MULT_BREAKEVEN, 2), 'min_cw': round(fair * MULT_MIN, 2),
-           'target_lo_cw': round(fair * MULT_TARGET_LO, 2), 'target_hi_cw': round(fair * MULT_TARGET_HI, 2)}
+           'breakeven_cw': round(fair * MULT_BREAKEVEN, 3), 'min_cw': MIN_CW,
+           'target_lo_cw': TARGET_LO_CW, 'target_hi_cw': TARGET_HI_CW}
     if width:
         W = float(width)
         out.update({'width': round(W, 2), 'min_credit': round(out['min_cw'] * W, 2),
@@ -294,5 +303,5 @@ CANON_LABELS = {
     'selection': f'top-{TOP_N} per day, k={K:g}, GROUND ≥ {THR:g}',
     'scoring':   'G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G−1)·e^(−k·D_ent)',
     'fill':      f'{FILL_MULT:.2f}× smile-fit model credit (19 real fills), ${COMMISSION:.2f} commission/spread',
-    'targets':   f'min credit/width {MULT_MIN:.2f}×fair, target {MULT_TARGET_LO:.2f}–{MULT_TARGET_HI:.2f}×fair',
+    'targets':   f'min credit/width {MIN_CW:.2f}, target {TARGET_LO_CW:.2f}–{TARGET_HI_CW:.2f} (× spread width)',
 }

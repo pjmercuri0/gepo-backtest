@@ -185,7 +185,7 @@ function tgtCell(p) {
   // above_min: the IBKR credit on the table clears the min (execution gate, part of "qualified").
   const gate = p.above_min == null ? "" : (p.above_min
     ? ` <span class="pos" title="IBKR credit ≥ min">✓</span>`
-    : ` <span class="neg" title="IBKR credit below min — not qualified">✗ below min</span>`);
+    : ` <span class="neg" title="IBKR credit below min — not qualified">✗</span>`);
   return `<span style="color:#c9a227">${fmtMoney(t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${fmtMoney(t.target_lo_credit)}–${fmtMoney(t.target_hi_credit)}</span>${gate}`;
 }
 // Midmid credit/max_loss: prefer fill_targets[0] (set by webapp from leg bid/ask),
