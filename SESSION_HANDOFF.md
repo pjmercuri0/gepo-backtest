@@ -1317,6 +1317,23 @@ and ruled out as sources:
 **=> The chains for 2026-05-27 .. 2026-08-19 should be on the MACBOOK**, which was
 the production runner until the cutover. That is the one place not yet checked.
 
+### UPDATE 2026-09-13 (MacBook): chains staged on Mya for the mini
+
+The MacBook holds `live/snapshots/` for **2026-05-19 .. 2026-08-20** (55 days, 620
+parquets, 45 MB; every May-Aug frozen file's `snapshot_file` resolves). No IB Gateway
+runs on the MacBook, and its `output/daily_closes.parquet` ends 2026-08-21, so the
+replay was NOT run here. The chains were rsynced to Mya, outside the app tree
+(nothing published): `~/gepo_transfer/snapshots/` on `$MYA_SSH_HOST`.
+
+On the Mac mini (does not touch the mini's own 08-19/08-20 files):
+
+```
+. ~/.gepo_env
+rsync -av --ignore-existing "$MYA_SSH_HOST":~/gepo_transfer/snapshots/ live/snapshots/
+python research/ibkr_replay/fetch_ibkr_closes.py      # IBKR closes through today
+python research/ibkr_replay/replay_canon.py --since 2026-05-27
+```
+
 ### To run it on the MacBook
 
 ```
