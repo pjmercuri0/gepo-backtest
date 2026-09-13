@@ -156,7 +156,7 @@
               <td>${{ "%.2f"|format(p.max_loss|rd(2)) }}</td>
               <td>{% if p.max_loss > 0 %}{{ "%.2f"|format((p.net_credit / p.max_loss)|rd(2)) }}{% else %}—{% endif %}</td>
             {% endif %}
-            <td class="fw">{{ "%.3f"|format((p.GROUND * 100)|rd(3)) }}%</td>
+            <td class="fw">{{ "%.2f"|format((p.GROUND * 100)|rd(2)) }}%</td>
             <td>{{ "%.2f"|format(p.short_delta|rd(2)) }}</td>
             <td>{{ p.DTE }}</td>
 
