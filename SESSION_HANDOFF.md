@@ -2618,3 +2618,7 @@ model with natural ~$0.05, so ranking on the quote favours inflated quotes and d
 backtest. Model credit is still computed on every pick and drives the min / target cells; History
 and Actuals still book 1.08x model. Set the flag to "model" to restore backtest-consistent selection.
 On 2026-08-19/1531: 9 qualified on the quote vs 4 on the model; ISRG 400/402.5 quoted 1.55 vs model 1.17.
+**Execution gate (user 2026-09-13):** a candidate is `qualified` only if GROUND >= 0.01 AND the IBKR credit on the
+table (net_credit: combo mid / combo last / leg mids) >= its min credit (1.04 x model). Payload field `above_min`;
+live tab shows ✓ / "✗ below min" in the min/target cell; chip "exec gate". On 2026-08-19/1531 it removed RTX
+(quoted 1.205 vs min 1.25) and CSCO (0.49 vs 0.53): 7 qualified.

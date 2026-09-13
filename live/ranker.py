@@ -358,7 +358,14 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
 
     # D_ent canon: GROUND >= config.GROUND_THRESHOLD (0.01), top-5 per day.
     thr = backtest_config.GROUND_THRESHOLD
-    ranked["qualified"] = ranked["GROUND"] >= thr
+    # Execution gate (user 2026-09-13): the IBKR credit on the table (combo mid, or combo last on a
+    # too-wide book, else leg mids) must sit at or above the pick's MIN credit (1.04 x model).
+    # A spread the market is not offering at the minimum is not a trade, whatever its GROUND.
+    ranked["above_min"] = ranked["net_credit"] >= ranked["tgt_min_credit"]
+    ranked["qualified"] = (ranked["GROUND"] >= thr) & ranked["above_min"]
+    n_below = int(((ranked["GROUND"] >= thr) & ~ranked["above_min"]).sum())
+    if n_below:
+        print(f"  execution gate: {n_below} candidate(s) above GROUND {thr} but quoted BELOW their min credit — not qualified", flush=True)
 
     # Sort by GROUND descending (qualified first, then below-threshold).
     ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
@@ -519,6 +526,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "GROUND":           _num(r.get("GROUND")),
             "w_star":           _num(r.get("w_star")),
             "qualified":        bool(r.get("qualified", True)),
+            "above_min":        (None if r.get("above_min") is None else bool(r.get("above_min"))),
         }
 
     return {
@@ -560,6 +568,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "FILL_MULT":        entc.FILL_MULT,
             "COMMISSION":       entc.COMMISSION,
             "TARGETS":          entc.CANON_LABELS["targets"],
+            "EXEC_GATE":        "qualified only if the IBKR credit ≥ min (1.04×model)",
         },
         "regime":    current_regime(),
         "vol_gate":  gate,
