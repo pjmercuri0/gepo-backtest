@@ -61,7 +61,7 @@
            Reason is on the ticker's tooltip. #}
         <tr class="{% if arisk and arisk.at_risk %}assign-watch{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
-          <td>{{ row.date or (p.entry_date or '')[:10] }}</td>
+          <td>{{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>
           <td>{{ row.source_time or '—' }}</td>
           {# Source column dropped 2026-09-03 to save width; row.source_label is
              still produced by webapp.py and used elsewhere. #}
@@ -90,7 +90,7 @@
               —
             {% endif %}
           </td>
-          <td>${{ "%.2f"|format(p.short_strike|rd(2)) }} / ${{ "%.2f"|format(p.long_strike|rd(2)) }}</td>
+          <td>${{ p.short_strike|strike }} / ${{ p.long_strike|strike }}</td>
           <td style="color:#e8b366;font-weight:600">{{ p.suggested_qty or 1 }}×</td>
           {% if p.fill_targets %}
             {% set cr = p.fill_targets[0].credit %}
@@ -143,7 +143,7 @@
               <span class="actual-shown" style="color:#7ec99a">({{ "%.2f"|format(ar) }})</span>
             {%- endif %}
           </td>
-          <td class="fw">{% if p.GROUND is not none %}{{ "%.2f"|format((p.GROUND * 100)|rd(2)) }}%{% else %}—{% endif %}</td>
+          <td class="fw">{% if p.GROUND is not none %}{{ "%.1f"|format((p.GROUND * 100)|rd(1)) }}%{% else %}—{% endif %}</td>
           <td>{% if p.short_delta is defined and p.short_delta is not none %}{{ "%.2f"|format(p.short_delta|rd(2)) }}{% else %}—{% endif %}</td>
           <td>{{ p.DTE if p.DTE is not none else '—' }}</td>
           {% if outcome_row and outcome_row.result %}

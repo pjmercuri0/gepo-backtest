@@ -74,7 +74,33 @@ def _round_half_up(x, digits=0):
     return -math.floor(-f * mult + 0.5) / mult
 
 
+def _short_date(v):
+    """'2026-09-08' -> 'Sep 8'. The year is the same on every Actuals row, so it
+    is pure width. Anything unparseable passes through untouched."""
+    if not v:
+        return v
+    try:
+        return datetime.strptime(str(v)[:10], "%Y-%m-%d").strftime("%b ") + str(
+            int(datetime.strptime(str(v)[:10], "%Y-%m-%d").strftime("%d")))
+    except (ValueError, TypeError):
+        return v
+
+
+def _strike(v):
+    """205.00 -> '205', 202.50 -> '202.5', 202.25 -> '202.25'. Trailing zeros on
+    whole-dollar strikes cost two characters a side on a table that is too wide."""
+    if v is None:
+        return "—"
+    try:
+        t = f"{float(v):.2f}".rstrip("0").rstrip(".")
+        return t or "0"
+    except (ValueError, TypeError):
+        return str(v)
+
+
 app.jinja_env.filters['rd'] = _round_half_up
+app.jinja_env.filters['shortdate'] = _short_date
+app.jinja_env.filters['strike'] = _strike
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
