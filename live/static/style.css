@@ -250,3 +250,27 @@ tr.assign-watch td { background: rgba(214, 158, 46, 0.14);
                      border-bottom-color: rgba(214, 158, 46, 0.40); }
 tr.assign-watch td:first-child { box-shadow: inset 3px 0 0 #d69e2e; }
 .assign-tag-watch { background: #6b4c15; color: #ffe9bf; }
+
+/* Fill-sensitivity table — collapsed reference on the backtest and OOT pages.
+   Styled as a chip so the closed state sits in the chip row without competing
+   with it; opens to a scrollable table. */
+details.fill-sens { margin: 10px 0 4px; }
+details.fill-sens > summary {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 4px 10px; border-radius: 999px; font-size: 11px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  list-style: none; user-select: none;
+}
+details.fill-sens > summary::-webkit-details-marker { display: none; }
+details.fill-sens > summary::after { content: "▾"; color: #888780; font-size: 9px; margin-left: 2px; }
+details.fill-sens[open] > summary::after { content: "▴"; }
+details.fill-sens > summary:hover { background: rgba(255,255,255,0.07); }
+details.fill-sens .table-scroll { margin-top: 8px; }
+table.fs-table { font-size: 11px; }
+table.fs-table th { white-space: nowrap; font-weight: 500; color: #888780; }
+table.fs-table td { white-space: nowrap; }
+tr.fs-canon td { background: rgba(255,255,255,0.05); font-weight: 600; }
+.fs-tag { font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
+          background: #2f4858; color: #cfe4f0; padding: 1px 5px; border-radius: 3px; }
+.fs-note { margin-top: 8px; max-width: 70ch; font-size: 11px;
+           line-height: 1.5; color: #888780; }
