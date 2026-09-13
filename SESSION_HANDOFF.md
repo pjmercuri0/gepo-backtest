@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-13 EDT. Current canon is D_ent (§0.33-0.35): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit. The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-13 EDT (§0.37 is the latest state). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.00x the spread's own model credit and target 1.06-1.10x** (§0.37 — the absolute 0.50 credit/width levels of 9f251e0 lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
@@ -11,7 +11,9 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - The Mac mini at `/Users/securio/Downloads/gepo-backtest` is the production runner. The MacBook is the development machine.
 - Production strategy canon is the **D_ent** canon of 2026-09-13 (§0.33-0.35):
   `DELTA_TARGET=0.55`, `DELTA_MIN=0.50`, `DELTA_MAX=0.60`, `DKL_K=1.0`,
-  `GROUND_THRESHOLD=0.01`, `PROB_BASIS="realized"`, `DKL_REFERENCE="entropy_uniform"`.
+  `GROUND_THRESHOLD=0.01`, `PROB_BASIS="realized"`, `DKL_REFERENCE="entropy_uniform"`
+  (that last name describes the behaviour but is NOT a constant in `ent_canon.py` — §0.37).
+  Execution targets: **min 1.00x model credit, target 1.06-1.10x** (§0.37).
   (The 20-delta canon of 2026-09-11, §0.20, lasted one day and is superseded.)
 - The web app has an `actuals` tab for manually tracked real trades. It is populated only by pressing `+` on History or Snapshots rows; it does not place trades and does not require IBKR API write access.
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
@@ -23,6 +25,9 @@ This block and the two safety/workflow blocks immediately below it are the autho
   counted directly from realized spreads, keyed (ticker, $width) with pooled
   fallback, 52-expiry causal window, k=10. `rv_vs_iv` is dead. The LIVE path is
   NOT yet switched over — see the "NOT DONE" note at the end of §0.21.
+- **Run `research/dkl_2026_09_13/ablate_k.py` on the MacBook** (§0.37). It is the only real
+  test of whether the D_ent penalty earns its place; it needs `featATM6.parquet`, which is
+  not on the Mac mini.
 - **The open research task is §0.19: IV skew as a directional feature.** It is measured
   and significant on 2026 OOT and NOT yet validated on 2020-2025. Nothing in canon uses it.
 - Assignment/pin monitoring was rebuilt on 2026-09-11 (§0.18). The Actuals tab shows ONE
@@ -986,6 +991,246 @@ succeed. Latent for a long time, harmless while some candidate always ranked.
 ---
 
 ---
+
+## 0.37 Credit targets made model-relative, and what the fill is worth (2026-09-13) — CURRENT STATE
+
+Nine commits after `4fcd344`. The substantive one is `5da1aa4`; the rest are the
+web app and one research script.
+
+### The min is 1.00x the spread's own model credit (`5da1aa4`)
+
+`9f251e0`, earlier the same day, replaced the relative multipliers with ABSOLUTE
+credit/width levels (`MIN_CW, TARGET_LO_CW, TARGET_HI_CW = 0.50, 0.53, 0.56`).
+That was the wrong fix to a real bug. The bug was cosmetic: at `fair_cw` 0.467,
+1.04x = 0.4853 and 1.06x = 0.4946, and both print 0.49 at 2dp, so min and
+target_lo rendered identical.
+
+A flat level cannot work, because **credit/width is not a constant at a given
+delta — it depends on the spread's width in units of sigma**. Measured on 76
+SP100 names at delta 0.50 / DTE 5 with each name's real spot and ATM IV:
+
+| width | median w/sigma | credit/width (median) |
+|---|---|---|
+| 0.5 | 0.06 | 0.472 |
+| 1.0 | 0.12 | 0.460 |
+| 2.5 | 0.30 | 0.425 |
+
+The ceiling is `N(d2)` = 0.487 and only a zero-width spread reaches it. For cheap
+underlyings a 2.5 width is 3-4 sigma and c/w collapses: F 0.096, PFE 0.129, T 0.131.
+So the flat 0.50 was 32% ABOVE fair on HON (model 0.95 on a 2.5 width, min demanded
+1.25 — unreachable) and BELOW fair on GS (model 1.41).
+
+Now `MULT_MIN, MULT_TARGET_LO, MULT_TARGET_HI = 1.00, 1.06, 1.10`, applied to the
+spread's own `model_credit`. Ratios carry 3dp so two levels can never round
+together again. `CANON_LABELS['targets']` reads "min 1.00x model credit, target
+1.06-1.10x".
+
+**`fair_cw(delta, dte)` has no width term** (`ent_canon.py:261`) and therefore
+returns 0.433 for any delta-0.50/DTE-5 spread, where theory spans 0.46 to 0.24.
+It overstates worst on wide, low-IV names (BMY 0.537 vs BS 0.476, +13%). This only
+bites on the `basis: 'formula'` fallback path when no smile fit exists. Not fixed.
+
+### What the fill is actually worth — repriced exactly on both books
+
+Both published books repriced at multiples of model credit, holding selection and
+qty=2 fixed (GROUND scores off `model_credit`, not the fill, so the trade set does
+not move). Reproduction at the published 1.08x is exact to $0.000000 on all 3,997
+IS and 544 OOT trades.
+
+| fill | IS total P&L | IS return | OOT total | OOT return |
+|---|---|---|---|---|
+| 1.10x target hi | $68,288 | +682.9% | $10,571 | +105.7% |
+| **1.08x published** | **$56,694** | **+566.9%** | **$8,892** | **+88.9%** |
+| 1.06x target lo | $45,097 | +451.0% | $7,214 | +72.1% |
+| **1.00x = min** | **$10,248** | **+102.5%** | **$2,170** | **+21.7%** |
+| 0.965x breakeven | -$10,121 | -101.2% | -$777 | -7.8% |
+
+About **$5,800 of IS P&L per 1% of model credit**. At exactly model credit you keep
+18% of the backtested P&L and sit 3.5% of credit from wiping the account. The
+0.965x row landing at -$121 final is an independent confirmation that
+`MULT_BREAKEVEN = 0.965` is correctly calibrated. Win/partial/loss rates are
+IDENTICAL across every row (44.2/15.3/40.5) — outcome depends only on where spot
+landed, so the entire difference is fill quality.
+
+**min = 1.00x is a hard floor, not a target.** Essentially all of the return lives
+in the 1.06-1.10x band.
+
+### Validated against the 19 real fills
+
+`live/actuals.json` stores no `model_credit` (all 19 are pre-canon snapshots), so
+model credit was reconstructed by refitting `ec.fit_smiles` on the stored chain
+nearest each fill time and repricing the exact strikes. 18 of 19 recovered; NEE's
+chain had no valid fit.
+
+**fill/model: median 1.111, mean 1.165, range 0.953-1.795.**
+
+- `FILL_MULT = 1.08` holds up — the backtest assumption is marginally CONSERVATIVE
+  against real fills, not optimistic.
+- **4 of 18 filled below model** (MA 0.953, CSX 0.974, GS 0.978, ISRG 0.996), so the
+  1.00x min is a live gate that rejects about one trade in five, not a free floor.
+  At 1.06x it would have blocked 7 of 18.
+- Clearance: 1.00x 14/18 (78%), 1.06x 11/18 (61%), 1.10x 9/18 (50%).
+
+Caveats: refit is up to ~2 min off the fill time; the mean is dragged by PEP 1.795
+and MDT 1.536, both cheap spreads where a ~$0.28 model credit inflates the ratio
+(PEP's looks like a poor fit on a thin chain); and these are trades that were
+CHOSEN, partly because the quote looked rich, so the distribution across all ranked
+picks sits lower.
+
+### Partials, and a caption that misstates the code
+
+A PARTIAL is spot finishing between the strikes. `report_ent_canon.py:29-36`:
+`pnl = c - intrinsic`, then **halved only if positive**. Losing partials take the
+full loss. Asymmetric by design.
+
+| | IS 2020-25 | OOT 2026 |
+|---|---|---|
+| partials | 611 / 3,997 (15.3%) | 101 / 544 (18.6%) |
+| paid (halved) | 353 -> +$13,056 | 49 -> +$2,391 |
+| lost (full) | 258 -> -$17,849 | 52 -> -$4,233 |
+| **net** | **-$4,792** (-8.5% of book) | **-$1,841** (-20.7%) |
+
+Partials are a net DRAG in both books, not a soft middle outcome. A paying partial
+returns a median $12.64/contract; a losing one costs a median -$23.05 and reaches
+-$130.43. The pay/lose line sits at `credit/width` = 0.531 median, i.e. the first
+~53% of the pin zone measured from the short strike pays. P&L slides monotonically
+across the zone, +$8,155 in the first fifth to -$10,908 in the last.
+
+**BUG (not fixed): the caption "partial-WIN at 50% intrinsic" misstates the code.**
+It halves the NET P&L, `0.5*(c - intrinsic)`, not the intrinsic. On c=1.00,
+intrinsic=0.40 the label implies $0.80 and the code pays $0.30. Same wording, same
+`pnl *= 0.5`, in all four implementations — `report_ent_canon.py:35`,
+`report_mid_canon.py:46`, `backtest_midsel_sweep.py:119`,
+`report_three_sizings.py:176`. The code is uniform and more conservative than the
+label, so published curves are pessimistic here, not optimistic. Only the wording
+is wrong. $13,056 of surrendered haircut is ~23% of IS book P&L, so the assumption
+does real work and should be described accurately.
+
+### There is no hit-rate edge — the entire edge is price
+
+| | IS | OOT |
+|---|---|---|
+| mean \|short delta\| | 0.549 | 0.546 |
+| delta implies P(OTM) | 45.1% | 45.4% |
+| **actual per-trade WIN** | **44.2%** | **42.8%** |
+| money-positive trades | 53.0% | 51.8% |
+| weekly win rate | 58.8% | 64.5% |
+
+The per-trade rate is exactly what delta predicts, marginally below it. The
+58.8%/64.5% weekly figures are **aggregation, not skill** — ~15-18 trades a week
+with slightly positive expectancy makes most weeks green. Bundling by month would
+push it toward 100%. Do not quote the weekly number as evidence the strategy beats
+its delta.
+
+Weekly detail: IS 161/274 weeks up, median week +$234, up week +$934 vs down week
+-$830, profit factor 1.60. OOT 20/31, median +$308, profit factor 2.49 on 31 weeks.
+By year: 2020 61.9%/+$8.6k, 2021 62.0%/+$12.1k, 2022 56.9%/+$7.4k, **2023 49.0%/+$3**,
+2024 65.4%/+$20.9k, 2025 59.2%/+$7.7k, 2026 OOT 64.5%/+$8.9k. **2023 is the
+worst-case regime the strategy has seen and it looks like flatness, not drawdown.**
+
+### D_ent risk evidence — suggestive in-sample, NOT confirmed, ablation not yet run
+
+Calmar (CAGR / max drawdown): IS 1.85 (CAGR 41.7%, maxDD 22.6%, Sharpe wk 1.34).
+OOT 14.27 but that annualizes 0.63 years — not a real rate.
+
+Quartiling the published IS book by D_ent:
+
+| quartile | median D_ent | P&L | maxDD | Calmar |
+|---|---|---|---|---|
+| Q1 low | 0.041 | $15,519 | 10.5% | 1.80 |
+| Q2 | 0.085 | $14,755 | 10.7% | 1.70 |
+| Q3 | 0.136 | $12,361 | 21.6% | 0.74 |
+| Q4 high | 0.214 | $14,058 | 33.0% | 0.53 |
+
+P&L flat while **max drawdown triples and Calmar falls monotonically** — exactly the
+claimed shape. **OOT does NOT reproduce it**: Q1 4.13, Q2 0.84, Q3 0.59, then Q4
+inverts to 9.70 with the LOWEST drawdown (7.6%). On 136 trades over seven months
+that is plausibly noise, but it is not confirmation.
+
+**This is not an ablation.** Every trade in both books already passed selection at
+k=1.0, so it compares survivors. `research/dkl_2026_09_13/ablate_k.py` (`021dac4`)
+reruns `select()` at k in (0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0) — k=0 is the penalty
+off, GROUND collapses to EV — on the same frame, threshold, top-N and fill, and
+reports Calmar.
+
+**It cannot run on the Mac mini.** It needs `research/dkl_2026_09_13/featATM6.parquet`
+(gitignored, ~1.4 GB). The whole intermediate chain is absent here —
+`/tmp/gepo_pairs.parquet`, `is_synth.parquet`, `oot_pairs_q.parquet` — the mini
+carries only 2023-2024 vendor data, and `output/master_pool.parquet` has no strikes
+or prices. **Run it on the MacBook.** The script exits with that message rather than
+failing obscurely.
+
+### D_ent is unsided, and its reference is the uniform, not P_real
+
+`d_ent` is `ln3 - H(Q)`, pure entropy, so it is invariant to permuting the states:
+Q=[0.55,0.20,0.25], [0.20,0.55,0.25] and [0.25,0.20,0.55] all give 0.101341. It
+cannot distinguish a 55% WIN from a 55% LOSS.
+
+More important: it measures divergence from **U_3, the uniform**, and never sees
+`P_real`. `market_triple()` builds Q from BS `N(d2)` at fitted leg IVs and that is
+the only input. So `exp(-k*D_ent)` penalises **certainty, not disagreement** — a
+confident market and a mispriced market look identical to it. Nothing in current
+scoring can express "this one leans the wrong way", which is the gap §0.19 (IV skew)
+was meant to fill.
+
+`DKL_REFERENCE` is quoted in START HERE as `"entropy_uniform"` but **no such
+constant exists in `ent_canon.py`**. The behaviour is as described; the name is not
+in the code.
+
+Direction split (side effect of strike placement, not of D_ent): IS bull_put 3,153
+trades +$52,115 / bear_call 844 +$4,579. OOT bull_put 464 +$9,727 / bear_call 80
+**-$835 on a 32.5% hit rate**. The book is 79% bull_put and that is where the money is.
+
+### Web app (`35af0ef`, `6aae5f7`, `4d41719`, `8577d5e`, `03eae52`, `1a45398`)
+
+- Fill-sensitivity table (0.90x-1.10x model) in a collapsed chip on Backtest and OOT,
+  shared partial `live/templates/_fill_sensitivity.html`.
+- GROUND % one format everywhere, and 1dp on Actuals.
+- Table columns sized by content, headers wrap (`th { white-space: normal }`); the
+  880px `min-width` on `.table-scroll table` is gone.
+- Live tab: Top 5 cards moved BELOW the ranked table; the 16 canon chips fold behind
+  one `params` chip (`details.params-fold`). Vol-gate banner and weekly totals stay
+  at top — a gate warning below the fold is useless.
+- Fill-grade tags ("fill below-min / ok / target") removed from Actuals and History.
+  `webapp._attach_targets` still computes `pick["fill_grade"]`; nothing reads it, so
+  re-enabling is a template-only change.
+- Actuals width: dates lose the year ("Sep 8"), strikes lose trailing zeros but keep
+  a real half ($205, $202.5, $202.25). Two new Jinja filters, `shortdate` and
+  `strike`, beside the existing `rd`.
+
+All deployed to BOTH Mya checkouts (`/opt/vito/gepo-backtest`,
+`/opt/vito/gepo-euro-backtest`) with `pm2 restart` and verified by `curl` against
+the live URL, per [[feedback-verify-the-artifact-not-the-function]].
+
+### Monday readiness (verified 2026-09-13, not assumed)
+
+- `origin/main` clean, nothing unpushed.
+- `output/daily_closes.parquet`: 16,703 rows, 98 tickers, 2025-09-02 -> 2026-09-11.
+  `WINDOW = 252` is satisfied; the §0.36 `build_daily_closes.py` prerequisite is done.
+- Canon in force: `K=1.0`, `THR=0.01`, `TOP_N=5`, `FILL_MULT=1.08`, `COMMISSION=1.30`,
+  `MULT_MIN/LO/HI = 1.00/1.06/1.10`, `WINDOW=252`, `MIN_OBS=1`;
+  `DELTA_TARGET=0.55` band 0.50-0.60, `GROUND_THRESHOLD=0.01`.
+- Live: `LIVE_QUOTE_EXCHANGE=ISE`, `LIVE_SELECTION_CREDIT=quoted`,
+  `LIVE_MIN_OPEN_INTEREST=0`, `LIVE_DTE_MIN/MAX=0/6`, `LIVE_COMBO_MAX_WIDTH=1.0`.
+- Crontab installed and unchanged (scans :00/:15/:30/:45 9-15 Mon-Fri, 16:00 close,
+  daily bars 17:01, health 5/20/35/50). Not modified — see
+  [[feedback-dont-touch-live-crontab]].
+
+**Note:** `config.MIN_CREDIT_RATIO` is now `0.0` (was 0.30). Changed on the MacBook,
+not by this session; flagged here only so it is not mistaken for drift.
+
+### Still open
+
+1. **Run `ablate_k.py` on the MacBook** — the only real test of whether D_ent earns
+   its place. Everything else about it is correlational.
+2. **§0.19 IV skew** — measured on 2026 OOT, NOT validated on 2020-2025, no
+   incremental-lift-over-GROUND test. Still the open research task.
+3. **"50% intrinsic" caption** wrong in four scripts (above).
+4. `fair_cw` has no width term (above).
+5. **MMC is a dead symbol** and should leave `SP100_TICKERS` (§0.36).
+6. `output/rv_table.parquet` still carries corrupted RUTW values while RUTW is in
+   `SP100_TICKERS`.
+7. `report_oot_2026.py` books `last_clamped` while live uses mid.
 
 # 🗃️ HISTORICAL ARCHIVE — NOT A CURRENT TASK LIST
 
