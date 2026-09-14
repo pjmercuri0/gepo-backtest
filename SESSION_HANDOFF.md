@@ -13,6 +13,9 @@ This block and the two safety/workflow blocks immediately below it are the autho
   `DELTA_TARGET=0.55`, `DELTA_MIN=0.50`, `DELTA_MAX=0.60`, `DKL_K=1.0`,
   `GROUND_THRESHOLD=0.01`, `PROB_BASIS="realized"`, `DKL_REFERENCE="entropy_uniform"`
   (that last name describes the behaviour but is NOT a constant in `ent_canon.py` — §0.37).
+  **LIVE SELECTION (2026-09-13, late): rank on MODEL credit, execution gate = IBKR quote >= 1.00x model**
+  (`LIVE_SELECTION_CREDIT="model"`, ranker gates on `tgt_walkaway_credit`). Quoted-mid ranking and the
+  1.04x gate are OFF. Basis: §0.38 replay, model/1.00x = 118 trades $950, best per-trade and lowest DD.
   Execution targets: **min 1.04x model credit, target 1.06-1.10x, walk-away 1.00x** (§0.37,
   floor restored from 1.00x by `87901c2` — see the note at the end of §0.37).
   (The 20-delta canon of 2026-09-11, §0.20, lasted one day and is superseded.)
@@ -1363,6 +1366,27 @@ python research/ibkr_replay/replay_canon.py --since 2026-05-27
 - Parquets and pickles in that directory are gitignored.
 
 Verified on the mini: the committed scripts reproduce the 12-day numbers exactly.
+
+### Selection x gate on the same replay (2026-09-13, late) — DEPLOYED
+
+D_ent canon, fill 1.08x model, qty 1, 2026-05-27..09-10, IBKR chains, all four combinations:
+
+| selection / gate | traded | days | total | avg/trade | up days | maxDD$ |
+|---|---|---|---|---|---|---|
+| quoted / 1.04x (was live) | 240 | 50 | $322 | $1.34 | 38% | 1,454 |
+| quoted / 1.00x | 245 | 50 | $1,558 | $6.36 | 48% | 813 |
+| model / 1.04x | 54 | 31 | $309 | $5.72 | 52% | 724 |
+| **model / 1.00x (NOW LIVE)** | **118** | 41 | **$950** | **$8.05** | **59%** | **648** |
+
+Quoted scoring's extra 201 picks were worth $0.97 each -- rank bought by inflated leg mids.
+The 1.04x gate killed 80% of model-ranked spreads (the 15:00 leg mid is under 1.04x model on
+most good candidates); the 1.00x gate keeps the per-trade edge and doubles the count. Quoted/1.00x
+makes more total on 2x the trades, and its $322 -> $1,558 swing on a small gate change is a
+fragility flag. `replay_canon.py --select {quoted,model} --gate <m> --tag <s>` reproduces all four.
+
+**NOT yet verified on a real scan** -- first live check is Monday 2026-09-14 09:00
+([[feedback-verify-live-changes-next-run]]). On the Sunday adhoc snapshot the new defaults rank 44
+and qualify 0 (6 clear GROUND, all 6 below fair on the stale book) -- expected, not a bug.
 
 ### Live record 2026-05-27 .. 2026-09-10 (what actually happened, 198 picks/51 days)
 

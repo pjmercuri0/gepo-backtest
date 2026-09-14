@@ -279,4 +279,8 @@ TOP_N_DISPLAY = 5                 # canonical top-N picks
 #           on the smile-fit model credit; the user chose to rank live on the broker quote.
 # "model":  rank on the smile-fit model credit (backtest-consistent).
 # The model credit is still computed on every pick for the min / target execution cells.
-LIVE_SELECTION_CREDIT = "quoted"
+# 2026-09-13 (user): rank on MODEL. Replayed on the May-Sep IBKR chains, quoted-scoring's
+# extra picks were worth $0.97 each -- rank bought by inflated leg mids. Model scoring is
+# also what the backtest/OOT canon was validated on (§0.39). The broker quote is used ONCE,
+# as the execution gate below, not as a ranking input.
+LIVE_SELECTION_CREDIT = "model"
