@@ -396,6 +396,22 @@ def _actuals_rows() -> list[dict]:
                                              "max_loss": round(width - entry_credit, 4)}]
                 pick["suggested_qty"] = pick.get("suggested_qty") or 1
 
+        # Actuals display basis = the IBKR credit on the pick (combo last > combo mid >
+        # leg mids, i.e. quoted_credit/net_credit), NOT the modelled 0.80x mid /
+        # 1.08x model that History books at (user 2026-09-14: "should be mid credit or
+        # last from ibkr"). The typed fill still shows beside it and drives P&L.
+        _q = pick.get("quoted_credit")
+        if _q is None:
+            _q = pick.get("net_credit")
+        _w = pick.get("spread_width") or ((pick.get("net_credit") or 0) + (pick.get("max_loss") or 0))
+        try:
+            _q, _w = float(_q), float(_w)
+            if _q > 0 and _w > _q:
+                pick["fill_targets"] = [{"credit": round(_q, 4), "max_loss": round(_w - _q, 4)}]
+                pick["fill_basis"] = "IBKR"
+        except (TypeError, ValueError):
+            pass
+
         # Both branches above replace `pick` with a fresh copy from its source
         # file, which would drop a fill the user typed in. Re-apply it last.
         if item.get("actual_credit") is not None:
