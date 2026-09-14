@@ -3,12 +3,12 @@
    both pages include it. Collapsed by default: it is reference, not headline.
 
    Rows are the published trade lists repriced at m x the smile-fit model credit
-   (qty=1 on $10k, $1.30 commission, winning partials halved). Regenerated
+   (qty=2 on $10k, $1.30 commission, winning partials halved -- the tab headline basis). Regenerated
    2026-09-13 from live/data/{backtest,oot}_equity.json with the exact repricer;
    P&L and max drawdown reproduce §0.39's 1.00x/1.04x/1.08x rows to the dollar.
    Sharpe is left out on purpose: the weekly-curve convention differs between
    builders and a column that does not match the tab headline is worse than none.
-   Tab headlines are qty=2, so their P&L is 2x these figures. #}
+   The 1.08x row equals the tab headline P&L exactly. #}
 <details class="fill-sens">
   <summary><span class="chip-k">fill sensitivity</span><span class="chip-v">0.90× – 1.10× model</span></summary>
   <div class="table-scroll">
@@ -16,22 +16,22 @@
       <thead>
         <tr>
           <th>fill × model</th><th>med credit / max loss</th><th>credit / width</th>
-          <th>IS P&amp;L (qty 1)</th><th>IS maxDD</th>
-          <th>OOT P&amp;L (qty 1)</th><th>OOT maxDD</th>
+          <th>IS P&amp;L (qty 2)</th><th>IS maxDD</th>
+          <th>OOT P&amp;L (qty 2)</th><th>OOT maxDD</th>
         </tr>
       </thead>
       <tbody>
       {% for r in [
-          ('0.90','0.83','0.45','-$24.0k','-223%','-$3.1k','-35%'),
-          ('0.94','0.90','0.47','-$12.3k','-127%','-$1.4k','-23%'),
-          ('0.96','0.93','0.48','-$6.5k','-80%','-$0.6k','-19%'),
-          ('0.98','0.97','0.49','-$0.7k','-56%','$0.2k','-15%'),
-          ('1.00','1.01','0.50','$5.1k','-40%','$1.1k','-14%'),
-          ('1.02','1.05','0.51','$10.9k','-27%','$1.9k','-12%'),
-          ('1.04','1.09','0.52','$16.7k','-20%','$2.8k','-10%'),
-          ('1.06','1.14','0.53','$22.5k','-16%','$3.6k','-8%'),
-          ('1.08','1.19','0.54','$28.3k','-15%','$4.4k','-7%'),
-          ('1.10','1.24','0.55','$34.1k','-14%','$5.3k','-6%')
+          ('0.90','0.83','0.45','-$48.0k','-384%','-$6.3k','-67%'),
+          ('0.94','0.90','0.47','-$24.7k','-214%','-$2.9k','-44%'),
+          ('0.96','0.93','0.48','-$13.0k','-134%','-$1.2k','-36%'),
+          ('0.98','0.97','0.49','-$1.4k','-87%','$0.5k','-29%'),
+          ('1.00','1.01','0.50','$10.2k','-59%','$2.2k','-25%'),
+          ('1.02','1.05','0.51','$21.9k','-38%','$3.9k','-21%'),
+          ('1.04','1.09','0.52','$33.5k','-27%','$5.5k','-18%'),
+          ('1.06','1.14','0.53','$45.1k','-24%','$7.2k','-14%'),
+          ('1.08','1.19','0.54','$56.7k','-23%','$8.9k','-12%'),
+          ('1.10','1.24','0.55','$68.3k','-21%','$10.6k','-11%')
       ] %}
         <tr class="{% if r[0] == '1.08' %}fs-canon{% elif r[0] == '1.00' %}fs-gate{% endif %}">
           <td class="fw">{{ r[0] }}{% if r[0] == '1.08' %} <span class="fs-tag">canon</span>{% elif r[0] == '1.00' %} <span class="fs-tag">min / gate</span>{% endif %}</td>
@@ -48,7 +48,7 @@
   <div class="fs-note">
     Every row is the same trade list repriced at a different fill; win/partial/loss
     counts never move, so the whole difference is price. The edge is roughly linear —
-    about $5,800 of in-sample P&amp;L per 1% of model credit — and changes sign near
+    about $11,600 of in-sample P&amp;L per 1% of model credit at qty 2 — and changes sign near
     0.98× in-sample and 0.96× out of sample. The 1.00× row is fair value: it is the
     min on the ranked table and the execution gate. The 1.04×–1.10× target is where the
     book is actually earned; 1.08× is the canon fill assumption.
