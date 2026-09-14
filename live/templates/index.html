@@ -39,7 +39,7 @@
         <th>Δ</th>
         <th>DTE</th>
         <th title="IBKR quoted credit (combo mid, else leg mids) — the live selection basis; model credit in the card">Credit ($/sh)</th>
-        <th title="min 1.00× model credit, target 1.06–1.10×">Min / Target</th>
+        <th title="min 1.00× model credit (= execution gate), target 1.04–1.10×">Min / Target</th>
         <th>Max-Loss ($/sh)</th>
         <th>Ratio</th>
         <th title="P_real above (realized-move belief, used in G); Q_bs below (market law, D_ent reference)">real: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">bs below</span></th>
@@ -173,7 +173,7 @@ function renderParams(cfg) {
     ["belief",         cfg.BELIEF || `P_real: 252 sessions of realized moves vs the strikes`],
     ["credit",         cfg.CREDIT_MODEL || `smile-fit model credit; IBKR quote shown`],
     ["fill",           cfg.FILL_MULT != null ? `${cfg.FILL_MULT}× model, $${cfg.COMMISSION} comm` : `—`],
-    ["targets",        cfg.TARGETS || `min 1.00× model credit, target 1.06–1.10×`],
+    ["targets",        cfg.TARGETS || `min 1.00× model credit, target 1.04–1.10×`],
     ["exec gate",      cfg.EXEC_GATE || `qualified only if the IBKR credit ≥ min`],
     ["regime gate",    `OFF (both directions eligible)`],
   ];
@@ -271,7 +271,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
           <th title="IBKR credit — combo last, else combo mid (narrow book), else leg mids — the live selection basis">quoted ($/sh)</th>
           <th title="smile-fit model credit: what the spread is worth on the fitted surface (basis for min / target)">model ($/sh)</th>
-          <th title="ask: min 1.04×model, target 1.06–1.10×model. Execution gate is fair value (1.00×model)">min / target</th>
+          <th title="min 1.00×model = fair value = execution gate; target 1.04–1.10×model">min / target</th>
           <th>max-loss ($/sh)</th><th>ratio</th>
           <th title="P_real: realized-move belief at the strikes (used in G)">real: p / r₀ / q</th>
           <th title="Q_bs: market law at the fitted IVs (D_ent reference)">bs: p̂ / r̂₀ / q̂</th>

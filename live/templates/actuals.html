@@ -39,7 +39,7 @@
       <thead><tr>
         <th></th><th>Date</th><th>Time</th><th>Ticker</th>
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th>
-        <th title="Ask: min = 1.04 x fair credit, target = 1.06-1.10 x fair. Execution gate is fair value (1.00x). Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">Min / Target ($/sh)</th>
+        <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">Min / Target ($/sh)</th>
         <th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
         <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>
       </tr></thead>
@@ -123,7 +123,7 @@
             {% endif %}
           </td>
           {# Min / target credit from the model (D_ent canon): min is 1.00x this
-             spread's model credit, target 1.06-1.10x. Shown as reference only --
+             spread's model credit (= the gate), target 1.04-1.10x. Shown as reference only --
              the fill-grade tag was dropped 2026-09-13. IBKR quotes are untouched. #}
           {% set tg = p.credit_targets %}
           {% if tg and tg.min_credit is defined %}

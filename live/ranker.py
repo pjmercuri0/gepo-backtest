@@ -346,8 +346,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # Execution gate (user 2026-09-13, revised same day): the IBKR credit on the table (combo mid,
     # or combo last on a too-wide book, else leg mids) must sit at or above the WALK-AWAY line,
     # 1.00 x model (ent_canon.MULT_WALKAWAY) -- fair value. Below fair the spread is sold for less
-    # than it is worth, whatever its GROUND. The 1.04x MIN and 1.06-1.10x target stay on the page
-    # as the ask; they are not the gate. Gating at 1.04x on the May-Sep IBKR replay killed 80% of
+    # than it is worth, whatever its GROUND. MIN is the same 1.00x; the 1.04-1.10x target is the ask. Gating at 1.04x on the May-Sep IBKR replay killed 80% of
     # model-ranked spreads (54 trades / $309); at 1.00x it is 118 trades / $950, best per-trade
     # and lowest drawdown of the four selection x gate combinations (§0.38).
     ranked["above_min"] = ranked["net_credit"] >= ranked["tgt_walkaway_credit"]
