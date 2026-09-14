@@ -49,7 +49,10 @@ def _latest_snapshot() -> Path | None:
     base = Path(live_config.SNAPSHOTS_DIR)
     if not base.exists():
         return None
-    days = sorted([d for d in base.iterdir() if d.is_dir()], reverse=True)
+    # Only date-named directories (YYYY-MM-DD). 2026-09-14: an "adhoc" directory left by a
+    # manual Sunday run sorted lexically after every date and hijacked the 09:00 and 09:30
+    # scans -- the ranker ranked the stale file and the live page showed Sunday's numbers.
+    days = sorted([d for d in base.iterdir() if d.is_dir() and d.name[:1] == "2"], reverse=True)
     for d in days:
         files = sorted(d.glob("*.parquet"), reverse=True)
         if files:
