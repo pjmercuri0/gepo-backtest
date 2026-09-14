@@ -1115,11 +1115,13 @@ def actuals():
 def latest_json():
     """Return the latest ranked snapshot.
 
-    If we're past the freeze time and today's frozen file exists, return the
-    frozen payload with `frozen=true` instead of the live latest. This makes
-    the UI display the official 15:45 picks for the rest of the day.
+    The live tab keeps refreshing off the latest scan all day (user 2026-09-14:
+    "I want to see it keep refreshing for all the picks during the day"). It no
+    longer swaps to the 15:01 frozen payload after the freeze -- that record is
+    the History tab's job. `?frozen=1` still returns the frozen payload for
+    anything that wants the official picks of the day.
     """
-    if _is_past_freeze():
+    if request.args.get("frozen") == "1" and _is_past_freeze():
         frozen = _frozen_payload_today()
         if frozen is not None:
             frozen["frozen"] = True
