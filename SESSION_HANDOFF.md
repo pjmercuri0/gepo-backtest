@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-13 EDT (§0.38 is the latest state). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.00x the spread's own model credit and target 1.06-1.10x** (§0.37 — the absolute 0.50 credit/width levels of 9f251e0 lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-13 EDT (§0.38 is the latest state). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.04x the spread's own model credit, target 1.06-1.10x, walk-away 1.00x** (§0.37 — the absolute 0.50 credit/width levels of 9f251e0 lasted hours and are superseded; the floor briefly sat at 1.00x before `87901c2` restored 1.04x). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
@@ -1064,8 +1064,10 @@ About **$5,800 of IS P&L per 1% of model credit**. At exactly model credit you k
 IDENTICAL across every row (44.2/15.3/40.5) — outcome depends only on where spot
 landed, so the entire difference is fill quality.
 
-**min = 1.00x is a hard floor, not a target.** Essentially all of the return lives
-in the 1.06-1.10x band.
+**Fair value is a floor, not a target.** Essentially all of the return lives in the
+1.06-1.10x band. This table is the argument `87901c2` acted on: at 1.00x you keep
+18% of the book and sit 3.5% of credit from zero, so the gate was put at 1.04x and
+1.00x kept only as the walk-away line.
 
 ### Validated against the 19 real fills
 
@@ -1078,10 +1080,11 @@ chain had no valid fit.
 
 - `FILL_MULT = 1.08` holds up — the backtest assumption is marginally CONSERVATIVE
   against real fills, not optimistic.
-- **4 of 18 filled below model** (MA 0.953, CSX 0.974, GS 0.978, ISRG 0.996), so the
-  1.00x min is a live gate that rejects about one trade in five, not a free floor.
-  At 1.06x it would have blocked 7 of 18.
-- Clearance: 1.00x 14/18 (78%), 1.06x 11/18 (61%), 1.10x 9/18 (50%).
+- **4 of 18 filled below model** (MA 0.953, CSX 0.974, GS 0.978, ISRG 0.996), so even
+  fair value is a live gate that rejects about one trade in five, not a formality.
+- Clearance against each candidate floor: **1.00x 14/18 (78%), 1.04x (the gate as
+  shipped) 13/18 (72%), 1.06x 11/18 (61%), 1.10x 9/18 (50%)**. So the 1.04x floor
+  costs one more trade than fair value and buys the commission back.
 
 Caveats: refit is up to ~2 min off the fill time; the mean is dragged by PEP 1.795
 and MDT 1.536, both cheap spreads where a ~$0.28 model credit inflates the ratio
