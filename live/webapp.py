@@ -98,7 +98,26 @@ def _strike(v):
         return str(v)
 
 
+def _pin_open(pick, spot, settled=False) -> bool:
+    """Yellow pin highlight for an OPEN row on History / Snapshots (user 2026-09-14):
+    spot inside the strikes (inclusive) on a pick that has not settled and whose
+    expiry has not passed. Stops on its own at settlement -- Friday, or Thursday
+    when Thursday is the week's settlement day -- because the row gets an outcome."""
+    try:
+        if settled or spot is None:
+            return False
+        exp = str(pick.get("expiry_date") or "")[:10]
+        if not exp or exp < ddate.today().isoformat():
+            return False
+        s = float(spot); ks = float(pick.get("short_strike")); kl = float(pick.get("long_strike"))
+        lo, hi = min(ks, kl), max(ks, kl)
+        return lo <= s <= hi
+    except (TypeError, ValueError):
+        return False
+
+
 app.jinja_env.filters['rd'] = _round_half_up
+app.jinja_env.globals['pin_open'] = _pin_open
 app.jinja_env.filters['shortdate'] = _short_date
 app.jinja_env.filters['strike'] = _strike
 
