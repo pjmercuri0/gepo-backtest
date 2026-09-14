@@ -99,15 +99,15 @@ def _strike(v):
 
 
 def _pin_open(pick, spot, settled=False) -> bool:
-    """Yellow pin highlight for an OPEN row on History / Snapshots (user 2026-09-14):
-    spot inside the strikes (inclusive) on a pick that has not settled and whose
-    expiry has not passed. Stops on its own at settlement -- Friday, or Thursday
-    when Thursday is the week's settlement day -- because the row gets an outcome."""
+    """Yellow pin highlight (user 2026-09-14, clarified same day): ONLY on the pick's
+    settlement day -- Friday, or Thursday on a Thursday-settle week -- i.e. when the
+    pick expires today, is not yet settled, and spot sits inside the strikes
+    (inclusive). Sitting between the strikes on a Monday is not a warning."""
     try:
         if settled or spot is None:
             return False
         exp = str(pick.get("expiry_date") or "")[:10]
-        if not exp or exp < ddate.today().isoformat():
+        if not exp or exp != ddate.today().isoformat():
             return False
         s = float(spot); ks = float(pick.get("short_strike")); kl = float(pick.get("long_strike"))
         lo, hi = min(ks, kl), max(ks, kl)

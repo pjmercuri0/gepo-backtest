@@ -66,7 +66,7 @@
            say — and on a book closed Friday afternoon it never became an
            action. Ext keeps showing the number.
            Reason is on the ticker's tooltip. #}
-        <tr class="{% if arisk and (arisk.at_risk or arisk.in_pin_zone) %}assign-watch{% endif %}">
+        <tr class="{% if arisk and (arisk.at_risk or arisk.in_pin_zone) and pin_open(p, arisk.spot, false) %}assign-watch{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
           <td>{{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>
           <td>{{ row.source_time or '—' }}</td>
