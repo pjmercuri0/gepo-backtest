@@ -44,7 +44,9 @@ This block and the two safety/workflow blocks immediately below it are the autho
   and significant on 2026 OOT and NOT yet validated on 2020-2025. Nothing in canon uses it.
 - Assignment/pin monitoring was rebuilt on 2026-09-11 (§0.18). The Actuals tab shows ONE
   warning colour: yellow = pin risk. Extrinsic collapse is displayed in the Ext column but
-  no longer warns. Telegram fires once per option per expiry.
+  no longer warns. **2026-09-14 (`26ab18f`): the early-exercise channel is disabled and the
+  Telegram alert file is written only for positions expiring TODAY** (Friday pin only). The
+  page's daily pin highlight is unchanged. Telegram fires once per option per expiry.
 - `live_config.LIVE_QUOTE_EXCHANGE = "ISE"` pins single-leg option QUOTES to ISE.
   Execution is unaffected and still SMART. Measured cost: ISE is wider than SMART on some
   names. Revert is one line.
