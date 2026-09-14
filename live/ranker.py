@@ -22,6 +22,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -352,7 +353,11 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # than it is worth, whatever its GROUND. MIN is the same 1.00x; the 1.04-1.10x target is the ask. Gating at 1.04x on the May-Sep IBKR replay killed 80% of
     # model-ranked spreads (54 trades / $309); at 1.00x it is 118 trades / $950, best per-trade
     # and lowest drawdown of the four selection x gate combinations (§0.38).
-    ranked["above_min"] = ranked["net_credit"] >= ranked["tgt_walkaway_credit"]
+    # Compare at the precision the page shows (2dp, half-up). 2026-09-14: INTC quoted
+    # 0.275 (shown 0.28) against a walk-away of 0.28 (model 0.2805) read as a tie on
+    # screen and failed underneath. A tie at 2dp qualifies.
+    _r2 = lambda x: np.floor(x * 100 + 0.5) / 100
+    ranked["above_min"] = _r2(ranked["net_credit"].astype(float)) >= ranked["tgt_walkaway_credit"].astype(float)
     ranked["qualified"] = (ranked["GROUND"] >= thr) & ranked["above_min"]
     n_below = int(((ranked["GROUND"] >= thr) & ~ranked["above_min"]).sum())
     if n_below:
