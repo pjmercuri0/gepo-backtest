@@ -102,15 +102,15 @@ nothing captured yet</div></div>
   <div class="week-card">
     <div class="week-sub" style="padding:10px 0">
       Showing the {{ shown_days }} most recent of {{ total_days }} days.
-      <a href="{{ url_for('snapshots', days=shown_days + 15) }}" style="margin-left:10px">show 15 more</a>
+      <a href="{{ url_for('snapshots', days=shown_days + 7) }}" style="margin-left:10px">show 7 more</a>
       <a href="{{ url_for('snapshots', days='all') }}" style="margin-left:14px">show all ({{ total_days }})</a>
     </div>
   </div>
-{% elif total_days and day_limit is none and total_days > 15 %}
+{% elif total_days and day_limit is none and total_days > 7 %}
   <div class="week-card">
     <div class="week-sub" style="padding:10px 0">
       Showing all {{ total_days }} days.
-      <a href="{{ url_for('snapshots') }}" style="margin-left:10px">back to recent 15</a>
+      <a href="{{ url_for('snapshots') }}" style="margin-left:10px">back to recent 7</a>
     </div>
   </div>
 {% endif %}
