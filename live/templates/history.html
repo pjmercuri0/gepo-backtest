@@ -99,12 +99,13 @@
           {% set ns = namespace(marked=None) %}
           {% for r in track_arr | reverse %}{% if ns.marked is none and r.get('current_mark') is not none %}{% set ns.marked = r %}{% endif %}{% endfor %}
           {% set last_marked = ns.marked %}
-          {# No risk highlight here (removed 2026-09-04). History is a record of
-             what was frozen, not a live risk view — the flag it used fired on
-             "expiry day AND short leg ITM", which lit up rows that settled
-             cleanly to cash. Live assignment risk lives on the Actuals tab,
-             which is the only place holdings are tracked. #}
-          <tr>
+          {# Yellow = PIN (user 2026-09-14): open row, latest tracked spot inside the
+             strikes. Clears at settlement (Friday, or Thursday on a Thursday-settle
+             week) because the row then carries an outcome. The 2026-09-04 flag this
+             replaces fired on "expiry day AND short ITM", which lit rows that settled
+             cleanly to cash; pin-zone is the only state that delivers shares. #}
+          {% set _pin = pin_open(p, (last_track.underlying_price if last_track and last_track.underlying_price else none), outcome_row is not none) %}
+          <tr{% if _pin %} class="assign-watch" title="PIN risk: spot inside {{ p.long_strike }}-{{ p.short_strike }} — short assigned, long expires worthless, shares delivered"{% endif %}>
             <td><button class="actuals-add" data-url="{{ url_for('add_actual_from_frozen', date=day.date, index=loop.index0) }}" title="add this pick to actuals">+</button></td>
             <td>{{ loop.index }}</td>
             <td class="fw">{{ tk }}
