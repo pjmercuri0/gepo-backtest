@@ -189,10 +189,12 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
         # CHANNEL 1 — exercise beats HOLDING. Dividend (calls) or carry (puts)
         # exceeds the extrinsic given up. This is the classic textbook test.
         benefit, basis = _exercise_benefit(p)
-        if (extrinsic is not None and itm_by is not None and itm_by > 0
-                and benefit is not None and benefit > extrinsic):
-            reasons.append(
-                f"early exercise pays: {basis} {benefit:.2f} > extrinsic {extrinsic:.2f}")
+        # CHANNEL 1 — DISABLED 2026-09-14 (user: "only care about Friday pin
+        # risk alerts"). It fired 10:01 Monday on positions closed every Friday
+        # afternoon and was never an action. benefit/basis are still computed
+        # so the number is available if the channel is ever wanted back.
+        _early_exercise_pays = (extrinsic is not None and itm_by is not None and itm_by > 0
+                                and benefit is not None and benefit > extrinsic)
 
         # CHANNEL 2 — REMOVED 2026-09-03. It tested "bid < intrinsic", which
         # algebraically IS "extrinsic < half the bid-ask spread":
@@ -460,7 +462,10 @@ def main() -> int:
     def _key(r):
         return f"{r['ticker']}|{r['spread_type']}|{r['short_strike']:g}|{r['expiry']}"
 
-    fresh = [r for r in at_risk if _key(r) not in ledger]
+    # Telegram only on SETTLEMENT day (user 2026-09-14): the pin highlight on the
+    # page stays daily (at_risk / in_pin_zone above), but the alert file — which
+    # Mya's notify_watcher forwards — is written only for positions expiring today.
+    fresh = [r for r in at_risk if _key(r) not in ledger and r["expiry"] == today_iso]
 
     if fresh:
         alert = dict(state)
