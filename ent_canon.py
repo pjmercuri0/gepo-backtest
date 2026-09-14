@@ -42,11 +42,12 @@ MULT_BREAKEVEN = 0.965
 # the strikes sit relative to spot, not just on delta. A 0.50 flat min was 32%
 # ABOVE fair on HON and BELOW fair on GS — unreachable on cheap spreads and
 # free on rich ones.
-# min = the model credit itself, 1.00x (user 2026-09-13): below fair we are
-# selling the spread for less than it is worth, so that is the floor. Target
-# keeps its original 1.06-1.10x band. 3dp on the ratios so no two levels round
-# together, which is what made 1.04x and 1.06x both print 0.49.
-MULT_MIN, MULT_TARGET_LO, MULT_TARGET_HI = 1.04, 1.06, 1.10
+# min = the model credit itself, 1.00x (user 2026-09-13, reaffirmed late the same day
+# after a brief 1.04x): below fair we are selling the spread for less than it is
+# worth, so that is the floor AND the execution gate (MULT_WALKAWAY, same number).
+# Target 1.04-1.10x: 1.04x is roughly break-even after the $1.30 commission, 1.10x
+# is where the backtest edge lives. 3dp on the ratios so no two levels round together.
+MULT_MIN, MULT_TARGET_LO, MULT_TARGET_HI = 1.00, 1.04, 1.10
 MULT_WALKAWAY = 1.00   # fair value: below this the trade is a coin flip that pays the broker (break-even ~1.03x after commission)
 # cross-sectional fair credit/width by delta and DTE (fit on 43,479 candidates 2020-26, med |err| 0.025)
 FAIR_COEF = (0.4022, 2.3485, -12.464, 0.0077)

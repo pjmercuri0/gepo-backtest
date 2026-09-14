@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-13 EDT (§0.39 is the latest state: old canon vs D_ent on the same model-relative fill basis). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.04x the spread's own model credit, target 1.06-1.10x, walk-away 1.00x** (§0.37 — the absolute 0.50 credit/width levels of 9f251e0 lasted hours and are superseded; the floor briefly sat at 1.00x before `87901c2` restored 1.04x). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-13 EDT (§0.39 is the latest state: old canon vs D_ent on the same model-relative fill basis). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
@@ -16,8 +16,8 @@ This block and the two safety/workflow blocks immediately below it are the autho
   **LIVE SELECTION (2026-09-13, late): rank on MODEL credit, execution gate = IBKR quote >= 1.00x model**
   (`LIVE_SELECTION_CREDIT="model"`, ranker gates on `tgt_walkaway_credit`). Quoted-mid ranking and the
   1.04x gate are OFF. Basis: §0.38 replay, model/1.00x = 118 trades $950, best per-trade and lowest DD.
-  Execution targets: **min 1.04x model credit, target 1.06-1.10x, walk-away 1.00x** (§0.37,
-  floor restored from 1.00x by `87901c2` — see the note at the end of §0.37).
+  Execution targets (final, 2026-09-13 late): **min 1.00x model credit = execution gate, target
+  1.04-1.10x** (`7a1f0f4` + this commit; the 1.04x floor of `87901c2` lasted a few hours).
   (The 20-delta canon of 2026-09-11, §0.20, lasted one day and is superseded.)
 - The web app has an `actuals` tab for manually tracked real trades. It is populated only by pressing `+` on History or Snapshots rows; it does not place trades and does not require IBKR API write access.
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
