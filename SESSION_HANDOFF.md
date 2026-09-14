@@ -1515,6 +1515,43 @@ unlike in-sample, stays positive at fair value: its 2026 book carries a genuine 
   because the quote looked rich, so a version scored on honest prices might do somewhat better
   than the rows above. Doable from the picks cache if wanted.
 
+## 0.40 First live day on the model-ranked canon (2026-09-14) — CURRENT STATE
+
+Ten commits, all deployed to both Mya checkouts and verified by curl.
+
+**Open-day bug, fixed (`b792faa`).** The 09:00 and 09:30 scans ranked
+`live/snapshots/adhoc/merged.parquet` — a directory left by Sunday's manual runs —
+because `_latest_snapshot()` sorted directory names and "adhoc" > "2026-09-14". The
+live page showed Sunday's numbers at the open. Directory removed; the picker now
+only accepts date-named directories. **Never leave ad-hoc files under `live/`**
+([[feedback-readiness-means-run-the-pipeline]]).
+
+**Ranker / gate**
+- `df32976` gate compares the IBKR credit to the walk-away at 2dp half-up: INTC quoted
+  0.275 (shown 0.28) vs walk-away 0.28 read as a tie and failed. A tie now qualifies.
+- First live scans under model ranking: 09:34 → 29 ranked / 1 qualified; 10:00 → 40 / 3.
+  Intraday repeat rate is by design (12 scans, 11 distinct names, INTC 7/12); it rotates
+  day to day (21–32 distinct names on full prior days).
+
+**Assignment / pin (`26ab18f`, `b97576b`, `369abb3`)**
+- Early-exercise channel disabled (it fired 10:01 Monday on a CSCO carry test).
+- Telegram alert file written only for positions expiring TODAY.
+- Yellow pin highlight on Actuals, History and Snapshots — `pin_open()` in webapp — ONLY
+  on the pick's settlement day (Friday, or Thursday on a Thursday-settle week), spot
+  inside the strikes inclusive, not yet settled. Nothing lights up Mon–Thu.
+
+**Live tab (`1f7d058`, `800160c`, `d1913bc`)**
+- Ranked label: "All ranked candidates · tick H:MM AM ET".
+- `/api/latest.json` no longer swaps to the frozen payload after 15:01; the tab follows
+  every scan to the 16:00 close. `?frozen=1` returns the frozen payload. History unchanged.
+
+**Snapshots tab (`4f0aa51`)**: 7 most recent days by default (was 15); "show 7 more" / all.
+
+**INTC half-wide question:** the 97.5/97 Sep-18 put spread is real — the Sep 18 weekly
+has half-dollar strikes (97.5 bid 3.40 / ask 3.60, Δ 0.54, vol 101); TWS's $1-wide combo
+grid on the Sep 14 expiry does not show it. Half-wides are allowed by config; one line
+to forbid them if wanted.
+
 # 🗃️ HISTORICAL ARCHIVE — NOT A CURRENT TASK LIST
 
 The remainder records prior incidents, repairs, experiments, and once-pending work. It intentionally preserves historical detail, including instructions that were correct at the time but are now completed or obsolete. **Do not execute or report an item below as current unless the START HERE block or §0.14 explicitly carries it forward.**
