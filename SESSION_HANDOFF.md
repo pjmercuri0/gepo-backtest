@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-13 EDT (§0.37 is the latest state). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.00x the spread's own model credit and target 1.06-1.10x** (§0.37 — the absolute 0.50 credit/width levels of 9f251e0 lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-13 EDT (§0.38 is the latest state). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.00x the spread's own model credit and target 1.06-1.10x** (§0.37 — the absolute 0.50 credit/width levels of 9f251e0 lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
@@ -25,6 +25,10 @@ This block and the two safety/workflow blocks immediately below it are the autho
   counted directly from realized spreads, keyed (ticker, $width) with pooled
   fallback, 52-expiry causal window, k=10. `rv_vs_iv` is dead. The LIVE path is
   NOT yet switched over — see the "NOT DONE" note at the end of §0.21.
+- **On the MACBOOK: check `live/snapshots/` for 2026-05-27..08-19 chains and run the
+  IBKR replay** (§0.38). The mini only has chains from the 2026-08-19 cutover, and over
+  those 12 days the NEW canon LOST to the old one (-$21 vs +$1,350) on a credit/width of
+  0.503 vs the backtest's 0.543. This needs a longer window before the canon is trusted live.
 - **Run `research/dkl_2026_09_13/ablate_k.py` on the MacBook** (§0.37). It is the only real
   test of whether the D_ent penalty earns its place; it needs `featATM6.parquet`, which is
   not on the Mac mini.
@@ -1231,6 +1235,140 @@ not by this session; flagged here only so it is not mistaken for drift.
 6. `output/rv_table.parquet` still carries corrupted RUTW values while RUTW is in
    `SP100_TICKERS`.
 7. `report_oot_2026.py` books `last_clamped` while live uses mid.
+
+## 0.38 IBKR-only replay of the D_ent canon (2026-09-13) — CURRENT STATE, ACTION NEEDED ON THE MACBOOK
+
+Replayed the current canon over the days we hold IBKR chains for and compared it
+with what the canon of the day actually picked. **The new canon underperformed.**
+The window is only 12 days because of a data gap described below.
+
+### The result — 2026-08-20 .. 2026-09-10, 12 days
+
+| book | n | med c/w | win% | avg WIN | avg LOSS | payoff | total |
+|---|---|---|---|---|---|---|---|
+| **NEW canon @1.08x model** | 56 | **0.503** | 42.9% | +$88.72 | **-$90.29** | **0.983** | **-$21** |
+| OLD canon (as booked) | 54 | — | 53.7% | +$103.73 | -$81.16 | 1.278 | **+$1,350** |
+
+Booked on identical bases so the fill is not doing the work — at 0.80x/0.90x/1.00x
+each pick's own leg mid the new canon runs -$120 / +$472 / +$1,064 against the old
+canon's +$1,351 / +$1,926 / +$2,501. The new canon's 1.08x model is in fact the
+RICHER assumption in aggregate ($51.15 vs $49.96 per share across all picks).
+
+**The cause is delta, and the mechanism is credit/width.**
+
+| book | n | med c/w | win% | payoff | break-even win% |
+|---|---|---|---|---|---|
+| backtest 2020-25 | 3,997 | 0.543 | 44.2% | 1.171 | 46.1% |
+| OOT 2026 | 544 | 0.546 | 42.8% | 1.224 | 45.0% |
+| **live replay (12d)** | 56 | **0.503** | 42.9% | **0.983** | **50.4%** |
+
+The win rate is the same in all three (43-44%, exactly what delta 0.55 predicts —
+see §0.37, there is no hit-rate edge). What differs is credit per unit width: at
+0.543 a loss costs 0.457 of width and a 44% hit rate clears; at 0.503 the loss
+costs 0.497, the payoff collapses to 0.98, and break-even rises to 50.4%. **The
+average win barely moved ($80 -> $89); the average loss blew out ($68 -> $90.)**
+
+The old canon ran a 0.35-0.65 band and its median short delta was **0.489, with 32
+of 54 picks below 0.50** — further OTM than the new band allows. The two canons
+agreed on only 16 of ~94 picks.
+
+**Do not act on this yet.** 56 trades is far too few; one bad day moves the total
+by more than the gap. The in-sample case rests on 3,997 trades. What it does say is
+that live evidence is running AGAINST the ATM change so far, and the open question
+is now specific: **why are live spreads ~4 points cheaper per unit width than the
+backtest's?** Two untested candidates — width relative to sigma (§0.37 shows c/w
+falls as width/sigma rises, and the replay is 32/56 at width 2.5 on mid-priced
+names), and pool depth (the backtest picks 5 from 43,479 candidates over six years;
+these days offered 28-55 ranked candidates each).
+
+### Why the window is 12 days and not 15 weeks — THE BLOCKER
+
+`live/frozen/` goes back to 2026-05-20 and the History tab renders it fine, but
+**frozen files are not chains.** Each carries its five picks with their own legs
+(short_bid/ask, long_bid/ask, oi, last). `ec.fit_smiles()` needs the WHOLE strike
+ladder per (ticker, expiry) to produce c0/c1/c2/sig0, and only then can
+`price_spreads()` give a `model_credit` for arbitrary candidate strikes. Five picks'
+legs cannot make a smile, and they are the strikes the OLD canon chose anyway.
+
+So a day is replayable only if `live/snapshots/<date>/` exists. On the Mac mini the
+oldest is **2026-08-20 — the day after the cutover (§0.12, 2026-08-19).** Checked
+and ruled out as sources:
+
+- **Mya has no chains at all.** No `live/snapshots/` on either checkout; exactly two
+  parquet files on the whole box (`analysis/vix_daily.parquet` x2); the entire
+  `/opt/vito/gepo-backtest` tree is 21 MB. By design — `upload_to_mya.sh:186` ships
+  `live/frozen/` and `live/data/`, never `live/snapshots/`.
+- **Rebuilding from IBKR historical option bars is not practical** — tens of
+  thousands of paced requests (60 per 10 min), and expired-option history is spotty.
+- `output/2026_sp500_last_oot_combined.parquet` DOES cover 2026-01-01..08-18 and
+  would fill the gap exactly, but it is vendor data, excluded by instruction.
+
+**=> The chains for 2026-05-27 .. 2026-08-19 should be on the MACBOOK**, which was
+the production runner until the cutover. That is the one place not yet checked.
+
+### To run it on the MacBook
+
+```
+ls live/snapshots/ | head            # is May-August there?
+du -sh live/snapshots
+
+python research/ibkr_replay/fetch_ibkr_closes.py      # ~10 min, IBKR daily bars
+python research/ibkr_replay/replay_canon.py --since 2026-05-27
+```
+
+`research/ibkr_replay/` (committed this session):
+
+- **`fetch_ibkr_closes.py`** — N years of IBKR daily TRADES closes for the snapshot
+  universe, into its own parquet. Deliberately does NOT touch
+  `output/daily_closes.parquet`, which is vendor-seeded and Yahoo-backfilled (§0.36),
+  so the two never mix. Read-only, client id 178, 6s pacing.
+- **`replay_canon.py`** — reruns `rank_snapshot` per day on the exact snapshot the
+  freeze used, settles against the IBKR closes, prints the table above. `--since`
+  and `--fill` are parameters. Skips days with no stored chain and says how many.
+  Stubs `_reprice_on_combos`, because asking IBKR for a combo quote now would price
+  TODAY's book against historical strikes; leg mids from the snapshot stand in and
+  are mildly conservative.
+- Parquets and pickles in that directory are gitignored.
+
+Verified on the mini: the committed scripts reproduce the 12-day numbers exactly.
+
+### Live record 2026-05-27 .. 2026-09-10 (what actually happened, 198 picks/51 days)
+
+Settled by the site, booked at its own **0.80x mid** basis, qty 1:
+
+| basis | before comm | after $1.30 |
+|---|---|---|
+| as the site books it | $2,870 | **$2,613** |
+| + fix 2 bad settlements | $3,374 | $3,117 |
+| + backtest 50% partial haircut | $3,051 | **$2,793** |
+
+WIN 54.0% / PARTIAL 14.6% / LOSS 31.3%, $21,460 risked, 13.0% on risk, 32/51
+winning days, max drawdown -$1,250. By month: May -$415, Jun -$255, Jul +$949,
+Aug +$1,530, Sep +$985. **Seven different config eras in that window** — this is the
+record of several strategies, not one.
+
+### Three defects found while checking — none fixed
+
+1. **Two settlements are wrong**, both 2026-06-15, both backfilled late
+   (`settled_at` 2026-07-15), both booked LOSS when their own recorded
+   `underlying_price` implies WIN:
+   - **DE** bull_put 580/577.5 exp 06-18, DE closed **589.24** (verified) -> booked
+     LOSS -$122.
+   - **ISRG** bear_call 415/417.5 same day, closed **406.78** -> booked LOSS -$114.
+   -$236 wrongly booked, ~9% of the record. The other 196 settle correctly.
+2. **The live tab does not apply the partial haircut the backtest does.** Live books
+   winning partials at full value; the backtest halves them (confirmed exactly 2x on
+   CAT, VRTX, ISRG). Worth $324 here. **History and Backtest are not on the same
+   basis** — see also the §0.37 caption bug.
+3. **`output/daily_closes.parquet` holds only 12 tickers from 2026-08-19 onward**
+   (97 before). `live.closes.load_closes()` backfills from snapshots and recovers
+   ~89 most days, but **2026-08-21 and 2026-08-28 still have only 12**. Two holes in
+   a 252-session window will not break P_real (`MIN_OBS=1`), but the store is
+   degraded and wants a proper backfill.
+
+**MMC confirmed dead from a third source:** IBKR `qualifyContracts` returns no
+contract for it (also no Yahoo, 0 of 205 September snapshots — §0.36). RUTW and
+SPXW also fail, correctly, as index roots rather than stocks.
 
 # 🗃️ HISTORICAL ARCHIVE — NOT A CURRENT TASK LIST
 
