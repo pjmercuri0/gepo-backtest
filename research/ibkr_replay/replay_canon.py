@@ -65,7 +65,17 @@ def main() -> int:
                     help='multiple of model credit to book the new canon at')
     ap.add_argument('--closes', default=str(CLOSES))
     ap.add_argument('--outdir', default=str(ROOT / 'research' / 'ibkr_replay'))
+    ap.add_argument('--select', choices=['quoted', 'model'], default=None,
+                    help='override live_config.LIVE_SELECTION_CREDIT for the replay')
+    ap.add_argument('--tag', default='', help='suffix for the output pickles')
+    ap.add_argument('--gate', type=float, default=None,
+                    help='override ent_canon.MULT_MIN (execution gate, x model credit)')
     a = ap.parse_args()
+    if a.gate is not None:
+        ec.MULT_MIN = a.gate
+    if a.select:
+        from live import live_config
+        live_config.LIVE_SELECTION_CREDIT = a.select
 
     if not os.path.exists(a.closes):
         sys.exit(f"missing {a.closes}\n  run research/ibkr_replay/fetch_ibkr_closes.py first")
@@ -116,8 +126,8 @@ def main() -> int:
 
     N, O = pd.DataFrame(new), pd.DataFrame(old)
     os.makedirs(a.outdir, exist_ok=True)
-    N.to_pickle(os.path.join(a.outdir, 'replay_new.pkl'))
-    O.to_pickle(os.path.join(a.outdir, 'replay_old.pkl'))
+    N.to_pickle(os.path.join(a.outdir, f'replay_new{a.tag}.pkl'))
+    O.to_pickle(os.path.join(a.outdir, f'replay_old{a.tag}.pkl'))
 
     print(f"\nskipped {len(skipped)} day(s) with no stored chain")
     if skipped:

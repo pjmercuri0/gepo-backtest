@@ -343,14 +343,18 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
 
     # D_ent canon: GROUND >= config.GROUND_THRESHOLD (0.01), top-5 per day.
     thr = backtest_config.GROUND_THRESHOLD
-    # Execution gate (user 2026-09-13): the IBKR credit on the table (combo mid, or combo last on a
-    # too-wide book, else leg mids) must sit at or above the pick's MIN credit (1.04 x model).
-    # A spread the market is not offering at the minimum is not a trade, whatever its GROUND.
-    ranked["above_min"] = ranked["net_credit"] >= ranked["tgt_min_credit"]
+    # Execution gate (user 2026-09-13, revised same day): the IBKR credit on the table (combo mid,
+    # or combo last on a too-wide book, else leg mids) must sit at or above the WALK-AWAY line,
+    # 1.00 x model (ent_canon.MULT_WALKAWAY) -- fair value. Below fair the spread is sold for less
+    # than it is worth, whatever its GROUND. The 1.04x MIN and 1.06-1.10x target stay on the page
+    # as the ask; they are not the gate. Gating at 1.04x on the May-Sep IBKR replay killed 80% of
+    # model-ranked spreads (54 trades / $309); at 1.00x it is 118 trades / $950, best per-trade
+    # and lowest drawdown of the four selection x gate combinations (§0.38).
+    ranked["above_min"] = ranked["net_credit"] >= ranked["tgt_walkaway_credit"]
     ranked["qualified"] = (ranked["GROUND"] >= thr) & ranked["above_min"]
     n_below = int(((ranked["GROUND"] >= thr) & ~ranked["above_min"]).sum())
     if n_below:
-        print(f"  execution gate: {n_below} candidate(s) above GROUND {thr} but quoted BELOW their min credit — not qualified", flush=True)
+        print(f"  execution gate: {n_below} candidate(s) above GROUND {thr} but quoted BELOW fair value (1.00x model) — not qualified", flush=True)
 
     # Sort by GROUND descending (qualified first, then below-threshold).
     ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
@@ -554,7 +558,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "FILL_MULT":        entc.FILL_MULT,
             "COMMISSION":       entc.COMMISSION,
             "TARGETS":          entc.CANON_LABELS["targets"],
-            "EXEC_GATE":        "qualified only if the IBKR credit ≥ min (1.04×model)",
+            "EXEC_GATE":        "qualified only if the IBKR credit ≥ fair value (1.00×model, the walk-away line)",
         },
         "regime":    current_regime(),
         "vol_gate":  gate,
