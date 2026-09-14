@@ -26,7 +26,7 @@
 <div id="vol-gate-banner"></div>
 <div id="weekly-totals"></div>
 
-<div class="section-label" id="ranked-label">All ranked candidates (top 5 highlighted)</div>
+<div class="section-label" id="ranked-label">All ranked candidates</div>
 <div class="week-card">
   <div class="table-scroll">
   <table id="ranked-table">
@@ -588,7 +588,7 @@ async function refresh() {
     // Same tick on the ranked-table label (user 2026-09-14), so the table and the
     // Top-5 cards below it visibly come from the same scan.
     document.getElementById("ranked-label").textContent =
-      `All ranked candidates (top 5 highlighted)${tickStr ? ` · tick ${tickStr} ET` : ""}`;
+      `All ranked candidates${tickStr ? ` · tick ${tickStr} ET` : ""}`;
     if (data.frozen) {
       dot.className = "live-dot frozen-dot";
       txt.innerHTML =
