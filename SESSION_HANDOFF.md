@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-13 EDT (§0.38 is the latest state). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.04x the spread's own model credit, target 1.06-1.10x, walk-away 1.00x** (§0.37 — the absolute 0.50 credit/width levels of 9f251e0 lasted hours and are superseded; the floor briefly sat at 1.00x before `87901c2` restored 1.04x). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-13 EDT (§0.39 is the latest state: old canon vs D_ent on the same model-relative fill basis). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.04x the spread's own model credit, target 1.06-1.10x, walk-away 1.00x** (§0.37 — the absolute 0.50 credit/width levels of 9f251e0 lasted hours and are superseded; the floor briefly sat at 1.00x before `87901c2` restored 1.04x). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
@@ -30,6 +30,10 @@ This block and the two safety/workflow blocks immediately below it are the autho
   IBKR replay** (§0.38). The mini only has chains from the 2026-08-19 cutover, and over
   those 12 days the NEW canon LOST to the old one (-$21 vs +$1,350) on a credit/width of
   0.503 vs the backtest's 0.543. This needs a longer window before the canon is trusted live.
+- **Old canon vs D_ent on the same fill basis (§0.39):** repriced at m x model credit the old
+  canon has no in-sample edge at fair value and loses to D_ent at every multiple; OOT D_ent wins
+  at 1.08x, ties at 1.04x, trails at 1.00x. D_ent stays deployed; the achieved live fill/model
+  ratio and the May-Aug replay decide it.
 - **Run `research/dkl_2026_09_13/ablate_k.py` on the MacBook** (§0.37). It is the only real
   test of whether the D_ent penalty earns its place; it needs `featATM6.parquet`, which is
   not on the Mac mini.
@@ -1397,6 +1401,93 @@ record of several strategies, not one.
 **MMC confirmed dead from a third source:** IBKR `qualifyContracts` returns no
 contract for it (also no Yahoo, 0 of 205 September snapshots — §0.36). RUTW and
 SPXW also fail, correctly, as index roots rather than stocks.
+
+## 0.39 Old canon vs D_ent canon on the SAME fill basis: m x model credit (2026-09-13) — CURRENT STATE
+
+The old canon's published books were booked at 0.80x the vendor quote (mid in-sample, clamped
+LAST for OOT). The D_ent canon is booked at a multiple of the spread's own smile-fit model
+credit. Those are not comparable, so the old canon's trade sets were repriced at model-relative
+fills and both canons were run through the same equity builder (`report_mid_canon.build_payload`),
+with the $1.30 commission and the partial-WIN 50% haircut on every row.
+
+### Method
+
+- **Old canon** = the archived pre-2026-09-11 payloads (`git show 5da76fd~1:live/data/backtest_equity.json`
+  and `oot_equity.json`): delta 0.50, band 0.35-0.65, G_rv, rv_vs_iv DKL k=10, thr 0.05,
+  top-5/day. IS 2,250 trades (2020-01-07..2025-12-24), OOT 260 trades (2026-01-05..08-13).
+- **Selection held fixed** (as §0.37 did for the D_ent book). Each old-canon spread was repriced at
+  m x its smile-fit `model_credit`: fits from `research/dkl_2026_09_13/is_synth.parquet` /
+  `oot_synth.parquet`, plus 437 IS and 43 OOT chains refit from the vendor year files with
+  `ent_canon.fit_smiles` (identical fitter). Priced 2,245 of 2,250 IS and 260 of 260 OOT.
+- Settlement uses the payload's own expiry close. The published basis reproduces EXACTLY on the
+  matched rows (IS qty2 $81,457 = $81,457; OOT $10,476 vs $10,475).
+- **New canon** = `report_ent_canon.select()` with `FILL_MULT` overridden; the 1.08x row
+  reproduces the published $38,347 IS / $14,446 OOT (qty1 P&L) exactly.
+- Scripts and outputs: `research/fill_basis_2026_09_13/` (`refit_missing.py` first, then
+  `old_canon_model_fill.py` for IS and `old_canon_model_fill_oot.py` for OOT; results in
+  `old_vs_new_model_fill*.csv`). They pull the archived payloads from git themselves. IS needs
+  `/tmp/gepo_pairs.parquet` and `/tmp/gepo_expclose.parquet` from the §0.30 research session.
+
+### The old canon's edge was quote inflation
+
+Old-canon booked credit (0.80x quote) over smile-fit model credit: **IS median 1.23x**
+(p10 1.00, p25 1.10, p75 1.44, p90 1.69; every year 1.09-1.29x; every width rung 1.12-1.26x),
+**77% of IS trades booked above 1.08x model**. OOT median **1.19x**, 69% above 1.08x. The raw
+mid was 1.54x model in-sample. Median credit/width: booked 0.536, model 0.432 at a fitted
+short delta of 0.49. Hit rates never move across fill rows (IS 47/18/35, OOT 53/16/31), so as in
+§0.37 the entire difference between rows is price.
+
+### In-sample 2020-25, qty=1 on $10k
+
+| book | n | med c/w | qty1 P&L | Sh(wk) | maxDD | qty2 P&L |
+|---|---|---|---|---|---|---|
+| OLD @0.80x mid, no comm (published) | 2,245 | 0.536 | $40,728 | 2.44 | -5.8% | $81,457 |
+| OLD @0.80x mid + comm | 2,245 | 0.536 | $37,810 | 2.34 | -6.4% | $75,620 |
+| OLD @1.00x model | 2,245 | 0.432 | -$3,755 | -0.17 | -63% | -$7,510 |
+| **OLD @1.04x model** | 2,245 | 0.450 | **$2,582** | **0.29** | **-36%** | $5,165 |
+| **OLD @1.08x model** | 2,245 | 0.467 | **$8,909** | **0.76** | **-24%** | $17,819 |
+| NEW @1.00x model | 3,999 | 0.503 | $5,116 | 0.41 | -40% | $10,232 |
+| **NEW @1.04x model** | 3,998 | 0.523 | **$16,744** | **0.91** | **-20%** | $33,488 |
+| **NEW @1.08x model** | 3,997 | 0.543 | **$28,347** | **1.35** | **-15%** | $56,694 |
+
+In-sample the old canon has NO edge at fair value (negative at 1.00x) and the D_ent canon beats
+it at every multiple: ~3x the P&L at 1.08x, ~6x at 1.04x, with better Sharpe and drawdown.
+
+### OOT 2026, qty=1 on $10k (new canon cut to the old canon's entry window, <= 08-13)
+
+| book | n | med c/w | win/part/loss | qty1 P&L | Sh(wk) | maxDD |
+|---|---|---|---|---|---|---|
+| OLD @0.80x LAST, no comm (published) | 260 | 0.504 | 53/16/31 | $5,238 | 3.55 | -6.3% |
+| OLD @0.80x LAST + comm | 260 | 0.504 | 53/16/31 | $4,900 | 3.34 | -6.6% |
+| OLD @1.00x model | 259 | 0.432 | 53/16/31 | $1,492 | 1.13 | -13.8% |
+| **OLD @1.04x model** | 259 | 0.450 | 53/16/31 | **$2,226** | **1.60** | **-12.2%** |
+| **OLD @1.08x model** | 259 | 0.467 | 53/16/31 | **$2,960** | **2.05** | **-10.7%** |
+| NEW @1.00x model | 530 | 0.507 | 43/18/39 | $1,158 | 0.71 | -13.5% |
+| **NEW @1.04x model** | 530 | 0.527 | 43/18/39 | **$2,797** | **1.54** | **-9.9%** |
+| **NEW @1.08x model** | 530 | 0.547 | 43/18/39 | **$4,433** | **2.34** | **-6.6%** |
+
+(New canon on its full OOT frame, entries to 08-20: 544 trades, 1.08x $4,446 / Sh 2.34 / DD -6.6%.
+The featATM6 OOT frame ends at 08-20 entries although the payload window label says 09-11.)
+
+Out of sample the picture is much less lopsided. **At 1.08x the new canon wins on every metric.
+At 1.04x it is close to a tie** (new makes more dollars on twice the trades, old has marginally
+higher Sharpe and worse DD, and earns more per trade). **At 1.00x the old canon is ahead** and,
+unlike in-sample, stays positive at fair value: its 2026 book carries a genuine hit-rate edge
+(53% wins vs 43%) that the D_ent book does not have, so it depends less on the fill.
+
+### Verdict (user + assistant, 2026-09-13): D_ent stays the deployed canon, provisionally
+
+- On honest pricing the old canon's published numbers are not evidence of anything; the D_ent
+  numbers are the only ones the live book can be held to.
+- The advantage is entirely a function of the achieved fill multiple. >= 1.06x: closed case for
+  D_ent. 1.00-1.04x: roughly equal on the evidence, and the old canon's hit-rate edge starts to
+  matter. The 1.04x execution gate (§0.37) is the control that keeps the live book out of the
+  1.00x rows.
+- Two things decide it: the median live **fill/model ratio over a few weeks of real fills**
+  (Actuals tab, §0.37), and the **May-August IBKR replay** staged in §0.38 and still unrun.
+- Caveat: old-canon selection was NOT rescored on model credit. Its picks were chosen partly
+  because the quote looked rich, so a version scored on honest prices might do somewhat better
+  than the rows above. Doable from the picks cache if wanted.
 
 # 🗃️ HISTORICAL ARCHIVE — NOT A CURRENT TASK LIST
 
