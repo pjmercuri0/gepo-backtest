@@ -13,7 +13,8 @@ This block and the two safety/workflow blocks immediately below it are the autho
   `DELTA_TARGET=0.55`, `DELTA_MIN=0.50`, `DELTA_MAX=0.60`, `DKL_K=1.0`,
   `GROUND_THRESHOLD=0.01`, `PROB_BASIS="realized"`, `DKL_REFERENCE="entropy_uniform"`
   (that last name describes the behaviour but is NOT a constant in `ent_canon.py` — §0.37).
-  Execution targets: **min 1.00x model credit, target 1.06-1.10x** (§0.37).
+  Execution targets: **min 1.04x model credit, target 1.06-1.10x, walk-away 1.00x** (§0.37,
+  floor restored from 1.00x by `87901c2` — see the note at the end of §0.37).
   (The 20-delta canon of 2026-09-11, §0.20, lasted one day and is superseded.)
 - The web app has an `actuals` tab for manually tracked real trades. It is populated only by pressing `+` on History or Snapshots rows; it does not place trades and does not require IBKR API write access.
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
@@ -1001,7 +1002,7 @@ succeed. Latent for a long time, harmless while some candidate always ranked.
 Nine commits after `4fcd344`. The substantive one is `5da1aa4`; the rest are the
 web app and one research script.
 
-### The min is 1.00x the spread's own model credit (`5da1aa4`)
+### The min is a multiple of the spread's own model credit (`5da1aa4`, floor set by `87901c2`)
 
 `9f251e0`, earlier the same day, replaced the relative multipliers with ABSOLUTE
 credit/width levels (`MIN_CW, TARGET_LO_CW, TARGET_HI_CW = 0.50, 0.53, 0.56`).
@@ -1024,10 +1025,17 @@ underlyings a 2.5 width is 3-4 sigma and c/w collapses: F 0.096, PFE 0.129, T 0.
 So the flat 0.50 was 32% ABOVE fair on HON (model 0.95 on a 2.5 width, min demanded
 1.25 — unreachable) and BELOW fair on GS (model 1.41).
 
-Now `MULT_MIN, MULT_TARGET_LO, MULT_TARGET_HI = 1.00, 1.06, 1.10`, applied to the
-spread's own `model_credit`. Ratios carry 3dp so two levels can never round
-together again. `CANON_LABELS['targets']` reads "min 1.00x model credit, target
-1.06-1.10x".
+Now `MULT_MIN, MULT_TARGET_LO, MULT_TARGET_HI = 1.04, 1.06, 1.10` plus
+`MULT_WALKAWAY = 1.00`, all applied to the spread's own `model_credit`. Ratios
+carry 3dp so two levels can never round together again.
+
+`5da1aa4` first set the floor at 1.00x (fair value). `87901c2` raised it back to
+1.04x the same day, because break-even is ~1.03x once the $1.30 commission is
+paid — at exactly fair value the trade is a coin flip that pays the broker. 1.00x
+is retained as `MULT_WALKAWAY`, the walk-away line. The execution gate now
+requires the IBKR credit >= 1.04x model. §0.38 shows why this matters: live
+credit/width is running 0.503 against the backtest's 0.543, and every point of
+credit is worth ~$5,800 of IS P&L.
 
 **`fair_cw(delta, dte)` has no width term** (`ent_canon.py:261`) and therefore
 returns 0.433 for any delta-0.50/DTE-5 spread, where theory spans 0.46 to 0.24.
