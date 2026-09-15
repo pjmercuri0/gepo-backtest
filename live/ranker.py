@@ -571,7 +571,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "ALPHA":            "(b-1)/(2b)",
             "DKL_REF":          "D_ent = ln3 − H(Q_bs) (paper eq. 19)",
             "BELIEF":           f"P_real: {entc.WINDOW} sessions of realized moves vs the strikes",
-            "CREDIT_MODEL":     ("selection on IBKR credit: combo last > combo mid > leg mids (uncapped); model credit for targets" if getattr(live_config, "LIVE_SELECTION_CREDIT", "quoted") == "quoted" else "smile-fit model credit (selection); IBKR quote shown"),
+            "CREDIT_MODEL":     ("selection on IBKR credit: combo mid > fresh combo last > leg mids (uncapped); model credit for targets" if getattr(live_config, "LIVE_SELECTION_CREDIT", "quoted") == "quoted" else "smile-fit model credit (selection); IBKR quote shown"),
             "FILL_MULT":        entc.FILL_MULT,
             "COMMISSION":       entc.COMMISSION,
             "TARGETS":          entc.CANON_LABELS["targets"],
