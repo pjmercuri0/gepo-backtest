@@ -24,7 +24,6 @@
 <div class="ticker-strip" id="ticker-strip">loading ranked candidates...</div>
 
 <div id="vol-gate-banner"></div>
-<div id="weekly-totals"></div>
 
 <div class="section-label" id="ranked-label">All ranked candidates</div>
 <div class="week-card">
@@ -54,8 +53,6 @@
   </div>
 </div>
 
-<div class="section-label" id="top-label">Top 5 by GROUND rank (updates every {{ poll_seconds }}s)</div>
-<div id="top-picks"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -572,8 +569,8 @@ async function refresh() {
         vgEl.innerHTML = "";
       }
     }
-    document.getElementById("weekly-totals").innerHTML = renderWeeklyTotals(data.top_picks, data.snapshot_ts);
-    document.getElementById("top-picks").innerHTML = renderTopPicks(data.top_picks, maxG, kVal);
+    (document.getElementById("weekly-totals")||{}).innerHTML = renderWeeklyTotals(data.top_picks, data.snapshot_ts);
+    (document.getElementById("top-picks")||{}).innerHTML = renderTopPicks(data.top_picks, maxG, kVal);
     // Render all ranked candidates. Unqualified rows are dimmed via the
     // "unqualified" CSS class so the qualified picks stay visually prominent
     // while still preserving the full ranked list for reference.
@@ -604,19 +601,19 @@ async function refresh() {
       dot.className = "live-dot frozen-dot";
       txt.innerHTML =
         `GEPO Live Tracker <span class="badge badge-FROZEN" style="vertical-align:middle">FROZEN ${data.frozen_at || ""}</span>`;
-      document.getElementById("top-label").textContent =
+      (document.getElementById("top-label")||{}).textContent =
         `Frozen 15:01 picks for today${tickStr ? ` · tick ${tickStr} ET` : ""}`;
     } else if (tickIsFresh(data)) {
       // IB feed is healthy. Differentiate based on whether market is open.
       dot.className = marketOpenNow() ? "live-dot" : "live-dot premarket-dot";
       txt.textContent = "GEPO Live Tracker";
-      document.getElementById("top-label").textContent =
+      (document.getElementById("top-label")||{}).textContent =
         `Top 5 by GROUND rank${tickStr ? ` · tick ${tickStr} ET` : ""}`;
     } else {
       // Tick is stale — IB connection is down or last ranker run > 75 min ago.
       dot.className = "live-dot stale-dot";
       txt.textContent = "GEPO Live Tracker";
-      document.getElementById("top-label").textContent =
+      (document.getElementById("top-label")||{}).textContent =
         `Top 5 by GROUND rank${tickStr ? ` · stale tick ${tickStr} ET` : ""}`;
     }
   } catch (e) {
