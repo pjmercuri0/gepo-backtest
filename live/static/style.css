@@ -302,4 +302,6 @@ details.params-fold .params-row { margin-top: 10px; margin-bottom: 0; }
 /* Already held in Actuals (same name, strikes, expiry): IBKR refuses a second order on
    an option you hold, so the name is painted blue on the live tab. Wins over the
    unqualified grey. */
-.ranked-row td .held-tk, .ranked-row.unqualified td .held-tk, .week-title .held-tk { color: #4ea1ff !important; }
+.ranked-row.held-row td, .ranked-row.held-row.unqualified td,
+.ranked-row.held-row td .pos, .ranked-row.held-row td .neg,
+.ranked-row td .held-tk, .week-title .held-tk { color: #4ea1ff !important; }
