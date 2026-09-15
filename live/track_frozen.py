@@ -285,6 +285,40 @@ def _track_intraday(df: pd.DataFrame, today: date) -> None:
           flush=True)
 
 
+def _track_live_actuals(df: pd.DataFrame, today: date) -> None:
+    """Mark Actuals rows added from the LIVE tab (source.kind == "live"). Those rows
+    hold the ranked row itself, not a snapshot-record entry, so nothing else marks
+    them (2026-09-15: CSX showed a flat "open"). Same _track_pick, same parquet."""
+    fp = Path(live_config.ROOT_DIR) / "actuals.json"
+    if not fp.exists():
+        return
+    try:
+        with open(fp) as f:
+            store = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return
+    marked = 0
+    for t in store.get("trades") or []:
+        if (t.get("source") or {}).get("kind") != "live":
+            continue
+        pick = t.get("pick") or {}
+        if pick.get("pnl") is not None:
+            continue
+        try:
+            if pd.Timestamp(pick["expiry_date"]).date() < today:
+                continue
+        except (KeyError, ValueError, TypeError):
+            continue
+        row = _track_pick(df, pick)
+        if row is None:
+            continue
+        pick["live"] = row
+        marked += 1
+    if marked:
+        _atomic_write(fp, store)
+    print(f"Live-added actuals: marked {marked} open row(s)", flush=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--snapshot", type=str, default=None,
@@ -313,6 +347,7 @@ def main() -> int:
             active.append((fp, payload))
 
     _track_intraday(df, today)
+    _track_live_actuals(df, today)
 
     if not active:
         print("No active frozen files", flush=True)

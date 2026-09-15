@@ -375,6 +375,26 @@ def _actuals_rows() -> list[dict]:
                                              "max_loss": round(width - entry_credit, 4)}]
                 pick["suggested_qty"] = pick.get("suggested_qty") or 1
 
+        elif source.get("kind") == "live":
+            # Added from the live tab: the stored pick IS the ranked row. The mini's
+            # tracker writes pick["live"] each scan and snapshot_picks.settle writes
+            # outcome/pnl/expiry_close at expiry; upload_to_mya's field-aware merge
+            # carries them to Mya (2026-09-15).
+            live = pick.get("live") or {}
+            if live:
+                live.setdefault("live_status", _live_status(
+                    pick.get("spread_type"), live.get("underlying_price"),
+                    pick.get("short_strike"), pick.get("long_strike")))
+                last_track = live
+                if live.get("current_mark") is not None:
+                    last_marked = live
+            if pick.get("pnl") is not None:
+                outcome_row = {
+                    "result": pick.get("outcome"),
+                    "pnl_per_contract": pick.get("pnl"),
+                    "underlying_price": pick.get("expiry_close"),
+                }
+
         # Actuals display basis = the IBKR credit on the pick (combo last > combo mid >
         # leg mids, i.e. quoted_credit/net_credit), NOT the modelled 0.80x mid /
         # 1.08x model that History books at (user 2026-09-14: "should be mid credit or
