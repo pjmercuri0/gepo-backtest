@@ -205,6 +205,58 @@ def _settle_files(today, ib, ib_close_cache) -> None:
         if changed:
             day_path.write_text(json.dumps(payload, indent=1))
             print(f"[snapshot_picks] settled picks in {day_path.name}")
+    _settle_live_actuals(today, ib, ib_close_cache)
+
+
+def _settle_live_actuals(today, ib, ib_close_cache) -> None:
+    """Same settlement for Actuals rows added from the live tab (kind "live"): they
+    are ranked rows, not snapshot-record entries, so _settle_files never sees them.
+    Credit basis = the IBKR credit the row was added at; a typed fill overrides at
+    render (_actuals_row_pnl)."""
+    fp = Path(live_config.ROOT_DIR) / "actuals.json"
+    if not fp.exists():
+        return
+    try:
+        store = json.loads(fp.read_text())
+    except json.JSONDecodeError:
+        return
+    changed = 0
+    for t in store.get("trades") or []:
+        if (t.get("source") or {}).get("kind") != "live":
+            continue
+        p = t.get("pick") or {}
+        if p.get("outcome") is not None:
+            continue
+        expiry = (p.get("expiry_date") or "")[:10]
+        if not expiry or expiry > today:
+            continue
+        if expiry == today:
+            if ib is None:
+                continue
+            tk = p["ticker"]
+            if tk not in ib_close_cache:
+                from live import expire_frozen
+                ib_close_cache[tk] = expire_frozen._underlying_price(ib, tk)
+            spot = ib_close_cache[tk]
+        else:
+            spot = _expiry_close(p["ticker"], expiry)
+        if spot is None:
+            continue
+        ss, ls = float(p["short_strike"]), float(p["long_strike"])
+        width = float(p.get("spread_width") or (float(p["net_credit"]) + float(p["max_loss"])))
+        credit = float(p.get("entry_credit") or p["net_credit"])
+        pnl = spreads.calc_pnl(spot, ss, ls, credit, width - credit, p["spread_type"]) * 100
+        if p["spread_type"] == "bull_put":
+            oc = "WIN" if spot > ss else ("LOSS" if spot <= ls else "PARTIAL")
+        else:
+            oc = "WIN" if spot < ss else ("LOSS" if spot >= ls else "PARTIAL")
+        if oc == "PARTIAL" and pnl > 0:
+            pnl *= 0.5
+        p["outcome"] = oc; p["pnl"] = round(float(pnl), 2); p["expiry_close"] = round(spot, 2)
+        changed += 1
+    if changed:
+        tmp = fp.with_suffix(".tmp"); tmp.write_text(json.dumps(store, indent=1)); tmp.replace(fp)
+        print(f"[snapshot_picks] settled {changed} live-added actuals row(s)")
 
 
 if __name__ == "__main__":

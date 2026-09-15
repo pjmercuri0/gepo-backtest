@@ -145,12 +145,23 @@ else:
     local = empty()
 
 merged = {'version': 1, 'trades': []}
+# 2026-09-15: field-aware. The mini writes marks and settlement into a trade's
+# pick (track_frozen / snapshot_picks.settle for kind "live"); Mya holds the
+# user's inline fill edits. "Remote wins wholesale" threw the marks away on
+# every upload. Now: local trade as the base, Mya's fill fields on top.
+USER_KEYS = ('actual_credit', 'actual_max_loss')
+loc = {t.get('id'): t for t in (local.get('trades') or []) if t.get('id')}
+rem = {t.get('id'): t for t in (remote.get('trades') or []) if t.get('id')}
 by_id = {}
-for src in (local, remote):
-    for trade in src.get('trades', []) or []:
-        tid = trade.get('id')
-        if tid:
-            by_id[tid] = trade
+for tid in list(loc) + [k for k in rem if k not in loc]:
+    if tid in loc and tid in rem:
+        t = dict(loc[tid])
+        for k in USER_KEYS:
+            if k in rem[tid]:
+                t[k] = rem[tid][k]
+        by_id[tid] = t
+    else:
+        by_id[tid] = loc.get(tid) or rem.get(tid)
 merged['trades'] = list(by_id.values())
 updated = max([x for x in [local.get('updated_at'), remote.get('updated_at')] if x] or [''])
 if updated:
