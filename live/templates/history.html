@@ -106,7 +106,7 @@
              cleanly to cash; pin-zone is the only state that delivers shares. #}
           {% set _pin = pin_open(p, (last_track.underlying_price if last_track and last_track.underlying_price else none), outcome_row is not none) %}
           <tr{% if _pin %} class="assign-watch" title="PIN risk: spot inside {{ p.long_strike }}-{{ p.short_strike }} — short assigned, long expires worthless, shares delivered"{% endif %}>
-            <td><button class="actuals-add" data-url="{{ url_for('add_actual_from_frozen', date=day.date, index=loop.index0) }}" title="add this pick to actuals">+</button></td>
+            <td><button class="actuals-add{% if is_held(p) %} held-add{% endif %}" data-url="{{ url_for('add_actual_from_frozen', date=day.date, index=loop.index0) }}" title="add this pick to actuals">+</button></td>
             <td>{{ loop.index }}</td>
             <td class="fw">{{ tk }}
               {% if p.freeze_added_at %}<span style="font-size:10px;color:#e8b366;margin-left:6px" title="added from later freeze snapshot">+{{ p.freeze_added_at }}</span>{% endif %}
