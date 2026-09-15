@@ -1567,7 +1567,7 @@ has half-dollar strikes (97.5 bid 3.40 / ask 3.60, Δ 0.54, vol 101); TWS's $1-w
 grid on the Sep 14 expiry does not show it. Half-wides are allowed by config; one line
 to forbid them if wanted.
 
-## 0.41 NEXT RESEARCH (for the MacBook): delta-matched P_real (2026-09-15)
+## 0.41 CLOSED — delta-matched P_real (2026-09-15): tested in §0.42, exact strikes stay canon
 
 **User's idea, to test on the featATM frame.** P_real today counts, over the trailing 252
 sessions, how often the stock moved more than TODAY's percentage distance to the exact
@@ -1652,10 +1652,30 @@ Threshold on historical day t = today's % distance to each strike x sigma_t / si
 | delta-matched, RV20 | 1.19 / -19.2% | 1.12 / -18.9% |
 
 ATM-IV is a wash (slightly lower DD both times), RV20 is worse on both. bull_put share does
-not shrink (83% vs 79%). Not adopted. Logs `p_real_delta_matched_IS*.log`; per-candidate
-p/q/ro for every variant in `p_real_delta_matched_IS_{store,frame}.parquet` (gitignored).
-The script runs IS in ~2 min with month progress and a to-date table after every year;
-`--win OOT` not yet run.
+not shrink (83% vs 79%).
+
+OOT 2026 (544 trades, 01-01..08-20) flips the ranking:
+
+| P_real variant | frame series | full-session series |
+|---|---|---|
+| canon exact strikes | 2.34 / DD -6.6% | 1.75 / -10.5% |
+| delta-matched, RV20 | 2.66 / -5.1% | 2.20 / -8.6% |
+| delta-matched, ATM IV | 2.18 / -8.2% | 1.58 / -8.7% |
+
+RV20 wins OOT after losing IS; ATM-IV loses OOT after tying IS. Each variant is better in one
+window and worse in the other and the two sigma sources disagree in both: noise on 540 trades,
+not a method. **DECISION (user, 2026-09-15): exact strikes stay canon.** Delta-matching is
+closed. Reasoning that settled it: P_real scores a strike as a PERCENTAGE move from spot, not
+a price level, so "uncharted territory" (all-time highs) is not a problem; and the vol-regime
+bias it was meant to remove runs the safe way — by today-IV / trailing-252d-RV quintile, P_real
+falls 0.467 -> 0.406 from the lowest to the highest quintile while the realized loss rate
+stays 41-45%, so a spiking IV makes P_real more pessimistic, not more confident. The only real
+"uncharted" case is thin history (a name with few sessions), which is a data-depth issue the
+two-year IBKR seed addresses. §0.41 is CLOSED.
+
+Logs `p_real_delta_matched_{IS,OOT}*.log`; per-candidate p/q/ro for every variant in
+`p_real_delta_matched_{IS,OOT}_{store,frame}.parquet` (gitignored). IS runs in ~2 min, OOT
+in ~15 s, with month progress and a to-date table after every year.
 
 ### The change: `live/closes.py` reads ONLY `output/ibkr_closes.parquet`
 
@@ -1701,7 +1721,6 @@ that way; IBKR TRADES closes are unadjusted, which is what P_real wants).
   removed, not verified unused downstream.
 - Rerun the IS backtest on the actual IBKR series once the mini has it, so the number
   the live book is held to is computed on the series the live book uses.
-- `--win OOT` for the delta-matched script.
 
 # 🗃️ HISTORICAL ARCHIVE — NOT A CURRENT TASK LIST
 
