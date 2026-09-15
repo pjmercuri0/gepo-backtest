@@ -496,7 +496,7 @@ function renderRegime(r) {
 function renderTickerStrip(rows) {
   if (!rows || rows.length === 0) return "no candidates";
   return rows.slice(0, 5).map(r =>
-    `<span class="tick"><strong>${r.ticker}</strong>${dirLabel(r.spread_type).slice(0,2)} ${fmtGround(r.GROUND)}</span>`
+    `<span class="tick"><strong>${r.ticker}</strong>${r.spread_type === "bull_put" ? "bp" : r.spread_type === "bear_call" ? "bc" : ""} ${fmtGround(r.GROUND)}</span>`
   ).join("");
 }
 
