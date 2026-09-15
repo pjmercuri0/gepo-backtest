@@ -304,4 +304,7 @@ details.params-fold .params-row { margin-top: 10px; margin-bottom: 0; }
    unqualified grey. */
 .ranked-row.held-row td, .ranked-row.held-row td .pos, .ranked-row.held-row td .neg,
 .ranked-row td .held-tk, .week-title .held-tk { color: #4ea1ff !important; }
+/* Held but not currently qualified: grey-blue, so bright blue still means held AND a pick. */
+.ranked-row.held-row.unqualified td, .ranked-row.held-row.unqualified td .pos,
+.ranked-row.held-row.unqualified td .neg { color: #6f8fb0 !important; }
 

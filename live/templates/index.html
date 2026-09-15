@@ -316,9 +316,10 @@ function renderRanked(rows, maxGround, kVal) {
     const isPrimary = (r.qualified === true) && (qualSeen <= 5);
     // Blue only when it is a pick you already hold (user 2026-09-15). A held name that is
     // not currently qualified stays grey like any other unqualified row.
+    // Held + qualified = bright blue; held + not qualified = grey-blue (user 2026-09-15).
     const heldPick = r.held && isPrimary;
-    const rowClass = (isPrimary ? "" : " unqualified") + (heldPick ? " held-row" : "");
-    return `<tr class="ranked-row${rowClass}"${heldPick ? ' title="already held in Actuals — IBKR will refuse a second order on the same option"' : ""}>
+    const rowClass = (isPrimary ? "" : " unqualified") + (r.held ? " held-row" : "");
+    return `<tr class="ranked-row${rowClass}"${r.held ? ' title="already held in Actuals — IBKR will refuse a second order on the same option"' : ""}>
       <td>${i+1}</td>
       <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> <span class="${heldPick ? "held-tk" : ""}">${r.ticker}</span>${oiWarning(r)}</td>
       <td>${r.entry_price != null ? fmtMoney(r.entry_price) : "—"}</td>
