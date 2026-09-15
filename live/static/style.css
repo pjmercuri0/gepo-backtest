@@ -299,15 +299,11 @@ details.params-fold[open] > summary::after { content: "\25b4"; }
 details.params-fold > summary:hover { background: rgba(255,255,255,0.07); }
 details.params-fold .params-row { margin-top: 10px; margin-bottom: 0; }
 
-/* Already held in Actuals (same name, strikes, expiry): IBKR refuses a second order on
-   an option you hold, so the name is painted blue on the live tab. Wins over the
-   unqualified grey. */
-.ranked-row.held-row td, .ranked-row.held-row td .pos, .ranked-row.held-row td .neg,
-.ranked-row td .held-tk, .week-title .held-tk { color: #4ea1ff !important; }
-/* Held but not currently qualified: grey-blue, so bright blue still means held AND a pick. */
-.ranked-row.held-row.unqualified td, .ranked-row.held-row.unqualified td .pos,
-.ranked-row.held-row.unqualified td .neg { color: #6f8fb0 !important; }
 
 /* Live tab: the + shares the rank cell so it costs no column. */
 #ranked-table td.rank-cell { white-space: nowrap; }
 #ranked-table td.rank-cell .actuals-add { margin-right: 6px; }
+
+/* Already in Actuals (same name, strikes, expiry): the + turns blue so you do not
+   add it again -- IBKR refuses a second order on an option you already hold. */
+#ranked-table .actuals-add.held-add { background: #2f7bd8; border-color: #2f7bd8; color: #fff; }
