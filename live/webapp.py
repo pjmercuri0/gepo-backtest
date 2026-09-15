@@ -219,6 +219,8 @@ def _source_id(source: dict, pick: dict) -> str:
         return f"frozen:{source.get('date')}:{source.get('index')}:{_pick_identity(pick)}"
     if kind == "snapshot":
         return f"snapshot:{source.get('date')}:{source.get('hhmm')}:{source.get('index')}:{_pick_identity(pick)}"
+    if kind == "live":
+        return f"live:{source.get('date')}:{source.get('hhmm')}:{source.get('index')}:{_pick_identity(pick)}"
     return f"unknown:{_pick_identity(pick)}"
 
 
@@ -1278,6 +1280,44 @@ def add_actual_from_snapshot(date: str, hhmm: str, index: int):
         f"{hhmm[:2]}:{hhmm[2:]}" if len(hhmm) == 4 else hhmm,
     )
     return jsonify({"ok": True, "added": added, "actual": row})
+
+
+@app.route("/api/actuals/from_live/<int:index>", methods=["POST"])
+def add_actual_from_live(index: int):
+    """The + on the live tab (user 2026-09-15). Index is the row's position in
+    /api/latest.json's `ticker` list. If the same pick was captured by
+    snapshot_picks (every qualified pick of a scan is), the row is saved through
+    the snapshot path so marks and settlement attach as usual; otherwise it is
+    saved as kind "live" with the full ranked row -- displays and takes a typed
+    fill, but nothing tracks or settles it. ?dry=1 returns the resolved source
+    without saving."""
+    payload = _read_json(Path(live_config.RANKED_DIR) / "latest.json")
+    rows = (payload or {}).get("ticker") or []
+    if index < 0 or index >= len(rows):
+        abort(404)
+    pick = rows[index]
+    ident = _pick_identity(pick)
+    snap = str(payload.get("snapshot_file") or "")
+    date = str(payload.get("snapshot_ts") or "")[:10]
+    hhmm = Path(snap).stem if snap else str(payload.get("snapshot_ts") or "")[11:16].replace(":", "")
+    source, label, stime = None, "live", None
+    ip = _read_json(Path(live_config.ROOT_DIR) / "intraday_picks" / f"{date}.json") or {}
+    for scan in reversed(ip.get("scans") or []):
+        for j, q in enumerate(scan.get("picks") or []):
+            if _pick_identity(q) == ident:
+                source = {"kind": "snapshot", "date": date, "hhmm": str(scan.get("hhmm")), "index": j}
+                label, stime = "snapshots", f"{str(scan.get('hhmm'))[:2]}:{str(scan.get('hhmm'))[2:]}"
+                pick = q
+                break
+        if source:
+            break
+    if source is None:
+        source = {"kind": "live", "date": date, "hhmm": hhmm, "index": index}
+        stime = f"{hhmm[:2]}:{hhmm[2:]}" if len(hhmm) == 4 else hhmm
+    if request.args.get("dry") == "1":
+        return jsonify({"ok": True, "dry": True, "source": source, "ticker": pick.get("ticker")})
+    row, added = _save_actual_from_source(source, pick, label, stime)
+    return jsonify({"ok": True, "added": added, "actual": row, "source": source})
 
 
 @app.route("/api/actuals/<path:trade_id>", methods=["DELETE"])
