@@ -314,10 +314,13 @@ function renderRanked(rows, maxGround, kVal) {
     // Cap at five: the first five QUALIFIED rows in GROUND order are the picks.
     if (r.qualified === true) qualSeen += 1;
     const isPrimary = (r.qualified === true) && (qualSeen <= 5);
-    const rowClass = (isPrimary ? "" : " unqualified") + (r.held ? " held-row" : "");
-    return `<tr class="ranked-row${rowClass}"${r.held ? ' title="already held in Actuals — IBKR will refuse a second order on the same option"' : ""}>
+    // Blue only when it is a pick you already hold (user 2026-09-15). A held name that is
+    // not currently qualified stays grey like any other unqualified row.
+    const heldPick = r.held && isPrimary;
+    const rowClass = (isPrimary ? "" : " unqualified") + (heldPick ? " held-row" : "");
+    return `<tr class="ranked-row${rowClass}"${heldPick ? ' title="already held in Actuals — IBKR will refuse a second order on the same option"' : ""}>
       <td>${i+1}</td>
-      <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> <span class="${r.held ? "held-tk" : ""}" title="${r.held ? "already held in Actuals — IBKR will refuse a second order on the same option" : ""}">${r.ticker}</span>${oiWarning(r)}</td>
+      <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> <span class="${heldPick ? "held-tk" : ""}">${r.ticker}</span>${oiWarning(r)}</td>
       <td>${r.entry_price != null ? fmtMoney(r.entry_price) : "—"}</td>
       <td>${fmtMoney(r.short_strike)} / ${fmtMoney(r.long_strike)}</td>
       <td>${fmtNum(r.short_delta, 2)}</td>
