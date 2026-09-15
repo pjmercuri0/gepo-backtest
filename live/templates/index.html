@@ -306,9 +306,11 @@ function renderRanked(rows, maxGround, kVal) {
     return `<tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
   }
   return rows.map((r, i) => {
-    // Bright = top-5 ranked AND qualified (meets per-DOW GROUND threshold).
-    // Dimmed = either rank > 5 OR qualified=false (below per-DOW threshold).
-    const isPrimary = (i < 5) && (r.qualified !== false);
+    // Bright = qualified (GROUND >= threshold AND IBKR credit >= fair value), at any
+    // position. 2026-09-15: the old "first 5 rows AND qualified" rule dimmed CSCO at
+    // position 6 because two unqualified names (gate ✗) ranked above it, while the
+    // Snapshots tab correctly listed it as a qualified pick.
+    const isPrimary = (r.qualified === true);
     const rowClass = isPrimary ? "" : " unqualified";
     return `<tr class="ranked-row${rowClass}">
       <td>${i+1}</td>
@@ -563,8 +565,8 @@ async function refresh() {
     }
     document.getElementById("weekly-totals").innerHTML = renderWeeklyTotals(data.top_picks, data.snapshot_ts);
     document.getElementById("top-picks").innerHTML = renderTopPicks(data.top_picks, maxG, kVal);
-    // Render all ranked candidates. Rows past the top 5 are dimmed via
-    // the "unqualified" CSS class so the top 5 stay visually prominent
+    // Render all ranked candidates. Unqualified rows are dimmed via the
+    // "unqualified" CSS class so the qualified picks stay visually prominent
     // while still preserving the full ranked list for reference.
     document.getElementById("ranked-tbody").innerHTML = renderRanked(data.ticker || [], maxG, kVal);
 
