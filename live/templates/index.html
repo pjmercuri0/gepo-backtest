@@ -314,8 +314,8 @@ function renderRanked(rows, maxGround, kVal) {
     // Cap at five: the first five QUALIFIED rows in GROUND order are the picks.
     if (r.qualified === true) qualSeen += 1;
     const isPrimary = (r.qualified === true) && (qualSeen <= 5);
-    const rowClass = isPrimary ? "" : " unqualified";
-    return `<tr class="ranked-row${rowClass}">
+    const rowClass = (isPrimary ? "" : " unqualified") + (r.held ? " held-row" : "");
+    return `<tr class="ranked-row${rowClass}"${r.held ? ' title="already held in Actuals — IBKR will refuse a second order on the same option"' : ""}>
       <td>${i+1}</td>
       <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> <span class="${r.held ? "held-tk" : ""}" title="${r.held ? "already held in Actuals — IBKR will refuse a second order on the same option" : ""}">${r.ticker}</span>${oiWarning(r)}</td>
       <td>${r.entry_price != null ? fmtMoney(r.entry_price) : "—"}</td>
