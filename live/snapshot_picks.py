@@ -39,6 +39,10 @@ PICK_FIELDS = [
     # every scan of every day and the file should not grow for fields nothing
     # reads.
     "short_delta", "long_delta", "IV", "long_IV",
+    # Added 2026-09-15. Without model_credit a pick copied into Actuals fell back to
+    # the generic fair(delta, DTE) formula for min/target and disagreed with the live
+    # tab (BAC/EOG). The live tab's basis is the smile-fit model credit; persist it.
+    "model_credit", "dfit_short", "dfit_long", "quoted_credit", "credit_source", "D_ent",
     "short_bid", "short_ask", "long_bid", "long_ask",
     "short_oi", "long_oi",
 ]
