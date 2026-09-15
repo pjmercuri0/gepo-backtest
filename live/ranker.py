@@ -76,31 +76,41 @@ def _reprice_on_combos(candidates: pd.DataFrame) -> pd.DataFrame:
     before = len(candidates)
     candidates = combo_quotes.attach_combo_quotes(candidates)
 
-    # Credit priority (user 2026-09-13): combo LAST, then combo MID, then leg mids.
-    #   combo last  — the last trade on IBKR's complex-order book: the number on the TWS ticket
-    #   combo mid   — midpoint of the combo book, but only when the book is narrower than
-    #                 LIVE_COMBO_MAX_WIDTH x spread width (a wide book's midpoint is not a price)
-    #   leg mids    — mid(short) - mid(long) from the single-leg quotes
+    # Credit priority (user 2026-09-15, replacing the 09-13 last-first order):
+    #   combo MID   — midpoint of the combo book, when the book is narrower than
+    #                 LIVE_COMBO_MAX_WIDTH x spread width. The current market; cannot be stale.
+    #   combo LAST  — a real print, but on a 1-3 DTE spread it can be an hour old on a moved
+    #                 underlying. Used only when there is no tight mid, and only if it sits
+    #                 inside the current combo bid/ask (or there is no book to check against).
+    #   leg mids    — mid(short) - mid(long) from the single-leg quotes, the fallback.
     max_w = float(getattr(live_config, "LIVE_COMBO_MAX_WIDTH", float("inf")))
-    book_w = (candidates["combo_ask"] - candidates["combo_bid"]).abs()
+    bid_c, ask_c = candidates["combo_bid"], candidates["combo_ask"]
+    book_w = (ask_c - bid_c).abs()
     mid_c = candidates["combo_credit_mid"]
     last_c = candidates["combo_credit_last"]
     too_wide = mid_c.notna() & (book_w > max_w * candidates["spread_width"])
-    last_ok = last_c.notna() & (last_c > 0)
     mid_ok = mid_c.notna() & ~too_wide & (mid_c > 0)
+    has_book = bid_c.notna() & ask_c.notna() & (ask_c > 0)
+    lo_c = pd.concat([bid_c, ask_c], axis=1).min(axis=1)
+    hi_c = pd.concat([bid_c, ask_c], axis=1).max(axis=1)
+    last_fresh = last_c.notna() & (last_c > 0) & (~has_book | ((last_c >= lo_c) & (last_c <= hi_c)))
+    last_used = last_fresh & ~mid_ok
     candidates["combo_too_wide"] = too_wide
     candidates["leg_mid_credit"] = candidates["net_credit"]
     candidates["credit_source"] = "leg_mid"
+    candidates.loc[last_used, "credit_source"] = "combo_last"
     candidates.loc[mid_ok, "credit_source"] = "combo_mid"
-    candidates.loc[last_ok, "credit_source"] = "combo_last"
-    candidates["combo_priced"] = last_ok | mid_ok
+    candidates["combo_priced"] = mid_ok | last_used
+    candidates.loc[last_used, "net_credit"] = last_c[last_used]
     candidates.loc[mid_ok, "net_credit"] = mid_c[mid_ok]
-    candidates.loc[last_ok, "net_credit"] = last_c[last_ok]
-    n_wide = int((too_wide & ~last_ok).sum())
+    n_stale = int((last_c.notna() & (last_c > 0) & ~last_fresh & ~mid_ok).sum())
+    if n_stale:
+        print(f"  combo re-pricing: {n_stale} last print(s) outside the current book ignored as stale", flush=True)
+    n_wide = int((too_wide & ~last_used).sum())
     if n_wide:
-        print(f"  combo re-pricing: {n_wide} combo book(s) wider than {max_w:g}x spread width with no last "
-              f"→ leg mids used (user order: combo last > combo mid > leg mid)", flush=True)
-    basis = "last>mid>legs"
+        print(f"  combo re-pricing: {n_wide} combo book(s) wider than {max_w:g}x spread width with no fresh last "
+              f"→ leg mids used (order: combo mid > combo last > leg mid)", flush=True)
+    basis = "mid>last>legs"
     candidates["max_loss"] = (candidates["spread_width"] - candidates["net_credit"]).round(4)
 
     # Same rejections build_candidates would have made, now on real prices.
