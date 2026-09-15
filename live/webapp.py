@@ -222,27 +222,6 @@ def _source_id(source: dict, pick: dict) -> str:
     return f"unknown:{_pick_identity(pick)}"
 
 
-def _default_fill_from_quote(pick: dict) -> tuple[float, float] | None:
-    """(credit, max_loss) to pre-fill a NEW actuals row: the IBKR quote on the pick
-    (user 2026-09-14: "the default credit when added to the actuals tab should be the
-    IBKR quote, not the 0.8x"). Editable inline afterwards; it is the recorded fill
-    until the user types the real one, so the fill/model tracker counts it."""
-    try:
-        q = pick.get("quoted_credit")
-        if q is None:
-            q = pick.get("net_credit")
-        q = float(q)
-        w = pick.get("spread_width")
-        if not w:
-            w = float(pick.get("net_credit") or 0) + float(pick.get("max_loss") or 0)
-        w = float(w)
-        if q <= 0 or w <= 0 or q >= w:
-            return None
-        return round(q, 2), round(w - q, 2)
-    except (TypeError, ValueError):
-        return None
-
-
 def _save_actual_from_source(source: dict, pick: dict, source_label: str, source_time: str | None) -> tuple[dict, bool]:
     store = _actuals_store()
     trade_id = _source_id(source, pick)
@@ -261,9 +240,7 @@ def _save_actual_from_source(source: dict, pick: dict, source_label: str, source
         existing.update(row)          # row carries no actual_credit, so a typed fill survives
         added = False
     else:
-        fill = _default_fill_from_quote(pick)
-        if fill is not None:
-            row["actual_credit"], row["actual_max_loss"] = fill
+        # No auto-fill (user 2026-09-15): the row shows (+) until the real fill is typed.
         trades.append(row)
         added = True
     store["trades"] = trades
