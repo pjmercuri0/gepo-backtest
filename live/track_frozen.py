@@ -192,8 +192,18 @@ def _track_pick(df: pd.DataFrame, pick: dict, existing_rows: list = None) -> dic
         dte_days=days_to_expiry,
         spread_type=pick["spread_type"],
     )
-    current_mark = round(min(bs_debit, spread_w), 4)
-    mark_basis = "BS_theo"
+    # Floor at intrinsic (2026-09-15). ISRG 370/372.5 bear call with spot 377.31 --
+    # $2.50 fully ITM -- marked $0.68 because the per-leg IVs came out of a
+    # 3-point-wide illiquid book (370C 8.3/11.4) and the long leg's IV ran above
+    # the short's. A vertical can never be closed for less than its intrinsic,
+    # so the theoretical mark is floored there before the width cap.
+    if pick["spread_type"] == "bull_put":
+        intr = max(0.0, float(pick["short_strike"]) - spot_for_bs) - max(0.0, float(pick["long_strike"]) - spot_for_bs)
+    else:
+        intr = max(0.0, spot_for_bs - float(pick["short_strike"])) - max(0.0, spot_for_bs - float(pick["long_strike"]))
+    intr = max(0.0, intr)
+    current_mark = round(min(max(bs_debit, intr), spread_w), 4)
+    mark_basis = "BS_theo" if bs_debit >= intr else "intrinsic floor (BS below intrinsic)"
 
     # Entry basis: canonical shared basis (actual_credit > 0.80×MID). The old
     # LAST-preferred basis disagreed with webapp/expire_frozen — e.g. BLK
