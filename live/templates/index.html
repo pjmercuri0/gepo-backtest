@@ -240,7 +240,7 @@ function renderTopPicks(picks, maxGround, kVal) {
     html += `<div class="week-card">
       <div class="week-head">
         <div>
-          <div class="week-title">#${i+1} &nbsp; <strong>${p.ticker}</strong>
+          <div class="week-title">#${i+1} &nbsp; <strong class="${p.held ? "held-tk" : ""}" title="${p.held ? "already held in Actuals — IBKR will refuse a second order on the same option" : ""}">${p.ticker}</strong>
             <span class="${dirClass(p.spread_type)}">${dirLabel(p.spread_type)}</span>
             ${oiWarning(p)}</div>
           <div class="week-sub">${fmtMoney(p.short_strike)} / ${fmtMoney(p.long_strike)} &nbsp;·&nbsp;
@@ -317,7 +317,7 @@ function renderRanked(rows, maxGround, kVal) {
     const rowClass = isPrimary ? "" : " unqualified";
     return `<tr class="ranked-row${rowClass}">
       <td>${i+1}</td>
-      <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> ${r.ticker}${oiWarning(r)}</td>
+      <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> <span class="${r.held ? "held-tk" : ""}" title="${r.held ? "already held in Actuals — IBKR will refuse a second order on the same option" : ""}">${r.ticker}</span>${oiWarning(r)}</td>
       <td>${r.entry_price != null ? fmtMoney(r.entry_price) : "—"}</td>
       <td>${fmtMoney(r.short_strike)} / ${fmtMoney(r.long_strike)}</td>
       <td>${fmtNum(r.short_delta, 2)}</td>

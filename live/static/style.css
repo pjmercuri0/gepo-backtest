@@ -298,3 +298,8 @@ details.params-fold > summary::after { content: "\25be"; color: #888780; font-si
 details.params-fold[open] > summary::after { content: "\25b4"; }
 details.params-fold > summary:hover { background: rgba(255,255,255,0.07); }
 details.params-fold .params-row { margin-top: 10px; margin-bottom: 0; }
+
+/* Already held in Actuals (same name, strikes, expiry): IBKR refuses a second order on
+   an option you hold, so the name is painted blue on the live tab. Wins over the
+   unqualified grey. */
+.ranked-row td .held-tk, .ranked-row.unqualified td .held-tk, .week-title .held-tk { color: #4ea1ff !important; }

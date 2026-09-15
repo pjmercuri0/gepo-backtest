@@ -1128,6 +1128,37 @@ def actuals():
                            assign_ts=risk.get("_ts"))
 
 
+def _held_keys() -> set:
+    """(ticker, spread_type, short, long, expiry) of every actuals row not yet expired.
+    IBKR refuses a second order on an option you already hold, so the live tab paints
+    those names blue (user 2026-09-15)."""
+    out = set()
+    today = ddate.today().isoformat()
+    for t in (_actuals_store().get("trades") or []):
+        p = t.get("pick") or {}
+        exp = str(p.get("expiry_date") or "")[:10]
+        if not exp or exp < today:
+            continue
+        try:
+            out.add((p.get("ticker"), p.get("spread_type"), round(float(p.get("short_strike")), 2),
+                     round(float(p.get("long_strike")), 2), exp))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _mark_held(payload: dict) -> None:
+    keys = _held_keys()
+    for lst in (payload.get("ticker") or [], payload.get("top_picks") or []):
+        for r in lst:
+            try:
+                k = (r.get("ticker"), r.get("spread_type"), round(float(r.get("short_strike")), 2),
+                     round(float(r.get("long_strike")), 2), str(r.get("expiry_date") or "")[:10])
+            except (TypeError, ValueError):
+                r["held"] = False; continue
+            r["held"] = k in keys
+
+
 @app.route("/api/latest.json")
 def latest_json():
     """Return the latest ranked snapshot.
@@ -1147,6 +1178,7 @@ def latest_json():
             # tracks the IBKR tick (and the chip + subheader agree).
             frozen["regime"] = current_regime()
             _enrich_payload(frozen)
+            _mark_held(frozen)
             return jsonify(frozen)
 
     latest_path = Path(live_config.RANKED_DIR) / "latest.json"
@@ -1168,6 +1200,7 @@ def latest_json():
     # subheader matches the SPY chip even if `latest.json` was baked earlier.
     payload["regime"] = current_regime()
     _enrich_payload(payload)
+    _mark_held(payload)
     return jsonify(payload)
 
 
