@@ -62,7 +62,7 @@ Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or 
       {% for p in scan.picks %}
         {% set _pin = pin_open(p, (p.live.underlying_price if p.live and p.live.underlying_price else none), (p.outcome or p.expiry_close is not none)) %}
         <tr{% if _pin %} class="assign-watch" title="PIN risk: spot inside the strikes — short assigned, long expires worthless, shares delivered"{% endif %}>
-          <td><button class="actuals-add" data-url="{{ url_for('add_actual_from_snapshot', date=d.date, hhmm=scan.hhmm, index=loop.index0) }}" title="add this pick to actuals">+</button></td>
+          <td><button class="actuals-add{% if is_held(p) %} held-add{% endif %}" data-url="{{ url_for('add_actual_from_snapshot', date=d.date, hhmm=scan.hhmm, index=loop.index0) }}" title="add this pick to actuals">+</button></td>
           <td class="fw"><span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}">{{ '▲' if p.spread_type == 'bull_put' else '▼' }}</span> {{ p.ticker }}</td>
           <td>{{ 'bull put' if p.spread_type == 'bull_put' else 'bear call' }}</td>
           <td>${{ '%.2f' % p.short_strike }} / ${{ '%.2f' % p.long_strike }}</td>

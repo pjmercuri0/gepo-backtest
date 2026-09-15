@@ -19,7 +19,7 @@ import tempfile
 from datetime import datetime, time as dtime, date as ddate
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, abort, request, send_from_directory
+from flask import Flask, jsonify, render_template, abort, request, send_from_directory, g
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -118,6 +118,22 @@ def _pin_open(pick, spot, settled=False) -> bool:
 
 app.jinja_env.filters['rd'] = _round_half_up
 app.jinja_env.globals['pin_open'] = _pin_open
+
+
+def _is_held(pick: dict) -> bool:
+    """Template helper: this pick (name, side, strikes, expiry) is already an unexpired
+    Actuals row. Same rule as the live tab's blue +. Cached per request."""
+    keys = getattr(g, "_held_keys", None)
+    if keys is None:
+        keys = _held_keys(); g._held_keys = keys
+    try:
+        return (pick.get("ticker"), pick.get("spread_type"), round(float(pick.get("short_strike")), 2),
+                round(float(pick.get("long_strike")), 2), str(pick.get("expiry_date") or "")[:10]) in keys
+    except (TypeError, ValueError):
+        return False
+
+
+app.jinja_env.globals['is_held'] = _is_held
 app.jinja_env.filters['shortdate'] = _short_date
 app.jinja_env.filters['strike'] = _strike
 
