@@ -302,6 +302,7 @@ function renderTopPicks(picks, maxGround, kVal) {
 }
 
 function renderRanked(rows, maxGround, kVal) {
+  let qualSeen = 0;
   if (!rows || rows.length === 0) {
     return `<tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
   }
@@ -310,7 +311,9 @@ function renderRanked(rows, maxGround, kVal) {
     // position. 2026-09-15: the old "first 5 rows AND qualified" rule dimmed CSCO at
     // position 6 because two unqualified names (gate ✗) ranked above it, while the
     // Snapshots tab correctly listed it as a qualified pick.
-    const isPrimary = (r.qualified === true);
+    // Cap at five: the first five QUALIFIED rows in GROUND order are the picks.
+    if (r.qualified === true) qualSeen += 1;
+    const isPrimary = (r.qualified === true) && (qualSeen <= 5);
     const rowClass = isPrimary ? "" : " unqualified";
     return `<tr class="ranked-row${rowClass}">
       <td>${i+1}</td>
