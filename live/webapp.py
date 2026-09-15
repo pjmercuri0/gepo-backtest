@@ -1301,16 +1301,21 @@ def add_actual_from_live(index: int):
     date = str(payload.get("snapshot_ts") or "")[:10]
     hhmm = Path(snap).stem if snap else str(payload.get("snapshot_ts") or "")[11:16].replace(":", "")
     source, label, stime = None, "live", None
+    # Link to the snapshot record ONLY when the capture is from THIS scan (same
+    # snapshot_ts). 2026-09-15: matching by identity across earlier scans saved an
+    # hour-old CSX pick (13:01 quote 0.275) for a + pressed on the 14:01 row (0.20).
+    # The pick saved is always the live row the user was looking at.
     ip = _read_json(Path(live_config.ROOT_DIR) / "intraday_picks" / f"{date}.json") or {}
+    cur_ts = str(payload.get("snapshot_ts") or "")
     for scan in reversed(ip.get("scans") or []):
+        if str(scan.get("snapshot_ts") or "") != cur_ts:
+            continue
         for j, q in enumerate(scan.get("picks") or []):
             if _pick_identity(q) == ident:
                 source = {"kind": "snapshot", "date": date, "hhmm": str(scan.get("hhmm")), "index": j}
                 label, stime = "snapshots", f"{str(scan.get('hhmm'))[:2]}:{str(scan.get('hhmm'))[2:]}"
-                pick = q
                 break
-        if source:
-            break
+        break
     if source is None:
         source = {"kind": "live", "date": date, "hhmm": hhmm, "index": index}
         stime = f"{hhmm[:2]}:{hhmm[2:]}" if len(hhmm) == 4 else hhmm
