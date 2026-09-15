@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-13 EDT (§0.39 is the latest state: old canon vs D_ent on the same model-relative fill basis). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-15 EDT (§0.42 is the latest state: live P_real is IBKR-only; seed the store on the mini). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -43,6 +43,11 @@ This block and the two safety/workflow blocks immediately below it are the autho
   IBKR replay** (§0.38) — DONE on the mini via the staged chains; see §0.38/§0.39. The mini only has chains from the 2026-08-19 cutover, and over
   those 12 days the NEW canon LOST to the old one (-$21 vs +$1,350) on a credit/width of
   0.503 vs the backtest's 0.543. This needs a longer window before the canon is trusted live.
+- **ON THE MAC MINI: seed the IBKR close store (§0.42).** `live/closes.py` now reads ONLY
+  `output/ibkr_closes.parquet`; until `python3 -m live.fetch_ibkr_closes --years 2` has run
+  there, live P_real is computed on snapshot prints alone (the ranker prints a WARNING).
+  The published IS Sharpe 1.35 was computed on a sparse close series; on a full-session
+  series the same canon is 1.20 / DD -15.9%. Delta-matched P_real (§0.41) tested: no gain.
 - **Old canon vs D_ent on the same fill basis (§0.39):** repriced at m x model credit the old
   canon has no in-sample edge at fair value and loses to D_ent at every multiple; OOT D_ent wins
   at 1.08x, ties at 1.04x, trails at 1.00x. D_ent stays deployed; the achieved live fill/model
@@ -1614,6 +1619,89 @@ Expected effects: removes the vol-regime bias; dampens the raw directional-drift
   contract, not a size limit.
 - Pin highlight only on the pick's settlement day; assignment Telegram only for positions
   expiring today; early-exercise channel disabled.
+
+## 0.42 Live P_real is IBKR-ONLY; delta-matched P_real tested and rejected (2026-09-15) — CURRENT STATE, ACTION NEEDED ON THE MINI
+
+### Why
+
+Three different close series were feeding the same P_real formula and nobody had compared them:
+
+| series | what it is | sessions/yr | IS 2020-25 Sh(wk), canon selection |
+|---|---|---|---|
+| research frame (behind the published 1.35) | vendor underlying price on candidate days + expiry closes; a stock has a price only on days it produced a candidate | ~226 (10% of sessions MISSING) | **1.35** (published) |
+| `output/daily_closes.parquet` raw | vendor `UnderlyingPrice` per Symbol/DataDate incl. the vendor's HOLIDAY REPUBLISHES (stale duplicate close on ~9 non-session dates a year; AAPL 2022-07-04 == 07-01 exactly; 56 such dates 2020-25) | ~260 | 1.07, DD -27% |
+| same, SPY sessions only | the honest full-session series | ~251 | **1.20**, DD -15.9% |
+| Mac mini live (`load_closes` before this change) | 2026 vendor store + Yahoo backfill + 15:31 snapshot prints | mixed | never measured |
+
+`research/dkl_2026_09_13/p_real_delta_matched.py` (exact-strike recompute on the frame's own
+series reproduces the frame's p/q/ro to 0.0000). Median |dp| between series is < 0.01 but
+GROUND ranks within a day on tiny margins: 18% of picks change and Sharpe moves 1.35 -> 1.20.
+**The published 1.35 is in-sample luck from a defective calendar; 1.20 / DD -15.9% is the
+honest canon figure on a full-session series.** The frame series has no lookahead (every
+price is past when used), it is just not something the live path can or should reproduce.
+
+### Delta-matched P_real (§0.41) — tested, does NOT help
+
+Threshold on historical day t = today's % distance to each strike x sigma_t / sigma_today
+(same selection, credit 1.08x model, D_ent, k, thr). Both sigma sources, both close series:
+
+| P_real variant | frame series | full-session series |
+|---|---|---|
+| canon exact strikes | 1.35 / DD -14.9% | 1.20 / -15.9% |
+| delta-matched, ATM IV (sig0 ffilled) | 1.31 / -14.7% | 1.20 / -13.9% |
+| delta-matched, RV20 | 1.19 / -19.2% | 1.12 / -18.9% |
+
+ATM-IV is a wash (slightly lower DD both times), RV20 is worse on both. bull_put share does
+not shrink (83% vs 79%). Not adopted. Logs `p_real_delta_matched_IS*.log`; per-candidate
+p/q/ro for every variant in `p_real_delta_matched_IS_{store,frame}.parquet` (gitignored).
+The script runs IS in ~2 min with month progress and a to-date table after every year;
+`--win OOT` not yet run.
+
+### The change: `live/closes.py` reads ONLY `output/ibkr_closes.parquet`
+
+- **`live/fetch_ibkr_closes.py`** (NEW): official daily TRADES closes from IBKR into
+  `output/ibkr_closes.parquet`, MERGE only, read-only, client id 178, 6 s pacing.
+  `--years 2` seeds (~10 min), `--days 10` tops up. Universe = SP100 + snapshot equities +
+  SPY (for the calendar); index roots and MMC skipped. Today's bar is dropped before 16:05 ET.
+- **`live/closes.py`**: `load_closes()` = IBKR store + snapshot prints ONLY for dates after
+  the store's last date (stop-gap for a missed top-up). The vendor store is no longer read
+  by the live path (`STORE` kept for `build_daily_closes.py`). `session_calendar()` = dates
+  where >= 50% of tickers have a bar; `fill_gaps()` forward-fills a single ticker's missing
+  SESSIONS up to 3 in a row (an IBKR hiccup), never adds a non-session date. **Holidays are
+  not duplicated** — that is the 1.20-vs-1.07 difference above, user chose the higher Sharpe.
+  `GEPO_IBKR_CLOSES` env var overrides the store path (used by the offline test).
+- **`live/cron_daily_bars.sh`**: runs `-m live.fetch_ibkr_closes --days 10` after
+  `fetch_daily_bars` at 17:01.
+- **`live/ranker.py`**: logs `closes: IBKR store N sessions, T tickers, first -> last`, or a
+  loud WARNING when the store is empty (P_real then runs on snapshot prints only).
+
+Offline test on the MacBook (no IB Gateway here): a scratch store built from the vendor
+closes on SPY sessions with punched holes; calendar has 0 weekend/holiday dates, a 2-session
+hole is filled, a 6-session hole fills 3 then stops, snapshot rows appear only after the store
+end. Ranker on `live/snapshots/2026-08-19/1531`: same 2 qualified picks (ISRG 400/402.5,
+RTX 222.5/220) under the new and old loaders, median |dp| 0.004 on 44 common candidates.
+
+### TO DO ON THE MAC MINI (in this order)
+
+```
+git pull --ff-only origin main
+python3 -m live.fetch_ibkr_closes --years 2          # ~10 min, IB Gateway up, read-only
+python3 -c "from live.closes import closes_status as s; print(s())"   # expect ~96 tickers, ~500 sessions
+python3 -m live.ranker --snapshot live/snapshots/<latest>/<hhmm>.parquet   # look for the 'closes: IBKR store' line
+```
+Then the 17:01 cron keeps it current. Verify the store against the vendor on a few
+overlapping 2026 dates before trusting it (§0.36 caught BDX's adjusted-close problem
+that way; IBKR TRADES closes are unadjusted, which is what P_real wants).
+
+### Still open
+
+- The live ranker still TRIES to read `output/iv_rank.parquet`, `output/rv_table.parquet`,
+  `data/spy_us_d.csv` (regime), earnings and dividend calendars. Regime and vol gate are
+  OFF and DKL is entropy, so these are dead for scoring; the reads are try/except. Not
+  removed, not verified unused downstream.
+- Rerun the IS backtest on the actual IBKR series once the mini has it, so the number
+  the live book is held to is computed on the series the live book uses.
+- `--win OOT` for the delta-matched script.
 
 # 🗃️ HISTORICAL ARCHIVE — NOT A CURRENT TASK LIST
 

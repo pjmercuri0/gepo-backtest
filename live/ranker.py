@@ -42,7 +42,7 @@ from live.regime import current_regime
 # the credit is the smile-fit model credit, and the risk term is D_ent = ln3 - H(Q_bs),
 # the paper's eq. 19. See SESSION_HANDOFF.md §0.33 and ent_canon.py.
 import ent_canon as entc   # not "ec": the earnings block below binds a local `ec`
-from live.closes import load_closes
+from live.closes import load_closes, closes_status
 
 # ── Snapshot discovery ──────────────────────────────────────────────────────
 
@@ -328,6 +328,12 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if priced.empty:
         return pd.DataFrame()
     closes = load_closes()
+    cs = closes_status()
+    if cs["rows"] == 0:
+        print("  WARNING: output/ibkr_closes.parquet is EMPTY -- P_real is running on snapshot prints only. "
+              "Seed it: python3 -m live.fetch_ibkr_closes --years 2", flush=True)
+    else:
+        print(f"  closes: IBKR store {cs['sessions']} sessions, {cs['tickers']} tickers, {cs['first']} -> {cs['last']}", flush=True)
     sel_credit = "net_credit" if getattr(live_config, "LIVE_SELECTION_CREDIT", "quoted") == "quoted" else "model_credit"
     print(f"  selection credit: {'IBKR quoted mid (uncapped)' if sel_credit == 'net_credit' else 'smile-fit model'}", flush=True)
     scored = entc.score(priced, closes, k=ground.DKL_K, thr=backtest_config.GROUND_THRESHOLD, credit_col=sel_credit)

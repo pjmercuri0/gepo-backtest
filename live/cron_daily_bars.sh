@@ -36,6 +36,10 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
   echo ""
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
   "${GEPO_PYTHON:-python3}" -m live.fetch_daily_bars
+  # IBKR daily closes for P_real (MERGE, never wipe). The live ranker reads ONLY
+  # output/ibkr_closes.parquet (live/closes.py, 2026-09-15) -- no vendor files.
+  # Seed once with --years 2; this top-up keeps it current.
+  "${GEPO_PYTHON:-python3}" -m live.fetch_ibkr_closes --days 10
   # Refresh Yahoo daily closes (MERGE, never wipe) so snapshot_picks.settle()
   # can resolve each pick's expiry close.
   "${GEPO_PYTHON:-python3}" fetch_yahoo_recent.py
