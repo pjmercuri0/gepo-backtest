@@ -38,8 +38,9 @@ This block and the two safety/workflow blocks immediately below it are the autho
   counted directly from realized spreads, keyed (ticker, $width) with pooled
   fallback, 52-expiry causal window, k=10. `rv_vs_iv` is dead. The LIVE path is
   NOT yet switched over — see the "NOT DONE" note at the end of §0.21.
+- **On the MACBOOK: test delta-matched P_real** (§0.41) — user's idea, not started.
 - **On the MACBOOK: check `live/snapshots/` for 2026-05-27..08-19 chains and run the
-  IBKR replay** (§0.38). The mini only has chains from the 2026-08-19 cutover, and over
+  IBKR replay** (§0.38) — DONE on the mini via the staged chains; see §0.38/§0.39. The mini only has chains from the 2026-08-19 cutover, and over
   those 12 days the NEW canon LOST to the old one (-$21 vs +$1,350) on a credit/width of
   0.503 vs the backtest's 0.543. This needs a longer window before the canon is trusted live.
 - **Old canon vs D_ent on the same fill basis (§0.39):** repriced at m x model credit the old
@@ -1560,6 +1561,59 @@ only accepts date-named directories. **Never leave ad-hoc files under `live/`**
 has half-dollar strikes (97.5 bid 3.40 / ask 3.60, Δ 0.54, vol 101); TWS's $1-wide combo
 grid on the Sep 14 expiry does not show it. Half-wides are allowed by config; one line
 to forbid them if wanted.
+
+## 0.41 NEXT RESEARCH (for the MacBook): delta-matched P_real (2026-09-15)
+
+**User's idea, to test on the featATM frame.** P_real today counts, over the trailing 252
+sessions, how often the stock moved more than TODAY's percentage distance to the exact
+strike in d days (`ent_canon.p_real`, thresholds `ths`/`thl` = strike/spot − 1). That
+distance is set by today's IV, so a calm history flatters the pick and a wild history
+punishes it regardless of whether the stock's *tails* are actually fat.
+
+**Delta-matched variant:** on each historical day t, put the short strike where a 0.55Δ
+strike *would have been* — i.e. threshold_t = z·σ_t·√(d/252) with z = Φ⁻¹ of the delta
+and σ_t = that day's vol — and count crossings of THAT. P_real then measures "does this
+name's realized distribution have thinner tails than the market prices" (the VRP thesis
+directly) instead of "will spot reach this specific level."
+
+Expected effects: removes the vol-regime bias; dampens the raw directional-drift term
+(the thesis leans on drift, so watch that trade-off).
+
+**How to run it (MacBook, has the frame):**
+- σ_t: vendor daily ATM IV per (ticker, date) from the year files if convenient, else
+  trailing 20-day realized vol from closes — try both; the RV version is what the mini
+  could run live (IBKR closes only).
+- Same selection, same fill (1.08x model), only P_real changes. Report: pick overlap vs
+  current canon, per-trade P&L, Sharpe, maxDD, and the bull_put share (does the drift lean
+  shrink?). IS 2020-25 and OOT 2026 separately.
+- Suggested home: `research/dkl_2026_09_13/p_real_delta_matched.py`, reusing
+  `report_ent_canon.select()` with a swapped `p_real`.
+
+**Not started on the mini.** No code changed for this.
+
+### Also recorded 2026-09-15 (all deployed, all in main)
+
+- Actuals rows added from the LIVE tab (source kind "live") are now marked every scan
+  (`track_frozen._track_live_actuals`) and settled at expiry
+  (`snapshot_picks._settle_live_actuals`); `upload_to_mya.sh`'s merge is field-aware
+  (mini's marks/settlement as base, Mya's `actual_credit`/`actual_max_loss` on top) —
+  the old "remote wins wholesale" discarded the mini's marks on every upload.
+- **Tracker marks are floored at intrinsic** (`track_frozen`, `fdd5adc`). ISRG 370/372.5
+  bear call, spot 377.31, marked $0.68 from per-leg IVs backed out of a 3-point-wide book;
+  now $2.50. IBKR's own P&L uses mid-of-closing-quotes with no floor and flatters deep-ITM
+  legs (AAPL 332.5/330 marked 1.22 vs 2.26 intrinsic) — the site is the conservative one.
+- Live tab: `+` on every ranked row (`/api/actuals/from_live/<i>`, saves the live row;
+  snapshot linkage only from the same scan); blue `+` on live/History/Snapshots when the
+  same option is already held; held rows stay white/grey. Portfolio-totals card and top-5
+  cards removed. Ticker strip reads `put` / `call`. Bright = first five qualified rows.
+- Actuals display basis = IBKR credit (combo mid > fresh combo last > leg mids — the credit
+  priority was flipped from last-first, `358d7e3`); no auto-filled fill on add; min/target
+  on Actuals use the persisted `model_credit` (snapshot picks now store it; 24 rows
+  backfilled) so they match the live tab.
+- IBKR "cannot have open orders on both sides" = a resting close order on the same
+  contract, not a size limit.
+- Pin highlight only on the pick's settlement day; assignment Telegram only for positions
+  expiring today; early-exercise channel disabled.
 
 # 🗃️ HISTORICAL ARCHIVE — NOT A CURRENT TASK LIST
 
