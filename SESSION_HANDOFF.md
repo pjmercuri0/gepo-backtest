@@ -2,6 +2,15 @@
 
 **Last updated:** 2026-09-13 EDT (§0.39 is the latest state: old canon vs D_ent on the same model-relative fill basis). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
+## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
+
+> Bet the direction the stock is predicted to drift, when that prediction beats the market odds.
+> Favor names where the market's view is high-entropy / low-risk — that's where premium is richer.
+> Take bets where the fill yields positive expected value.
+
+(Mapping to the code: sentence 1 = P_real vs Q via Kelly EV; sentence 2 = the exp(−k·D_ent)
+discount, D_ent = ln3 − H(Q); sentence 3 = the ≥1.00× model execution gate.)
+
 ## 🛑 START HERE — CURRENT OPERATING STATE
 
 This block and the two safety/workflow blocks immediately below it are the authoritative instructions for current work. **Do not infer current tasks from the historical archive later in this file.**
