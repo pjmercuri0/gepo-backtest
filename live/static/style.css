@@ -308,3 +308,6 @@ details.params-fold .params-row { margin-top: 10px; margin-bottom: 0; }
 .ranked-row.held-row.unqualified td, .ranked-row.held-row.unqualified td .pos,
 .ranked-row.held-row.unqualified td .neg { color: #6f8fb0 !important; }
 
+/* Live tab: the + shares the rank cell so it costs no column. */
+#ranked-table td.rank-cell { white-space: nowrap; }
+#ranked-table td.rank-cell .actuals-add { margin-right: 6px; }
