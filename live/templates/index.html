@@ -32,6 +32,7 @@
   <table id="ranked-table">
     <thead>
       <tr>
+        <th title="add this pick to actuals"></th>
         <th>Rank</th>
         <th>Ticker</th>
         <th>Spot</th>
@@ -48,7 +49,7 @@
         <th>Γᵢ</th>
       </tr>
     </thead>
-    <tbody id="ranked-tbody"><tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
+    <tbody id="ranked-tbody"><tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
   </table>
   </div>
 </div>
@@ -304,7 +305,7 @@ function renderTopPicks(picks, maxGround, kVal) {
 function renderRanked(rows, maxGround, kVal) {
   let qualSeen = 0;
   if (!rows || rows.length === 0) {
-    return `<tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
+    return `<tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
   }
   return rows.map((r, i) => {
     // Bright = qualified (GROUND >= threshold AND IBKR credit >= fair value), at any
@@ -320,6 +321,7 @@ function renderRanked(rows, maxGround, kVal) {
     const heldPick = r.held && isPrimary;
     const rowClass = (isPrimary ? "" : " unqualified") + (r.held ? " held-row" : "");
     return `<tr class="ranked-row${rowClass}"${r.held ? ' title="already held in Actuals — IBKR will refuse a second order on the same option"' : ""}>
+      <td><button class="actuals-add" data-url="/api/actuals/from_live/${i}" title="add this pick to actuals">+</button></td>
       <td>${i+1}</td>
       <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> <span class="${heldPick ? "held-tk" : ""}">${r.ticker}</span>${oiWarning(r)}</td>
       <td>${r.entry_price != null ? fmtMoney(r.entry_price) : "—"}</td>
