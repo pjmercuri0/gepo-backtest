@@ -1265,6 +1265,14 @@ def _overlay_stream(payload: dict) -> None:
                 r["quoted_credit"] = r["net_credit"] = q["mid"]
                 r["credit_source"] = "stream_mid"
                 r["quote_ts"] = q["ts"]
+                # The table renders fill_targets[0] (mmCredit/mmMaxLoss), written by
+                # _enrich_payload before this overlay runs -- leaving it stale showed the
+                # scan credit next to a live quote clock (HD 1.16 vs 1.09, 2026-09-16).
+                w = r.get("spread_width")
+                if w:
+                    r["max_loss"] = round(float(w) - q["mid"], 4)
+                    r["fill_targets"] = [{"credit": q["mid"], "max_loss": r["max_loss"]}]
+                    r["credit_ratio"] = round(q["mid"] / r["max_loss"], 4) if r["max_loss"] > 0 else None
                 tg = r.get("credit_targets") or {}
                 wa = tg.get("walkaway_credit")
                 if wa is not None:
