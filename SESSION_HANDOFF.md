@@ -3762,3 +3762,41 @@ Artifacts:
   `python3 research/option_direction_2026_09_16/direction_signal_suite.py --force-chain`.
 
 Do not integrate anything yet.
+
+## 0.49 Direction stacking pass: combinations are stronger than single signals (2026-09-16)
+
+Added `research/option_direction_2026_09_16/direction_signal_stack.py`. It imports the §0.48 feature builders and
+tests walk-forward stacks without touching production:
+- `stack_equal_*`: equal rank-average of signed signals;
+- `stack_weighted_*`: prior-year correlation-weighted rank blend;
+- veto combos: `veto_gex_cp_iv`, `veto_gex_ivresid`, `veto_gex_skewterm`, `veto_top4_bad`.
+
+Signs/weights are fitted only on years before the scored year. 2020 has no prior years, so stack components are neutral.
+
+Gap ON results (`direction_signal_stack.txt`):
+- Base canon: 5,154 trades / $37,047 / full-win 43.89% / profitable 53.10%.
+- Best stack: `veto_gex_cp_iv` bottom-20%:
+  4,587 trades / $41,454 / full-win 46.02% / profitable 54.33%, changing 29.8% of base selections.
+- Next: `veto_gex_skewterm` bottom-20%:
+  4,753 trades / $41,224 / full-win 44.54% / profitable 53.94%, changing 22.9%.
+- Per-year for best stack is uneven: strong 2021/2024/2025, weak-but-positive 2022/2023, 2026 $2,953 vs base 2026 $4,591
+from the gap-on single-signal suite. So this is not a clean live-ready rule yet.
+
+Gap OFF results (`direction_signal_stack_nogap.txt`):
+- Base no-gap: 5,146 trades / $35,027 / full-win 43.55% / profitable 53.07%.
+- Best stack: `veto_top4_bad` bottom-30%:
+  4,193 trades / $38,527 / full-win 46.12% / profitable 54.26%, changing 38.8% of base selections.
+- Next: `veto_gex_cp_iv` bottom-20%:
+  4,563 trades / $38,261 / full-win 45.89% / profitable 54.11%, changing 30.3%.
+- No-gap stack also has uneven year profile: strong 2021/2024/2025/2026, slightly negative 2022/2023. This suggests
+the stack may be selecting a regime/volatility state, not a stable daily directional edge.
+
+Bottom line: stacking produced the first results with the desired +1-2 point full-win lift, and it survives no-gap in
+some forms. But the improvement comes from large vetoes/replacements, not small tilts. Next pass must do:
+date-shuffle null for the stack scores, unchanged/side-flip/replacement decomposition, per-year trade counts and PnL,
+and a focused search over veto thresholds with search-adjusted null.
+
+Artifacts:
+- `direction_signal_stack.py`
+- `direction_signal_stack.txt`, `direction_signal_stack_books.csv`, `direction_signal_stack_years.csv`
+- `direction_signal_stack_nogap.txt`, `direction_signal_stack_books_nogap.csv`, `direction_signal_stack_years_nogap.csv`
