@@ -110,6 +110,44 @@ def p_real_generic(cands, sig_col=None, window=ec.WINDOW):
     return out
 
 
+def p_real_expiry(cands, n_weeks=52):
+    """P_real from ONLY the moves that END on the past n_weeks weekly expiry days (the last
+    session of each ISO week: Friday, or Thursday when Friday is a holiday), each measured over
+    the candidate's own DTE. Causal: only expiries strictly before the entry date."""
+    out = np.full((len(cands), 3), np.nan)
+    Cc = cands.reset_index(drop=True)
+    for tk, g in Cc.groupby('ticker'):
+        s = BY.get(tk)
+        if s is None or len(s) < 60:
+            continue
+        dates = s.date.values.astype('datetime64[ns]'); cl = s.close.values.astype(float)
+        wk = pd.DatetimeIndex(dates).isocalendar()
+        key = (wk.year * 100 + wk.week).values
+        last_of_week = np.r_[key[1:] != key[:-1], True]          # position is the last session of its week
+        pe = np.flatnonzero(last_of_week)                          # expiry positions
+        pos = np.clip(np.searchsorted(dates, g.entry_date.values.astype('datetime64[ns]')), 0, len(cl) - 1)
+        for d in (1, 2, 3, 4):
+            m = (g.DTE.clip(1, 4).astype(int) == d).values
+            if not m.any():
+                continue
+            p0 = pos[m]; sub = g[m]; bp = (sub.spread_type == 'bull_put').values
+            ths = (sub.short_strike.values / sub.entry_price.values - 1)[:, None]
+            thl = (sub.long_strike.values / sub.entry_price.values - 1)[:, None]
+            ne = np.searchsorted(pe, p0)                            # expiries strictly before entry
+            k = (ne - 1)[:, None] - np.arange(n_weeks)[None, :]
+            ok = k >= 0
+            e = pe[np.clip(k, 0, len(pe) - 1)]
+            ok &= (e - d) >= 0
+            r = np.where(ok, cl[e] / cl[np.clip(e - d, 0, None)] - 1.0, np.nan)
+            bs_ = np.where(bp[:, None], r <= ths, r >= ths) & ok
+            bl = np.where(bp[:, None], r <= thl, r >= thl) & ok
+            n = ok.sum(1); ns = bs_.sum(1); nl = bl.sum(1)
+            t = np.column_stack([n - ns + ec.PRIOR, nl + ec.PRIOR, ns - nl + ec.PRIOR]).astype(float)
+            t = t / t.sum(1, keepdims=True); t[n < min(ec.MIN_OBS, n_weeks // 2)] = np.nan   # 120-obs canon floor cannot apply to 52 weekly moves
+            out[sub.index.values] = t
+    return out
+
+
 def rescore(df, P):
     df = df.copy(); df['p'], df['q'], df['ro'] = P[:, 0], P[:, 1], P[:, 2]
     b = df.model_credit.values / (df.width.values - df.model_credit.values)
@@ -130,6 +168,8 @@ def select_book(df):
 
 
 def metrics(sel, label, ref=None, end_year=None):
+    if sel.empty:
+        return dict(variant=label, n=0)
     s = rmc.build_payload(sel, end_year or sel.expiry_date.max().year, label)['summary']
     oc = sel._outcome.value_counts(normalize=True)
     row = dict(variant=label, n=len(sel), win=round(100 * oc.get('WIN', 0), 1), loss=round(100 * oc.get('LOSS', 0), 1),
@@ -145,7 +185,7 @@ def metrics(sel, label, ref=None, end_year=None):
 chk = rescore(C, C[['p', 'q', 'ro']].values)
 log(f'EV reproduction from frame p/q/ro: max |dEV| = {np.nanmax(np.abs(chk.EV - C.EV)):.2e}')
 
-VARIANTS = [('canon (frame p/q/ro)', None), ('exact strikes, daily_closes', None), ('delta-matched, RV20', 'sig_rv'), ('delta-matched, ATM IV', 'sig_iv')]
+VARIANTS = [('canon (frame p/q/ro)', None), ('exact strikes, daily_closes', None), ('delta-matched, RV20', 'sig_rv'), ('delta-matched, ATM IV', 'sig_iv'), ('expiry-matched, 52 weeks', 'exp52'), ('expiry-matched, 104 weeks', 'exp104')]
 P = {v[0]: np.full((len(C), 3), np.nan) for v in VARIANTS}
 P['canon (frame p/q/ro)'] = C[['p', 'q', 'ro']].values.astype(float)
 years = sorted(C.entry_date.dt.year.unique())
@@ -159,6 +199,8 @@ for yr in years:
         P['exact strikes, daily_closes'][idx] = p_real_generic(sub, None)
         P['delta-matched, RV20'][idx] = p_real_generic(sub, 'sig_rv')
         P['delta-matched, ATM IV'][idx] = p_real_generic(sub, 'sig_iv')
+        P['expiry-matched, 52 weeks'][idx] = p_real_expiry(sub, 52)
+        P['expiry-matched, 104 weeks'][idx] = p_real_expiry(sub, 104)
         log(f'{yr}  month {mo:2d}  {100*i/len(months):5.1f}%  ({len(idx):,} candidates)')
     done = C.entry_date.dt.year <= yr
     rows = []; ref = None
@@ -174,7 +216,7 @@ d = np.abs(P['exact strikes, daily_closes'] - P['canon (frame p/q/ro)'])
 log(f'exact-strike recompute vs frame: median |dp| {np.nanmedian(d[:,0]):.4f}, 90th pct {np.nanpercentile(d[:,0], 90):.4f}, NaN rows {np.isnan(P["exact strikes, daily_closes"][:,0]).sum()}')
 out = C[['ticker', 'entry_date', 'expiry_date', 'DTE', 'spread_type', 'short_strike', 'long_strike', 'model_credit', 'D_ent', 'expiry_close']].copy()
 for name, _ in VARIANTS[1:]:
-    tag = {'exact strikes, daily_closes': 'ex', 'delta-matched, RV20': 'rv', 'delta-matched, ATM IV': 'iv'}[name]
+    tag = {'exact strikes, daily_closes': 'ex', 'delta-matched, RV20': 'rv', 'delta-matched, ATM IV': 'iv', 'expiry-matched, 52 weeks': 'e52', 'expiry-matched, 104 weeks': 'e104'}[name]
     out[f'p_{tag}'], out[f'q_{tag}'], out[f'ro_{tag}'] = P[name].T
 out.to_parquet(HERE + f'p_real_delta_matched_{a.win}_{a.closes}.parquet')
 log('done')

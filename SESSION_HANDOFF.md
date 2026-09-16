@@ -1673,6 +1673,21 @@ stays 41-45%, so a spiking IV makes P_real more pessimistic, not more confident.
 "uncharted" case is thin history (a name with few sessions), which is a data-depth issue the
 two-year IBKR seed addresses. §0.41 is CLOSED.
 
+**Expiry-matched P_real (user, 2026-09-15): also tested, also rejected.** P_real from ONLY the
+moves that end on the past 52 (or 104) weekly expiry days (last session of each ISO week: Friday,
+Thursday on holiday Fridays), each over the candidate's own DTE, instead of all 252 overlapping
+daily windows. `p_real_expiry()` in the same script; logs `p_real_expiry_{IS,OOT}_{frame,store}.log`.
+
+| P_real | IS frame | IS full-session | OOT frame | OOT full-session |
+|---|---|---|---|---|
+| canon 252 sessions | 1.35 / DD -14.9% | 1.20 / -15.9% | 2.34 / -6.6% | 1.75 / -10.5% |
+| 52 expiries | 0.89 / -36.3% | 1.18 / -30.0% | 1.92 / -4.5% | 2.42 / -5.3% |
+| 104 expiries | 1.03 / -34.2% | 1.40 / -23.1% | 2.21 / -5.2% | 1.82 / -10.3% |
+
+Pick overlap with canon only 45-49%. 52 observations make P_real noisy and Kelly EV on a noisy
+p picks outliers: the 2022 drawdown blows out to -30..-36% on every series. The one good cell
+(52w OOT full-session) is 583 trades in a window with no 2022. 252 sessions stays canon.
+
 Logs `p_real_delta_matched_{IS,OOT}*.log`; per-candidate p/q/ro for every variant in
 `p_real_delta_matched_{IS,OOT}_{store,frame}.parquet` (gitignored). IS runs in ~2 min, OOT
 in ~15 s, with month progress and a to-date table after every year.
