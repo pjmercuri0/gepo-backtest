@@ -271,7 +271,10 @@ LIVE_ASSIGN_CLIENT_ID       = 193    # avoid 100-109 (fetchers), 110 (combo), 11
 # --- Webapp ---
 WEBAPP_HOST = "127.0.0.1"
 WEBAPP_PORT = 5050
-WEBAPP_POLL_SECONDS = 900         # browser polls /api/latest.json this often
+WEBAPP_POLL_SECONDS = 5           # browser polls /api/latest.json this often. 900 matched the
+                                  # scan cadence; since 2026-09-16 combo_stream.py refreshes the
+                                  # quote and spot every second, so a 15-minute poll showed scan
+                                  # values on a page whose data was seconds old.
                                   # (15 min — matches the fetcher cadence; no
                                   # point polling more often than new data arrives)
 TOP_N_DISPLAY = 5                 # canonical top-N picks

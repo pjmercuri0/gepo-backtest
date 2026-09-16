@@ -592,8 +592,18 @@ async function refresh() {
     }
     // Same tick on the ranked-table label (user 2026-09-14), so the table and the
     // Top-5 cards below it visibly come from the same scan.
+    // Two clocks: the scan tick (what was ranked) and the stream tick (how fresh the
+    // quotes and spot are). They differ by design -- GROUND is from the scan, prices stream.
+    let qStr = "";
+    if (data.stream_ts && data.stream_ts.includes("T")) {
+      qStr = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York", hour: "numeric", minute: "2-digit",
+        second: "2-digit", hour12: true,
+      }).format(new Date(data.stream_ts.slice(0, 19)));
+    }
     document.getElementById("ranked-label").textContent =
-      `All ranked candidates${tickStr ? ` · tick ${tickStr} ET` : ""}`;
+      `All ranked candidates${tickStr ? ` · scan ${tickStr}` : ""}` +
+      (qStr ? ` · quotes ${qStr} ET (live)` : "");
     if (data.frozen) {
       dot.className = "live-dot frozen-dot";
       txt.innerHTML =
