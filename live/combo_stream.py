@@ -28,7 +28,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from ib_insync import IB
+from ib_insync import IB, Stock
 from live import live_config
 from live.combo_quotes import _bag_for
 from live.fetcher import _connect_with_retry
@@ -104,6 +104,7 @@ def main() -> int:
 
     ib = IB()
     subs: dict[str, tuple] = {}          # key -> (bag, ticker)
+    spots: dict[str, tuple] = {}         # symbol -> (contract, ticker)
     try:
         _connect_with_retry(ib, CLIENT_ID)
         ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
@@ -135,7 +136,25 @@ def main() -> int:
                         subs[k] = (bag, ib.reqMktData(bag, "", False, False))
                     except Exception as e:
                         print(f"[combo_stream] subscribe failed {k}: {e}", flush=True)
-                print(f"[combo_stream] holding {len(subs)} subscriptions", flush=True)
+                # Underlying spot too (2026-09-16): the page colours pin/status and shows
+                # the cushion off spot, so a streaming credit beside a scan-old spot reads
+                # inconsistently. One line per distinct ticker.
+                want_syms = {r["ticker"] for r in board}
+                for sym in list(spots):
+                    if sym not in want_syms:
+                        c, _t = spots.pop(sym)
+                        try: ib.cancelMktData(c)
+                        except Exception: pass
+                for sym in want_syms:
+                    if sym in spots:
+                        continue
+                    try:
+                        c = Stock(sym, "SMART", "USD")
+                        if ib.qualifyContracts(c):
+                            spots[sym] = (c, ib.reqMktData(c, "", False, False))
+                    except Exception as e:
+                        print(f"[combo_stream] spot subscribe failed {sym}: {e}", flush=True)
+                print(f"[combo_stream] holding {len(subs)} combos, {len(spots)} spots", flush=True)
 
             ib.sleep(WRITE_S)
             ts = datetime.now().isoformat(timespec="seconds")
@@ -149,7 +168,13 @@ def main() -> int:
                 quotes[k] = {"bid": float(bid), "ask": float(ask),
                              "mid": round(-(float(bid) + float(ask)) / 2.0, 4),
                              "last": (float(last) if ok(last) else None), "ts": ts}
-            _atomic(OUT, {"ts": ts, "n": len(quotes), "held": len(subs), "quotes": quotes})
+            sp = {}
+            for sym, (_c, t) in spots.items():
+                v = t.last if (t.last is not None and t.last == t.last and t.last != 0) else t.close
+                if v is not None and v == v and v != 0:
+                    sp[sym] = round(float(v), 4)
+            _atomic(OUT, {"ts": ts, "n": len(quotes), "held": len(subs),
+                          "quotes": quotes, "spots": sp})
             last_pub = _publish(last_pub)
     except KeyboardInterrupt:
         pass
@@ -157,6 +182,9 @@ def main() -> int:
         try:
             for _k, (bag, _t) in subs.items():
                 try: ib.cancelMktData(bag)
+                except Exception: pass
+            for _s, (c, _t) in spots.items():
+                try: ib.cancelMktData(c)
                 except Exception: pass
             if ib.isConnected():
                 ib.disconnect()
