@@ -1,0 +1,74 @@
+signal,status,year,coverage,raw_spearman,wf_spearman,wf_sign,note
+skew25_level,backtested,2020.0,0.8174936921783011,-0.10391373424851907,,0.0,-put-call 25d IV skew
+skew25_level,backtested,2021.0,0.7892516794250898,-0.03560726723921912,0.03560726723921912,-1.0,-put-call 25d IV skew
+skew25_level,backtested,2022.0,0.7910814606741573,0.023500488303338306,-0.023500488303338306,-1.0,-put-call 25d IV skew
+skew25_level,backtested,2023.0,0.765933892139807,0.00017017797350867947,,0.0,-put-call 25d IV skew
+skew25_level,backtested,2024.0,0.7449784258294897,-0.047829624047243266,-0.047829624047243266,1.0,-put-call 25d IV skew
+skew25_level,backtested,2025.0,0.7953657901588128,-0.03089408413386984,,0.0,-put-call 25d IV skew
+skew25_level,backtested,2026.0,0.574585635359116,0.07924211199463665,-0.07924211199463665,-1.0,-put-call 25d IV skew
+skew25_change,backtested,2020.0,0.5197645079899075,-0.03141712059813412,,0.0,-daily change in 25d skew on same expiry
+skew25_change,backtested,2021.0,0.49461021715356973,-0.039222846050841816,0.039222846050841816,-1.0,-daily change in 25d skew on same expiry
+skew25_change,backtested,2022.0,0.41245318352059923,0.014278842377207971,-0.014278842377207971,-1.0,-daily change in 25d skew on same expiry
+skew25_change,backtested,2023.0,0.35426221730191365,-0.0014134100686332223,0.0014134100686332223,-1.0,-daily change in 25d skew on same expiry
+skew25_change,backtested,2024.0,0.34384764171998217,0.011113949251788414,-0.011113949251788414,-1.0,-daily change in 25d skew on same expiry
+skew25_change,backtested,2025.0,0.4064045821400677,-0.013800424269578362,0.013800424269578362,-1.0,-daily change in 25d skew on same expiry
+skew25_change,backtested,2026.0,0.4165745856353591,-0.010727874980491218,0.010727874980491218,-1.0,-daily change in 25d skew on same expiry
+same_strike_cp_iv,backtested,2020.0,0.9974768713204374,0.0633948569182168,,0.0,-median same-strike put-call IV gap near ATM
+same_strike_cp_iv,backtested,2021.0,0.9973441649742227,0.029198171568623102,0.029198171568623102,1.0,-median same-strike put-call IV gap near ATM
+same_strike_cp_iv,backtested,2022.0,0.9984784644194756,0.008940590121675434,0.008940590121675434,1.0,-median same-strike put-call IV gap near ATM
+same_strike_cp_iv,backtested,2023.0,0.9958880278348885,0.023476696825900978,0.023476696825900978,1.0,-median same-strike put-call IV gap near ATM
+same_strike_cp_iv,backtested,2024.0,0.9950900163666121,0.029808009210735512,0.029808009210735512,1.0,-median same-strike put-call IV gap near ATM
+same_strike_cp_iv,backtested,2025.0,0.9967456391564696,0.02369770212655039,0.02369770212655039,1.0,-median same-strike put-call IV gap near ATM
+same_strike_cp_iv,backtested,2026.0,0.6955801104972376,0.0074984673041838,0.0074984673041838,1.0,-median same-strike put-call IV gap near ATM
+dealer_gex,backtested,2020.0,1.0,-0.04715167225647779,,0.0,"signed gamma*OI imbalance, sign fit walk-forward"
+dealer_gex,backtested,2021.0,1.0,-0.10798306704176339,0.10798306704176339,-1.0,"signed gamma*OI imbalance, sign fit walk-forward"
+dealer_gex,backtested,2022.0,1.0,0.0028702473464622368,-0.0028702473464622368,-1.0,"signed gamma*OI imbalance, sign fit walk-forward"
+dealer_gex,backtested,2023.0,1.0,0.046578741673844806,-0.046578741673844806,-1.0,"signed gamma*OI imbalance, sign fit walk-forward"
+dealer_gex,backtested,2024.0,1.0,-0.036549335048655054,0.036549335048655054,-1.0,"signed gamma*OI imbalance, sign fit walk-forward"
+dealer_gex,backtested,2025.0,1.0,-0.021739607425577335,0.021739607425577335,-1.0,"signed gamma*OI imbalance, sign fit walk-forward"
+dealer_gex,backtested,2026.0,0.6968692449355433,0.06150417487897124,-0.06150417487897124,-1.0,"signed gamma*OI imbalance, sign fit walk-forward"
+oi_pin,backtested,2020.0,0.8099243061396131,-0.04342358307932498,,0.0,"direction toward max-OI strike, normalized by ATM vol move"
+oi_pin,backtested,2021.0,0.7790970160912357,0.002425572067379494,-0.002425572067379494,-1.0,"direction toward max-OI strike, normalized by ATM vol move"
+oi_pin,backtested,2022.0,0.8259597378277154,-0.015476688807970894,0.015476688807970894,-1.0,"direction toward max-OI strike, normalized by ATM vol move"
+oi_pin,backtested,2023.0,0.7660920449153883,-0.06292712315989074,0.06292712315989074,-1.0,"direction toward max-OI strike, normalized by ATM vol move"
+oi_pin,backtested,2024.0,0.7787531617318851,0.021432919557095767,-0.021432919557095767,-1.0,"direction toward max-OI strike, normalized by ATM vol move"
+oi_pin,backtested,2025.0,0.8186670137984899,-0.00035870493361094485,0.00035870493361094485,-1.0,"direction toward max-OI strike, normalized by ATM vol move"
+oi_pin,backtested,2026.0,0.5834254143646409,-0.006334545629266582,0.006334545629266582,-1.0,"direction toward max-OI strike, normalized by ATM vol move"
+oi_pressure_change,backtested,2020.0,0.6757779646761984,0.009488804582542502,,0.0,daily change in call OI minus put OI near 20-60 delta
+oi_pressure_change,backtested,2021.0,0.6694266520856116,0.003194416996980444,0.003194416996980444,1.0,daily change in call OI minus put OI near 20-60 delta
+oi_pressure_change,backtested,2022.0,0.5888342696629213,-0.030500453045154217,-0.030500453045154217,1.0,daily change in call OI minus put OI near 20-60 delta
+oi_pressure_change,backtested,2023.0,0.510042701249407,-0.020536302845879036,0.020536302845879036,-1.0,daily change in call OI minus put OI near 20-60 delta
+oi_pressure_change,backtested,2024.0,0.5200119029906264,0.011109062110094726,-0.011109062110094726,-1.0,daily change in call OI minus put OI near 20-60 delta
+oi_pressure_change,backtested,2025.0,0.5633949492319709,0.014663295221787546,-0.014663295221787546,-1.0,daily change in call OI minus put OI near 20-60 delta
+oi_pressure_change,backtested,2026.0,0.5397790055248619,-0.030710554126209197,0.030710554126209197,-1.0,daily change in call OI minus put OI near 20-60 delta
+atm_term_inversion,backtested,2020.0,0.16694701429772918,-0.04441163196448294,,0.0,front ATM IV minus next-expiry ATM IV
+atm_term_inversion,backtested,2021.0,0.1790345258553351,-0.021396211914693458,0.021396211914693458,-1.0,front ATM IV minus next-expiry ATM IV
+atm_term_inversion,backtested,2022.0,0.10486891385767791,0.06560448611755429,-0.06560448611755429,-1.0,front ATM IV minus next-expiry ATM IV
+atm_term_inversion,backtested,2023.0,0.11798197058358374,0.08632815905610962,-0.08632815905610962,-1.0,front ATM IV minus next-expiry ATM IV
+atm_term_inversion,backtested,2024.0,0.1309328968903437,0.07330796668103869,-0.07330796668103869,-1.0,front ATM IV minus next-expiry ATM IV
+atm_term_inversion,backtested,2025.0,0.12288466545170529,0.13886283571630204,-0.13886283571630204,-1.0,front ATM IV minus next-expiry ATM IV
+atm_term_inversion,backtested,2026.0,0.23904235727440148,-0.03293338367831339,-0.03293338367831339,1.0,front ATM IV minus next-expiry ATM IV
+skew_term_structure,backtested,2020.0,0.16400336417157274,-0.03393739521823196,,0.0,front 25d skew minus next-expiry 25d skew
+skew_term_structure,backtested,2021.0,0.1659115763162006,-0.012404455629467279,0.012404455629467279,-1.0,front 25d skew minus next-expiry 25d skew
+skew_term_structure,backtested,2022.0,0.10323033707865169,0.02474575287031445,-0.02474575287031445,-1.0,front 25d skew minus next-expiry 25d skew
+skew_term_structure,backtested,2023.0,0.11149770678475407,-0.03312934498638293,0.03312934498638293,-1.0,front 25d skew minus next-expiry 25d skew
+skew_term_structure,backtested,2024.0,0.1239398898973367,0.04017934220462995,-0.04017934220462995,-1.0,front 25d skew minus next-expiry 25d skew
+skew_term_structure,backtested,2025.0,0.11936995574069253,-0.06029345945074979,,0.0,front 25d skew minus next-expiry 25d skew
+skew_term_structure,backtested,2026.0,0.22596685082872928,-0.0011742397843664215,0.0011742397843664215,-1.0,front 25d skew minus next-expiry 25d skew
+smile_slope,backtested,2020.0,1.0,-0.12515393428845706,,0.0,quadratic smile c1 from canon fit
+smile_slope,backtested,2021.0,1.0,-0.1293002754123503,0.1293002754123503,-1.0,quadratic smile c1 from canon fit
+smile_slope,backtested,2022.0,1.0,-0.026575852832915737,0.026575852832915737,-1.0,quadratic smile c1 from canon fit
+smile_slope,backtested,2023.0,1.0,-0.008895880564956596,0.008895880564956596,-1.0,quadratic smile c1 from canon fit
+smile_slope,backtested,2024.0,1.0,-0.1045785947060426,0.1045785947060426,-1.0,quadratic smile c1 from canon fit
+smile_slope,backtested,2025.0,1.0,-0.05697482488452192,0.05697482488452192,-1.0,quadratic smile c1 from canon fit
+smile_slope,backtested,2026.0,1.0,0.04583013331518548,-0.04583013331518548,-1.0,quadratic smile c1 from canon fit
+iv_price_residual,backtested,2020.0,0.6417157275021026,0.07700661214249292,,0.0,ATM IV change residual after same-day stock return
+iv_price_residual,backtested,2021.0,0.6200593657241056,-0.024802907907572273,-0.024802907907572273,1.0,ATM IV change residual after same-day stock return
+iv_price_residual,backtested,2022.0,0.6741573033707865,0.03204242505441678,0.03204242505441678,1.0,ATM IV change residual after same-day stock return
+iv_price_residual,backtested,2023.0,0.6054088249248775,0.0025272532929202503,0.0025272532929202503,1.0,ATM IV change residual after same-day stock return
+iv_price_residual,backtested,2024.0,0.6067549471804791,-0.028263203499068898,-0.028263203499068898,1.0,ATM IV change residual after same-day stock return
+iv_price_residual,backtested,2025.0,0.6477479822962771,-0.002890959277223959,-0.002890959277223959,1.0,ATM IV change residual after same-day stock return
+iv_price_residual,backtested,2026.0,0.676427255985267,0.06677343258296077,0.06677343258296077,1.0,ATM IV change residual after same-day stock return
+earnings_event_skew,not_backtested,,,,,,local earnings calendar lacks 2020-2025 coverage
+live_volume_flow,live_only,,,,,,"requires live option volume history, absent in backtest"
+live_quote_size_imbalance,live_only,,,,,,"requires live bid/ask sizes, absent in backtest"

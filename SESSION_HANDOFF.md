@@ -3700,3 +3700,55 @@ Artifacts:
 
 Next best tests: same-strike call-put IV residual, then new-OI repricing. Avoid spending more time on raw
 same-expiry 25-delta put-call skew unless a materially different causal definition is proposed.
+
+## 0.48 Option-direction bakeoff: 10-signal suite coded and run (2026-09-16)
+
+User pushed back correctly: testing only one idea was not enough. Added
+`research/option_direction_2026_09_16/direction_signal_suite.py` and ran the broader bakeoff.
+
+What the suite does:
+- builds `chain_direction_features.parquet` from the yearly vendor option files, restricted to candidate names/dates
+  but including all expiries up to DTE 45 so term-structure signals have a next expiry;
+- recomputes the current canon P_real/GROUND from `ent_canon.py`;
+- evaluates historically available option-market signals with walk-forward sign fitting;
+- compares each signal via pooled rank correlation to expiry return plus two overlays on the current book:
+  `tilt10` and `veto_bottom20`.
+
+Backtested signals in this pass:
+1. 25d put-call skew level.
+2. 25d skew change.
+3. Same-strike near-ATM put-call IV gap.
+4. Dealer GEX proxy from signed gamma*OI.
+5. Max-OI pin direction.
+6. Call-minus-put OI pressure change.
+7. Front ATM IV vs next-expiry ATM IV.
+8. Front skew vs next-expiry skew.
+9. Canon smile slope `c1`.
+10. ATM IV change residual after same-day stock return.
+
+Not truly backtestable from current local history:
+- earnings event skew: local `data/earnings_calendar.csv` only covers 2026;
+- live option volume flow and live quote-size imbalance: no historical option volume or size fields in the backtest.
+
+Headline result: the only overlay that beat the base selected book was **dealer_gex / veto_bottom20**.
+Base canon: 5,154 trades / $37,047 / full-win 43.89% / profitable 53.10%.
+Dealer GEX veto bottom 20%: 4,749 trades / $40,444 / full-win 44.41% / profitable 53.65%, changing 23.6% of base selections.
+This is a candidate worth a stricter second pass: date-shuffle null, per-year deltas, and decomposition into unchanged/side-flip/replacement.
+
+Other notes:
+- `smile_slope` had the best mean walk-forward Spearman (0.0467 across 2021-2026), but both overlays lost money vs base;
+  the strong rank correlation did not convert to selection improvement under the simple tilt/veto tested here.
+- `same_strike_cp_iv` was positive in rank diagnostics, but overlays lost vs base; possible second-pass with a better integration rule, not production.
+- `skew_term_structure` veto was near-flat/slightly positive ($37,099 vs $37,047) but tiny edge and low coverage.
+- raw `skew25_level` remained bad, consistent with §0.47.
+
+Artifacts:
+- `direction_signal_suite.py`: suite.
+- `direction_signal_suite.txt`: full report.
+- `direction_signal_summary.csv`: year-level diagnostics.
+- `direction_signal_books.csv`: selected-book overlays.
+- `chain_direction_features.parquet`: derived cache, safe to regenerate with
+  `python3 research/option_direction_2026_09_16/direction_signal_suite.py --force-chain`.
+
+Do not integrate anything yet. Next step should be a focused dealer-GEX validation with date-shuffled null and
+per-year selected-book decomposition.
