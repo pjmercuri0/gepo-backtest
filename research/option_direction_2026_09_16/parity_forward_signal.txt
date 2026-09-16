@@ -1,0 +1,94 @@
+parity forward signal
+feature rows: 33,282
+
+Top books
+        n        pnl  full_win  profitable      days               signal     rule
+4955.0000 40907.6000    0.4523      0.5425 1144.0000       parity_balance veto0.05
+4990.0000 40493.1900    0.4435      0.5345 1151.0000   parity_balance_chg  veto0.2
+4901.0000 39762.0800    0.4422      0.5330 1148.0000   parity_balance_chg  veto0.3
+5030.0000 39160.9650    0.4416      0.5336 1151.0000   parity_balance_chg veto0.15
+5115.0000 39145.3000    0.4414      0.5333 1152.0000   parity_balance_chg veto0.05
+5154.0000 39088.4700    0.4404      0.5320 1155.0000 parity_fwd_slope_chg  tilt0.5
+4871.0000 38787.4550    0.4584      0.5424 1142.0000         parity_fwd_z veto0.05
+5154.0000 38773.5150    0.4397      0.5326 1155.0000   parity_balance_chg  tilt0.5
+5154.0000 38459.1050    0.4402      0.5322 1155.0000 parity_fwd_slope_chg  tilt0.2
+4841.0000 38430.2500    0.4524      0.5404 1139.0000       parity_balance  veto0.1
+4917.0000 38417.6950    0.4503      0.5396 1145.0000     parity_fwd_slope veto0.05
+5082.0000 38269.0700    0.4412      0.5321 1154.0000 parity_fwd_slope_chg veto0.05
+5154.0000 38172.5600    0.4399      0.5318 1155.0000 parity_fwd_slope_chg  tilt0.1
+5154.0000 37946.9750    0.4393      0.5324 1155.0000   parity_balance_chg  tilt0.2
+5154.0000 37876.6800    0.4393      0.5318 1155.0000   parity_balance_chg  tilt0.1
+5097.0000 37768.9900    0.4397      0.5327 1154.0000       parity_fwd_iqr veto0.05
+5154.0000 37579.9800    0.4393      0.5312 1155.0000 parity_fwd_slope_chg tilt0.05
+5075.0000 37564.0100    0.4404      0.5322 1151.0000   parity_balance_chg  veto0.1
+5030.0000 37437.6000    0.4408      0.5338 1153.0000       parity_fwd_iqr veto0.15
+5154.0000 37322.1450    0.4393      0.5312 1155.0000     parity_fwd_z_chg tilt0.05
+5154.0000 37290.4950    0.4391      0.5314 1155.0000     parity_fwd_z_chg  tilt0.1
+4981.0000 37185.0550    0.4423      0.5314 1149.0000 parity_fwd_slope_chg veto0.15
+4993.0000 37180.0950    0.4398      0.5341 1151.0000       parity_fwd_iqr  veto0.2
+5154.0000 37125.0400    0.4391      0.5316 1155.0000   parity_balance_chg tilt0.05
+5154.0000 37083.6850    0.4383      0.5305 1155.0000     parity_fwd_z_chg  tilt0.5
+5154.0000 37075.1800    0.4387      0.5312 1155.0000       parity_balance tilt0.05
+4935.0000 37064.3050    0.4407      0.5297 1150.0000     parity_fwd_z_chg  veto0.2
+5032.0000 37056.4850    0.4416      0.5310 1153.0000 parity_fwd_slope_chg  veto0.1
+5154.0000 37047.5250    0.4389      0.5310 1155.0000                 BASE    canon
+5154.0000 36947.6350    0.4397      0.5320 1155.0000       parity_balance  tilt0.2
+
+Year diagnostics
+              signal  year  coverage  spearman
+        parity_fwd_z  2020    0.9987       NaN
+        parity_fwd_z  2021    0.9995    0.0393
+        parity_fwd_z  2022    0.9999    0.0369
+        parity_fwd_z  2023    0.9987    0.0257
+        parity_fwd_z  2024    0.9987    0.0174
+        parity_fwd_z  2025    0.9987    0.0281
+        parity_fwd_z  2026    0.6961    0.0436
+    parity_fwd_slope  2020    0.9987       NaN
+    parity_fwd_slope  2021    0.9995    0.0201
+    parity_fwd_slope  2022    0.9999    0.0111
+    parity_fwd_slope  2023    0.9987   -0.0043
+    parity_fwd_slope  2024    0.9987    0.0157
+    parity_fwd_slope  2025    0.9987    0.0114
+    parity_fwd_slope  2026    0.6961   -0.0253
+      parity_fwd_iqr  2020    0.9987       NaN
+      parity_fwd_iqr  2021    0.9995   -0.0005
+      parity_fwd_iqr  2022    0.9999       NaN
+      parity_fwd_iqr  2023    0.9987   -0.0241
+      parity_fwd_iqr  2024    0.9987       NaN
+      parity_fwd_iqr  2025    0.9987    0.0055
+      parity_fwd_iqr  2026    0.6961    0.0418
+      parity_balance  2020    0.9987       NaN
+      parity_balance  2021    0.9995   -0.0100
+      parity_balance  2022    0.9999       NaN
+      parity_balance  2023    0.9987    0.0059
+      parity_balance  2024    0.9987    0.0295
+      parity_balance  2025    0.9987    0.0301
+      parity_balance  2026    0.6961    0.0352
+   parity_oi_balance  2020    0.9987       NaN
+   parity_oi_balance  2021    0.9995   -0.0447
+   parity_oi_balance  2022    0.9999   -0.0383
+   parity_oi_balance  2023    0.9987    0.0673
+   parity_oi_balance  2024    0.9987    0.0024
+   parity_oi_balance  2025    0.9987   -0.0279
+   parity_oi_balance  2026    0.6961    0.0585
+    parity_fwd_z_chg  2020    0.5446       NaN
+    parity_fwd_z_chg  2021    0.5368    0.0140
+    parity_fwd_z_chg  2022    0.5878   -0.0256
+    parity_fwd_z_chg  2023    0.5093       NaN
+    parity_fwd_z_chg  2024    0.5193       NaN
+    parity_fwd_z_chg  2025    0.5629    0.0140
+    parity_fwd_z_chg  2026    0.4105    0.0020
+parity_fwd_slope_chg  2020    0.5446       NaN
+parity_fwd_slope_chg  2021    0.5368   -0.0124
+parity_fwd_slope_chg  2022    0.5878   -0.0044
+parity_fwd_slope_chg  2023    0.5093       NaN
+parity_fwd_slope_chg  2024    0.5193   -0.0164
+parity_fwd_slope_chg  2025    0.5629    0.0164
+parity_fwd_slope_chg  2026    0.4105   -0.0273
+  parity_balance_chg  2020    0.5446       NaN
+  parity_balance_chg  2021    0.5368   -0.0129
+  parity_balance_chg  2022    0.5878   -0.0005
+  parity_balance_chg  2023    0.5093       NaN
+  parity_balance_chg  2024    0.5193       NaN
+  parity_balance_chg  2025    0.5629    0.0273
+  parity_balance_chg  2026    0.4105    0.0275
