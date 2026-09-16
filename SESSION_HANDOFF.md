@@ -59,6 +59,9 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - **Run `research/dkl_2026_09_13/ablate_k.py` on the MacBook** (§0.37). It is the only real
   test of whether the D_ent penalty earns its place; it needs `featATM6.parquet`, which is
   not on the Mac mini.
+- **Directional win-rate work is the next research push (§0.44)**, for the MacBook: validate
+  IV skew on 2020-25 (§0.19) and test a spike-reversal filter. Win rate is exactly
+  delta-implied today, and +1pt of win rate is worth more than +1% of fill credit.
 - **The open research task is §0.19: IV skew as a directional feature.** It is measured
   and significant on 2026 OOT and NOT yet validated on 2020-2025. Nothing in canon uses it.
 - Assignment/pin monitoring was rebuilt on 2026-09-11 (§0.18). The Actuals tab shows ONE
@@ -1815,6 +1818,80 @@ admits a holiday-shifted same-week expiry. Applies to the fetcher's chain reques
 `git pull`. Offline on `live/snapshots/2026-08-19/1531` with a full-session test store: 4 qualified
 (RTX, ISRG, MS, FCX) vs 2 under the old cell — the lower threshold passes more names; the 1.00x execution
 gate still applies on top. Expect ~15% more picks/day.
+
+## 0.44 NEXT RESEARCH: directional win-rate work (2026-09-16) — for the MacBook
+
+**Why this is the lever.** Win rate is exactly delta-implied: 43.8% actual against
+45.0% implied on the 4,552-trade IS book. There is no directional information in the
+picks today. On a near-1:1 payoff (avg WIN +$79.43, avg LOSS -$69.20 per contract),
+moving **1% of trades from LOSS to WIN is worth ~$13,500 at qty 2** — slightly MORE
+than 1% of fill credit (~$11,600). A +3pt win rate roughly doubles the edge.
+
+Realistic target is +2-3 points, not +10. The goal is removing obvious bad setups,
+not calling direction.
+
+### Already ON — do not "fix" these
+
+Verified from a live scan log 2026-09-16, not from a grep:
+
+- **Earnings gate is LIVE** at `live/ranker.py:242` (its own block, reads
+  `data/earnings_calendar.csv`). It dropped 2 candidates on every scan that day.
+  `spreads.EARNINGS_FILTER = False` is the BACKTEST flag, flipped by `run.py` — it
+  does NOT describe live behaviour. Calendar refreshes Fridays 17:01
+  (`cron_calendar_refresh.sh`); thin in September by nature (7 names), fills out
+  mid-October.
+- **Ex-div gate** is live in the same path (drops 5-12 candidates a scan).
+
+### 1. IV skew / 25-delta risk reversal — HIGHEST PRIORITY
+
+Already written up in §0.19: measured and significant on 2026 OOT, **never validated
+on 2020-2025**, nothing in canon uses it. That validation is the single highest-value
+piece of directional work outstanding and the frame to run it on already exists.
+
+Run it as §0.19 specifies, then the test that section never got: **incremental lift
+over GROUND**, i.e. does skew add anything once GROUND has already ranked, or is it
+picking the same trades? Report win rate and per-trade P&L for the current canon vs
+canon+skew on IS and OOT separately.
+
+### 2. Spike-reversal filter — cheap, mechanical, motivated by a real loss
+
+**The observation (2026-09-16).** The whole energy complex jumped ~3% on 09-15 and
+fully round-tripped the next day: EOG 148.54 -> 153.74 -> 145.12 (-5.6% intraday,
+below where it started two days earlier), XOM -3.2%, CVX -2.7%. The book had sold EOG
+152.5/150 puts near the top; that position went to max loss.
+
+**Rule to test:** skip a `bull_put` when the underlying's prior-session move was
+> k sigma IN YOUR FAVOUR (up), and a `bear_call` when it was > k sigma down.
+Sigma = the same trailing-20d realized vol the strike band already uses. Sweep
+k in {1.0, 1.5, 2.0, 2.5} and also test "no filter" as the control.
+
+Data needed: `output/ibkr_closes.parquet` live, the full-session close series in the
+backtest (`ent_canon.backtest_closes()`, §0.43). Report trades dropped, win rate
+delta, per-trade P&L delta, IS and OOT separately. Reject unless it holds in BOTH —
+§0.41/§0.42 is the cautionary tale: delta-matched P_real won one window, lost the
+other, and was correctly rejected as noise.
+
+### 3. Sector relative strength — same motivation, broader
+
+The EOG loss was sector-wide, not idiosyncratic: three energy names moved together
+both days. A per-sector one-day move (or the sector ETF: XLE, XLF, XLK, XLV ...) is
+the natural generalisation of #2 and would catch the case where the individual name's
+move looks unremarkable but the whole sector just spiked. Needs a sector map, which
+the repo does not currently carry.
+
+### Explicitly NOT worth testing
+
+- **Short-horizon price momentum** on large caps at 1-4 DTE. §0.19 already ranked
+  RM_20 / MOM_5 below skew, and at this horizon it is mostly noise.
+- **The regime gate** (SPY vs 100d SMA). Too slow for a 2-day holding period; it is
+  already OFF live and the books show no benefit.
+
+### Context for judging any result
+
+The current environment is paying less than the backtest period: live model
+credit/width is **0.469 against the backtest's 0.502** (§0.38), and that ~3-point gap
+is roughly the entire edge. A directional improvement that only shows up in a rich-
+premium regime is not a result. Test both windows, always.
 
 # 🗃️ HISTORICAL ARCHIVE — NOT A CURRENT TASK LIST
 
