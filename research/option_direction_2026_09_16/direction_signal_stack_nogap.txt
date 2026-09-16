@@ -1,0 +1,163 @@
+direction signal stack
+own_gap_drift: off
+candidate rows: 43,479
+
+Top stack overlays
+        n        pnl  full_win  profitable      days               stack       overlay  changed_vs_base
+4193.0000 38527.4550    0.4612      0.5426 1104.0000       veto_top4_bad veto_bottom30           0.3875
+4563.0000 38261.2150    0.4589      0.5411 1130.0000      veto_gex_cp_iv veto_bottom20           0.3032
+4974.0000 37436.1100    0.4423      0.5360 1151.0000   veto_gex_skewterm veto_bottom10           0.1183
+5146.0000 36653.4000    0.4368      0.5328 1157.0000   veto_gex_skewterm        tilt10           0.0159
+4835.0000 36541.6250    0.4538      0.5384 1141.0000      veto_gex_cp_iv veto_bottom10           0.1939
+5146.0000 36219.9950    0.4366      0.5323 1157.0000   veto_gex_skewterm         tilt5           0.0085
+5146.0000 36218.8200    0.4372      0.5321 1157.0000      veto_gex_cp_iv        tilt20           0.0260
+5146.0000 36213.8550    0.4363      0.5321 1157.0000    stack_equal_core        tilt10           0.0150
+5146.0000 36203.7850    0.4363      0.5323 1157.0000    stack_equal_core         tilt5           0.0089
+5146.0000 36164.3950    0.4372      0.5328 1157.0000      veto_gex_cp_iv        tilt10           0.0155
+5146.0000 36113.8300    0.4366      0.5319 1157.0000       veto_top4_bad        tilt20           0.0276
+5146.0000 35843.3400    0.4357      0.5319 1157.0000     stack_equal_all        tilt10           0.0152
+5146.0000 35749.4550    0.4359      0.5319 1157.0000      veto_gex_cp_iv         tilt5           0.0078
+5146.0000 35728.6500    0.4365      0.5315 1157.0000   veto_gex_skewterm        tilt20           0.0272
+5146.0000 35658.0300    0.4361      0.5315 1157.0000     stack_equal_all         tilt5           0.0080
+4458.0000 35602.8100    0.4441      0.5334 1132.0000   veto_gex_skewterm veto_bottom30           0.3180
+5146.0000 35597.0450    0.4355      0.5311 1157.0000  stack_weighted_all         tilt5           0.0074
+5146.0000 35511.4800    0.4363      0.5321 1157.0000    veto_gex_ivresid         tilt5           0.0084
+5146.0000 35469.8050    0.4359      0.5309 1157.0000    veto_gex_ivresid        tilt20           0.0280
+4641.0000 35403.1150    0.4415      0.5335 1136.0000    veto_gex_ivresid veto_bottom20           0.2352
+5146.0000 35319.1650    0.4357      0.5317 1157.0000       veto_top4_bad         tilt5           0.0064
+5146.0000 35277.8400    0.4355      0.5309 1157.0000 stack_weighted_core         tilt5           0.0072
+5146.0000 35200.5950    0.4355      0.5317 1157.0000    veto_gex_ivresid        tilt10           0.0165
+5146.0000 35183.1650    0.4351      0.5307 1157.0000 stack_weighted_core        tilt10           0.0142
+5146.0000 35147.8950    0.4361      0.5311 1157.0000    stack_equal_core        tilt20           0.0311
+
+Per-year books for top overlays
+       n        pnl  full_win  profitable     days             stack       overlay  year
+355.0000  4645.0700    0.4507      0.5549  81.0000     veto_top4_bad veto_bottom30  2020
+731.0000  8559.9150    0.5048      0.5705 182.0000     veto_top4_bad veto_bottom30  2021
+703.0000   -72.8950    0.4253      0.5121 191.0000     veto_top4_bad veto_bottom30  2022
+428.0000  -961.8500    0.3949      0.4626 156.0000     veto_top4_bad veto_bottom30  2023
+761.0000 13297.0600    0.4862      0.5782 190.0000     veto_top4_bad veto_bottom30  2024
+691.0000  9288.2250    0.4891      0.5745 185.0000     veto_top4_bad veto_bottom30  2025
+524.0000  3771.9300    0.4370      0.5076 119.0000     veto_top4_bad veto_bottom30  2026
+355.0000  4645.0700    0.4507      0.5549  81.0000    veto_gex_cp_iv veto_bottom20  2020
+794.0000  7902.0800    0.5000      0.5617 189.0000    veto_gex_cp_iv veto_bottom20  2021
+767.0000   -30.9750    0.4263      0.5085 191.0000    veto_gex_cp_iv veto_bottom20  2022
+490.0000  -537.8050    0.4041      0.4735 168.0000    veto_gex_cp_iv veto_bottom20  2023
+820.0000 13733.9450    0.4915      0.5829 192.0000    veto_gex_cp_iv veto_bottom20  2024
+757.0000  9198.7750    0.4795      0.5654 189.0000    veto_gex_cp_iv veto_bottom20  2025
+580.0000  3350.1250    0.4241      0.5138 120.0000    veto_gex_cp_iv veto_bottom20  2026
+355.0000  4645.0700    0.4507      0.5549  81.0000 veto_gex_skewterm veto_bottom10  2020
+850.0000  6936.9400    0.4647      0.5529 191.0000 veto_gex_skewterm veto_bottom10  2021
+832.0000  2162.5700    0.4303      0.5204 194.0000 veto_gex_skewterm veto_bottom10  2022
+615.0000   905.1250    0.4098      0.4813 181.0000 veto_gex_skewterm veto_bottom10  2023
+898.0000 10426.9800    0.4555      0.5579 195.0000 veto_gex_skewterm veto_bottom10  2024
+839.0000  7642.4550    0.4505      0.5495 189.0000 veto_gex_skewterm veto_bottom10  2025
+585.0000  4716.9700    0.4239      0.5265 120.0000 veto_gex_skewterm veto_bottom10  2026
+355.0000  4645.0700    0.4507      0.5549  81.0000 veto_gex_skewterm        tilt10  2020
+880.0000  6456.2100    0.4489      0.5455 192.0000 veto_gex_skewterm        tilt10  2021
+872.0000  2940.3500    0.4323      0.5206 196.0000 veto_gex_skewterm        tilt10  2022
+656.0000  1206.2100    0.4055      0.4787 183.0000 veto_gex_skewterm        tilt10  2023
+923.0000  9609.6950    0.4464      0.5547 196.0000 veto_gex_skewterm        tilt10  2024
+866.0000  6984.9250    0.4469      0.5450 189.0000 veto_gex_skewterm        tilt10  2025
+594.0000  4810.9400    0.4226      0.5269 120.0000 veto_gex_skewterm        tilt10  2026
+355.0000  4645.0700    0.4507      0.5549  81.0000    veto_gex_cp_iv veto_bottom10  2020
+834.0000  8004.4950    0.4868      0.5576 190.0000    veto_gex_cp_iv veto_bottom10  2021
+819.0000  1186.6500    0.4322      0.5165 193.0000    veto_gex_cp_iv veto_bottom10  2022
+558.0000    76.5800    0.4158      0.4857 175.0000    veto_gex_cp_iv veto_bottom10  2023
+870.0000 11624.1550    0.4747      0.5678 193.0000    veto_gex_cp_iv veto_bottom10  2024
+812.0000  7972.1200    0.4704      0.5542 189.0000    veto_gex_cp_iv veto_bottom10  2025
+587.0000  3032.5550    0.4208      0.5162 120.0000    veto_gex_cp_iv veto_bottom10  2026
+355.0000  4645.0700    0.4507      0.5549  81.0000 veto_gex_skewterm         tilt5  2020
+880.0000  6363.0500    0.4489      0.5455 192.0000 veto_gex_skewterm         tilt5  2021
+872.0000  3331.5600    0.4346      0.5229 196.0000 veto_gex_skewterm         tilt5  2022
+656.0000  1266.0350    0.4070      0.4802 183.0000 veto_gex_skewterm         tilt5  2023
+923.0000  9502.3600    0.4442      0.5536 196.0000 veto_gex_skewterm         tilt5  2024
+866.0000  6492.4150    0.4446      0.5404 189.0000 veto_gex_skewterm         tilt5  2025
+594.0000  4619.5050    0.4226      0.5253 120.0000 veto_gex_skewterm         tilt5  2026
+355.0000  4645.0700    0.4507      0.5549  81.0000    veto_gex_cp_iv        tilt20  2020
+880.0000  6646.7650    0.4511      0.5477 192.0000    veto_gex_cp_iv        tilt20  2021
+872.0000  2216.9900    0.4266      0.5149 196.0000    veto_gex_cp_iv        tilt20  2022
+656.0000  1087.7550    0.4055      0.4787 183.0000    veto_gex_cp_iv        tilt20  2023
+923.0000 10136.6550    0.4507      0.5569 196.0000    veto_gex_cp_iv        tilt20  2024
+866.0000  6691.2500    0.4457      0.5427 189.0000    veto_gex_cp_iv        tilt20  2025
+594.0000  4794.3350    0.4259      0.5253 120.0000    veto_gex_cp_iv        tilt20  2026
+355.0000  4810.4800    0.4535      0.5577  81.0000  stack_equal_core        tilt10  2020
+880.0000  6326.4750    0.4466      0.5420 192.0000  stack_equal_core        tilt10  2021
+872.0000  3552.7550    0.4358      0.5241 196.0000  stack_equal_core        tilt10  2022
+656.0000  1004.3250    0.4040      0.4787 183.0000  stack_equal_core        tilt10  2023
+923.0000  9622.6350    0.4453      0.5547 196.0000  stack_equal_core        tilt10  2024
+866.0000  6440.0650    0.4446      0.5404 189.0000  stack_equal_core        tilt10  2025
+594.0000  4457.1200    0.4209      0.5253 120.0000  stack_equal_core        tilt10  2026
+
+Walk-forward weights
+ year                  signal   weight     sign
+ 2020         sig_skew25_bull  0.00000  0.00000
+ 2020     sig_skew25_chg_bull  0.00000  0.00000
+ 2020 sig_same_strike_cp_bull  0.00000  0.00000
+ 2020             sig_gex_net  0.00000  0.00000
+ 2020            sig_pin_bull  0.00000  0.00000
+ 2020     sig_oi_pressure_chg  0.00000  0.00000
+ 2020            sig_atm_term  0.00000  0.00000
+ 2020           sig_skew_term  0.00000  0.00000
+ 2020         sig_smile_slope  0.00000  0.00000
+ 2020      sig_iv_price_resid  0.00000  0.00000
+ 2021         sig_skew25_bull -0.10391 -1.00000
+ 2021     sig_skew25_chg_bull -0.03142 -1.00000
+ 2021 sig_same_strike_cp_bull  0.06339  1.00000
+ 2021             sig_gex_net -0.04715 -1.00000
+ 2021            sig_pin_bull -0.04342 -1.00000
+ 2021     sig_oi_pressure_chg  0.00949  1.00000
+ 2021            sig_atm_term  0.00000  0.00000
+ 2021           sig_skew_term  0.00000  0.00000
+ 2021         sig_smile_slope -0.12515 -1.00000
+ 2021      sig_iv_price_resid  0.07701  1.00000
+ 2022         sig_skew25_bull -0.05483 -1.00000
+ 2022     sig_skew25_chg_bull -0.03587 -1.00000
+ 2022 sig_same_strike_cp_bull  0.03888  1.00000
+ 2022             sig_gex_net -0.08938 -1.00000
+ 2022            sig_pin_bull -0.01031 -1.00000
+ 2022     sig_oi_pressure_chg  0.00524  1.00000
+ 2022            sig_atm_term -0.03282 -1.00000
+ 2022           sig_skew_term -0.01902 -1.00000
+ 2022         sig_smile_slope -0.12808 -1.00000
+ 2022      sig_iv_price_resid  0.00362  1.00000
+ 2023         sig_skew25_bull  0.00000  0.00000
+ 2023     sig_skew25_chg_bull -0.01385 -1.00000
+ 2023 sig_same_strike_cp_bull  0.01415  1.00000
+ 2023             sig_gex_net -0.02382 -1.00000
+ 2023            sig_pin_bull -0.02128 -1.00000
+ 2023     sig_oi_pressure_chg -0.01326 -1.00000
+ 2023            sig_atm_term -0.06055 -1.00000
+ 2023           sig_skew_term -0.00452 -1.00000
+ 2023         sig_smile_slope -0.05246 -1.00000
+ 2023      sig_iv_price_resid  0.01546  1.00000
+ 2024         sig_skew25_bull  0.00549  1.00000
+ 2024     sig_skew25_chg_bull -0.01219 -1.00000
+ 2024 sig_same_strike_cp_bull  0.02269  1.00000
+ 2024             sig_gex_net -0.00579 -1.00000
+ 2024            sig_pin_bull -0.03454 -1.00000
+ 2024     sig_oi_pressure_chg -0.01439 -1.00000
+ 2024            sig_atm_term -0.03424 -1.00000
+ 2024           sig_skew_term -0.00838 -1.00000
+ 2024         sig_smile_slope -0.04107 -1.00000
+ 2024      sig_iv_price_resid  0.01404  1.00000
+ 2025         sig_skew25_bull  0.00000  0.00000
+ 2025     sig_skew25_chg_bull -0.00765 -1.00000
+ 2025 sig_same_strike_cp_bull  0.02921  1.00000
+ 2025             sig_gex_net -0.01094 -1.00000
+ 2025            sig_pin_bull -0.02497 -1.00000
+ 2025     sig_oi_pressure_chg -0.00975 -1.00000
+ 2025            sig_atm_term -0.01745 -1.00000
+ 2025           sig_skew_term  0.00000  0.00000
+ 2025         sig_smile_slope -0.05068 -1.00000
+ 2025      sig_iv_price_resid  0.00643  1.00000
+ 2026         sig_skew25_bull -0.00525 -1.00000
+ 2026     sig_skew25_chg_bull -0.00889 -1.00000
+ 2026 sig_same_strike_cp_bull  0.02796  1.00000
+ 2026             sig_gex_net -0.01334 -1.00000
+ 2026            sig_pin_bull -0.01976 -1.00000
+ 2026     sig_oi_pressure_chg -0.00467 -1.00000
+ 2026            sig_atm_term  0.01218  1.00000
+ 2026           sig_skew_term -0.01098 -1.00000
+ 2026         sig_smile_slope -0.05184 -1.00000
+ 2026      sig_iv_price_resid  0.00415  1.00000
