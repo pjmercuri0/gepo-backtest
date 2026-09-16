@@ -28,13 +28,17 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from ib_insync import IB, Stock
+from ib_insync import IB, Stock, Option, Bag, ComboLeg
 from live import live_config
 from live.combo_quotes import _bag_for
 from live.fetcher import _connect_with_retry
 
 CLIENT_ID = int(getattr(live_config, "LIVE_STREAM_CLIENT_ID", 111))
-MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 45))
+# IBKR caps concurrent market-data lines (error 101 "Max number of tickers has been
+# reached" at 100 on this account). Budget: open positions always get a line, the
+# ranked board fills what is left, and spots are capped separately.
+MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 30))
+MAX_SPOTS = int(getattr(live_config, "LIVE_STREAM_MAX_SPOTS", 40))
 RELOAD_S  = float(getattr(live_config, "LIVE_STREAM_RELOAD_S", 20))
 WRITE_S   = float(getattr(live_config, "LIVE_STREAM_WRITE_S", 1.0))
 OUT   = Path(live_config.RANKED_DIR) / "combo_stream.json"
@@ -46,10 +50,45 @@ def _key(r) -> str:
     return f"{r['ticker']}|{r['spread_type']}|{float(r['short_strike']):g}|{float(r['long_strike']):g}|{str(r['expiry_date'])[:10]}"
 
 
+def _positions(ib) -> list[dict]:
+    """Open Actuals rows as streamable spreads (2026-09-16). Held strikes are often
+    outside the scan's fetch band -- a position that ran deep ITM is exactly the one
+    the fetcher stops pulling -- so conIds are qualified straight from IBKR rather
+    than looked up in the snapshot."""
+    fp = ROOT / "live" / "actuals.json"
+    if not fp.exists():
+        return []
+    try:
+        store = json.loads(fp.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    today = datetime.now().date().isoformat()
+    out = []
+    for t in store.get("trades") or []:
+        p = t.get("pick") or {}
+        exp = str(p.get("expiry_date") or "")[:10]
+        if not exp or exp < today or p.get("pnl") is not None:
+            continue
+        right = "P" if p.get("spread_type") == "bull_put" else "C"
+        legs = []
+        for k in ("short_strike", "long_strike"):
+            try:
+                o = Option(p["ticker"], exp.replace("-", ""), float(p[k]), right, "SMART", currency="USD")
+            except (KeyError, TypeError, ValueError):
+                legs = []; break
+            if not ib.qualifyContracts(o) or not o.conId:
+                legs = []; break
+            legs.append(o.conId)
+        if len(legs) != 2:
+            continue
+        out.append({**p, "short_conid": legs[0], "long_conid": legs[1], "_key": _key(p)})
+    return out
+
+
 def _board() -> list[dict]:
     """Ranked rows with leg conIds resolved from the payload's own snapshot."""
     payload = json.loads((Path(live_config.RANKED_DIR) / "latest.json").read_text())
-    rows = (payload.get("ticker") or [])[:MAX_BAGS]
+    rows = (payload.get("ticker") or [])[:MAX_BAGS]   # trimmed again after positions
     snap_path = ROOT / str(payload.get("snapshot_file") or "")
     if not snap_path.exists():
         return []
@@ -120,6 +159,13 @@ def main() -> int:
                 except Exception as e:
                     board = []
                     print(f"[combo_stream] board read failed: {e}", flush=True)
+                try:
+                    pos = _positions(ib)
+                except Exception as e:
+                    pos = []
+                    print(f"[combo_stream] positions read failed: {e}", flush=True)
+                seen = {r["_key"] for r in pos}
+                board = pos + [r for r in board if r["_key"] not in seen][:max(0, MAX_BAGS - len(pos))]
                 want = {r["_key"]: r for r in board}
                 for k in list(subs):
                     if k not in want:
@@ -139,7 +185,7 @@ def main() -> int:
                 # Underlying spot too (2026-09-16): the page colours pin/status and shows
                 # the cushion off spot, so a streaming credit beside a scan-old spot reads
                 # inconsistently. One line per distinct ticker.
-                want_syms = {r["ticker"] for r in board}
+                want_syms = list(dict.fromkeys(r["ticker"] for r in board))[:MAX_SPOTS]
                 for sym in list(spots):
                     if sym not in want_syms:
                         c, _t = spots.pop(sym)
