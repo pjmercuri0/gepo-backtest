@@ -789,12 +789,54 @@ def index():
     )
 
 
+def _wagering(payload: dict | None) -> dict | None:
+    """Wagering-style metrics from a backtest/OOT payload's trade list, per contract (qty=1):
+    yield on risk, turnover, simple (non-compounding) annual return, the fill-vs-fair price
+    edge (the closing-line-value analogue: fill = 1.08x smile-fit model credit by construction),
+    and the outcome split with partials counted by their actual sign. Computed at render time
+    so the shipped JSON is untouched."""
+    if not payload or not payload.get("trades"):
+        return None
+    T = payload["trades"]; s = payload.get("summary", {})
+    yrs = float(s.get("years") or 0) or None
+    n = len(T)
+    risk = [float(t["max_loss"]) * 100 for t in T]
+    pnl1 = [float(t["pnl"]) / max(int(t.get("qty") or 1), 1) for t in T]
+    wag = sum(risk); pnl = sum(pnl1)
+    if wag <= 0:
+        return None
+    pos = sum(1 for t, v in zip(T, pnl1) if t.get("outcome") == "WIN" or (t.get("outcome") == "PARTIAL" and v > 0))
+    out = {
+        "n": n, "trades_per_year": round(n / yrs) if yrs else None,
+        "mean_risk": round(wag / n, 0), "mean_pnl": round(pnl / n, 2),
+        "yield": round(100 * pnl / wag, 2),
+        "turnover": round(wag / yrs / 10000.0, 1) if yrs else None,
+        "annual_simple": round(100 * pnl / yrs / 10000.0, 1) if yrs else None,
+        "positive_pct": round(100 * pos / n, 1), "negative_pct": round(100 * (n - pos) / n, 1),
+        "cw_median": None, "fill_model": None, "edge_per_contract": None, "edge_pct_risk": None, "realized_over_edge": None,
+    }
+    cw = sorted(float(t["credit"]) / (float(t["credit"]) + float(t["max_loss"])) for t in T if float(t["credit"]) + float(t["max_loss"]) > 0)
+    if cw:
+        out["cw_median"] = round(cw[len(cw) // 2], 3)
+    fm = [(float(t["credit"]), float(t["model_credit"])) for t in T if t.get("model_credit")]
+    if fm:
+        ratios = sorted(c / m for c, m in fm if m > 0)
+        edge = [(c - m) * 100 - 1.30 for c, m in fm]
+        out["fill_model"] = round(ratios[len(ratios) // 2], 3)
+        out["edge_per_contract"] = round(sum(edge) / len(edge), 2)
+        out["edge_pct_risk"] = round(100 * sum(edge) / wag, 2)
+        out["realized_over_edge"] = round((pnl / n) / (sum(edge) / len(edge)), 2) if sum(edge) else None
+    return out
+
+
 @app.route("/backtest")
 def backtest():
     """Static backtest tab: equity curve vs SPY (G_rv canon 2026-06-09).
     Data is precomputed and shipped to live/data/backtest_equity.json by
     report_three_sizings.py (rich payload: weeks/trades/sizing arms)."""
     payload = _read_json(_data_path("backtest_equity.json"))
+    if payload:
+        payload["wagering"] = _wagering(payload)
     return render_template("backtest.html", data=payload)
 
 
@@ -803,6 +845,8 @@ def oot():
     """2026 out-of-time results: frozen canon applied to 2026 data.
     Payload written by report_oot_2026.py to live/data/oot_equity.json."""
     payload = _read_json(_data_path("oot_equity.json"))
+    if payload:
+        payload["wagering"] = _wagering(payload)
     return render_template("oot.html", data=payload)
 
 

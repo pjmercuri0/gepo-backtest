@@ -1,0 +1,48 @@
+{# Wagering metrics (per contract, qty=1). Computed at render time by webapp._wagering from
+   the payload's trade list; the shipped JSON is untouched. Bankroll numbers (return, CAGR)
+   describe a wallet that does not compound; these describe the bets themselves.
+   "price edge" is the closing-line-value analogue: fill credit vs the smile-fit fair
+   (model) credit, after the $1.30 commission. The book is booked at 1.08x model, so this
+   is the assumption the whole result rests on; the live fill/model ratio on Actuals is the
+   number to hold it against. #}
+{% set w = data.wagering %}
+{% if w %}
+<div class="subtitle" style="margin:14px 0 6px">wagering · per contract (qty=1) · {{ w.n }} trades{% if w.trades_per_year %}, {{ w.trades_per_year }}/yr{% endif %}</div>
+<div class="stats">
+  <div class="stat">
+    <div class="stat-label">yield (P&amp;L / risked)</div>
+    <div class="stat-value {{ 'pos' if w.yield >= 0 else 'neg' }}">{% if w.yield >= 0 %}+{% endif %}{{ w.yield }}%</div>
+    <div class="subtitle" style="margin:2px 0 0">${{ w.mean_pnl }} on ${{ '{:,.0f}'.format(w.mean_risk) }} risk</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">turnover</div>
+    <div class="stat-value">{{ w.turnover if w.turnover is not none else '—' }}×</div>
+    <div class="subtitle" style="margin:2px 0 0">bankroll risked / yr</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">simple annual return</div>
+    <div class="stat-value {{ 'pos' if (w.annual_simple or 0) >= 0 else 'neg' }}">{% if w.annual_simple is not none %}{% if w.annual_simple >= 0 %}+{% endif %}{{ w.annual_simple }}%{% else %}—{% endif %}</div>
+    <div class="subtitle" style="margin:2px 0 0">yield × turnover, no compounding</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">positive / negative</div>
+    <div class="stat-value"><span class="pos">{{ w.positive_pct }}%</span> / <span class="neg">{{ w.negative_pct }}%</span></div>
+    <div class="subtitle" style="margin:2px 0 0">partials by their sign</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">fill / fair (model)</div>
+    <div class="stat-value">{{ w.fill_model if w.fill_model is not none else '—' }}×</div>
+    <div class="subtitle" style="margin:2px 0 0">credit/width {{ w.cw_median }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">price edge (CLV)</div>
+    <div class="stat-value {{ 'pos' if (w.edge_pct_risk or 0) >= 0 else 'neg' }}">{% if w.edge_pct_risk is not none %}{% if w.edge_pct_risk >= 0 %}+{% endif %}{{ w.edge_pct_risk }}%{% else %}—{% endif %}</div>
+    <div class="subtitle" style="margin:2px 0 0">${{ w.edge_per_contract }}/contract after comm</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">realized / price edge</div>
+    <div class="stat-value">{{ w.realized_over_edge if w.realized_over_edge is not none else '—' }}×</div>
+    <div class="subtitle" style="margin:2px 0 0">selection on top of price</div>
+  </div>
+</div>
+{% endif %}

@@ -1713,6 +1713,26 @@ Then the 17:01 cron keeps it current. Verify the store against the vendor on a f
 overlapping 2026 dates before trusting it (§0.36 caught BDX's adjusted-close problem
 that way; IBKR TRADES closes are unadjusted, which is what P_real wants).
 
+### Wagering block on the Backtest and OOT tabs (2026-09-15, deployed to Mya)
+
+`webapp._wagering()` computes, at render time from the payload's trade list (JSON untouched),
+per contract qty=1: yield on risk, turnover, simple annual return (yield x turnover, no
+compounding), positive/negative split with partials by their actual sign, fill/fair (model)
+ratio, the price edge as % of risk after commission (the closing-line-value analogue), and
+realized P&L over that price edge. `live/templates/_wagering.html`, included on both tabs
+above the charts. Published books: IS yield 10.3%, turnover 5.1x, simple 51.9%/yr, 53.0/47.0,
+price edge +6.9% of risk ($4.76/contract), realized/edge 1.49x. OOT 11.2%, 5.7x, 64.4%/yr,
+51.8/48.2, +7.1% ($5.18), 1.58x. Since the books are booked at 1.08x model by construction,
+the CLV cell is the assumption the result rests on; hold it against the live fill/model
+ratio on Actuals (18 real fills: median 1.111).
+
+**gunicorn HUP on Mya:** the master's parent is NOT pid 1 (it sits under a shell), so the
+`awk '$2==1'` one-liner in the archive finds nothing and kills nothing. Find the master as
+the gunicorn pid that other gunicorn pids have as ppid:
+```
+G=$(ps -eo pid,ppid,cmd | grep "[g]unicorn" | grep "live.wsgi"); M=$(echo "$G" | awk '{print $1}' | while read p; do echo "$G" | awk -v p="$p" '$2==p' | grep -q . && echo "$p"; done | head -1); kill -HUP "$M"
+```
+
 ### Still open
 
 - The live ranker still TRIES to read `output/iv_rank.parquet`, `output/rv_table.parquet`,
