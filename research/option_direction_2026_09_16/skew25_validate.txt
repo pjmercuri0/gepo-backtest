@@ -1,0 +1,79 @@
+skew25 validation
+candidate rows: 43,479
+skew cache rows: 31,984
+
+Directional rank test: bullish_skew25 = -skew25, target = expiry_close / entry_price - 1
+ year  candidates  with_skew  coverage  pooled_spearman  daily_spearman_mean  daily_spearman_days
+ 2020        2378       1919    0.8070          -0.0964              -0.0198                   71
+ 2021        6401       4977    0.7775          -0.0429              -0.0072                  170
+ 2022        8544       6718    0.7863           0.0196              -0.0050                  194
+ 2023        6323       4788    0.7572           0.0020              -0.0054                  170
+ 2024        6721       4869    0.7244          -0.0622               0.0008                  178
+ 2025        7682       5926    0.7714          -0.0275              -0.0173                  183
+ 2026        5430       3026    0.5573           0.0611               0.0704                   84
+
+Within-date shuffle null for daily Spearman, signal shuffled across names on each date
+ year  observed_daily_spearman  null_p05  null_p50  null_p95  beat_null_95  days
+ 2020                  -0.0198   -0.0438    0.0035    0.0441         False    71
+ 2021                  -0.0072   -0.0279   -0.0003    0.0266         False   170
+ 2022                  -0.0050   -0.0252   -0.0006    0.0256         False   194
+ 2023                  -0.0054   -0.0284   -0.0032    0.0265         False   170
+ 2024                   0.0008   -0.0237    0.0006    0.0273         False   178
+ 2025                  -0.0173   -0.0240    0.0002    0.0204         False   183
+ 2026                   0.0704   -0.0354    0.0013    0.0295          True    84
+
+Directional quintiles by date, Q1 least bullish skew, Q5 most bullish skew
+bucket                1      2      3      4      5
+year spread_type                                   
+2020 bear_call   0.3314 0.3665 0.3654 0.3314 0.3775
+     bull_put    0.4309 0.5000 0.4593 0.4316 0.3878
+2021 bear_call   0.3766 0.3760 0.3706 0.3750 0.3452
+     bull_put    0.4444 0.4991 0.5203 0.4701 0.4559
+2022 bear_call   0.4376 0.5000 0.5102 0.4915 0.4542
+     bull_put    0.4121 0.3954 0.3688 0.4151 0.4017
+2023 bear_call   0.4178 0.3745 0.3992 0.3903 0.3978
+     bull_put    0.4625 0.4769 0.4699 0.4548 0.4648
+2024 bear_call   0.3684 0.3418 0.3382 0.3504 0.3928
+     bull_put    0.4709 0.5417 0.4972 0.4944 0.4670
+2025 bear_call   0.3682 0.4165 0.4373 0.4012 0.3862
+     bull_put    0.4603 0.4638 0.4743 0.4695 0.4397
+2026 bear_call   0.4440 0.4873 0.5271 0.4307 0.3951
+     bull_put    0.4099 0.4032 0.4353 0.4403 0.4102
+
+Selection book tests, canon GROUND threshold/top-5, skew sign fitted only on prior years
+        n        pnl  full_win  profitable      days                   book  changed_vs_base
+5154.0000 37047.5250    0.4389      0.5310 1155.0000                   base           0.0000
+5154.0000 35755.5650    0.4383      0.5307 1155.0000    base_plus_5pct_skew           0.0058
+5154.0000 36122.4300    0.4383      0.5314 1155.0000   base_plus_10pct_skew           0.0111
+4942.0000 30740.6400    0.4338      0.5271 1148.0000 skew_veto_bottom_20pct           0.1319
+
+Per-year selected book tests
+       n       pnl  full_win  profitable     days                   book  changed_vs_base      year
+355.0000 4645.0700    0.4507      0.5549  81.0000                   base              NaN 2020.0000
+887.0000 8687.1100    0.4645      0.5536 193.0000                   base              NaN 2021.0000
+880.0000 2904.7650    0.4375      0.5114 196.0000                   base              NaN 2022.0000
+654.0000 1584.2000    0.4098      0.4862 180.0000                   base              NaN 2023.0000
+920.0000 8932.5750    0.4424      0.5478 196.0000                   base              NaN 2024.0000
+865.0000 5702.4700    0.4370      0.5376 189.0000                   base              NaN 2025.0000
+593.0000 4591.3350    0.4250      0.5261 120.0000                   base              NaN 2026.0000
+355.0000 4645.0700    0.4507      0.5549  81.0000    base_plus_5pct_skew              NaN 2020.0000
+887.0000 8143.6950    0.4634      0.5524 193.0000    base_plus_5pct_skew              NaN 2021.0000
+880.0000 3208.4450    0.4386      0.5136 196.0000    base_plus_5pct_skew              NaN 2022.0000
+654.0000 1723.7900    0.4113      0.4878 180.0000    base_plus_5pct_skew              NaN 2023.0000
+920.0000 8498.8800    0.4402      0.5457 196.0000    base_plus_5pct_skew              NaN 2024.0000
+865.0000 5263.7400    0.4358      0.5364 189.0000    base_plus_5pct_skew              NaN 2025.0000
+593.0000 4271.9450    0.4233      0.5245 120.0000    base_plus_5pct_skew              NaN 2026.0000
+355.0000 4645.0700    0.4507      0.5549  81.0000   base_plus_10pct_skew              NaN 2020.0000
+887.0000 8000.7650    0.4634      0.5524 193.0000   base_plus_10pct_skew              NaN 2021.0000
+880.0000 3469.6050    0.4398      0.5148 196.0000   base_plus_10pct_skew              NaN 2022.0000
+654.0000 1616.4800    0.4098      0.4878 180.0000   base_plus_10pct_skew              NaN 2023.0000
+920.0000 8950.7900    0.4424      0.5489 196.0000   base_plus_10pct_skew              NaN 2024.0000
+865.0000 5151.9350    0.4335      0.5364 189.0000   base_plus_10pct_skew              NaN 2025.0000
+593.0000 4287.7850    0.4233      0.5245 120.0000   base_plus_10pct_skew              NaN 2026.0000
+355.0000 4645.0700    0.4507      0.5549  81.0000 skew_veto_bottom_20pct              NaN 2020.0000
+856.0000 5858.3900    0.4556      0.5467 193.0000 skew_veto_bottom_20pct              NaN 2021.0000
+830.0000 2890.4900    0.4386      0.5120 194.0000 skew_veto_bottom_20pct              NaN 2022.0000
+598.0000 1054.2450    0.4047      0.4900 176.0000 skew_veto_bottom_20pct              NaN 2023.0000
+883.0000 7996.4450    0.4394      0.5481 195.0000 skew_veto_bottom_20pct              NaN 2024.0000
+834.0000 5748.1250    0.4329      0.5336 189.0000 skew_veto_bottom_20pct              NaN 2025.0000
+586.0000 2547.8750    0.4078      0.5000 120.0000 skew_veto_bottom_20pct              NaN 2026.0000

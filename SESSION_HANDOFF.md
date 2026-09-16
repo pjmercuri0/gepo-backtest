@@ -3661,3 +3661,42 @@ branches only exercise during market hours on the Mac mini.
 targets). The execution gate therefore requires the IBKR credit >= 1.04x model. Actuals page shows median
 fill/model and fill/quoted over recorded fills plus the count below min: if fill/quoted runs < ~0.95 for a couple
 of weeks, set `LIVE_SELECTION_CREDIT = "model"`.
+
+## 0.47 Option-direction research pass: same-expiry 25-delta skew failed IS validation (2026-09-16)
+
+New isolated research folder: `research/option_direction_2026_09_16/`. No production code changed.
+
+Tested the first/high-priority idea from §0.46 / the ChatGPT comparison:
+
+`skew25 = median IV(puts abs(delta) .20-.30) - median IV(calls abs(delta) .20-.30)` on the same
+`ticker, entry_date, expiry_date`; bullish signal = `-skew25` because the earlier 2026-only hint implied richer
+put skew was bearish.
+
+Harness: `skew25_validate.py` reads the canon candidate universe
+`research/dkl_2026_09_13/featATM6.parquet`, rebuilds current canon P_real/GROUND using `ent_canon.py`
+and `output/name_gaps_backtest.parquet`, builds `skew25_by_chain.parquet` from the vendor yearly option files,
+then reports:
+- pooled and within-date Spearman of bullish_skew25 vs expiry return;
+- within-date shuffle null, preserving each trading day's cross-section;
+- date-quintile full-win tables;
+- selected-book overlays: base canon, +5% skew tilt, +10% skew tilt, bottom-20% skew veto. Skew sign is fitted
+  walk-forward using prior years only.
+
+Result: do **not** integrate this raw same-expiry skew signal. 2026 alone beats the date-shuffle null
+(daily Spearman 0.0704 vs null p95 0.0295), but 2020-2025 all fail the null and are mostly negative/flat:
+2020 -0.0198, 2021 -0.0072, 2022 -0.0050, 2023 -0.0054, 2024 0.0008, 2025 -0.0173.
+Selected-book overlays also underperform the current canon:
+base 5,154 trades / $37,047 / full-win 43.89% / profitable 53.10%;
++5% tilt $35,756 / 43.83% / 53.07%;
++10% tilt $36,122 / 43.83% / 53.14%;
+bottom-20% veto $30,741 / 43.38% / 52.71%.
+
+Artifacts:
+- `skew25_validate.txt`: full report.
+- `skew25_years.csv`: year-level rank/null inputs.
+- `skew25_buckets.csv`: quintile table.
+- `skew25_by_chain.parquet`: derived 643 KB cache from vendor option files; safe to regenerate with
+  `python3 research/option_direction_2026_09_16/skew25_validate.py --force-skew`.
+
+Next best tests: same-strike call-put IV residual, then new-OI repricing. Avoid spending more time on raw
+same-expiry 25-delta put-call skew unless a materially different causal definition is proposed.
