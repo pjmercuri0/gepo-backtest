@@ -85,13 +85,13 @@ def pnl(r: pd.Series) -> float:
     return val - ec.COMMISSION
 
 
-def add_canon_scores(C: pd.DataFrame) -> pd.DataFrame:
+def add_canon_scores(C: pd.DataFrame, use_gap: bool = True) -> pd.DataFrame:
     C = C.copy()
     C["entry_date"] = pd.to_datetime(C["entry_date"]).dt.normalize()
     C["expiry_date"] = pd.to_datetime(C["expiry_date"]).dt.normalize()
     closes = ec.backtest_closes()
     gaps = pd.read_parquet(GAP_SERIES)
-    mu = ec.gap_drift(C, closes, gaps) if ec.GAP_GAMMA else None
+    mu = ec.gap_drift(C, closes, gaps) if (use_gap and ec.GAP_GAMMA) else None
     P = ec.p_real(C, closes, mu=mu)
     C["p"], C["q"], C["ro"] = P[:, 0], P[:, 1], P[:, 2]
     b = C["model_credit"].to_numpy(float) / (C["width"].to_numpy(float) - C["model_credit"].to_numpy(float))
@@ -402,9 +402,14 @@ def evaluate_signal(C: pd.DataFrame, sig: Signal) -> tuple[list[dict], list[dict
 
 def main() -> None:
     force = "--force-chain" in sys.argv
+    use_gap = "--no-gap" not in sys.argv
+    suffix = "" if use_gap else "_nogap"
+    report_txt = HERE / f"direction_signal_suite{suffix}.txt"
+    signal_csv = HERE / f"direction_signal_summary{suffix}.csv"
+    book_csv = HERE / f"direction_signal_books{suffix}.csv"
     F = build_chain_cache(force=force)
     C = pd.read_parquet(FRAME)
-    C = add_canon_scores(C)
+    C = add_canon_scores(C, use_gap=use_gap)
     C = add_term_features(C, F)
     C = add_candidate_signals(C)
 
@@ -428,8 +433,8 @@ def main() -> None:
 
     S = pd.DataFrame(summary_rows)
     B = pd.DataFrame(book_rows)
-    S.to_csv(SIGNAL_CSV, index=False)
-    B.to_csv(BOOK_CSV, index=False)
+    S.to_csv(signal_csv, index=False)
+    B.to_csv(book_csv, index=False)
 
     ranked = (
         S[(S["status"] == "backtested") & (S["year"].between(2021, 2026))]
@@ -446,6 +451,7 @@ def main() -> None:
 
     lines = []
     lines.append("direction signal suite")
+    lines.append(f"own_gap_drift: {'on' if use_gap else 'off'}")
     lines.append(f"candidate rows: {len(C):,}")
     lines.append(f"chain feature rows: {len(F):,}")
     lines.append("")
@@ -457,9 +463,9 @@ def main() -> None:
     lines.append("")
     lines.append("Year-level signal diagnostics")
     lines.append(S.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
-    REPORT_TXT.write_text("\n".join(lines) + "\n")
+    report_txt.write_text("\n".join(lines) + "\n")
     log("\n".join(lines))
-    log(f"wrote {REPORT_TXT}")
+    log(f"wrote {report_txt}")
 
 
 if __name__ == "__main__":

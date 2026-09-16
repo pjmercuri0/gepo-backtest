@@ -3730,10 +3730,19 @@ Not truly backtestable from current local history:
 - earnings event skew: local `data/earnings_calendar.csv` only covers 2026;
 - live option volume flow and live quote-size imbalance: no historical option volume or size fields in the backtest.
 
-Headline result: the only overlay that beat the base selected book was **dealer_gex / veto_bottom20**.
+Headline result with the current own-gap drift ON: the only overlay that beat the base selected book was
+**dealer_gex / veto_bottom20**.
 Base canon: 5,154 trades / $37,047 / full-win 43.89% / profitable 53.10%.
 Dealer GEX veto bottom 20%: 4,749 trades / $40,444 / full-win 44.41% / profitable 53.65%, changing 23.6% of base selections.
-This is a candidate worth a stricter second pass: date-shuffle null, per-year deltas, and decomposition into unchanged/side-flip/replacement.
+
+Own-gap OFF ablation added immediately after user asked. Run:
+`python3 research/option_direction_2026_09_16/direction_signal_suite.py --no-gap`.
+No-gap base canon: 5,146 trades / $35,027 / full-win 43.55% / profitable 53.07%.
+No-gap dealer GEX veto bottom 20%: 4,728 trades / $34,870 / full-win 43.97% / profitable 53.17%, changing 23.0%.
+No-gap dealer GEX tilt10: 5,146 trades / $36,488 / full-win 43.68% / profitable 53.26%, changing 1.6%.
+Conclusion: the big GEX-veto improvement is **gap-dependent** and should not be treated as a standalone options edge yet.
+If continuing, the second pass must compare gap-on/off jointly with a date-shuffle null, per-year deltas, and
+decomposition into unchanged/side-flip/replacement.
 
 Other notes:
 - `smile_slope` had the best mean walk-forward Spearman (0.0467 across 2021-2026), but both overlays lost money vs base;
@@ -3747,8 +3756,9 @@ Artifacts:
 - `direction_signal_suite.txt`: full report.
 - `direction_signal_summary.csv`: year-level diagnostics.
 - `direction_signal_books.csv`: selected-book overlays.
+- `direction_signal_suite_nogap.txt`, `direction_signal_summary_nogap.csv`, `direction_signal_books_nogap.csv`:
+  same suite with own-gap drift disabled.
 - `chain_direction_features.parquet`: derived cache, safe to regenerate with
   `python3 research/option_direction_2026_09_16/direction_signal_suite.py --force-chain`.
 
-Do not integrate anything yet. Next step should be a focused dealer-GEX validation with date-shuffled null and
-per-year selected-book decomposition.
+Do not integrate anything yet.
