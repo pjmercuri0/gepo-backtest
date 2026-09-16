@@ -1,5 +1,5 @@
-"""§0.45 market-gap drift: the drift is off at zero, moves P_real the right way, and the sigma and gap
-definitions match their pandas reference implementations."""
+"""§0.45 own-gap drift: off at zero, moves P_real the right way, uses only the candidate's own gap, and the sigma
+and gap definitions match their pandas reference implementations."""
 import unittest
 import numpy as np, pandas as pd
 import ent_canon as ec
@@ -11,9 +11,9 @@ def closes(n=300, seed=1, tk='AAA'):
     return pd.DataFrame({'ticker': tk, 'date': d, 'close': 100 * np.exp(np.cumsum(r))})
 
 
-def cands(cl, i=280):
+def cands(cl, i=280, tk='AAA'):
     s = float(cl.close.iloc[i]); d = cl.date.iloc[i]
-    return pd.DataFrame({'ticker': 'AAA', 'entry_date': [d, d], 'DTE': [2, 2], 'entry_price': [s, s],
+    return pd.DataFrame({'ticker': tk, 'entry_date': [d, d], 'DTE': [2, 2], 'entry_price': [s, s],
                          'spread_type': ['bull_put', 'bear_call'], 'short_strike': [s * 0.995, s * 1.005], 'long_strike': [s * 0.975, s * 1.025]})
 
 
@@ -28,22 +28,23 @@ class GapDrift(unittest.TestCase):
         p0, p1 = ec.p_real(C, cl), ec.p_real(C, cl, mu=np.full(2, 0.01))
         self.assertGreater(p1[0, 0], p0[0, 0]); self.assertLess(p1[1, 0], p0[1, 0])
 
-    def test_sigma_matches_pandas_rolling(self):
-        cl = closes(); C = cands(cl, 250)
-        m, s, b = ec.gap_fit(C.entry_date.iloc[0].year + 2)                         # any year with a fit
-        mg = pd.DataFrame({'date': [C.entry_date.iloc[0]], 'mkt_gap': [m + s]})     # z = 1
-        mu = ec.gap_drift(C, cl, mg, gamma=1.0, fit=(m, s, b))
+    def test_sigma_and_drift_match_reference(self):
+        cl = closes(); C = cands(cl, 250); d = C.entry_date.iloc[0]
+        m, s, b = 0.01, 0.4, 0.03
+        gaps = pd.DataFrame({'ticker': ['AAA'], 'date': [d], 'gap': [m + s]})                 # z = 1
+        mu = ec.gap_drift(C, cl, gaps, gamma=1.0, fit=(m, s, b))
         ref = np.log(cl.close).diff().rolling(ec.GAP_SIGMA_N).std().shift(1).iloc[250]
         np.testing.assert_allclose(mu, b * ref * np.sqrt(2), rtol=1e-9)
 
-    def test_walk_forward_year_lookup(self):
-        self.assertEqual(ec.gap_fit(2019)[2], 0.0)                                  # before the first fit: no drift
-        self.assertEqual(ec.gap_fit(2026), ec.GAP_FIT[2026])
-        self.assertEqual(ec.gap_fit(2030), ec.GAP_FIT[max(ec.GAP_FIT)])             # no refit yet: latest earlier fit
+    def test_only_own_gap_is_used(self):
+        cl = pd.concat([closes(tk='AAA'), closes(seed=2, tk='BBB')]); C = cands(closes(), 250); d = C.entry_date.iloc[0]
+        other = pd.DataFrame({'ticker': ['BBB'], 'date': [d], 'gap': [3.0]})                   # another stock gapped hard
+        self.assertTrue((ec.gap_drift(C, cl, other, gamma=1.0, fit=(0.0, 0.4, 0.05)) == 0).all())
 
-    def test_no_gap_row_means_no_drift(self):
-        cl = closes(); C = cands(cl)
-        self.assertTrue((ec.gap_drift(C, cl, pd.DataFrame({'date': [pd.Timestamp('1999-01-01')], 'mkt_gap': [1.0]})) == 0).all())
+    def test_walk_forward_year_lookup(self):
+        self.assertEqual(ec.gap_fit(2019)[2], 0.0)
+        self.assertEqual(ec.gap_fit(2026), ec.GAP_FIT[2026])
+        self.assertEqual(ec.gap_fit(2030), ec.GAP_FIT[max(ec.GAP_FIT)])
 
     def test_gap_definition(self):
         n = 120; rng = np.random.default_rng(3); c = 50 * np.exp(np.cumsum(rng.normal(0, .01, n)))

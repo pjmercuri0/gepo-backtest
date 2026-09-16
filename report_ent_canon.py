@@ -16,7 +16,7 @@ import ent_canon as ec
 import report_mid_canon as rmc
 
 FRAME = 'research/dkl_2026_09_13/featATM6.parquet'
-GAP_SERIES = 'output/market_gap_backtest.parquet'   # build_market_gap.py
+GAP_SERIES = 'output/name_gaps_backtest.parquet'   # build_name_gaps.py (per-name own gaps)
 DOW = {0: 'Mon', 1: 'Tue', 2: 'Wed', 3: 'Thu', 4: 'Fri'}
 
 
@@ -46,7 +46,7 @@ def select(win):
     # 2026-09-15: P_real recomputed on the FULL-SESSION close series (ec.backtest_closes), not the frame's
     # sparse candidate-day series (20-35% of sessions missing, handoff §0.42). Frame p/q/ro/EV are overwritten.
     CLS = ec.backtest_closes()
-    # 2026-09-16 (§0.45): market-gap drift shifts P_real. GAP_GAMMA=0 reproduces the pre-gap canon.
+    # 2026-09-16 (§0.45): own-gap drift shifts P_real. GAP_GAMMA=0 reproduces the pre-gap canon.
     MU = ec.gap_drift(C, CLS, pd.read_parquet(GAP_SERIES)) if ec.GAP_GAMMA else None
     P = ec.p_real(C, CLS, mu=MU)
     C['p'], C['q'], C['ro'] = P[:, 0], P[:, 1], P[:, 2]

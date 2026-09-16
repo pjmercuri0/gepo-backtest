@@ -1,0 +1,156 @@
+S&P 100 universe: 100 names; in 83 but not 93: ['ADI', 'ADP', 'CME', 'CSX', 'EOG', 'F', 'FCX', 'HON', 'IWM', 'NSC', 'PNC', 'PYPL', 'QQQ', 'SPY', 'TJX', 'VRTX', 'WM']; new: ['ADBE', 'AMAT', 'AMD', 'AMT', 'BKNG', 'BLK', 'BNY', 'BRK.B', 'C', 'CMCSA', 'COF', 'COP', 'CVS', 'DUK', 'FDX', 'GD', 'GEV', 'HONA', 'INTU', 'LIN', 'LLY', 'LMT', 'LRCX', 'MDLZ', 'META', 'MU', 'NKE', 'PLTR', 'SPG', 'TMO', 'TMUS', 'UBER', 'UNP', 'WFC']
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+bars 31/100 (31%)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+bars 62/100 (62%)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+bars 93/100 (93%)
+/Users/mercurio/Downloads/gepo-backtest/research/ta_direction/ta_gap_sp100.py:24: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  z = bmg.api(t); y = pd.concat([y, z[~z.date.isin(set(y.date))]], ignore_index=True)
+bars 100/100 (100%)
+names per day by year (sp100 set): {2020: 97.0, 2021: 98.0, 2022: 98.0, 2023: 98.0, 2024: 99.0, 2025: 99.0, 2026: 99.0}
+corr(83-name gap, S&P100 gap) by year: {2020: np.float64(0.999), 2021: np.float64(0.994), 2022: np.float64(0.997), 2023: np.float64(0.991), 2024: np.float64(0.987), 2025: np.float64(0.99), 2026: np.float64(0.989)} | names per day 93-set median 98
+    2021: (0.08769314606637116, 0.33839106807254715, 0.20312695355747878),   # 1,782 stock-days   [83-name beta 0.1989]
+    2022: (0.041288740129331564, 0.25359228570225306, 0.04970954897001914),   # 6,727 stock-days   [83-name beta 0.0406]
+    2023: (0.013314288295125605, 0.27184702142126244, 0.01776787690619261),   # 13,307 stock-days   [83-name beta 0.0163]
+    2024: (0.007472454540273917, 0.25457872819748106, 0.025330749650164897),   # 18,199 stock-days   [83-name beta 0.0248]
+    2025: (0.009367023206102951, 0.24401213623523255, 0.023644989349460757),   # 23,461 stock-days   [83-name beta 0.0227]
+    2026: (0.00809291434083723, 0.23427969674841528, 0.05373575258679036),   # 29,383 stock-days   [83-name beta 0.0537]
+day-level corr(market gap, mean fwd move) by year, S&P 100: {2020: np.float64(0.179), 2021: np.float64(-0.033), 2022: np.float64(-0.019), 2023: np.float64(0.08), 2024: np.float64(0.073), 2025: np.float64(0.253), 2026: np.float64(-0.059)}
+evaluated canon
+evaluated gap83
+evaluated gap93
+evaluated gapSP100
+
+--- pnl ---
+config      canon  gap83  gap93  gapSP100
+period                                   
+2020         4645   4645   4645      4645
+2021         6009   5923   5201      5683
+2022         2785   4339   4494      4526
+2023         1067   2374   2257      2212
+2024         9559  10199  10373     10267
+2025         6589   7196   7297      7212
+2021-25     26010  30032  29621     29901
+IS 2020-25  30655  34677  34267     34546
+2026         4372   5241   5067      4579
+
+--- sh ---
+config      canon  gap83  gap93  gapSP100
+period                                   
+2020         2.26   2.26   2.26      2.26
+2021         1.34   1.67   1.45      1.61
+2022         1.11   1.51   1.53      1.61
+2023         0.50   1.06   1.01      0.96
+2024         2.30   2.52   2.58      2.52
+2025         1.55   1.73   1.78      1.79
+2021-25      1.24   1.54   1.48      1.53
+IS 2020-25   1.37   1.55   1.52      1.54
+2026         2.62   3.17   3.19      2.89
+
+--- dd ---
+config      canon  gap83  gap93  gapSP100
+period                                   
+2020       -12.88 -12.88 -12.88    -12.88
+2021       -16.73  -9.56 -10.28     -9.90
+2022       -20.43 -24.29 -24.61    -21.36
+2023       -21.30 -17.08 -16.63    -17.49
+2024       -11.53 -11.00 -10.62    -11.04
+2025       -14.38 -11.55 -10.96    -10.76
+2021-25    -20.31 -16.62 -17.41    -14.85
+IS 2020-25 -16.11 -13.32 -13.80    -12.88
+2026        -4.24  -3.04  -3.27     -2.97
+
+--- win ---
+config      canon  gap83  gap93  gapSP100
+period                                   
+2020         45.1   45.1   45.1      45.1
+2021         44.7   44.9   44.3      44.3
+2022         43.2   44.7   44.7      44.7
+2023         40.5   42.1   42.5      42.2
+2024         44.5   45.5   45.6      45.5
+2025         44.5   44.0   44.1      44.1
+2021-25      43.7   44.4   44.3      44.3
+IS 2020-25   43.8   44.4   44.4      44.3
+2026         41.9   43.6   44.4      43.2
+
+--- winp ---
+config      canon  gap83  gap93  gapSP100
+period                                   
+2020         55.5   55.5   55.5      55.5
+2021         54.4   52.4   51.8      52.5
+2022         51.8   51.4   51.7      51.8
+2023         47.7   49.4   49.5      49.0
+2024         55.4   55.9   55.9      55.9
+2025         54.0   54.4   54.3      54.5
+2021-25      53.0   52.9   52.8      53.0
+IS 2020-25   53.2   53.1   53.0      53.1
+2026         52.4   53.0   53.6      52.9
+
+--- n ---
+config      canon  gap83  gap93  gapSP100
+period                                   
+2020          355    355    355       355
+2021          880    868    867       871
+2022          872    900    900       913
+2023          656    662    663       661
+2024          923    930    930       930
+2025          866    871    874       874
+2021-25      4197   4231   4234      4249
+IS 2020-25   4552   4586   4589      4604
+2026          594    594    593       590
