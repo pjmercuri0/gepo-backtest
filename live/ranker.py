@@ -344,23 +344,25 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         print(f"  closes: IBKR store {cs['sessions']} sessions, {cs['tickers']} tickers, {cs['first']} -> {cs['last']}", flush=True)
     sel_credit = "net_credit" if getattr(live_config, "LIVE_SELECTION_CREDIT", "quoted") == "quoted" else "model_credit"
     print(f"  selection credit: {'IBKR quoted mid (uncapped)' if sel_credit == 'net_credit' else 'smile-fit model'}", flush=True)
-    # §0.45 market-gap drift: today's mean opening gap (live/fetch_market_gap.py, 09:36) shifts P_real.
+    # §0.45 own-gap drift: each stock's own opening gap today (live/fetch_name_gaps.py, 09:36) shifts its P_real.
     gap_mu = None
     if entc.GAP_GAMMA:
-        from live.fetch_market_gap import load_store as _load_gap
-        _mg = _load_gap(); _today = pd.to_datetime(priced["entry_date"]).dt.normalize().max()
-        _row = _mg[_mg.date == _today]
-        if _row.empty or not _row.mkt_gap.notna().any():
-            print(f"  WARNING: no market gap stored for {_today.date()} -- P_real drift is 0 today "
-                  "(run: python3 -m live.fetch_market_gap)", flush=True)
+        from live.fetch_name_gaps import load_store as _load_gaps
+        _gs = _load_gaps(); _today = pd.to_datetime(priced["entry_date"]).dt.normalize().max()
+        _gt = _gs[(_gs.date == _today) & _gs.gap.notna()]
+        if _today.year not in entc.GAP_FIT:
+            print(f"  WARNING: ent_canon.GAP_FIT has no {_today.year} fit -- using the latest earlier year. "
+                  f"Refit: python3 fit_gap.py {_today.year}", flush=True)
+        _have = priced["ticker"].isin(set(_gt.ticker))
+        if _gt.empty:
+            print(f"  WARNING: no stock gaps stored for {_today.date()} -- P_real drift is 0 today "
+                  "(run: python3 -m live.fetch_name_gaps)", flush=True)
         else:
-            gap_mu = entc.gap_drift(priced, closes, _mg)
-            _g = float(_row.mkt_gap.iloc[0]); _m, _s, _b = entc.gap_fit(_today.year)
-            if _today.year not in entc.GAP_FIT:
-                print(f"  WARNING: ent_canon.GAP_FIT has no {_today.year} fit -- using the latest earlier year. "
-                      f"Refit: python3 fit_market_gap.py {_today.year}", flush=True)
-            print(f"  market gap {_today.date()}: {_g:+.4f} over {int(_row.n_names.iloc[0])} names, z {(_g - _m) / _s:+.2f}, "
-                  f"beta {_b:.4f}; drift median {np.median(gap_mu) * 100:+.3f}% of price", flush=True)
+            gap_mu = entc.gap_drift(priced, closes, _gt)
+            _names = priced.loc[_have, "ticker"].nunique(); _all = priced["ticker"].nunique()
+            print(f"  own gaps {_today.date()}: {_names}/{_all} candidate names have today's gap"
+                  f"{'' if _names == _all else ' (the rest score with zero drift)'}; beta {entc.gap_fit(_today.year)[2]:.4f}; "
+                  f"drift range {np.min(gap_mu) * 100:+.3f}%..{np.max(gap_mu) * 100:+.3f}% of price", flush=True)
     scored = entc.score(priced, closes, k=ground.DKL_K, thr=backtest_config.GROUND_THRESHOLD, credit_col=sel_credit, mu=gap_mu)
     scored["quoted_credit"] = scored["net_credit"]
     scored["spread_width"] = scored["width"]
