@@ -3800,3 +3800,46 @@ Artifacts:
 - `direction_signal_stack.py`
 - `direction_signal_stack.txt`, `direction_signal_stack_books.csv`, `direction_signal_stack_years.csv`
 - `direction_signal_stack_nogap.txt`, `direction_signal_stack_books_nogap.csv`, `direction_signal_stack_years_nogap.csv`
+
+## 0.50 New option-market idea: same-strike parity-implied forward pressure (2026-09-16)
+
+User wanted a genuinely different options-data idea, not more skew/OI threshold grinding. Added
+`research/option_direction_2026_09_16/parity_forward_signal.py`.
+
+Idea: pair calls and puts at the same strike and compute the option-implied forward:
+
+`F_impl(K) = K + call_mid(K) - put_mid(K)` over near-ATM strikes.
+
+Features:
+- `parity_fwd_z`: median `(F_impl / spot - 1) / expected_move`;
+- `parity_fwd_slope`: slope of implied forward across moneyness;
+- `parity_fwd_iqr`: dispersion of implied forward across same-strike pairs;
+- `parity_balance`: median `(call_mid - put_mid) / (call_mid + put_mid)`;
+- `parity_oi_balance`: same-strike call-vs-put OI balance;
+- daily changes for the main parity features.
+
+Standalone parity result: `parity_balance` veto 5% was excellent aggregate
+(4,955 trades / $40,908 / full-win 45.23% / profitable 54.25%), but failed 2026:
+2020-25 $38,080 vs base $32,456; 2026 $2,828 vs base $4,591. Not acceptable alone.
+
+Combined parity + existing GEX/skew-term targeted search:
+`min(veto_gex_skewterm_rank, parity_balance_rank)` with bottom-15% veto is the best new both-period candidate.
+Saved as `min_gex_skewterm_parity_balance_veto15_metrics.csv`.
+
+Metrics, gap-on:
+- 2020-25 base: 4,563 trades / $32,643 / full-win 44.09% / profitable 53.19% / weekly Sh 1.52 / Calmar 2.36 / yield 10.15%.
+- 2020-25 combo: 3,891 trades / $33,462 / full-win 45.70% / profitable 54.38% / weekly Sh 1.45 / Calmar 1.78 / yield 10.75%.
+- 2026 base: 593 trades / $4,591 / full-win 42.50% / profitable 52.61% / weekly Sh 2.97 / Calmar 18.28 / yield 10.44%.
+- 2026 combo: 544 trades / $5,030 / full-win 44.49% / profitable 53.49% / weekly Sh 3.22 / Calmar 18.89 / yield 11.75%.
+
+Read: this is better on the user's core ask (direction/win-rate in both IS and 2026) and gives a meaningful 2026
+improvement. It still worsens 2020-25 Sharpe/Calmar because it is a large veto and concentrates risk. Next pass:
+date-shuffle/search-adjusted null for the combined score, and decomposition of removed/replaced trades.
+
+Artifacts:
+- `parity_forward_features.parquet`
+- `parity_forward_signal.py`
+- `parity_forward_signal.txt`, `parity_forward_summary.csv`, `parity_forward_books.csv`
+- `parity_top_split_metrics.csv`
+- `parity_gex_targeted_joint.csv`
+- `min_gex_skewterm_parity_balance_veto15_metrics.csv`
