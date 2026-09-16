@@ -1242,7 +1242,8 @@ def _overlay_stream(payload: dict) -> None:
     try:
         st = _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
         quotes = st.get("quotes") or {}
-        if not quotes:
+        spots = st.get("spots") or {}
+        if not quotes and not spots:
             return
         payload["stream_ts"] = st.get("ts")
         n = 0
@@ -1253,6 +1254,9 @@ def _overlay_stream(payload: dict) -> None:
                          f"|{float(r['long_strike']):g}|{str(r['expiry_date'])[:10]}")
                 except (KeyError, TypeError, ValueError):
                     continue
+                sp = spots.get(r.get("ticker"))
+                if sp:
+                    r["entry_price"] = sp
                 q = quotes.get(k)
                 if not q or q.get("mid") is None:
                     continue
