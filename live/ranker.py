@@ -210,6 +210,13 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # we want those gates evaluated against the REAL spread quote, so neutralise
     # them here and re-apply after the combo pass. Otherwise a pair the leg mids
     # misprice is discarded before IBKR ever gets asked about it.
+    # Selection basis for the BUILD step is mid (2026-09-16). build_candidates prices
+    # with config.CREDIT_BASIS, which is "last_clamped" for the backtest; live that
+    # both mispriced pairs off stale prints and dropped any pair whose legs had not
+    # traded yet. The live credit is set properly downstream by _reprice_on_combos
+    # (combo mid > fresh combo last > leg mids) and selection scores on model credit.
+    _saved_basis = getattr(backtest_config, "CREDIT_BASIS", "last_clamped")
+    backtest_config.CREDIT_BASIS = "mid"
     if live_config.LIVE_COMBO_ENABLED:
         _saved_gates = (backtest_config.MIN_CREDIT_RATIO,
                         getattr(backtest_config, "MAX_CREDIT_RATIO", float("inf")),
@@ -218,6 +225,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         backtest_config.MAX_CREDIT_RATIO = float("inf")
         backtest_config.MAX_MAX_LOSS = float("inf")
     candidates = spreads.build_candidates(df)
+    backtest_config.CREDIT_BASIS = _saved_basis
     if live_config.LIVE_COMBO_ENABLED:
         (backtest_config.MIN_CREDIT_RATIO,
          backtest_config.MAX_CREDIT_RATIO,
