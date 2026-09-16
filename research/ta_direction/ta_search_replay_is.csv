@@ -1,0 +1,5 @@
+rule,DISC dP&L,DISC dSh,DISC dDD,DISC dWin,OOT dP&L,OOT dSh,OOT dDD,OOT dWin,disc ok,PASS
+atr_ratio bear_call >= 1.27,1094,0.02,0.9,0.2,436,0.24,0.0,1.0,True,True
+bbw_pct bear_call >= 0.867,2496,0.05,-0.6,0.5,519,0.27,0.0,0.7,True,True
+clv_s all >= 0.333,-629,0.04,0.2,0.3,-97,-0.09,0.0,-0.6,False,False
+pctb_s all >= 0.36,1435,0.1,-0.7,0.3,-923,-0.6,0.0,-1.4,True,True
