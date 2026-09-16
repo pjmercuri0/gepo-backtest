@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-16 EDT (**§0.45 is the latest state: CANON NOW INCLUDES THE OWN-GAP DRIFT IN P_real (each stock's own opening gap; the market-average version lived a few hours and is gone) — the Mac mini must `git pull`, run `deploy/mac-mini/install_crontab.sh`, and run `python3 -m live.fetch_name_gaps` once**; canon cell is still §0.43, k=4 / thr 0.005 on full-session P_real). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), **k=4, GROUND threshold 0.005 (§0.43, 2026-09-15; was k=1 / 0.01)**, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-16 EDT (**§0.46 is the latest research plan (10 option-market direction ideas); §0.45 is the latest canon state: CANON NOW INCLUDES THE OWN-GAP DRIFT IN P_real (each stock's own opening gap; the market-average version lived a few hours and is gone) — the Mac mini must `git pull`, run `deploy/mac-mini/install_crontab.sh`, and run `python3 -m live.fetch_name_gaps` once**; canon cell is still §0.43, k=4 / thr 0.005 on full-session P_real). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), **k=4, GROUND threshold 0.005 (§0.43, 2026-09-15; was k=1 / 0.01)**, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -66,6 +66,9 @@ This block and the two safety/workflow blocks immediately below it are the autho
   2026 593 / $4,591 / 2.97 / -4.0% (pre-gap $4,372 / 2.62 / -4.2%). **MAC MINI TO DO:** `git pull`,
   `deploy/mac-mini/install_crontab.sh` (09:36 + 10:06 `cron_name_gaps.sh`), then run `python3 -m live.fetch_name_gaps`
   once and confirm `live/logs/name_gaps.log` stores today's gaps. A stock without today's gap scores with zero drift.
+- **NEXT RESEARCH (§0.46): 10 option-market direction ideas** (OI pin, dealer gamma, 25-delta risk reversal, same-strike
+  call/put IV gap, smile skew into P_real, term structure, OI change, IV-with-price, post-earnings drift, live order-book
+  imbalance) with a mandatory test protocol. Price-chart TA is exhausted (§0.45).
 - **Directional win-rate work is the next research push (§0.44)**, for the MacBook: validate
   IV skew on 2020-25 (§0.19) and test a spike-reversal filter. Win rate is exactly
   delta-implied today, and +1pt of win rate is worth more than +1% of fill credit.
@@ -1825,6 +1828,66 @@ admits a holiday-shifted same-week expiry. Applies to the fetcher's chain reques
 `git pull`. Offline on `live/snapshots/2026-08-19/1531` with a full-session test store: 4 qualified
 (RTX, ISRG, MS, FCX) vs 2 under the old cell — the lower threshold passes more names; the 1.00x execution
 gate still applies on top. Expect ~15% more picks/day.
+
+## 0.46 NEXT RESEARCH: 10 option-market ideas for 1-4 day direction (2026-09-16) — for the MacBook
+
+**Why this list.** Price-chart TA is exhausted for this book (§0.45 and research/ta_direction/): 508 veto rules and
+280 ranking tilts did not beat a shuffled-data null, a walk-forward ridge on ~70 features had out-of-sample corr
+~0.01, price features flip sign by regime, and the opening gap (own or market) has no within-day power. The user
+wants a real directional edge. The information most likely to carry one at 1-4 DTE on mega caps is in the OPTIONS
+market. Rankings below are Claude's judgment; **none of these has been tested.**
+
+**Data check (verified 2026-09-16).** Backtest vendor chains (`output/<year>_sp500_last.parquet`) carry, per strike
+and expiry per day: Bid, Ask, Last, ImpliedVolatility, Delta, Gamma, Vega, Theta, **OpenInterest**,
+UnderlyingPrice. **No option Volume in the backtest.** Live snapshots (`live/snapshots/<date>/*.parquet`) add
+Volume, BidSize, AskSize. `data/earnings_calendar.csv` exists; whether it holds 2020-25 history is UNVERIFIED.
+
+### From the option chain (backtestable)
+
+1. **Open-interest pin toward expiry.** Near expiry, price tends to drift toward strikes with very large open
+   interest (dealer hedging). Signal: distance and direction from spot to the heaviest-OI strike within +-1 ATR
+   for the expiry being traded. Fits 1-4 DTE Friday expiries directly. Needs OI by strike.
+2. **Dealer gamma sign (GEX).** Net dealer gamma per name from sum(OI x gamma x 100 x spot) by strike, with a sign
+   convention for calls vs puts (document the assumption). Long dealer gamma -> mean reversion; short -> moves
+   extend. Use it to decide whether P_real should expect reversal or continuation of the recent move.
+3. **25-delta risk reversal and its day-over-day change.** Put IV minus call IV at 25 delta; a steepening put skew
+   signals downside demand. §0.19 found it significant on 2026 and never validated it on 2020-25. Run §0.19's
+   validation first, then the incremental test over GROUND.
+4. **Call-vs-put IV gap at the same strike.** By parity, call and put IV at one strike should match; call IV richer
+   than put IV -> bullish informed demand, and vice versa. Use ATM or near-ATM strikes with both sides quoted.
+5. **Implied skewness from the canon smile fits.** `ent_canon.fit_smiles` already fits a smile per chain; its slope
+   and curvature define a skewed risk-neutral distribution. Blend that skew into P_real instead of assuming the
+   last 252 moves repeat.
+6. **IV term structure.** Front-expiry ATM IV vs the next expiry's; inversion (front richer) means an imminent move
+   is priced, usually downside -> shift drift down or avoid bull puts.
+7. **Day-over-day change in open interest by side.** New put OI below spot = hedging/bearish; new call OI above
+   spot = bullish. Needs consecutive days of OI by strike.
+10. **IV rising with price.** Normally ATM IV falls in a rally. IV up while the stock is up = paying for protection
+    (bearish); IV down while the stock falls = complacent (bullish). Needs ATM IV per day.
+
+### Events and flow
+
+8. **Post-earnings drift.** After an earnings gap, stocks tend to keep drifting with the gap for days; trade only
+   with the gap in the 1-5 sessions after earnings. Needs HISTORICAL earnings dates for 2020-25 (check the
+   calendar file first; if it is forward-only, get a history before testing).
+9. **Live order-book imbalance.** Bid size vs ask size and call vs put volume at the 15:01 scan. Live data only, so
+   NO backtest: run as a logged shadow signal to build a track record.
+
+### Test protocol (mandatory — this is what went wrong on 2026-09-16)
+
+1. **Prediction first, per year:** rank correlation of the signal with the stock's own move to expiry, both pooled
+   and WITHIN each day (cross-sectional). A signal must show within-day power in most of 2020-2025. Pooled-only
+   power is just the market move (the gap's failure).
+2. **Chance baseline:** shuffle the signal across stocks within each date (for stock-level signals) or shift the
+   date sequence (for market-level signals); the real result must beat the 95th percentile of the null best.
+3. **Book test, walk-forward only:** any fitted parameter for year Y is fitted on data before Y (as `fit_gap.py`).
+   Never replay past years with a later fit.
+4. **Decompose every book change:** trades unchanged / swapped by side flip (direction) / swapped by other stock
+   (selection), with P&L per year. Report win % AND win+partial %. Say whether one year carries the result.
+5. **2026 is the only unseen data; check the mechanism there too,** not just the P&L.
+
+The user also asked ChatGPT for 10 ideas with a structured prompt (same context and failed list); merge that list
+here before testing and drop anything already covered.
 
 ## 0.45 CANON: own-gap drift in P_real (2026-09-16)
 
