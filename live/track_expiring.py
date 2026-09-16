@@ -2,7 +2,7 @@
 
 The regular `track_frozen.py` reads from the daily snapshot parquet,
 which only contains options in the main fetcher's DTE window
-(`live_config.LIVE_DTE_MIN/MAX`, default 1-7). On Fridays, picks from the
+(`live_config.LIVE_DTE_MIN/MAX`, 0-5 since 2026-09-16). On Fridays, picks from the
 prior week expire that day (DTE 0) and aren't in the snapshot, so the
 regular tracker can only capture spot — never mark.
 

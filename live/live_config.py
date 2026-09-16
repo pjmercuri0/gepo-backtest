@@ -110,11 +110,14 @@ LIVE_STRIKE_BAND_VRP     = 1.25    # IV/RV uplift when falling back to RV
 
 # --- Live DTE window ---
 # Weekly expiry window for live scans. Mon→DTE 4, Tue→DTE 3, Wed→DTE 2,
-# Thu→DTE 1, Fri→DTE 0 for same-week Friday expiry. The upper bound gives
-# holiday-shifted / calendar edge cases enough room without targeting the
-# following week's normal Friday.
+# Thu→DTE 1, Fri→DTE 0 for same-week Friday expiry. Upper bound 5 (user,
+# 2026-09-16; was 6): P_real is DTE-matched and clamps DTE to 1-4 sessions, so
+# anything beyond the same-week expiry is scored on the wrong move length. 5
+# still admits a holiday-shifted same-week expiry; a Friday scan can no longer
+# reach the following Friday (DTE 7) and a Monday scan cannot reach a
+# Saturday-dated calendar edge.
 LIVE_DTE_MIN = 0
-LIVE_DTE_MAX = 6
+LIVE_DTE_MAX = 5
 
 
 def live_dte_window(day=None):

@@ -1807,6 +1807,10 @@ this canon. The plateau is the defence.
 - Bear calls lose money in every variant in both windows (IS yield 1-3%, OOT -3..-23%); the books differ
   mainly in how many they take. Not acted on; a separate question.
 
+**Live DTE window narrowed to 0-5 (user, 2026-09-16; was 0-6):** `live_config.LIVE_DTE_MAX = 5`. P_real clamps
+DTE to 1-4 sessions, so a spread beyond the same-week expiry was being scored on the wrong move length. 5 still
+admits a holiday-shifted same-week expiry. Applies to the fetcher's chain request and the ranker's filter.
+
 **Live:** the ranker reads `ground.DKL_K` and `config.GROUND_THRESHOLD`, so the mini picks this up on
 `git pull`. Offline on `live/snapshots/2026-08-19/1531` with a full-session test store: 4 qualified
 (RTX, ISRG, MS, FCX) vs 2 under the old cell — the lower threshold passes more names; the 1.00x execution
