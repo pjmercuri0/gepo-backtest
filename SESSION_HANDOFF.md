@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-16 EDT (§0.44 is the latest state: directional win-rate research queued for the MacBook; canon cell is §0.43, k=4 / thr 0.005 on full-session P_real). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), **k=4, GROUND threshold 0.005 (§0.43, 2026-09-15; was k=1 / 0.01)**, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-16 EDT (**§0.45 is the latest state: CANON NOW INCLUDES THE MARKET-GAP DRIFT IN P_real — the Mac mini must `git pull`, run `deploy/mac-mini/install_crontab.sh`, and run `python3 -m live.fetch_market_gap` once**; canon cell is still §0.43, k=4 / thr 0.005 on full-session P_real). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), **k=4, GROUND threshold 0.005 (§0.43, 2026-09-15; was k=1 / 0.01)**, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -59,6 +59,14 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - **Run `research/dkl_2026_09_13/ablate_k.py` on the MacBook** (§0.37). It is the only real
   test of whether the D_ent penalty earns its place; it needs `featATM6.parquet`, which is
   not on the Mac mini.
+- **CANON CHANGED 2026-09-16 (§0.45): market-gap drift in P_real.** Before entry, the mean opening gap of
+  83 names (ATR units) shifts every historical move behind P_real by beta_year x z x sigma x sqrt(DTE).
+  Walk-forward beta per entry year in `ent_canon.GAP_FIT` (refit each January: `python3 fit_market_gap.py <year>`).
+  Published: IS 4,586 tr / $34,677 / Sh 1.55 / DD -13.3% (was 4,552 / $30,655 / 1.37 / -16.1%);
+  2026 594 / $5,241 / 3.17 / -3.0% (was $4,372 / 2.62 / -4.2%). **MAC MINI TO DO:** `git pull`,
+  `deploy/mac-mini/install_crontab.sh` (adds 09:36 + 10:06 `cron_market_gap.sh`), then run
+  `python3 -m live.fetch_market_gap` once and confirm `live/logs/market_gap.log` stores today's value.
+  Without a stored value the ranker scores with zero drift and prints a WARNING.
 - **Directional win-rate work is the next research push (§0.44)**, for the MacBook: validate
   IV skew on 2020-25 (§0.19) and test a spike-reversal filter. Win rate is exactly
   delta-implied today, and +1pt of win rate is worth more than +1% of fill credit.
@@ -1818,6 +1826,61 @@ admits a holiday-shifted same-week expiry. Applies to the fetcher's chain reques
 `git pull`. Offline on `live/snapshots/2026-08-19/1531` with a full-session test store: 4 qualified
 (RTX, ISRG, MS, FCX) vs 2 under the old cell — the lower threshold passes more names; the 1.00x execution
 gate still applies on top. Expect ~15% more picks/day.
+
+## 0.45 CANON: market-gap drift in P_real (2026-09-16)
+
+**What it is.** TA as a prediction feeding the belief, not a filter (user, 2026-09-16). Before entry, each
+name's opening gap = (open / prior close - 1) / (prior 14d Wilder ATR / prior close) is averaged over the 83
+names in `ent_canon.GAP_UNIVERSE`. z = (mkt_gap - mean) / sd, clipped +-4. Drift
+mu = GAP_GAMMA (1.0) x beta x z x sigma_d x sqrt(clip(DTE,1,4)), sigma_d = std of the name's last 20 daily log
+close changes ending the session before entry. Every historical move is shifted by mu before P_real counts it,
+so G, GROUND, the threshold, the side and the top-5 all follow. `GAP_GAMMA = 0` reproduces the §0.43 canon
+exactly (4,552 / $30,655; 2026 594 / $4,372 — verified).
+
+**Walk-forward.** (mean, sd, beta) for entry year Y are fitted only on stock-days before Y
+(`fit_market_gap.py`, reproduces the research fits exactly). 2020 has no fit (no drift). Betas:
+2021 0.199 (5 months of data only), 2022 0.041, 2023 0.016, 2024 0.025, 2025 0.023, 2026 0.054.
+**Each January: `python3 build_market_gap.py` (writes .new if the parquet exists — rename after checking),
+then `python3 fit_market_gap.py <year>` and paste the line into `GAP_FIT`.** Until then the latest earlier
+year's fit is used and the ranker warns.
+
+**Published numbers (report_ent_canon.py, qty1):**
+
+| period | canon P&L | +gap P&L | canon Sh | +gap Sh | canon DD | +gap DD |
+|---|---|---|---|---|---|---|
+| 2021 | $6,009 | $5,923 | 1.34 | 1.67 | -16.7% | -9.6% |
+| 2022 | $2,785 | $4,339 | 1.11 | 1.51 | -20.4% | -24.3% |
+| 2023 | $1,067 | $2,374 | 0.50 | 1.06 | -21.3% | -17.1% |
+| 2024 | $9,559 | $10,199 | 2.30 | 2.52 | -11.5% | -11.0% |
+| 2025 | $6,589 | $7,196 | 1.55 | 1.73 | -14.4% | -11.6% |
+| IS 2020-25 | $30,655 | $34,677 | 1.37 | 1.55 | -16.1% | -13.3% |
+| 2026 | $4,372 | $5,241 | 2.62 | 3.17 | -4.2% | -3.0% |
+
+**Evidence and its limits (do not overstate).**
+- Stock-level TA failed every chance test (research/ta_direction/ta_search2.py, ta_search3.py: 508 vetoes, 280
+  tilts, walk-forward ridge). Within a day, TA rank says nothing about which name does better; most features
+  flip sign by regime.
+- The gap works only as a MARKET-level signal (day-level corr 0.079, t 2.6, 1,051 days).
+- 2022-25 walk-forward, 126 market-forecast variants: family-wise p = 0.12 against a date-shift null
+  (ta_predict_mkt.py). Not significant on its own. 2026 was never used to choose it and improved at gamma 0.5-1.5;
+  gamma 3 failed 2026.
+- The feature was chosen after looking at 2020-25 ICs, so the walk-forward fits beta honestly but not that
+  choice. 2026 (8 months) is the only clean check.
+- Partial-inclusive win rate is unchanged 2021-25 (53.0% both): the gain is partials becoming full wins.
+
+**Live path.** `live/fetch_market_gap.py` (read-only IBKR, client id 179, ~6 s pacing, ~9 min for 83 names) at
+09:36 with a 10:06 retry -> `output/market_gap_live.parquet` (merge; today's row only). Today's open comes from
+IBKR's in-progress daily bar, else the first 30-minute bar of today — **this path has NOT been run against IBKR
+yet (written on the MacBook); check the first log.** `live/ranker.py` reads today's row; if missing, zero drift
++ WARNING. Backtest series: `build_market_gap.py` -> `output/market_gap_backtest.parquet` (Yahoo files plus the
+Yahoo chart API for missing dates).
+
+**Data defect found.** `data/daily_bars_yahoo/*.csv` has no bars 2026-01-01..2026-05-14. Any 2026 TA feature built
+from those files is invalid (this is why the 2026-09-16 early-morning TA "OOT" checks changed only 5 trades).
+The files were not modified.
+
+**Two bugs caught during the build (both fixed before publishing):** a NaN drift made P_real count every
+trade as a sure win; `gap_drift`'s gamma default was bound at import time.
 
 ## 0.44 NEXT RESEARCH: directional win-rate work (2026-09-16) — for the MacBook
 

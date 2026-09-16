@@ -34,6 +34,31 @@ COMMISSION   = 1.30       # $ per spread per contract, opening only (IBKR ~$0.65
 TOP_N        = 5
 PRIOR        = 0.5        # pseudo-count per state in P_real
 
+# market-gap drift in P_real (2026-09-16, handoff §0.45). Before entry, the day's opening gap of each name in
+# GAP_UNIVERSE, (open / prior close - 1) / (prior 14d Wilder ATR / prior close), is averaged across names. Its
+# z-score times beta forecasts every name's move to expiry in units of its own daily sigma; that drift shifts each
+# historical move before P_real counts it. WALK-FORWARD: an entry in year Y uses GAP_FIT[Y], fitted only on
+# stock-days before Y (fit_market_gap.py). Refit each January and add the new year. A year with no entry uses the
+# latest year below it; years before the first key get no drift. GAP_GAMMA = 0 turns it off (pre-gap canon).
+GAP_GAMMA    = 1.0
+GAP_FIT      = {          # entry year: (mean, sd, beta) of the market gap z-score and slope -- fit_market_gap.py
+    2021: (0.0890857010555448, 0.3422397235325401, 0.19892916413790118),     # 1,782 stock-days before 2021 (2020-07..12 only)
+    2022: (0.04051205616242337, 0.2607364711351133, 0.04060944837939027),    # 6,727
+    2023: (0.013461065578095038, 0.27594679408059763, 0.016312593717690612), # 13,307
+    2024: (0.0067927752707501975, 0.25738786729728574, 0.024839317270095033),# 18,199
+    2025: (0.00854523141753816, 0.24627839694326897, 0.02266987204858886),   # 23,461
+    2026: (0.007042259513691144, 0.23600083470569388, 0.05366186022927569),  # 29,383 stock-days 2020-07..2025-12
+}
+GAP_CLIP     = 4.0
+GAP_ATR_N    = 14
+GAP_SIGMA_N  = 20         # sessions of log close changes, ending the session before entry
+GAP_UNIVERSE = ('AAPL', 'ABBV', 'ABT', 'ACN', 'ADI', 'ADP', 'AMGN', 'AMZN', 'AVGO', 'AXP', 'BA', 'BAC', 'BMY', 'CAT', 'CL', 'CME',
+                'COST', 'CRM', 'CSCO', 'CSX', 'CVX', 'DE', 'DHR', 'DIS', 'EMR', 'EOG', 'F', 'FCX', 'GE', 'GILD', 'GM', 'GOOGL', 'GS',
+                'HD', 'HON', 'IBM', 'INTC', 'ISRG', 'IWM', 'JNJ', 'JPM', 'KO', 'LOW', 'MA', 'MCD', 'MDT', 'MMM', 'MO', 'MRK', 'MS',
+                'MSFT', 'NEE', 'NFLX', 'NOW', 'NSC', 'NVDA', 'ORCL', 'PEP', 'PFE', 'PG', 'PM', 'PNC', 'PYPL', 'QCOM', 'QQQ', 'RTX',
+                'SBUX', 'SCHW', 'SO', 'SPY', 'T', 'TJX', 'TSLA', 'TXN', 'UNH', 'UPS', 'USB', 'V', 'VRTX', 'VZ', 'WM', 'WMT', 'XOM')
+GAP_MIN_NAMES = 60        # fewer names with a valid gap than this -> no forecast that day (drift 0)
+
 # execution targets, as multiples of fair (model) credit
 MULT_BREAKEVEN = 0.965
 # Min and target are multiples of THIS spread's model credit, not absolute
@@ -178,14 +203,17 @@ def d_ent(Q: np.ndarray) -> np.ndarray:
 
 
 # ── 3. realized belief from daily closes ────────────────────────────────────
-def p_real(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW) -> np.ndarray:
+def p_real(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW, mu=None) -> np.ndarray:
     """(p, q, ro) per candidate from the name's realized DTE-day moves vs the exact strikes.
 
     closes: columns ticker, date, close (daily). Strictly causal: only moves that COMPLETED
     before the entry date are used. Rows with < MIN_OBS valid moves get NaN.
+    mu: optional per-candidate drift (return units, aligned to cands' row order) added to every historical
+    move before it is counted (gap_drift). None or 0 = no drift.
     """
     out = np.full((len(cands), 3), np.nan)
     C = cands.reset_index(drop=True)
+    MU = np.zeros(len(C)) if mu is None else np.nan_to_num(np.asarray(mu, dtype=float))
     C['entry_date'] = pd.to_datetime(C.entry_date).dt.normalize()
     px = closes.dropna().drop_duplicates(['ticker', 'date']).sort_values(['ticker', 'date'])
     by = {tk: g for tk, g in px.groupby('ticker')}
@@ -203,7 +231,7 @@ def p_real(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW) -> n
             p0 = pos[m]; sub = g[m]; bp = (sub.spread_type == 'bull_put').values
             ths = sub.short_strike.values / sub.entry_price.values - 1; thl = sub.long_strike.values / sub.entry_price.values - 1
             idx = (p0 - d - 1)[:, None] - np.arange(window)[None, :]; ok = idx >= 0
-            r = np.where(ok, R[np.clip(idx, 0, len(R) - 1)], np.nan)
+            r = np.where(ok, R[np.clip(idx, 0, len(R) - 1)] + MU[sub.index.values][:, None], np.nan)
             bs_ = np.where(bp[:, None], r <= ths[:, None], r >= ths[:, None]) & ok
             bl = np.where(bp[:, None], r <= thl[:, None], r >= thl[:, None]) & ok
             n = ok.sum(1); ns = bs_.sum(1); nl = bl.sum(1)
@@ -221,6 +249,72 @@ def backtest_closes(store: str = 'output/daily_closes.parquet', spy_csv: str = '
     d['date'] = pd.to_datetime(d['date']).dt.normalize()
     spy = set(pd.to_datetime(pd.read_csv(spy_csv, parse_dates=['Date']).Date).dt.normalize())
     return d[d.date.isin(spy)].sort_values(['ticker', 'date']).reset_index(drop=True)
+
+
+# ── 3b. market-gap drift (§0.45) ────────────────────────────────────────────
+def name_gaps(bars: pd.DataFrame) -> pd.DataFrame:
+    """Per-name opening gap in ATR units from daily OHLC bars (columns ticker, date, open, high, low, close).
+    gap_t = (open_t / close_{t-1} - 1) / (ATR14_{t-1} / close_{t-1}), ATR = Wilder EWM of true range.
+    A name's first 60 bars carry no gap (ATR warm-up), as in the research frame."""
+    out = []
+    for tk, y in bars.groupby('ticker'):
+        y = y.dropna(subset=['open', 'high', 'low', 'close']).sort_values('date').drop_duplicates('date').reset_index(drop=True)
+        c, h, l, o = y.close, y.high, y.low, y.open
+        tr = pd.concat([h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1).max(axis=1)
+        atr = tr.ewm(alpha=1.0 / GAP_ATR_N, adjust=False).mean()
+        g = (o / c.shift(1) - 1) / (atr.shift(1) / c.shift(1))
+        g[y.index < 60] = np.nan
+        out.append(pd.DataFrame({'ticker': tk, 'date': pd.to_datetime(y.date).dt.normalize(), 'gap': g.values}))
+    return pd.concat(out, ignore_index=True) if out else pd.DataFrame(columns=['ticker', 'date', 'gap'])
+
+
+def market_gap(bars: pd.DataFrame) -> pd.DataFrame:
+    """Daily mean gap over GAP_UNIVERSE names -> columns date, mkt_gap, n_names. Days with fewer than
+    GAP_MIN_NAMES valid names get mkt_gap NaN (no forecast)."""
+    g = name_gaps(bars[bars.ticker.isin(GAP_UNIVERSE)]).dropna(subset=['gap'])
+    d = g.groupby('date').gap.agg(['mean', 'size']).reset_index().rename(columns={'mean': 'mkt_gap', 'size': 'n_names'})
+    d.loc[d.n_names < GAP_MIN_NAMES, 'mkt_gap'] = np.nan
+    return d
+
+
+def gap_fit(year: int) -> tuple:
+    """(mean, sd, beta) for an entry year: GAP_FIT[year], else the latest earlier key, else no drift (beta 0)."""
+    ks = [k for k in GAP_FIT if k <= year]
+    return GAP_FIT[max(ks)] if ks else (0.0, 1.0, 0.0)
+
+
+def gap_drift(cands: pd.DataFrame, closes: pd.DataFrame, mkt_gap: pd.DataFrame, gamma: float | None = None, fit: tuple | None = None) -> np.ndarray:
+    """Per-candidate drift mu (return units) for p_real, aligned to cands' row order.
+    mu = gamma * beta * clip((mkt_gap - mean) / sd, +-GAP_CLIP) * sigma_d * sqrt(clip(DTE, 1, 4)), (mean, sd, beta) =
+    gap_fit(entry year) unless `fit` is given,
+    sigma_d = std of the name's last GAP_SIGMA_N daily log close changes ending the session before entry.
+    No market gap for the date, or no sigma -> 0 (canon without the forecast)."""
+    gamma = GAP_GAMMA if gamma is None else gamma                         # read at call time, not import time
+    C = cands.reset_index(drop=True)
+    ed = pd.to_datetime(C.entry_date).dt.normalize()
+    if gamma == 0 or mkt_gap is None or len(mkt_gap) == 0:
+        return np.zeros(len(C))
+    mg = mkt_gap.assign(date=pd.to_datetime(mkt_gap.date).dt.normalize()).drop_duplicates('date').set_index('date').mkt_gap
+    yrs = ed.dt.year.values
+    m_, s_, b_ = (np.array([gap_fit(y)[j] for y in yrs]) for j in range(3)) if fit is None else (np.full(len(C), fit[j]) for j in range(3))
+    z = np.clip((ed.map(mg).values.astype(float) - m_) / s_, -GAP_CLIP, GAP_CLIP)
+    px = closes.dropna().drop_duplicates(['ticker', 'date']).sort_values(['ticker', 'date'])
+    sd = np.full(len(C), np.nan)
+    for tk, g in C.groupby('ticker'):
+        s = px[px.ticker == tk]
+        if len(s) <= GAP_SIGMA_N:
+            continue
+        dates = pd.to_datetime(s.date).dt.normalize().values.astype('datetime64[ns]')
+        lr = np.diff(np.log(s.close.values.astype(float)))                 # lr[i] = change into session i+1
+        cs1, cs2 = np.r_[0, np.cumsum(lr)], np.r_[0, np.cumsum(lr * lr)]
+        k = np.searchsorted(dates, ed[g.index].values.astype('datetime64[ns]'))  # sessions strictly before entry: 0..k-1
+        hi = k - 1; lo = hi - GAP_SIGMA_N                                     # changes lr[lo..hi-1] end at session k-1
+        okk = lo >= 0; n = GAP_SIGMA_N
+        m1 = np.where(okk, (cs1[np.clip(hi, 0, None)] - cs1[np.clip(lo, 0, None)]) / n, np.nan)
+        m2 = np.where(okk, (cs2[np.clip(hi, 0, None)] - cs2[np.clip(lo, 0, None)]) / n, np.nan)
+        sd[g.index.values] = np.sqrt(np.clip((m2 - m1 * m1) * n / (n - 1), 0, None))
+    d = np.clip(pd.to_numeric(C.DTE, errors='coerce').fillna(1).values, 1, 4)
+    return np.nan_to_num(gamma * b_ * z * sd * np.sqrt(d))
 
 
 # ── 4. Kelly growth (identical FOC to ground._score_row) ────────────────────
@@ -246,13 +340,13 @@ def kelly(p, q, ro, b):
 
 
 # ── 5. score ────────────────────────────────────────────────────────────────
-def score(C: pd.DataFrame, closes: pd.DataFrame, k: float = K, thr: float = THR, credit_col: str = 'model_credit') -> pd.DataFrame:
+def score(C: pd.DataFrame, closes: pd.DataFrame, k: float = K, thr: float = THR, credit_col: str = 'model_credit', mu=None) -> pd.DataFrame:
     """C must already carry model_credit + D_ent (price_spreads). Adds p,q,ro,w_star,G,EV,DKL,GROUND,qualified.
 
     credit_col: the credit the Kelly growth is computed on. 'model_credit' (backtest canon) or
     'net_credit' (live: IBKR quoted mid, user decision 2026-09-13 — uncapped)."""
     C = C.copy()
-    P = p_real(C, closes)
+    P = p_real(C, closes, mu=mu)
     C['p'], C['q'], C['ro'] = P[:, 0], P[:, 1], P[:, 2]
     width = (C.short_strike - C.long_strike).abs().values.astype(float)
     cr = C[credit_col].values.astype(float)
@@ -318,6 +412,7 @@ CANON_LABELS = {
     'dkl':       'D_ent = D(Q_bs‖U₃) = ln3 − H(Q_bs), Q_bs = N(d2) at the smile-fit IVs (Mercurio–Wu–Xie 2020 eq. 19)',
     'window':    f'{WINDOW} full sessions of realized DTE-matched moves vs the exact strikes (P_real, every trading day)',
     'selection': f'top-{TOP_N} per day, k={K:g}, GROUND ≥ {THR:g}',
+    'gap':       f'P_real drift = {GAP_GAMMA:g} × β_year σ × z(mean opening gap of {len(GAP_UNIVERSE)} names, ATR units) × √DTE; β walk-forward, fitted on years before entry (§0.45)',
     'scoring':   'G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G−1)·e^(−k·D_ent)',
     'fill':      f'{FILL_MULT:.2f}× smile-fit model credit (19 real fills), ${COMMISSION:.2f} commission/spread',
     'targets':   f'min {MULT_MIN:.2f}× model credit, target {MULT_TARGET_LO:.2f}–{MULT_TARGET_HI:.2f}×',

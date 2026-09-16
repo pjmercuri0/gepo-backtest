@@ -1,0 +1,59 @@
+[   2.2s] candidates scored: 41,871
+[   3.5s] features 21/83 tickers (25%)
+[   4.8s] features 42/83 tickers (51%)
+[   6.0s] features 63/83 tickers (76%)
+[   7.3s] features 83/83 tickers (100%)
+[   7.8s] features merged; coverage 92.4% of candidates
+[  12.3s] reproduction: IS 4554 trades $30,842 (published 4,552 / $30,655); OOT 594 $4,372 (594 / $4,372)
+
+BASELINE canon book by period:
+           n      pnl   win   yld    sh     dd
+DISC  2108.0  13492.0  44.2  9.42  1.45 -16.08
+VAL   2446.0  17350.0  43.5  9.66  1.45 -20.03
+OOT    594.0   4372.0  41.9  9.94  2.62  -4.24
+[  12.7s] screened 8/40 feature groups (20%)
+[  13.0s] screened 16/40 feature groups (40%)
+[  13.4s] screened 24/40 feature groups (60%)
+[  13.8s] screened 32/40 feature groups (80%)
+[  14.0s] screened 40/40 feature groups (100%)
+
+=== SCREEN (discovery pool, 3,995 eligible candidates): 138 rules tested, 9 pass t <= -2 AND vetoed worse in all 3 years ===
+       feat grp        lab op       thr  n_veto  veto_pnl  rest_pnl   diff     t                  yrs
+   ret20z_s all bottom 10% <= -0.784004     400     -6.79      7.55 -14.35 -3.53 [-8.8, -15.7, -12.0]
+    xs20z_s all bottom 20% <= -0.539957     799     -2.59      8.29 -10.88 -3.41 [-12.5, -11.2, -9.4]
+      clv_s all    top 10% >=  0.427895     400     -5.79      7.44 -13.22 -3.30  [-6.7, -18.9, -9.7]
+upcount10_s all bottom 10% <= -1.000000    1024      0.03      8.21  -8.18 -2.87   [-3.1, -9.4, -7.7]
+upcount10_s all bottom 20% <= -1.000000    1024      0.03      8.21  -8.18 -2.87   [-3.1, -9.4, -7.7]
+      clv_s all    top 20% >=  0.339044     799     -0.79      7.84  -8.62 -2.83 [-12.3, -5.2, -12.4]
+    xs20z_s all bottom 10% <= -0.939699     400     -3.81      7.22 -11.03 -2.62 [-22.3, -8.2, -10.7]
+       sr10 all bottom 20% <=  0.962363     799     -0.32      7.72  -8.04 -2.59  [-10.4, -5.2, -8.8]
+       sr10 all bottom 10% <=  0.588331     400     -1.41      6.95  -8.36 -2.06 [-12.0, -10.9, -3.3]
+[  17.9s] replayed rule 1/9 (11%): ret20z_s all <= -0.784  PASS=False
+[  22.0s] replayed rule 2/9 (22%): xs20z_s all <= -0.54  PASS=False
+[  25.3s] replayed rule 3/9 (33%): clv_s all >= 0.428  PASS=True
+[  28.3s] replayed rule 4/9 (44%): upcount10_s all <= -1  PASS=False
+[  31.6s] replayed rule 5/9 (56%): upcount10_s all <= -1  PASS=False
+[  35.3s] replayed rule 6/9 (67%): clv_s all >= 0.339  PASS=False
+[  38.6s] replayed rule 7/9 (78%): xs20z_s all <= -0.94  PASS=False
+[  41.5s] replayed rule 8/9 (89%): sr10 all <= 0.962  PASS=False
+[  44.5s] replayed rule 9/9 (100%): sr10 all <= 0.588  PASS=False
+
+=== REPLAY with refill: change vs baseline (qty1 P&L $, weekly Sharpe, maxDD pts, win pts) ===
+                  rule  DISC dP&L  DISC dSh  DISC dDD  DISC dWin  VAL dP&L  VAL dSh  VAL dDD  VAL dWin  OOT dP&L  OOT dSh  OOT dDD  OOT dWin  disc ok  PASS
+ret20z_s all <= -0.784       2576      0.21      -0.3        1.0     -1002     0.02     -3.1       0.8      -474    -0.29      0.0       0.1     True False
+  xs20z_s all <= -0.54        432      0.05      -2.9        1.2     -2807    -0.12     -3.1       0.6      -753    -0.46     -1.8      -0.1     True False
+    clv_s all >= 0.428         54      0.02       2.6        0.1      2377     0.20      0.2       0.8       650     0.32      0.0       0.4     True  True
+ upcount10_s all <= -1        419      0.18      -5.6        1.4     -2292    -0.08    -10.7       0.5      -741    -0.61     -5.0      -0.6     True False
+ upcount10_s all <= -1        419      0.18      -5.6        1.4     -2292    -0.08    -10.7       0.5      -741    -0.61     -5.0      -0.6     True False
+    clv_s all >= 0.339       -220      0.04       0.6        0.1      -137     0.14      0.9       0.4       144     0.00      0.0      -0.3    False False
+  xs20z_s all <= -0.94        603      0.07      -2.9        0.8      -788    -0.03     -2.5       0.4      -658    -0.39     -0.2      -0.3     True False
+     sr10 all <= 0.962       2250      0.37       1.0        1.3     -2403    -0.01     -2.5      -0.3      -747    -0.57     -5.4       0.1     True False
+     sr10 all <= 0.588       1289      0.15      -1.1        0.4        26     0.10     -2.5      -0.2      -889    -0.54     -0.5      -0.3     True False
+
+=== COMBINED veto of all 1 passing rules ===
+     baseline                                   combined                                   
+            n      pnl   win   yld    sh     dd        n      pnl   win    yld    sh     dd
+DISC   2108.0  13492.0  44.2  9.42  1.45 -16.08   2025.0  13546.0  44.3   9.81  1.47 -13.52
+VAL    2446.0  17350.0  43.5  9.66  1.45 -20.03   2357.0  19727.0  44.3  11.33  1.65 -19.79
+OOT     594.0   4372.0  41.9  9.94  2.62  -4.24    589.0   5022.0  42.3  11.46  2.94  -4.24
+[  47.5s] done
