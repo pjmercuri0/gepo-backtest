@@ -1249,6 +1249,22 @@ def actuals():
                            assign_ts=risk.get("_ts"))
 
 
+def _held_shorts() -> dict:
+    """(ticker, spread_type, expiry) -> the short strikes already held, unexpired."""
+    out = {}
+    today = ddate.today().isoformat()
+    for t in (_actuals_store().get("trades") or []):
+        p = t.get("pick") or {}
+        exp = str(p.get("expiry_date") or "")[:10]
+        if not exp or exp < today:
+            continue
+        try:
+            out.setdefault((p.get("ticker"), p.get("spread_type"), exp), []).append(float(p["short_strike"]))
+        except (TypeError, ValueError, KeyError):
+            continue
+    return out
+
+
 def _held_keys() -> set:
     """(ticker, spread_type, short, long, expiry) of every actuals row not yet expired.
     IBKR refuses a second order on an option you already hold, so the live tab paints
@@ -1326,6 +1342,7 @@ def _overlay_stream(payload: dict) -> None:
 
 def _mark_held(payload: dict) -> None:
     keys = _held_keys()
+    shortmap = _held_shorts()
     for lst in (payload.get("ticker") or [], payload.get("top_picks") or []):
         for r in lst:
             try:
@@ -1334,6 +1351,25 @@ def _mark_held(payload: dict) -> None:
             except (TypeError, ValueError):
                 r["held"] = False; continue
             r["held"] = k in keys
+            # Same name and side, different strike (user 2026-09-15): green when the new
+            # short sits AWAY from the adverse direction relative to the one already held,
+            # red when it has moved WITH the stock -- selling into the move. ABT held short
+            # 102C, suggested 103C: the stock ran up, the suggestion followed it, so red.
+            if r["held"]:
+                r["held_cmp"] = "same"
+            else:
+                try:
+                    shorts = shortmap.get((r.get("ticker"), r.get("spread_type"),
+                                           str(r.get("expiry_date") or "")[:10]))
+                    if shorts:
+                        ks = float(r["short_strike"])
+                        ref = max(shorts) if r["spread_type"] == "bear_call" else min(shorts)
+                        adverse = (ks > ref) if r["spread_type"] == "bear_call" else (ks < ref)
+                        r["held_cmp"] = "same" if ks == ref else ("worse" if adverse else "better")
+                    else:
+                        r["held_cmp"] = None
+                except (TypeError, ValueError, KeyError):
+                    r["held_cmp"] = None
 
 
 @app.route("/api/latest.json")

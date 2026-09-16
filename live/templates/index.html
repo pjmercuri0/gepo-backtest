@@ -316,7 +316,7 @@ function renderRanked(rows, maxGround, kVal) {
     // Held = the + is painted blue (user 2026-09-15); row text stays white / grey.
     const rowClass = isPrimary ? "" : " unqualified";
     return `<tr class="ranked-row${rowClass}">
-      <td class="rank-cell"><button class="actuals-add${r.held ? " held-add" : ""}" data-url="/api/actuals/from_live/${i}" title="${r.held ? "already in Actuals — IBKR will refuse a second order on the same option" : "add this pick to actuals"}">+</button> ${i+1}</td>
+      <td class="rank-cell"><button class="actuals-add${r.held_cmp === "same" ? " held-add" : r.held_cmp === "better" ? " held-better" : r.held_cmp === "worse" ? " held-worse" : ""}" data-url="/api/actuals/from_live/${i}" title="${r.held_cmp === "same" ? "already in Actuals — IBKR will refuse a second order on the same option" : r.held_cmp === "better" ? "same name and side you hold, strike away from the move" : r.held_cmp === "worse" ? "same name and side you hold, strike has followed the stock — selling into the move" : "add this pick to actuals"}">+</button> ${i+1}</td>
       <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> ${r.ticker}${oiWarning(r)}</td>
       <td>${r.entry_price != null ? fmtMoney(r.entry_price) : "—"}</td>
       <td>${fmtMoney(r.short_strike)} / ${fmtMoney(r.long_strike)}</td>
