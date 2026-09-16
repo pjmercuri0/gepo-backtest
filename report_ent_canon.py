@@ -1,8 +1,9 @@
 """Regenerate live/data/backtest_equity.json + oot_equity.json under the D_ent canon (2026-09-13).
 
-Selection and pricing come from the research frame research/dkl_2026_09_13/featATM6.parquet, which
+Candidates and pricing come from the research frame research/dkl_2026_09_13/featATM6.parquet, which
 holds every 50-60 delta candidate 2020-2026 with: fitted-delta strikes, smile-fit model credit,
-P_real (p, q, ro), EV, D_ent and the realized outcome. That frame is rebuilt by
+D_ent and the realized outcome. P_real (p, q, ro) and EV are RECOMPUTED here on the full-session
+close series (2026-09-15); the frame's own p/q/ro were built on a sparse candidate-day series. That frame is rebuilt by
 research/dkl_2026_09_13/{band_sweep,band_checks,atm_dkl,atm2,..}.py from the vendor year files.
 
 Payload shape is report_mid_canon.build_payload's (summary / points / weeks / trades, qty1 /
@@ -41,6 +42,15 @@ def select(win):
     C = pd.read_parquet(FRAME)
     C = C[(C.win == win)].dropna(subset=['EV']).copy()
     C['entry_date'] = pd.to_datetime(C.entry_date); C['expiry_date'] = pd.to_datetime(C.expiry_date)
+    # 2026-09-15: P_real recomputed on the FULL-SESSION close series (ec.backtest_closes), not the frame's
+    # sparse candidate-day series (20-35% of sessions missing, handoff §0.42). Frame p/q/ro/EV are overwritten.
+    P = ec.p_real(C, ec.backtest_closes())
+    C['p'], C['q'], C['ro'] = P[:, 0], P[:, 1], P[:, 2]
+    b = C.model_credit.values / (C.width.values - C.model_credit.values)
+    _, ell = ec.kelly(np.nan_to_num(C.p.values), np.nan_to_num(C.q.values), np.nan_to_num(C.ro.values), b)
+    ell[~np.isfinite(C.p.values)] = np.nan
+    C['EV'] = np.exp(ell) - 1.0
+    C = C.dropna(subset=['EV']).copy()
     C['GROUND'] = C.EV * np.exp(-ec.K * C.D_ent)
     sel = (C[C.GROUND >= ec.THR].sort_values(['entry_date', 'GROUND'], ascending=[True, False])
            .groupby('entry_date').head(ec.TOP_N)).copy()
@@ -60,7 +70,7 @@ def select(win):
 def patch_config(payload, oot=False):
     c = payload['config']
     c['delta'] = ec.CANON_LABELS['delta']; c['dkl'] = ec.CANON_LABELS['dkl']; c['window'] = ec.CANON_LABELS['window']
-    c['selection'] = ec.CANON_LABELS['selection'] + (' — frozen canon, no 2026 tuning' if oot else ' (all days)')
+    c['selection'] = ec.CANON_LABELS['selection'] + (' — k/thr cell chosen 2026-09-15 with 2026 in view (§0.43): NOT a clean holdout' if oot else ' (all days)')
     c['scoring'] = ec.CANON_LABELS['scoring']
     c['fill_basis'] = ec.CANON_LABELS['fill'] + '; partial-WIN at 50% intrinsic'
     c['targets'] = ec.CANON_LABELS['targets']

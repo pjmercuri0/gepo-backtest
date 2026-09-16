@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-15 EDT (§0.42 is the latest state: live P_real is IBKR-only; seed the store on the mini). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), k=1, GROUND threshold 0.01, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-15 EDT (§0.43 is the latest state: canon cell moved to k=4 / thr 0.005 on full-session P_real). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), **k=4, GROUND threshold 0.005 (§0.43, 2026-09-15; was k=1 / 0.01)**, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -19,8 +19,8 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - GitHub SSH authentication works on both machines. Any later statement that GitHub authentication is broken, a token must be fixed, or commits still need to be transferred is historical and obsolete.
 - The Mac mini at `/Users/securio/Downloads/gepo-backtest` is the production runner. The MacBook is the development machine.
 - Production strategy canon is the **D_ent** canon of 2026-09-13 (§0.33-0.35):
-  `DELTA_TARGET=0.55`, `DELTA_MIN=0.50`, `DELTA_MAX=0.60`, `DKL_K=1.0`,
-  `GROUND_THRESHOLD=0.01`, `PROB_BASIS="realized"`, `DKL_REFERENCE="entropy_uniform"`
+  `DELTA_TARGET=0.55`, `DELTA_MIN=0.50`, `DELTA_MAX=0.60`, `DKL_K=4.0`,
+  `GROUND_THRESHOLD=0.005` (§0.43, 2026-09-15; was 1.0 / 0.01), `PROB_BASIS="realized"`, `DKL_REFERENCE="entropy_uniform"`
   (that last name describes the behaviour but is NOT a constant in `ent_canon.py` — §0.37).
   **LIVE SELECTION (2026-09-13, late): rank on MODEL credit, execution gate = IBKR quote >= 1.00x model**
   (`LIVE_SELECTION_CREDIT="model"`, ranker gates on `tgt_walkaway_credit`). Quoted-mid ranking and the
@@ -43,6 +43,10 @@ This block and the two safety/workflow blocks immediately below it are the autho
   IBKR replay** (§0.38) — DONE on the mini via the staged chains; see §0.38/§0.39. The mini only has chains from the 2026-08-19 cutover, and over
   those 12 days the NEW canon LOST to the old one (-$21 vs +$1,350) on a credit/width of
   0.503 vs the backtest's 0.543. This needs a longer window before the canon is trusted live.
+- **CANON CELL CHANGED 2026-09-15 (§0.43): k=4, thr 0.005, P_real on full-session closes.** Mini
+  picks it up on `git pull` (ranker reads `ground.DKL_K` / `config.GROUND_THRESHOLD`). Published:
+  IS 4,552 tr / $30,655 / Sh 1.37 / DD -16.1%; OOT 594 / $4,372 / 2.62 / -4.2%. OOT is no longer a
+  clean holdout for this cell (it was used to confirm it).
 - **ON THE MAC MINI: seed the IBKR close store (§0.42).** `live/closes.py` now reads ONLY
   `output/ibkr_closes.parquet`; until `python3 -m live.fetch_ibkr_closes --years 2` has run
   there, live P_real is computed on snapshot prints alone (the ranker prints a WARNING).
@@ -1756,6 +1760,57 @@ G=$(ps -eo pid,ppid,cmd | grep "[g]unicorn" | grep "live.wsgi"); M=$(echo "$G" |
   removed, not verified unused downstream.
 - Rerun the IS backtest on the actual IBKR series once the mini has it, so the number
   the live book is held to is computed on the series the live book uses.
+
+## 0.43 CANON CHANGE: k=4, thr 0.005, P_real on full-session closes (2026-09-15) — CURRENT CANON
+
+**What changed (user decision 2026-09-15, "proposed win. lets change to that"):**
+
+| | old canon (§0.35) | NEW canon |
+|---|---|---|
+| P_real close series | research frame: candidate-day prices only (20-35% of sessions missing, §0.42) | full-session: every trading day (vendor store on SPY sessions for the backtest; the IBKR store live) |
+| GROUND threshold | 0.01 | **0.005** |
+| k (exp(-k·D_ent)) | 1.0 | **4.0** |
+| everything else | unchanged: 0.55Δ (0.50-0.60), exact-strike P_real over 252 sessions, D_ent, smile-fit credit, fill 1.08x, top-5/day, $1.30 commission | |
+
+Constants: `ent_canon.K/THR`, `config.GROUND_THRESHOLD`, `ground.DKL_K`. `ent_canon.backtest_closes()` is the
+backtest's full-session series; `report_ent_canon.select()` now RECOMPUTES p/q/ro/EV on it instead of taking
+the frame's. Payloads regenerated (numbers reproduce `research/dkl_2026_09_13/expiry_k_sweep.log` exactly);
+`_fill_sensitivity.html` regenerated for the new books. Deployed to Mya.
+
+**Published numbers, qty1 on $10k, fill 1.08x:**
+
+| | old canon (frame series) | old cell on full-session (honest) | **NEW canon** |
+|---|---|---|---|
+| IS 2020-25 | 3,997 tr · $28,347 · yield 10.3% · Sh 1.35 · DD -14.9% · Calmar 1.87 | 3,999 · $24,422 · 8.9% · 1.20 · -15.9% · 1.59 | **4,552 · $30,655 · 9.5% · 1.37 · -16.1% · 1.82** |
+| OOT 2026 | 544 · $4,446 · 11.2% · 2.34 · -6.6% · 10.7 | 547 · $3,058 · 7.7% · 1.75 · -10.5% · 4.5 | **594 · $4,372 · 9.9% · 2.62 · -4.2% · 16.3** |
+
+qty2: IS $61,310 / DD -20.7%, OOT $8,744 / -7.1%. ~830 trades/yr (was ~730). Bull-put share 77% IS / 80% OOT.
+Every IS year positive at the new cell (old cell lost 2023): 2020 $4.6k, 2021 $6.0k, 2022 $2.8k, 2023 $1.1k,
+2024 $9.6k, 2025 $6.6k. Fill sensitivity: at 1.04x IS Sh 0.91 / OOT 1.63 (old cell 0.75 / 0.85); break-even
+~0.985x model in both windows; ~$6,500 IS P&L (qty2) per 1% of model credit.
+
+**Why this cell.** On full-session P_real the canon's k x thr grid (`expiry_k_sweep.log`, fill 1.08) has a
+plateau at thr 0.005, k 3-6 that holds in BOTH windows: IS Sh 1.28-1.37 / Calmar 1.35-1.82, OOT Sh 2.62-2.96 /
+DD -4.2..-4.8 / Calmar 15.8-16.6. k=4 is its middle. Neighbours are all good; it is not a spike.
+**Caveat, stated on the OOT tab:** 2026 was used to confirm the cell, so it is no longer a clean holdout for
+this canon. The plateau is the defence.
+
+**Alternatives tested and rejected the same day (all on full-session closes):**
+- 52-expiry P_real (moves ending on the past 52 weekly expiries): best single OOT cells (thr 0.005 k=2: 2.89)
+  but IS drawdown -23..-31% at EVERY k; the user's candidate cell (thr 0.005, k=8) beats the new canon on
+  IS Sharpe by 0.06 (1.43 vs 1.37) and loses on the other eight metrics (IS yield 7.5 vs 9.5, DD -24.6 vs
+  -16.1, Calmar 1.07 vs 1.82; OOT 2.46/-6.5/9.5 vs 2.62/-4.2/16.3), and is a spike (k=4 1.19, k=6 1.35, k=8
+  1.43, k=12 1.28).
+- 104-expiry P_real: best single IS cells (thr 0.005 k=2: 1.65) but OOT never above 2.0 with DD -13..-15%
+  at every k, Calmar 3-4 vs the canon's 8-16.
+- Delta-matched P_real (§0.41/0.42): closed.
+- Bear calls lose money in every variant in both windows (IS yield 1-3%, OOT -3..-23%); the books differ
+  mainly in how many they take. Not acted on; a separate question.
+
+**Live:** the ranker reads `ground.DKL_K` and `config.GROUND_THRESHOLD`, so the mini picks this up on
+`git pull`. Offline on `live/snapshots/2026-08-19/1531` with a full-session test store: 4 qualified
+(RTX, ISRG, MS, FCX) vs 2 under the old cell — the lower threshold passes more names; the 1.00x execution
+gate still applies on top. Expect ~15% more picks/day.
 
 # 🗃️ HISTORICAL ARCHIVE — NOT A CURRENT TASK LIST
 
