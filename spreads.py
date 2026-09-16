@@ -244,9 +244,15 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
     long_ask_raw   = float(long_row["AskPrice"])
     short_mid_raw  = (short_bid_raw + short_ask_raw) / 2.0
     long_mid_raw   = (long_bid_raw  + long_ask_raw)  / 2.0
-    if short_last_raw <= 0 or long_last_raw <= 0:
-        return None  # no LAST on either leg → no real market, skip
     credit_basis = getattr(config, "CREDIT_BASIS", "last_clamped")
+    if credit_basis != "mid" and (short_last_raw <= 0 or long_last_raw <= 0):
+        # No LAST on a leg. Under the vendor EOD basis that meant no real market,
+        # so the pair was skipped. On a live basis it just means the contract has
+        # not traded yet: at 09:30 74% of weeklies have no print (vs 19% at 15:45),
+        # which cut the 2026-09-16 open from 94 viable pairs to 18. CREDIT_BASIS
+        # "mid" prices off the two-sided quote and never consults LAST, so the gate
+        # does not apply there. Backtest behaviour (last_clamped) is unchanged.
+        return None
     if credit_basis == "mid":
         short_credit_basis = short_mid_raw
         long_credit_basis  = long_mid_raw
