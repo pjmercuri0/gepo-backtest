@@ -411,6 +411,45 @@ def _actuals_rows() -> list[dict]:
                     "underlying_price": pick.get("expiry_close"),
                 }
 
+        # Live overlay (2026-09-16): combo_stream.py also holds the open positions, so the
+        # Actuals tab shows the same second-old spot and mark as the live tab instead of the
+        # last scan's. The streamed mid is the book's cost to close; floor it at intrinsic
+        # for the same reason the tracker does -- a vertical cannot be closed for less.
+        try:
+            _st = _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
+            _q = (_st.get("quotes") or {}).get(
+                f"{pick.get('ticker')}|{pick.get('spread_type')}|{float(pick.get('short_strike')):g}"
+                f"|{float(pick.get('long_strike')):g}|{str(pick.get('expiry_date'))[:10]}")
+            _sp = (_st.get("spots") or {}).get(pick.get("ticker"))
+            if outcome_row is None and (_q or _sp):
+                ks, kl = float(pick["short_strike"]), float(pick["long_strike"])
+                w = float(pick.get("spread_width") or abs(ks - kl))
+                live = dict(last_track or {})
+                if _sp:
+                    live["underlying_price"] = _sp
+                    live["live_status"] = _live_status(pick.get("spread_type"), _sp, ks, kl)
+                    intr = (max(0.0, ks - _sp) - max(0.0, kl - _sp)) if pick["spread_type"] == "bull_put" \
+                           else (max(0.0, _sp - ks) - max(0.0, _sp - kl))
+                    intr = min(max(0.0, intr), w)
+                else:
+                    intr = 0.0
+                if _q and _q.get("mid") is not None:
+                    live["current_mark"] = round(min(max(float(_q["mid"]), intr), w), 4)
+                    live["mark_basis"] = "stream mid" if float(_q["mid"]) >= intr else "intrinsic floor"
+                    live["ts"] = _q["ts"]
+                elif _sp:
+                    live["current_mark"] = round(intr, 4)
+                    live["mark_basis"] = "intrinsic (no combo quote)"
+                    live["ts"] = _st.get("ts")
+                ac = pick.get("actual_credit")
+                if live.get("current_mark") is not None and ac is not None:
+                    live["unrealized_pnl_per_contract"] = round((float(ac) - live["current_mark"]) * 100, 2)
+                last_track = live
+                if live.get("current_mark") is not None:
+                    last_marked = live
+        except (TypeError, ValueError, KeyError):
+            pass
+
         # Actuals display basis = the IBKR credit on the pick (combo last > combo mid >
         # leg mids, i.e. quoted_credit/net_credit), NOT the modelled 0.80x mid /
         # 1.08x model that History books at (user 2026-09-14: "should be mid credit or
