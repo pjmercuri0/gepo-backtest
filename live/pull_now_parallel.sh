@@ -160,6 +160,26 @@ then
     exit 0
 fi
 
+# Keep the combo quote stream alive (2026-09-16). It holds IBKR subscriptions open so
+# the live tab shows quotes a second old instead of a scan old; it exits immediately if
+# another copy holds the lock, so this is a no-op when it is already up. No crontab change.
+"${GEPO_PYTHON:-python3}" -c "
+import os,sys,subprocess
+from pathlib import Path
+lock=Path('live/logs/combo_stream.lock')
+alive=False
+if lock.exists():
+    try: os.kill(int(lock.read_text().strip()),0); alive=True
+    except Exception: lock.unlink(missing_ok=True)
+if not alive:
+    subprocess.Popen([sys.executable,'-m','live.combo_stream'],
+                     stdout=open('live/logs/combo_stream.log','a'),
+                     stderr=subprocess.STDOUT, start_new_session=True)
+    print('  [stream] started combo_stream')
+else:
+    print('  [stream] combo_stream already running')
+"
+
 echo "Running ranker..."
 "${GEPO_PYTHON:-python3}" -m live.ranker 2>&1 | sed "s/^/  [Ranker] /"
 echo "✓ Snapshot, merge, and rankings complete"

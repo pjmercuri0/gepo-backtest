@@ -1229,6 +1229,50 @@ def _held_keys() -> set:
     return out
 
 
+def _overlay_stream(payload: dict) -> None:
+    """Overlay live combo quotes from live/combo_stream.json (written by
+    live/combo_stream.py, which holds the subscriptions open) onto the ranked rows.
+
+    Combo quotes take 2-3s to arrive on a cold subscription, so a scan's quotes are
+    as old as the scan. The daemon keeps them current; this shows them. GROUND and
+    the model credit are untouched -- only the quote, the credit derived from it and
+    above_min move, so the min/target comparison on the page is against a price that
+    exists right now."""
+    import config as backtest_config          # module-level name is function-local elsewhere
+    try:
+        st = _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
+        quotes = st.get("quotes") or {}
+        if not quotes:
+            return
+        payload["stream_ts"] = st.get("ts")
+        n = 0
+        for lst in (payload.get("ticker") or [], payload.get("top_picks") or []):
+            for r in lst:
+                try:
+                    k = (f"{r['ticker']}|{r['spread_type']}|{float(r['short_strike']):g}"
+                         f"|{float(r['long_strike']):g}|{str(r['expiry_date'])[:10]}")
+                except (KeyError, TypeError, ValueError):
+                    continue
+                q = quotes.get(k)
+                if not q or q.get("mid") is None:
+                    continue
+                r["combo_bid"], r["combo_ask"] = q["bid"], q["ask"]
+                r["combo_credit_mid"] = q["mid"]
+                r["quoted_credit"] = r["net_credit"] = q["mid"]
+                r["credit_source"] = "stream_mid"
+                r["quote_ts"] = q["ts"]
+                tg = r.get("credit_targets") or {}
+                wa = tg.get("walkaway_credit")
+                if wa is not None:
+                    r["above_min"] = math.floor(q["mid"] * 100 + 0.5) / 100 >= wa
+                    r["qualified"] = bool(r.get("GROUND", 0) >= backtest_config.GROUND_THRESHOLD) and r["above_min"]
+                n += 1
+        payload["stream_n"] = n
+    except Exception as e:
+        print(f"[overlay_stream] {e}", flush=True)
+        return
+
+
 def _mark_held(payload: dict) -> None:
     keys = _held_keys()
     for lst in (payload.get("ticker") or [], payload.get("top_picks") or []):
@@ -1260,6 +1304,7 @@ def latest_json():
             # tracks the IBKR tick (and the chip + subheader agree).
             frozen["regime"] = current_regime()
             _enrich_payload(frozen)
+            _overlay_stream(frozen)
             _mark_held(frozen)
             return jsonify(frozen)
 
@@ -1282,6 +1327,7 @@ def latest_json():
     # subheader matches the SPY chip even if `latest.json` was baked earlier.
     payload["regime"] = current_regime()
     _enrich_payload(payload)
+    _overlay_stream(payload)
     _mark_held(payload)
     return jsonify(payload)
 
