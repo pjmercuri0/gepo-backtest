@@ -170,7 +170,12 @@ LIVE_QUOTE_EXCHANGE = "ISE"
 LIVE_COMBO_ENABLED   = True    # verified live 2026-09-01
 LIVE_COMBO_CLIENT_ID = 110     # avoid 100-109 (fetchers), 11 (default), 12 (SPY)
 LIVE_COMBO_TIMEOUT   = 60      # wall-clock budget for the whole combo pass
-LIVE_COMBO_EXCHANGE  = "CBOE"  # NOT SMART — SMART returns nan on every combo field
+LIVE_COMBO_EXCHANGE  = "SMART" # 2026-09-16: SMART is the aggregated book and is what TWS shows.
+                               # The 2026-09-01 note below (SMART returns nan) no longer holds --
+                               # measured on the live board, SMART quoted 10/10 candidates vs CBOE
+                               # 5/10, and tighter or equal on every one. JNJ 267.5/265: SMART bid
+                               # -1.25 (matches the TWS ticket exactly, 0.49 wide) vs CBOE -1.57
+                               # (0.81 wide), which is why the page read 1.12 against TWS 1.06.
 # Reject a combo book wider than this multiple of the spread width and fall
 # back to leg mids. A wide combo book has the same disease as a wide leg quote:
 # its midpoint is not a price. 2026-09-01 13:21 DE 670/667.5 quoted -5.60/+1.60
