@@ -1875,6 +1875,11 @@ yet (written on the MacBook); check the first log.** `live/ranker.py` reads toda
 + WARNING. Backtest series: `build_market_gap.py` -> `output/market_gap_backtest.parquet` (Yahoo files plus the
 Yahoo chart API for missing dates).
 
+**Mya.** The two payloads were uploaded to Mya directly from the MacBook on 2026-09-16 16:19 (rsync of only
+`live/data/backtest_equity.json` and `oot_equity.json`; the MacBook's `live/NOT_PRODUCTION` guard still blocks the
+full upload). Mya's previous copies are kept as `live/data/*.json.bak_pregap_20260916-161954`. Verified: /backtest
+serves 4,586 trades / Sh 1.55, /oot serves $15,241 / Sh 3.17 (webapp reads the JSON per request; no restart needed).
+
 **Data defect found.** `data/daily_bars_yahoo/*.csv` has no bars 2026-01-01..2026-05-14. Any 2026 TA feature built
 from those files is invalid (this is why the 2026-09-16 early-morning TA "OOT" checks changed only 5 trades).
 The files were not modified.
