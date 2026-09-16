@@ -24,8 +24,8 @@ from math import erf
 
 # ── canon parameters ────────────────────────────────────────────────────────
 DELTA_TARGET, DELTA_MIN, DELTA_MAX = 0.55, 0.50, 0.60
-K            = 1.0        # exp(-K * D_ent)
-THR          = 0.01       # GROUND threshold (0.015 = conservative)
+K            = 4.0        # exp(-K * D_ent). 2026-09-15: k=4 / thr=0.005, middle of the k=3-6 plateau on full-session P_real (handoff §0.43). Was 1.0 / 0.01.
+THR          = 0.005      # GROUND threshold
 WINDOW       = 252        # sessions of realized moves behind P_real
 MIN_OBS      = 1          # use whatever history the name has (user 2026-09-13); the 0.5 pseudo-count per
                           # state is the only regularisation, so a name with very few sessions scores near the prior
@@ -213,6 +213,16 @@ def p_real(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW) -> n
     return out
 
 
+def backtest_closes(store: str = 'output/daily_closes.parquet', spy_csv: str = 'data/spy_us_d.csv') -> pd.DataFrame:
+    """The backtest's P_real close series: the vendor-seeded store restricted to SPY sessions.
+    The store carries ~9 vendor holiday republishes a year (stale duplicate closes); dropping
+    them is what makes this series match what the live IBKR store holds (sessions only)."""
+    d = pd.read_parquet(store).dropna().drop_duplicates(['ticker', 'date'])
+    d['date'] = pd.to_datetime(d['date']).dt.normalize()
+    spy = set(pd.to_datetime(pd.read_csv(spy_csv, parse_dates=['Date']).Date).dt.normalize())
+    return d[d.date.isin(spy)].sort_values(['ticker', 'date']).reset_index(drop=True)
+
+
 # ── 4. Kelly growth (identical FOC to ground._score_row) ────────────────────
 def kelly(p, q, ro, b):
     """Returns (w_star, ell). ell = p ln(1+w b) + ro ln(1+w a b) + q ln(1-w), a=(b-1)/(2b) for b<1."""
@@ -306,7 +316,7 @@ def grade_fill(actual_credit, width, targets: dict) -> str | None:
 CANON_LABELS = {
     'delta':     f'{DELTA_TARGET:g}Δ short leg (fitted delta, band {DELTA_MIN:g}–{DELTA_MAX:g})',
     'dkl':       'D_ent = D(Q_bs‖U₃) = ln3 − H(Q_bs), Q_bs = N(d2) at the smile-fit IVs (Mercurio–Wu–Xie 2020 eq. 19)',
-    'window':    f'{WINDOW} sessions of realized DTE-matched moves vs the exact strikes (P_real)',
+    'window':    f'{WINDOW} full sessions of realized DTE-matched moves vs the exact strikes (P_real, every trading day)',
     'selection': f'top-{TOP_N} per day, k={K:g}, GROUND ≥ {THR:g}',
     'scoring':   'G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G−1)·e^(−k·D_ent)',
     'fill':      f'{FILL_MULT:.2f}× smile-fit model credit (19 real fills), ${COMMISSION:.2f} commission/spread',

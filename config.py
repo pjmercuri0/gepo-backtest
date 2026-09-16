@@ -184,7 +184,7 @@ LOG_BASE = _math.e
 # so a 0.0010 cutoff = 0.10% per-trade hurdle on variance-adjusted EV
 # after the entropic ambiguity discount. See paper §7 for the threshold
 # sweep and the comparison against the legacy top-N=5 rule.
-GROUND_THRESHOLD = 0.01  # D_ent canon 2026-09-13: 0.05 was set on inflated EVs and passes 0.35 trades/day at fillable
+GROUND_THRESHOLD = 0.005  # 2026-09-15: thr 0.005 / k=4 on full-session P_real (§0.43); was 0.01. D_ent canon 2026-09-13: 0.05 was set on inflated EVs and passes 0.35 trades/day at fillable
                          # credit; 0.01 = 3.8/day (0.015 conservative). SESSION_HANDOFF.md §0.33.
 
 # ── SELECTION ────────────────────────────────────────────────────────────────

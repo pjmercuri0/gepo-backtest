@@ -52,7 +52,7 @@ PROB_BASIS    = "realized"   # D_ent CANON 2026-09-13: P_real = the name's reali
                        # Full 2020-25 count-matched: $26.37 vs $22.76/pick, WR 48.4% vs 45.7%, Sh 2.17 vs 2.04;
                        # robust to k∈[5,20], RV window/estimator, fill 0.70-0.90 (backtest_g_probs*.py).
                        # (The 2026-06-04 "rv worse" result was under OLD canon: pre-rv_vs_iv DKL + regime gate.)
-DKL_K         = 1.0    # D_ent CANON 2026-09-13: k=1 (working range 0.8-1.2, §0.33). Previous: 10.0 (2026-09-12 "52:10": k=10 with the empirical_vs_iv
+DKL_K         = 4.0    # 2026-09-15: k=4 / thr 0.005, middle of the k=3-6 plateau on full-session P_real (§0.43). Was 1.0. D_ent CANON 2026-09-13: k=1 (working range 0.8-1.2, §0.33). Previous: 10.0 (2026-09-12 "52:10": k=10 with the empirical_vs_iv
                        # reference on a 52-expiry window. Prior note (k=10 growth-optimal
                        # under rv_vs_iv) kept below for history.
                        # Was: Canonical 2026-06-12 (corrected solver): k=10 w/ thr=0.05 = the GROWTH-OPTIMAL cell on the plateau — selection criterion matches the framework objective (max expected growth). Was briefly 16 (Calmar pick, reverted same day: DD is a path statistic, criterion-shopped).
