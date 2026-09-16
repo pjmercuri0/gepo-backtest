@@ -88,6 +88,18 @@ def capture(latest_path: Path) -> None:
 
 
 def _expiry_close(ticker: str, expiry: str):
+    """Official close on `expiry`. IBKR store first (2026-09-15: live P&L must not lean
+    on vendor/Yahoo files -- output/ibkr_closes.parquet holds official RTH daily TRADES
+    closes for the whole universe); Yahoo daily-bar CSV only as a fallback."""
+    try:
+        from live.closes import IBKR_STORE
+        if IBKR_STORE.exists():
+            d = pd.read_parquet(IBKR_STORE, columns=["ticker", "date", "close"])
+            d = d[(d["ticker"] == ticker) & (pd.to_datetime(d["date"]).dt.strftime("%Y-%m-%d") == expiry)]
+            if not d.empty:
+                return float(d["close"].iloc[0])
+    except Exception:
+        pass
     fp = BARS_DIR / f"{ticker}.csv"
     if not fp.exists():
         return None
