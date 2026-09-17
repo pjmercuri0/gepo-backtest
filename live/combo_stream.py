@@ -145,6 +145,7 @@ def main() -> int:
     subs: dict[str, tuple] = {}          # key -> (bag, ticker)
     spots: dict[str, tuple] = {}         # symbol -> (contract, ticker)
     legs: dict[str, tuple] = {}          # key -> (short_conid, long_conid)
+    widths: dict[str, float] = {}        # key -> spread width, for the sanity check
     leg_c: dict[int, object] = {}        # conid -> contract
     leg_t: dict[int, object] = {}        # conid -> ticker
     try:
@@ -177,6 +178,10 @@ def main() -> int:
                         except Exception: pass
                 for k, r in want.items():
                     legs[k] = (r.get("short_conid"), r.get("long_conid"))
+                    try:
+                        widths[k] = float(r.get("spread_width") or abs(float(r["short_strike"]) - float(r["long_strike"])))
+                    except (TypeError, ValueError, KeyError):
+                        widths[k] = None
                     if k in subs:
                         continue
                     bag = _bag_for(r)
@@ -231,12 +236,13 @@ def main() -> int:
             for k, (_bag, t) in subs.items():
                 bid, ask, last = t.bid, t.ask, t.last
                 if ok(bid) and ok(ask):
-                    # Complex-order book exists: negative quotes, mid is the credit.
-                    quotes[k] = {"bid": float(bid), "ask": float(ask),
-                                 "mid": round(-(float(bid) + float(ask)) / 2.0, 4),
-                                 "last": (float(last) if ok(last) else None),
-                                 "src": "combo", "ts": ts}
-                    continue
+                    _m = -(float(bid) + float(ask)) / 2.0
+                    _w = widths.get(k)
+                    if _m > 0 and (_w is None or _m <= _w + 1e-9):
+                        quotes[k] = {"bid": float(bid), "ask": float(ask), "mid": round(_m, 4),
+                                     "last": (float(last) if ok(last) else None),
+                                     "src": "combo", "ts": ts}
+                        continue
                 # 2026-09-17: most of these bags never quote -- FCX 72/71 returned
                 # nan while TWS showed -0.68/-0.29/-0.48. TWS derives those from the
                 # LEGS: bid = short_ask - long_bid, ask = short_bid - long_ask,
@@ -252,9 +258,19 @@ def main() -> int:
                     continue
                 s_mid = (float(st_.bid) + float(st_.ask)) / 2.0
                 l_mid = (float(lt_.bid) + float(lt_.ask)) / 2.0
+                mid = s_mid - l_mid
+                # Sanity (2026-09-17, after the first evening this ran): leg quotes decay
+                # once the bell goes -- sizes drop out, one side stops updating -- and the
+                # subtraction then yields 0.0 or a NEGATIVE spread value. A short vertical
+                # is always worth between 0 and its width, and the short leg (nearer the
+                # money) is always worth more than the long. Anything else is not a quote,
+                # so publish nothing and let the caller fall back to BS.
+                wid = widths.get(k)
+                if not (s_mid > l_mid and mid > 0 and (wid is None or mid <= wid + 1e-9)):
+                    continue
                 quotes[k] = {"bid": round(-(float(st_.ask) - float(lt_.bid)), 4),
                              "ask": round(-(float(st_.bid) - float(lt_.ask)), 4),
-                             "mid": round(s_mid - l_mid, 4),
+                             "mid": round(mid, 4),
                              "last": None, "src": "legs", "ts": ts}
             sp = {}
             for sym, (_c, t) in spots.items():

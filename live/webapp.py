@@ -468,6 +468,7 @@ def _actuals_rows() -> list[dict]:
                     intr = 0.0; deep = False
                 if _q and _q.get("mid") is not None:
                     _m = float(_q["mid"])
+                    _m = min(max(_m, 0.0), w)          # a vertical is worth 0..width, always
                     live["current_mark"] = round(min(max(_m, intr) if deep else _m, w), 4)
                     live["mark_basis"] = ("intrinsic floor (both legs deep ITM)"
                                           if deep and _m < intr else "stream mid")
