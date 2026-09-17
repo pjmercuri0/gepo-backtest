@@ -27,7 +27,11 @@ IB_CONNECT_TIMEOUT = 30          # seconds per ib.connect() attempt. ib_insync d
                                  # 75 occurrences in parallel_pull.log; G1-G7 never).
 IB_CONNECT_ATTEMPTS = 3          # retries around that timeout, backing off 2s then 4s.
 
-IB_MKT_DATA_TYPE = 1             # 1=live, 2=frozen, 3=delayed, 4=delayed-frozen. Account has
+IB_MKT_DATA_TYPE = int(os.environ.get("GEPO_MKT_DATA_TYPE", 1))
+                                 # 1=live, 2=frozen, 3=delayed, 4=delayed-frozen. Account has
+                                 # 2026-09-17: env-overridable so an out-of-hours scan can ask for
+                                 # frozen (last close) instead of getting -1 on every option. Cron
+                                 # is unaffected and still runs live.
                                  # Snapshot Bundle + OPRA Streaming Add-On subscribed, so type 1
                                  # serves real-time. Was 3 before 2026-05-26.
 
