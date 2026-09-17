@@ -164,6 +164,12 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     )
     spreads.REGIME_FILTER     = backtest_config.REGIME_FILTER
     spreads.REGIME_PER_TICKER = False
+    spreads.REGIME_BULL_ONLY  = getattr(backtest_config, "REGIME_BULL_ONLY", False)
+    spreads.REGIME_LAG_SESSIONS = getattr(backtest_config, "REGIME_LAG_SESSIONS", 0)
+    spreads.REGIME_FAIL_CLOSED = getattr(backtest_config, "REGIME_FAIL_CLOSED", False)
+    spreads.REGIME_MAX_STALE_CALENDAR_DAYS = getattr(
+        backtest_config, "REGIME_MAX_STALE_CALENDAR_DAYS", None
+    )
     spreads.GAP_FILTER        = False
     spreads.LOW_VIX_BULLPUT_FILTER = False
     spreads.SLIPPAGE_CENTS    = 0.0
@@ -335,6 +341,25 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     priced = priced[priced["model_credit"].notna() & (priced["model_credit"] > 0.01)].copy()
     if priced.empty:
         return pd.DataFrame()
+    parity = entc.chain_parity_signal(df_full).rename(columns={
+        "Symbol": "ticker", "DataDate": "entry_date", "ExpirationDate": "expiry_date",
+    })
+    for c in ("entry_date", "expiry_date"):
+        priced[c] = pd.to_datetime(priced[c]).dt.normalize()
+        if not parity.empty:
+            parity[c] = pd.to_datetime(parity[c]).dt.normalize()
+    if not parity.empty:
+        priced = priced.drop(columns=['parity_bull_raw', 'parity_pairs'], errors='ignore')
+        priced = priced.merge(
+            parity[["ticker", "entry_date", "expiry_date", "parity_bull_raw", "parity_pairs"]],
+            on=["ticker", "entry_date", "expiry_date"], how="left",
+        )
+    else:
+        priced["parity_bull_raw"] = np.nan
+        priced["parity_pairs"] = 0
+    priced = entc.add_parity_percentile(priced)
+    print(f"  parity: {priced['parity_bull_raw'].notna().sum()}/{len(priced)} candidates "
+          f"have matched-strike IV pairs; veto <= {backtest_config.PARITY_MIN_PCT:.0%}", flush=True)
     closes = load_closes()
     cs = closes_status()
     if cs["rows"] == 0:
@@ -388,7 +413,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if len(ranked) < before:
         print(f"  per-ticker dedupe: {before} -> {len(ranked)} rows", flush=True)
 
-    # D_ent canon: GROUND >= config.GROUND_THRESHOLD (0.01), top-5 per day.
+    # D_ent canon: bull regime only, GROUND/parity/execution gates, top-10/day.
     thr = backtest_config.GROUND_THRESHOLD
     # Execution gate (user 2026-09-13, revised same day): the IBKR credit on the table (combo mid,
     # or combo last on a too-wide book, else leg mids) must sit at or above the WALK-AWAY line,
@@ -401,15 +426,20 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # screen and failed underneath. A tie at 2dp qualifies.
     _r2 = lambda x: np.floor(x * 100 + 0.5) / 100
     ranked["above_min"] = _r2(ranked["net_credit"].astype(float)) >= ranked["tgt_walkaway_credit"].astype(float)
-    ranked["qualified"] = (ranked["GROUND"] >= thr) & ranked["above_min"]
+    parity_ok = (ranked["parity_pct"] > getattr(backtest_config, "PARITY_MIN_PCT", 0.12))
+    ranked["qualified"] = (ranked["GROUND"] >= thr) & parity_ok & ranked["above_min"]
     n_below = int(((ranked["GROUND"] >= thr) & ~ranked["above_min"]).sum())
     if n_below:
         print(f"  execution gate: {n_below} candidate(s) above GROUND {thr} but quoted BELOW fair value (1.00x model) — not qualified", flush=True)
+    n_parity = int(((ranked["GROUND"] >= thr) & ~parity_ok).sum())
+    if n_parity:
+        print(f"  parity veto: dropped {n_parity} candidate(s) at or below the "
+              f"{backtest_config.PARITY_MIN_PCT:.0%} daily percentile", flush=True)
 
     # Sort by GROUND descending (qualified first, then below-threshold).
     ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
-    print(f"  qualified: {ranked['qualified'].sum()}/{len(ranked)} above per-DOW thresholds "
-          f"(all days {thr})", flush=True)
+    print(f"  qualified: {ranked['qualified'].sum()}/{len(ranked)} bull-regime candidates "
+          f"(GROUND >= {thr}, parity > {backtest_config.PARITY_MIN_PCT:.0%}, quote >= fair)", flush=True)
     return ranked
 
 
@@ -485,8 +515,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
     # yield <N picks on low-edge days.
     # ticker_rows contains every positive-GROUND candidate for the table below;
     # the table still dims rows that are either rank>5 or below threshold.
-    # Canonical: top cards = top-5 QUALIFIED picks only (above per-DOW threshold).
-    # On low-edge days you may see < 5 cards — that's intentional, only show
+    # Canonical: top cards = top-N QUALIFIED picks only.
+    # On low-edge days you may see fewer than N cards — that's intentional; only show
     # picks that actually meet the GROUND threshold. Full ranked list (including
     # below-threshold) lives in `ticker_rows` for the table below.
     qualified_only = ranked[ranked.get("qualified", False) == True] if not ranked.empty else ranked
@@ -565,6 +595,10 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "DKL":              _num(r.get("DKL")),
             "GROUND":           _num(r.get("GROUND")),
             "w_star":           _num(r.get("w_star")),
+            "parity_bull_raw":  _num(r.get("parity_bull_raw")),
+            "parity_bull_signed": _num(r.get("parity_bull_signed")),
+            "parity_pct":       _num(r.get("parity_pct")),
+            "parity_pairs":     _num(r.get("parity_pairs")),
             "qualified":        bool(r.get("qualified", True)),
             "above_min":        (None if r.get("above_min") is None else bool(r.get("above_min"))),
         }
@@ -610,6 +644,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "COMMISSION":       entc.COMMISSION,
             "TARGETS":          entc.CANON_LABELS["targets"],
             "EXEC_GATE":        "qualified only if the IBKR credit ≥ fair value (1.00×model, the walk-away line)",
+            "REGIME_GATE":      "bull puts only when prior-session SPY close > 100d SMA; cash otherwise",
+            "PARITY_GATE":      f"same-strike call-IV minus put-IV daily percentile > {backtest_config.PARITY_MIN_PCT:.0%}",
         },
         "regime":    current_regime(),
         "vol_gate":  gate,

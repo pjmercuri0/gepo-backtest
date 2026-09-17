@@ -35,8 +35,8 @@ def parse_args():
     p.add_argument("--delta-max",          type=float, default=config.DELTA_MAX)
     p.add_argument("--dte-min",            type=int,   default=config.DTE_MIN)
     p.add_argument("--dte-max",            type=int,   default=config.DTE_MAX)
-    p.add_argument("--top-n",              type=int,   default=None,
-                   help="Keep best N trades per week by GROUND (default: all)")
+    p.add_argument("--top-n",              type=int,   default=config.TOP_N,
+                   help="Keep best N trades per entry day by GROUND")
     p.add_argument("--sizing",             type=str,   default="2kelly",
                    help="'kelly'/'1kelly' = full-Kelly equal-dollar; "
                         "'2kelly' = half-Kelly (default); '4kelly' = quarter-Kelly; "
@@ -87,11 +87,10 @@ def parse_args():
     p.add_argument("--skew-alpha",         type=float, default=0.5,
                    help="Scale factor for skew adjustment. Default: 0.5. "
                         "Higher = stronger skew effect on p.")
-    p.add_argument("--regime-filter",      action="store_true",
-                   help="Restrict trades by market regime: bull (SPY > SMA) → "
-                        "only bull_put; bear (SPY < SMA) → only bear_call. "
-                        "Default: off (both directions allowed).")
-    p.add_argument("--regime-window",      type=int, default=50,
+    p.add_argument("--regime-filter",      action="store_true", default=config.REGIME_FILTER,
+                   help="Apply the configured regime gate (canonical: prior-session "
+                        "SPY > 100d SMA permits bull puts; cash otherwise).")
+    p.add_argument("--regime-window",      type=int, default=config.REGIME_WINDOW,
                    help="Trailing SMA window in trading days for regime "
                         "classification. Default: 50.")
     p.add_argument("--slippage-cents",     type=float, default=None,
@@ -314,6 +313,15 @@ def main():
         spreads.REGIME_FILTER     = False
         spreads.REGIME_LOOKUP     = None
         spreads.REGIME_PER_TICKER = False
+
+    # Canonical one-sided/lagged regime semantics.  Explicit CLI experiments
+    # still inherit these config values unless the config is changed.
+    spreads.REGIME_BULL_ONLY = getattr(config, "REGIME_BULL_ONLY", False)
+    spreads.REGIME_LAG_SESSIONS = getattr(config, "REGIME_LAG_SESSIONS", 0)
+    spreads.REGIME_FAIL_CLOSED = getattr(config, "REGIME_FAIL_CLOSED", False)
+    spreads.REGIME_MAX_STALE_CALENDAR_DAYS = getattr(
+        config, "REGIME_MAX_STALE_CALENDAR_DAYS", None
+    )
 
     # Mirror runtime settings into config so results.py can render them
     config.REGIME_FILTER = args.regime_filter

@@ -282,7 +282,7 @@ WEBAPP_POLL_SECONDS = 5           # browser polls /api/latest.json this often. 9
                                   # values on a page whose data was seconds old.
                                   # (15 min — matches the fetcher cadence; no
                                   # point polling more often than new data arrives)
-TOP_N_DISPLAY = 5                 # canonical top-N picks
+TOP_N_DISPLAY = 10                # 2026-09-16 canon: top-10 qualified bull puts
 
 # --- D_ent canon: selection credit (2026-09-13, user decision) ---
 # "quoted": Kelly growth (and therefore GROUND) is computed on the IBKR credit — the combo

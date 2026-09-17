@@ -658,13 +658,13 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = N
               f"from {today}", flush=True)
         return pd.DataFrame()
 
-    # Both rights, always. The regime gate is OFF in canon (2026-06-05:
-    # gating cost ~27% of profit; backtest builds both directions every day).
-    # The old regime-aware right filter (puts-only in bull) survived here
-    # until 2026-06-10 and silently suppressed every bear_call live.
+    # Both rights, always.  Calls are required to compute the matched-strike
+    # call/put IV parity signal even though the 2026-09-16 canon trades only
+    # bull puts in a bull regime.
     regime = current_regime()
     rights = ("P", "C")
-    print(f"  regime={regime.get('regime')} (gate OFF) → fetching rights={rights}", flush=True)
+    print(f"  prior-session regime={regime.get('regime')} → fetching rights={rights} "
+          "(both required for parity)", flush=True)
 
     ib = IB()
     _connect_with_retry(ib, client_id)
