@@ -28,7 +28,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from ib_insync import IB, Stock, Option, Bag, ComboLeg
+from ib_insync import IB, Stock, Option, Bag, ComboLeg, Contract
 from live import live_config
 from live.combo_quotes import _bag_for
 from live.fetcher import _connect_with_retry
@@ -37,7 +37,7 @@ CLIENT_ID = int(getattr(live_config, "LIVE_STREAM_CLIENT_ID", 111))
 # IBKR caps concurrent market-data lines (error 101 "Max number of tickers has been
 # reached" at 100 on this account). Budget: open positions always get a line, the
 # ranked board fills what is left, and spots are capped separately.
-MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 30))
+MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 26))
 MAX_SPOTS = int(getattr(live_config, "LIVE_STREAM_MAX_SPOTS", 40))
 RELOAD_S  = float(getattr(live_config, "LIVE_STREAM_RELOAD_S", 20))
 WRITE_S   = float(getattr(live_config, "LIVE_STREAM_WRITE_S", 1.0))
@@ -144,6 +144,9 @@ def main() -> int:
     ib = IB()
     subs: dict[str, tuple] = {}          # key -> (bag, ticker)
     spots: dict[str, tuple] = {}         # symbol -> (contract, ticker)
+    legs: dict[str, tuple] = {}          # key -> (short_conid, long_conid)
+    leg_c: dict[int, object] = {}        # conid -> contract
+    leg_t: dict[int, object] = {}        # conid -> ticker
     try:
         _connect_with_retry(ib, CLIENT_ID)
         ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
@@ -173,6 +176,7 @@ def main() -> int:
                         try: ib.cancelMktData(bag)
                         except Exception: pass
                 for k, r in want.items():
+                    legs[k] = (r.get("short_conid"), r.get("long_conid"))
                     if k in subs:
                         continue
                     bag = _bag_for(r)
@@ -182,6 +186,24 @@ def main() -> int:
                         subs[k] = (bag, ib.reqMktData(bag, "", False, False))
                     except Exception as e:
                         print(f"[combo_stream] subscribe failed {k}: {e}", flush=True)
+                # Leg subscriptions: the combo book is usually empty, so the legs are
+                # what actually price the spread. Deduped -- adjacent spreads share strikes.
+                want_legs = {c for k in want for c in legs.get(k, ()) if c}
+                for cid in list(leg_c):
+                    if cid not in want_legs:
+                        try: ib.cancelMktData(leg_c.pop(cid))
+                        except Exception: pass
+                        leg_t.pop(cid, None)
+                for cid in want_legs:
+                    if cid in leg_c:
+                        continue
+                    try:
+                        c = Contract(conId=int(cid), exchange="SMART")
+                        if ib.qualifyContracts(c):
+                            leg_c[cid] = c
+                            leg_t[cid] = ib.reqMktData(c, "", False, False)
+                    except Exception as e:
+                        print(f"[combo_stream] leg subscribe failed {cid}: {e}", flush=True)
                 # Underlying spot too (2026-09-16): the page colours pin/status and shows
                 # the cushion off spot, so a streaming credit beside a scan-old spot reads
                 # inconsistently. One line per distinct ticker.
@@ -200,20 +222,40 @@ def main() -> int:
                             spots[sym] = (c, ib.reqMktData(c, "", False, False))
                     except Exception as e:
                         print(f"[combo_stream] spot subscribe failed {sym}: {e}", flush=True)
-                print(f"[combo_stream] holding {len(subs)} combos, {len(spots)} spots", flush=True)
+                print(f"[combo_stream] holding {len(subs)} combos, {len(leg_c)} legs, {len(spots)} spots", flush=True)
 
             ib.sleep(WRITE_S)
             ts = datetime.now().isoformat(timespec="seconds")
             quotes = {}
+            ok = lambda v: v is not None and v == v and v != 0          # not None/NaN/0
             for k, (_bag, t) in subs.items():
                 bid, ask, last = t.bid, t.ask, t.last
-                ok = lambda v: v is not None and v == v and v != 0      # not None/NaN/0
-                if not (ok(bid) and ok(ask)):
+                if ok(bid) and ok(ask):
+                    # Complex-order book exists: negative quotes, mid is the credit.
+                    quotes[k] = {"bid": float(bid), "ask": float(ask),
+                                 "mid": round(-(float(bid) + float(ask)) / 2.0, 4),
+                                 "last": (float(last) if ok(last) else None),
+                                 "src": "combo", "ts": ts}
                     continue
-                # Combo quotes come back negative for a credit; mid is the credit.
-                quotes[k] = {"bid": float(bid), "ask": float(ask),
-                             "mid": round(-(float(bid) + float(ask)) / 2.0, 4),
-                             "last": (float(last) if ok(last) else None), "ts": ts}
+                # 2026-09-17: most of these bags never quote -- FCX 72/71 returned
+                # nan while TWS showed -0.68/-0.29/-0.48. TWS derives those from the
+                # LEGS: bid = short_ask - long_bid, ask = short_bid - long_ask,
+                # mid = short_mid - long_mid. Do the same so a missing combo book no
+                # longer falls back to the scan's stale leg mids.
+                lg = legs.get(k)
+                if not lg:
+                    continue
+                st_, lt_ = leg_t.get(lg[0]), leg_t.get(lg[1])
+                if not st_ or not lt_:
+                    continue
+                if not (ok(st_.bid) and ok(st_.ask) and ok(lt_.bid) and ok(lt_.ask)):
+                    continue
+                s_mid = (float(st_.bid) + float(st_.ask)) / 2.0
+                l_mid = (float(lt_.bid) + float(lt_.ask)) / 2.0
+                quotes[k] = {"bid": round(-(float(st_.ask) - float(lt_.bid)), 4),
+                             "ask": round(-(float(st_.bid) - float(lt_.ask)), 4),
+                             "mid": round(s_mid - l_mid, 4),
+                             "last": None, "src": "legs", "ts": ts}
             sp = {}
             for sym, (_c, t) in spots.items():
                 v = t.last if (t.last is not None and t.last == t.last and t.last != 0) else t.close
@@ -230,6 +272,9 @@ def main() -> int:
                 try: ib.cancelMktData(bag)
                 except Exception: pass
             for _s, (c, _t) in spots.items():
+                try: ib.cancelMktData(c)
+                except Exception: pass
+            for _cid, c in leg_c.items():
                 try: ib.cancelMktData(c)
                 except Exception: pass
             if ib.isConnected():
