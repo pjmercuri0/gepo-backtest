@@ -431,15 +431,46 @@ def _actuals_rows() -> list[dict]:
                     intr = (max(0.0, ks - _sp) - max(0.0, kl - _sp)) if pick["spread_type"] == "bull_put" \
                            else (max(0.0, _sp - ks) - max(0.0, _sp - kl))
                     intr = min(max(0.0, intr), w)
+                    # Only treat intrinsic as a floor when the LONG leg is also
+                    # comfortably ITM (>1% of spot). With spot between the strikes
+                    # intrinsic IS the width, so flooring there forces max loss on a
+                    # position that still has time value (ADI 2026-09-17).
+                    long_itm_by = (kl - _sp) if pick["spread_type"] == "bull_put" else (_sp - kl)
+                    deep = long_itm_by > 0.01 * _sp
                 else:
-                    intr = 0.0
+                    intr = 0.0; deep = False
                 if _q and _q.get("mid") is not None:
-                    live["current_mark"] = round(min(max(float(_q["mid"]), intr), w), 4)
-                    live["mark_basis"] = "stream mid" if float(_q["mid"]) >= intr else "intrinsic floor"
+                    _m = float(_q["mid"])
+                    live["current_mark"] = round(min(max(_m, intr) if deep else _m, w), 4)
+                    live["mark_basis"] = ("intrinsic floor (both legs deep ITM)"
+                                          if deep and _m < intr else "stream mid")
                     live["ts"] = _q["ts"]
                 elif _sp:
-                    live["current_mark"] = round(intr, 4)
-                    live["mark_basis"] = "intrinsic (no combo quote)"
+                    # No complex-order book for this spread (common once a position
+                    # runs ITM -- the scanner stops fetching those strikes and the
+                    # combo stops quoting). Mark it with Black-Scholes off the stored
+                    # leg IVs at the live spot rather than at intrinsic: with spot
+                    # between the strikes, intrinsic IS the width, so that printed max
+                    # loss on a position with a day still to run (ADI 2026-09-17,
+                    # -$106 shown against a true ~-$1).
+                    _bs = None
+                    try:
+                        from live.bs_pricing import bs_spread_debit
+                        _ivs = pick.get("iv_fit_short") or pick.get("IV")
+                        _ivl = pick.get("iv_fit_long") or pick.get("long_IV") or _ivs
+                        _dte = max((ddate.fromisoformat(str(pick["expiry_date"])[:10]) - ddate.today()).days, 0)
+                        if _ivs:
+                            _bs = bs_spread_debit(spot=_sp, short_strike=ks, long_strike=kl,
+                                                  short_iv=float(_ivs), long_iv=float(_ivl),
+                                                  dte_days=_dte, spread_type=pick["spread_type"])
+                    except Exception:
+                        _bs = None
+                    if _bs is not None:
+                        live["current_mark"] = round(min(max(_bs, intr) if deep else _bs, w), 4)
+                        live["mark_basis"] = f"BS at stored IV, {_dte}d (no combo quote)"
+                    else:
+                        live["current_mark"] = round(intr, 4)
+                        live["mark_basis"] = "intrinsic (no combo quote, no IV)"
                     live["ts"] = _st.get("ts")
                 ac = pick.get("actual_credit")
                 if live.get("current_mark") is not None and ac is not None:
