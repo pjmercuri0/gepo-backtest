@@ -3843,3 +3843,55 @@ Artifacts:
 - `parity_top_split_metrics.csv`
 - `parity_gex_targeted_joint.csv`
 - `min_gex_skewterm_parity_balance_veto15_metrics.csv`
+
+## 0.51 Strike-local / side-conditional option-book direction pass (2026-09-16)
+
+User pushed for a stronger options-market directional signal that improves both 2020-25 and 2026, including Sharpe,
+yield, Calmar, and win rate. New pass moved from chain-level summaries to strike-local structure at the exact
+candidate strikes and corrected the signal orientation by trade side:
+- bull puts want bullish/support signals high;
+- bear calls want bearish/resistance signals high.
+
+Added `research/option_direction_2026_09_16/strike_local_oi_gex_search.py` and built
+`strike_local_oi_gex_features.parquet` from the full yearly option-chain parquet files. Features include local OI
+walls, same-strike OI put/call balance, local GEX/DEX, risk-vs-safe-side OI, and side-aligned parity balance.
+
+Important implementation note: the useful rules are side-conditional. Applying the same option-book threshold to
+both bull puts and bear calls is weaker. Best balanced current candidate:
+
+`bear_call_min_parity_gex_pct_veto08`
+
+Definition:
+- For each candidate/year, compute walk-forward-signed ranks:
+  - `r_side_parity_balance_wf`: side-aligned same-strike parity premium balance, with sign fit only on prior years.
+  - `r_veto_gex_skewterm_wf`: prior-year-signed GEX/skew-term veto score.
+- Composite raw score = `min(r_side_parity_balance_wf, r_veto_gex_skewterm_wf)`.
+- Convert that composite to a within-year percentile.
+- For **bear calls only**, veto candidates below the 8th percentile. Bull puts are untouched.
+- Selection remains canon `GROUND >= THR`, top 5/day.
+
+Exact full metrics saved in `bear_call_min_parity_gex_pct_veto08_full_metrics.csv`.
+
+Split metrics:
+- 2020-25 base: 4,563 trades / $32,643 PnL / full-win 44.09% / profitable 53.19% / weekly Sh 1.532 /
+  Calmar 3.193 / yield 10.15%.
+- 2020-25 overlay: 4,503 trades / $33,688 PnL / full-win 44.37% / profitable 53.34% / weekly Sh 1.549 /
+  Calmar 3.257 / yield 10.45%.
+- 2026 base: 593 trades / $4,591 PnL / full-win 42.50% / profitable 52.61% / weekly Sh 3.191 /
+  Calmar 19.35 / yield 10.44%.
+- 2026 overlay: 588 trades / $5,554 PnL / full-win 43.20% / profitable 53.40% / weekly Sh 3.450 /
+  Calmar 23.47 / yield 12.71%.
+- Overall: $39,242 vs $37,234, full-win 44.23% vs 43.91%, profitable 53.35% vs 53.12%,
+  weekly Sh 1.668 vs 1.622, yield 10.72% vs 10.18%.
+
+This is the first found rule in this direction pass that improves **both** 2020-25 and 2026 across PnL, full-win,
+profitable rate, yield, weekly Sharpe, and Calmar. It is still modest in 2020-25 (+$1,045 / +0.28 full-win pt), so
+do not overstate it as proven alpha. It is a credible candidate for a date-shuffle/search-adjusted null and a live
+paper run.
+
+Related search artifacts:
+- `side_aligned_direction_search_gap_on.csv`
+- `strike_local_narrow_search.csv`, `strike_local_narrow_best_metrics.csv`
+- `side_conditional_search.csv`, `side_conditional_best_metrics.csv`
+- `dual_side_conditional_grid.csv`, `dual_side_conditional_best_metrics.csv`
+- `bear_call_min_parity_gex_pct_veto08_full_metrics.csv`
