@@ -24,3 +24,8 @@ paper/**/*.pdf
 paper/**/.Rhistory
 paper/**/texput.log
 paper/**/missfont.log
+
+# Local operational artefacts: crontab backups/staging and archived data files.
+backup/
+deploy/mac-mini/backups/
+deploy/mac-mini/crontab.live.new
