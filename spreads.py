@@ -15,15 +15,39 @@ import pandas as pd
 import config
 
 
+def _parity_bull_raw(chain: pd.DataFrame) -> float:
+    """Median matched-strike call IV minus put IV in the 35-65 delta band."""
+    if chain.empty:
+        return float("nan")
+    d = chain.copy()
+    d["_pc"] = d["PutCall"].astype(str).str.lower().str.strip()
+    d["_iv"] = pd.to_numeric(d["ImpliedVolatility"], errors="coerce")
+    delta_col = "AbsDelta" if "AbsDelta" in d else "Delta"
+    d["_ad"] = pd.to_numeric(d[delta_col], errors="coerce").abs()
+    d = d[
+        d["_pc"].isin(["put", "call"])
+        & d["_ad"].between(0.35, 0.65)
+        & d["_iv"].between(0.03, 3.0, inclusive="neither")
+        & (pd.to_numeric(d["AskPrice"], errors="coerce")
+           > pd.to_numeric(d["BidPrice"], errors="coerce"))
+    ]
+    if d.empty:
+        return float("nan")
+    p = d.pivot_table(index="StrikePrice", columns="_pc", values="_iv", aggfunc="median")
+    if "call" not in p or "put" not in p:
+        return float("nan")
+    gap = (p["call"] - p["put"]).dropna()
+    return float(gap.median()) if not gap.empty else float("nan")
+
+
 # Module-level regime filter state, set by run.py before backtest.
 # REGIME_LOOKUP is a pd.Series indexed by date (sorted ascending),
-# values are 'bull' or 'bear'. Lookup uses as-of matching (latest
-# SPY trading day ≤ entry_date) so option entries on market holidays
-# still get classified correctly using the prior trading day.
-# When REGIME_FILTER is True:
-#   bull regime → only bull_put allowed (bear_call rejected)
-#   bear regime → only bear_call allowed (bull_put rejected)
-# Dates before any SPY data → fail open (allow both).
+# values are 'bull' or 'bear'. Canonical lagged lookup uses the latest SPY
+# trading day strictly before entry_date.
+# When REGIME_FILTER is True, the legacy mode switches sides with the regime.
+# The 2026-09-16 canon sets REGIME_BULL_ONLY: bull regime → bull puts only;
+# bear or unknown regime → cash.  REGIME_LAG_SESSIONS=1 makes the as-of
+# lookup strictly earlier than entry_date, avoiding the 15:00 look-ahead.
 # Slippage cost in dollars per leg, applied as a post-hoc P&L haircut
 # in backtest.py — does NOT affect trade selection or filters. Selection
 # always uses mid-mid pricing so different slippage levels produce
@@ -33,6 +57,10 @@ SLIPPAGE_CENTS = 0.0
 REGIME_FILTER     = False
 REGIME_LOOKUP     = None   # pd.Series (global) OR dict[ticker -> pd.Series] (per-ticker)
 REGIME_PER_TICKER = False  # if True, REGIME_LOOKUP is dict keyed by ticker
+REGIME_BULL_ONLY  = False
+REGIME_LAG_SESSIONS = 0
+REGIME_FAIL_CLOSED = False
+REGIME_MAX_STALE_CALENDAR_DAYS = None
 
 # Earnings filter: reject any spread whose holding window (entry_date, expiry_date]
 # contains an earnings announcement for the ticker.
@@ -95,6 +123,12 @@ def build_candidates(df: pd.DataFrame) -> pd.DataFrame:
         bp = _build_spread(puts,  ticker, entry_date, expiry_date, "bull_put")
         bc = _build_spread(calls, ticker, entry_date, expiry_date, "bear_call")
 
+        parity = _parity_bull_raw(grp)
+        if bp is not None:
+            bp["parity_bull_raw"] = parity
+        if bc is not None:
+            bc["parity_bull_raw"] = parity
+
         if bp is not None:
             candidates.append(bp)
         if bc is not None:
@@ -111,26 +145,35 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
     if opts.empty:
         return None
 
-    # Regime filter: in bull regime (price > SMA), only allow bull_put.
-    # In bear regime (price < SMA), only allow bear_call.
+    # Regime filter.  Canonical bull-only mode takes bull puts in a bull regime
+    # and cash otherwise.  Legacy mode switches between puts and calls.
     # Global mode reads SPY/OEF; per-ticker mode reads each ticker's own
     # Monday-sampled price vs. its own rolling SMA.
-    if REGIME_FILTER and REGIME_LOOKUP is not None:
+    if REGIME_FILTER:
         if REGIME_PER_TICKER:
-            regime_series = REGIME_LOOKUP.get(ticker)
+            regime_series = REGIME_LOOKUP.get(ticker) if REGIME_LOOKUP is not None else None
         else:
             regime_series = REGIME_LOOKUP
+        regime = None
         if regime_series is not None and len(regime_series) > 0:
             ed  = pd.Timestamp(entry_date)
-            idx = regime_series.index.searchsorted(ed, side="right") - 1
+            side = "left" if REGIME_LAG_SESSIONS else "right"
+            idx = regime_series.index.searchsorted(ed, side=side) - 1
             if idx >= 0:
-                regime = regime_series.iloc[idx]
-                if regime == "bull" and spread_type == "bear_call":
-                    return None
-                if regime == "bear" and spread_type == "bull_put":
-                    return None
-            # idx < 0 → entry_date predates regime data → fail open
-        # ticker missing from per-ticker dict → fail open
+                regime_date = pd.Timestamp(regime_series.index[idx]).normalize()
+                stale_days = (ed.normalize() - regime_date).days
+                if (REGIME_MAX_STALE_CALENDAR_DAYS is None
+                        or stale_days <= REGIME_MAX_STALE_CALENDAR_DAYS):
+                    regime = regime_series.iloc[idx]
+        if REGIME_BULL_ONLY:
+            if regime != "bull" or spread_type != "bull_put":
+                return None
+        elif regime == "bull" and spread_type == "bear_call":
+            return None
+        elif regime == "bear" and spread_type == "bull_put":
+            return None
+        elif regime is None and REGIME_FAIL_CLOSED:
+            return None
 
     # SPY gap filter: reject any candidate when SPY's overnight gap_pct
     # on entry_date is below threshold (e.g., -1% = big down-gap).

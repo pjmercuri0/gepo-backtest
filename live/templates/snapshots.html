@@ -3,7 +3,7 @@
 
 {% block content %}
 <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">Intraday Snapshot Picks</h1>
-<div class="subtitle">Every :01/:31 scan's threshold-qualified top-5, settled at expiry
+<div class="subtitle">Every :01/:31 scan's threshold-qualified top-N, settled at expiry
 (entry 0.80&times;mid, partial-WIN at 50% intrinsic — same P&amp;L model as the backtest).
 Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or only near the close?</div>
 

@@ -7,7 +7,7 @@
   {% set c = data.config %}
 
   <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">GEPO 2026 Out-of-Time</h1>
-  <div class="subtitle">Frozen canon applied to 2026 — zero 2026 tuning · D_ent canon (2026-09-13) · 0.55Δ short leg by fitted delta (band 0.50–0.60) · G on P_real (252-session realized moves vs the strikes) · D_ent = ln3 − H(Q_bs) (paper eq. 19) · k=1 · GROUND ≥ 0.01 · top-5/day · smile-fit credit, fills 1.08×model, $1.30/spread commission · no regime gate · qty=2</div>
+  <div class="subtitle">2026 evaluation (not a clean holdout; configuration selected with 2026 in view) · D_ent canon · {{ c.delta }} · {{ c.selection }} · {{ c.regime }} · {{ c.parity }} · {{ c.fill_basis }} · qty=2</div>
 
   <details class="params-fold">
     <summary><span class="chip-k">params</span><span class="chip-v">canon settings</span></summary>

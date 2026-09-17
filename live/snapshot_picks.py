@@ -1,7 +1,7 @@
 """Archive every scan's qualified picks + settle expired ones.
 
 Runs after the ranker on each :01/:31 firing (pull_now_parallel.sh).
-1. Appends the current ranking's qualified top-5 to
+1. Appends the current ranking's qualified canonical top-N to
    live/intraday_picks/YYYY-MM-DD.json (idempotent per HHMM).
 2. Settles any unsettled picks (any day file) whose expiry has passed,
    using data/daily_bars_yahoo closes. P&L model matches the backtest:
@@ -43,6 +43,7 @@ PICK_FIELDS = [
     # the generic fair(delta, DTE) formula for min/target and disagreed with the live
     # tab (BAC/EOG). The live tab's basis is the smile-fit model credit; persist it.
     "model_credit", "dfit_short", "dfit_long", "quoted_credit", "credit_source", "D_ent",
+    "parity_bull_raw", "parity_bull_signed", "parity_pct", "parity_pairs",
     "short_bid", "short_ask", "long_bid", "long_ask",
     "short_oi", "long_oi",
 ]
@@ -60,7 +61,9 @@ def capture(latest_path: Path) -> None:
     day = ts[:10]
     hhmm = ts[11:16].replace(":", "")
     rows = [r for r in d.get("ticker") or [] if r.get("qualified")]
-    rows = sorted(rows, key=lambda r: r.get("GROUND") or 0, reverse=True)[:5]
+    rows = sorted(rows, key=lambda r: r.get("GROUND") or 0, reverse=True)[
+        :live_config.TOP_N_DISPLAY
+    ]
 
     PICKS_DIR.mkdir(exist_ok=True)
     day_path = PICKS_DIR / f"{day}.json"

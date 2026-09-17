@@ -67,8 +67,8 @@ def _gen_spread(rng: random.Random, ticker: str, spot: float, entry_date: date,
 
     `allowed_direction` enforces the regime filter:
       "bull_put"  → only bull-puts emitted
-      "bear_call" → only bear-calls emitted
-      None        → 78/22 mix (legacy)
+      "bear_call" → only bear-calls emitted (legacy mode)
+      None        → 78/22 mix (legacy; canonical caller converts this to cash)
     """
     if allowed_direction == "bull_put":
         spread_type = "bull_put"
@@ -218,6 +218,10 @@ def _build_payload(when: datetime, n_candidates: int = 30, seed: int = 0,
         regime_info = current_regime()
     allowed = regime_info.get("allowed_direction")
 
+    # Canonical bear/unknown regime is cash, not a mixed-direction mock book.
+    if getattr(backtest_config, "REGIME_BULL_ONLY", False) and allowed is None:
+        n_candidates = 0
+
     picks = []
     used = set()
     universe = list(UNIVERSE)
@@ -236,7 +240,7 @@ def _build_payload(when: datetime, n_candidates: int = 30, seed: int = 0,
     threshold = backtest_config.GROUND_THRESHOLD if backtest_config.GROUND_THRESHOLD not in (None, float("-inf")) else 0.0
     for p in picks:
         p["qualified"] = p["GROUND"] >= threshold
-    top_picks = picks[:live_config.TOP_N_DISPLAY]
+    top_picks = [p for p in picks if p["qualified"]][:live_config.TOP_N_DISPLAY]
     ticker_rows = [p for p in picks if p["GROUND"] > 0]
 
     return {
@@ -263,6 +267,8 @@ def _build_payload(when: datetime, n_candidates: int = 30, seed: int = 0,
             "TOP_N":             live_config.TOP_N_DISPLAY,
             "DKL_K":             DKL_K,
             "ALPHA":             "(b-1)/(2b)",
+            "REGIME_GATE":       "bull puts only when prior-session SPY close > 100d SMA; cash otherwise",
+            "PARITY_GATE":       f"same-strike call-IV minus put-IV daily percentile > {backtest_config.PARITY_MIN_PCT:.0%}",
         },
         "regime":    regime_info,
         "top_picks": top_picks,

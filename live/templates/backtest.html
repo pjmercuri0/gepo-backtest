@@ -7,7 +7,7 @@
   {% set c = data.config %}
 
   <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">{% if is_euro_profile %}GEPO Euro Index Backtest{% else %}GEPO Credit Spread Backtest{% endif %}</h1>
-  <div class="subtitle">{% if is_euro_profile %}Cash-settled European index options · G_rv/DKL canon · all expiry weekdays · fills 0.80×clamped LAST · no regime gate · qty=2{% else %}D_ent canon (2026-09-13) · 0.55Δ short leg by fitted delta (band 0.50–0.60) · G on P_real (252-session realized moves vs the strikes) · D_ent = ln3 − H(Q_bs) (paper eq. 19) · k=1 · GROUND ≥ 0.01 · top-5/day · smile-fit credit, fills 1.08×model, $1.30/spread commission · no regime gate · qty=2{% endif %}</div>
+  <div class="subtitle">{% if is_euro_profile %}Cash-settled European index options · G_rv/DKL canon · all expiry weekdays · fills 0.80×clamped LAST · no regime gate · qty=2{% else %}D_ent canon · {{ c.delta }} · {{ c.selection }} · {{ c.regime }} · {{ c.parity }} · {{ c.fill_basis }} · qty=2{% endif %}</div>
 
   <details class="params-fold">
     <summary><span class="chip-k">params</span><span class="chip-v">canon settings</span></summary>

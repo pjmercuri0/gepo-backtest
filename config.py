@@ -192,7 +192,7 @@ GROUND_THRESHOLD = 0.005  # 2026-09-15: thr 0.005 / k=4 on full-session P_real (
 # Γᵢ ≥ 0.10% threshold rule TOP_N is set to None (no per-week cap); every
 # candidate clearing the threshold is taken. Set to a positive integer to
 # fall back to the legacy top-N rule.
-TOP_N = 5  # canonical 2026-06-03 (top-5 per day-of-week)
+TOP_N = 10  # 2026-09-16 canon: up to 10 qualified bull puts per entry day
 
 # Sizing rule: "1" = 1 contract per spread, "2" = 2 contracts, "dyn10k" = dynamic.
 # Per-variant scripts override this.
@@ -207,14 +207,21 @@ USE_DRIFT    = False
 DRIFT_WINDOW = 60
 
 # ── REGIME FILTER ────────────────────────────────────────────────────────────
-# SPY 100-day SMA gate. Canonical 2026-06-05: OFF. With rv_vs_iv DKL ranking,
-# GROUND correctly identifies counter-regime picks with real edge (e.g. bull-put
-# in bear regime had 58% WR over 2020-25). Gate ON: Sh 1.48, DD -11.8%, 541 picks.
-# Gate OFF: Sh 2.19, DD -6.4%, 1014 picks. REGIME_WINDOW kept for any future
-# regime-aware logic.
-REGIME_FILTER = False
+# 2026-09-16 canon: bull puts only when the PRIOR completed SPY session closed
+# above its 100-session SMA; cash in bear/unknown regimes.  The one-session lag
+# avoids using the entry day's close for a 15:00 ET decision.
+REGIME_FILTER = True
 REGIME_WINDOW = 100
 REGIME_SOURCE = "spy"
+REGIME_BULL_ONLY = True
+REGIME_LAG_SESSIONS = 1
+REGIME_FAIL_CLOSED = True
+REGIME_MAX_STALE_CALENDAR_DAYS = 4
+
+# Daily cross-sectional same-strike call/put IV veto.  Strictly greater than
+# the 12th percentile; missing observations are neutral (0.5) and pass.
+PARITY_FILTER = True
+PARITY_MIN_PCT = 0.12
 
 # ── BANKROLL ─────────────────────────────────────────────────────────────────
 STARTING_BANKROLL = 10_000.0

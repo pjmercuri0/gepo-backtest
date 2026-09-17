@@ -605,6 +605,12 @@ def select_trades(scored: pd.DataFrame, top_n: int = None) -> pd.DataFrame:
         weeks.append(_compute_ground_for_week(week_df))
     scored = pd.concat(weeks, ignore_index=True)
 
+    # 2026-09-16 canon: daily cross-sectional same-strike call/put IV veto.
+    # The percentile is formed before applying the GROUND threshold.
+    if getattr(config, "PARITY_FILTER", False):
+        import ent_canon
+        scored = ent_canon.add_parity_percentile(scored)
+
     # Select best per ticker
     selected = []
     for (ticker, entry_date), grp in scored.groupby(["ticker", "entry_date"]):
@@ -617,6 +623,17 @@ def select_trades(scored: pd.DataFrame, top_n: int = None) -> pd.DataFrame:
             continue
 
         best = valid.loc[valid["GROUND"].idxmax()]
+
+        if (getattr(config, "PARITY_FILTER", False)
+                and best.get("parity_pct", 0.5) <= getattr(config, "PARITY_MIN_PCT", 0.12)):
+            selected.append({
+                "ticker": ticker, "entry_date": entry_date,
+                "decision": "PASS",
+                "reason": (f"parity percentile {best.get('parity_pct', 0.5):.3f} "
+                           f"<= {getattr(config, 'PARITY_MIN_PCT', 0.12):.3f}"),
+                "best_ground": best["GROUND"],
+            })
+            continue
 
         if best["GROUND"] < config.GROUND_THRESHOLD:
             selected.append({

@@ -8,8 +8,10 @@ the live ranker and the webapp.
                        WINDOW sessions, counted against the exact strikes -> (WIN, LOSS, PARTIAL)
     risk (DKL)         D_ent = D(Q_bs || U_3) = ln 3 - H(Q_bs)   (Mercurio, Wu, Xie 2020, eq. 19)
                        Q_bs = N(d2) triple at the fitted IVs
-    score              GROUND = (exp(G) - 1) * exp(-K * D_ent),  qualified if GROUND >= THR, top-5/day
-    execution          min credit/width = 1.04 x fair, target (1.06, 1.10) x fair; fair = model credit
+    score              GROUND = (exp(G) - 1) * exp(-K * D_ent), qualified if GROUND >= THR
+    direction          bull puts only when prior-session SPY close > its 100-session SMA; cash otherwise
+    option veto        daily same-strike call-IV minus put-IV percentile > 12%, then top-10/day
+    execution          minimum = 1.00 x fair, target = (1.04, 1.10) x fair; fair = model credit
                        when known, else fair(d, DTE) = 0.4022 + 2.3485(d-.5) - 12.464(d-.5)^2 + .0077(DTE-1)
 
 Everything here is vectorised numpy/pandas; no vendor quote at a wing strike is ever used
@@ -31,8 +33,26 @@ MIN_OBS      = 1          # use whatever history the name has (user 2026-09-13);
                           # state is the only regularisation, so a name with very few sessions scores near the prior
 FILL_MULT    = 1.08       # measured on 19 real fills vs model credit
 COMMISSION   = 1.30       # $ per spread per contract, opening only (IBKR ~$0.65/leg)
-TOP_N        = 5
+TOP_N        = 10
 PRIOR        = 0.5        # pseudo-count per state in P_real
+
+# Direction overlay (2026-09-16).  For each chain, pair calls and puts at the
+# same strike in the 35-65 absolute-delta band.  The raw bullish signal is the
+# median(call IV - put IV).  Its sign is fit using years strictly before the
+# entry year; the fitted sign has been +1 from 2021 through 2026.  There is no
+# pre-2020 training sample, so 2020 is neutral (all percentiles become 0.5).
+# Missing parity data is also neutral/fail-open.  The veto itself is strict:
+# parity_pct must be > 0.12.
+PARITY_MIN_PCT = 0.12
+PARITY_SIGN_BY_YEAR = {
+    2020: 0.0,
+    2021: 1.0,
+    2022: 1.0,
+    2023: 1.0,
+    2024: 1.0,
+    2025: 1.0,
+    2026: 1.0,
+}
 
 # own-gap drift in P_real (2026-09-16, handoff §0.45). Each candidate uses ONLY its own stock's opening gap,
 # (open / prior close - 1) / (prior 14d Wilder ATR / prior close); no cross-name or market average (user decision).
@@ -194,6 +214,89 @@ def d_ent(Q: np.ndarray) -> np.ndarray:
     out = LN3 - H
     out[~np.isfinite(Q).all(1)] = np.nan
     return out
+
+
+def parity_sign(year: int) -> float:
+    """Return the latest causal same-strike parity sign known for *year*."""
+    eligible = [y for y in PARITY_SIGN_BY_YEAR if y <= int(year)]
+    return float(PARITY_SIGN_BY_YEAR[max(eligible)]) if eligible else 0.0
+
+
+def chain_parity_signal(chain: pd.DataFrame) -> pd.DataFrame:
+    """Build the canonical chain-level bullish parity signal from raw options.
+
+    Formula (per Symbol/DataDate/ExpirationDate):
+        median_K[IV_call(K) - IV_put(K)]
+    using exact matched strikes whose absolute delta is in [0.35, 0.65].
+    Rows require a positive, finite IV and a non-crossed quote.  This matches
+    the historical option-direction research feature.
+    """
+    keys = ['Symbol', 'DataDate', 'ExpirationDate']
+    out_cols = keys + ['parity_bull_raw', 'parity_pairs']
+    required = keys + ['PutCall', 'StrikePrice', 'ImpliedVolatility',
+                       'BidPrice', 'AskPrice']
+    delta_col = 'Delta' if 'Delta' in chain.columns else 'AbsDelta'
+    if (chain.empty or not set(required).issubset(chain.columns)
+            or delta_col not in chain.columns):
+        return pd.DataFrame(columns=out_cols)
+
+    d = chain[required + [delta_col]].copy()
+    d['PutCall'] = d['PutCall'].astype(str).str.lower().str.strip()
+    d['iv'] = pd.to_numeric(d['ImpliedVolatility'], errors='coerce')
+    d['abs_delta'] = pd.to_numeric(d[delta_col], errors='coerce').abs()
+    d['bid'] = pd.to_numeric(d['BidPrice'], errors='coerce')
+    d['ask'] = pd.to_numeric(d['AskPrice'], errors='coerce')
+    d = d[
+        d['PutCall'].isin(['put', 'call'])
+        & d['abs_delta'].between(0.35, 0.65)
+        & d['iv'].between(IV_LO, IV_HI, inclusive='neither')
+        & (d['ask'] > d['bid'])
+    ]
+    if d.empty:
+        return pd.DataFrame(columns=out_cols)
+
+    piv = d.pivot_table(
+        index=keys + ['StrikePrice'], columns='PutCall', values='iv', aggfunc='median'
+    ).reset_index()
+    if 'call' not in piv.columns or 'put' not in piv.columns:
+        return pd.DataFrame(columns=out_cols)
+    piv = piv.dropna(subset=['call', 'put']).copy()
+    if piv.empty:
+        return pd.DataFrame(columns=out_cols)
+    piv['parity_bull_raw'] = piv['call'] - piv['put']
+    return (
+        piv.groupby(keys, sort=False)
+        .agg(parity_bull_raw=('parity_bull_raw', 'median'),
+             parity_pairs=('parity_bull_raw', 'size'))
+        .reset_index()
+    )
+
+
+def add_parity_percentile(cands: pd.DataFrame,
+                          raw_col: str = 'parity_bull_raw') -> pd.DataFrame:
+    """Add causal signed parity and its daily bull-candidate percentile.
+
+    Percentiles are formed before the GROUND threshold and regime filters.
+    Non-bull rows and missing parity observations are assigned neutral 0.5.
+    """
+    C = cands.copy()
+    if C.empty:
+        C['parity_bull_signed'] = pd.Series(dtype=float)
+        C['parity_pct'] = pd.Series(dtype=float)
+        return C
+    if raw_col not in C:
+        C[raw_col] = np.nan
+    years = pd.to_datetime(C['entry_date']).dt.year
+    signs = years.map(parity_sign)
+    C['parity_bull_signed'] = pd.to_numeric(C[raw_col], errors='coerce') * signs
+    C['parity_pct'] = 0.5
+    bull = C['spread_type'].eq('bull_put')
+    active = bull & signs.ne(0) & C['parity_bull_signed'].notna()
+    ranked = C.loc[active].groupby('entry_date', sort=False)['parity_bull_signed'].rank(
+        method='average', pct=True
+    )
+    C.loc[active, 'parity_pct'] = ranked
+    return C
 
 
 # ── 3. realized belief from daily closes ────────────────────────────────────
@@ -401,7 +504,9 @@ CANON_LABELS = {
     'delta':     f'{DELTA_TARGET:g}Δ short leg (fitted delta, band {DELTA_MIN:g}–{DELTA_MAX:g})',
     'dkl':       'D_ent = D(Q_bs‖U₃) = ln3 − H(Q_bs), Q_bs = N(d2) at the smile-fit IVs (Mercurio–Wu–Xie 2020 eq. 19)',
     'window':    f'{WINDOW} full sessions of realized DTE-matched moves vs the exact strikes (P_real, every trading day)',
-    'selection': f'top-{TOP_N} per day, k={K:g}, GROUND ≥ {THR:g}',
+    'selection': (f'bull puts only; prior-close SPY>100d SMA; '
+                  f'parity percentile > {PARITY_MIN_PCT:.0%}; top-{TOP_N}/day; '
+                  f'k={K:g}, GROUND ≥ {THR:g}'),
     'gap':       f'P_real drift = {GAP_GAMMA:g} × β_year σ × z(the stock\'s OWN opening gap, ATR units) × √DTE; no market average; β walk-forward, fitted on years before entry (§0.45)',
     'scoring':   'G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G−1)·e^(−k·D_ent)',
     'fill':      f'{FILL_MULT:.2f}× smile-fit model credit (19 real fills), ${COMMISSION:.2f} commission/spread',

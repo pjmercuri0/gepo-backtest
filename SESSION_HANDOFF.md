@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-16 EDT (**§0.46 is the latest research plan (10 option-market direction ideas); §0.45 is the latest canon state: CANON NOW INCLUDES THE OWN-GAP DRIFT IN P_real (each stock's own opening gap; the market-average version lived a few hours and is gone) — the Mac mini must `git pull`, run `deploy/mac-mini/install_crontab.sh`, and run `python3 -m live.fetch_name_gaps` once**; canon cell is still §0.43, k=4 / thr 0.005 on full-session P_real). Current canon is D_ent (§0.33-0.35, §0.37): short-leg delta 0.55 (band 0.50-0.60, fitted), **k=4, GROUND threshold 0.005 (§0.43, 2026-09-15; was k=1 / 0.01)**, smile-fit credit, **execution min 1.00x the spread's own model credit (= the gate), target 1.04-1.10x**, ranking on model credit (§0.37/§0.38 — the absolute 0.50 c/w levels of 9f251e0 and the 1.04x floor of 87901c2 each lasted hours and are superseded). The 2026-09-11 canon (k=10, thr 0.05, delta 0.20) is superseded. The MacBook and Mac mini histories were reconciled, tested, and integrated into GitHub `main`; the Mac mini remains the production runner. See §0.14 for cross-machine ops state, §0.15 for the Actuals tab, §0.16/§0.17 for the European index option lane, §0.18 for the assignment monitor and Actuals rebuild, §0.19 for IV skew, and §0.20 for the delta-canon change. Older deployment/GitHub warnings in §0.13 and below are historical unless §0.14, §0.15, §0.16, §0.18 or §0.20 explicitly carries them forward.
+**Last updated:** 2026-09-16 EDT (**§0.54 is the current canon and supersedes the earlier two-sided/top-5 regime notes**). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection is now **bull puts only when the prior completed SPY close is above its 100-session SMA; cash otherwise; same-strike call-IV minus put-IV daily percentile strictly above 12%; top 10 qualified trades/day**. Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -18,11 +18,12 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - GitHub `origin/main` is the source of truth. At this update, the MacBook and Mac mini histories have been fully reconciled and pushed; there are no seven-commit or eleven-commit transfers left to perform.
 - GitHub SSH authentication works on both machines. Any later statement that GitHub authentication is broken, a token must be fixed, or commits still need to be transferred is historical and obsolete.
 - The Mac mini at `/Users/securio/Downloads/gepo-backtest` is the production runner. The MacBook is the development machine.
-- Production strategy canon is the **D_ent** canon of 2026-09-13 (§0.33-0.35):
+- Production strategy canon is the **D_ent + bull/parity overlay** canon of 2026-09-16 (§0.54):
   `DELTA_TARGET=0.55`, `DELTA_MIN=0.50`, `DELTA_MAX=0.60`, `DKL_K=4.0`,
   `GROUND_THRESHOLD=0.005` (§0.43, 2026-09-15; was 1.0 / 0.01), `PROB_BASIS="realized"`, `DKL_REFERENCE="entropy_uniform"`
   (that last name describes the behaviour but is NOT a constant in `ent_canon.py` — §0.37).
-  **LIVE SELECTION (2026-09-13, late): rank on MODEL credit, execution gate = IBKR quote >= 1.00x model**
+  `TOP_N=10`, `REGIME_FILTER=True`, `REGIME_BULL_ONLY=True`, `REGIME_LAG_SESSIONS=1`,
+  `PARITY_MIN_PCT=0.12` (strict `>`). **LIVE SELECTION: rank on MODEL credit, execution gate = IBKR quote >= 1.00x model**
   (`LIVE_SELECTION_CREDIT="model"`, ranker gates on `tgt_walkaway_credit`). Quoted-mid ranking and the
   1.04x gate are OFF. Basis: §0.38 replay, model/1.00x = 118 trades $950, best per-trade and lowest DD.
   Execution targets (final, 2026-09-13 late): **min 1.00x model credit = execution gate, target
@@ -32,8 +33,8 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
 - The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
-- **CURRENT CANON is §0.33-0.35 ("D_ent", 2026-09-13)**: 50-60 delta by fitted delta, G on P_real, D_ent = ln3 − H(Q_bs)
-  (paper eq. 19) discounted with k=1, thr 0.01, smile-fit credit, fills 1.08× model. §0.21 below is superseded.
+- **CURRENT CANON is §0.54 (2026-09-16)**: 50-60 delta by fitted delta, G on P_real,
+  D_ent = ln3 − H(Q_bs), k=4, threshold 0.005, bull-regime bull puts only, parity >12%, top 10/day.
 - **OLD (superseded) SCORING CANON §0.21 ("52:10")**: DKL = D(P_emp‖Q_iv) with outcomes
   counted directly from realized spreads, keyed (ticker, $width) with pooled
   fallback, 52-expiry causal window, k=10. `rv_vs_iv` is dead. The LIVE path is
@@ -66,9 +67,8 @@ This block and the two safety/workflow blocks immediately below it are the autho
   2026 593 / $4,591 / 2.97 / -4.0% (pre-gap $4,372 / 2.62 / -4.2%). **MAC MINI TO DO:** `git pull`,
   `deploy/mac-mini/install_crontab.sh` (09:36 + 10:06 `cron_name_gaps.sh`), then run `python3 -m live.fetch_name_gaps`
   once and confirm `live/logs/name_gaps.log` stores today's gaps. A stock without today's gap scores with zero drift.
-- **NEXT RESEARCH (§0.46): 10 option-market direction ideas** (OI pin, dealer gamma, 25-delta risk reversal, same-strike
-  call/put IV gap, smile skew into P_real, term structure, OI change, IV-with-price, post-earnings drift, live order-book
-  imbalance) with a mandatory test protocol. Price-chart TA is exhausted (§0.45).
+- **Option-direction research (§0.46-§0.54):** same-strike call/put IV parity is now part of canon as a mild
+  bottom-12% veto. The 2026 evaluation was used during selection and is not a clean holdout.
 - **Directional win-rate work is the next research push (§0.44)**, for the MacBook: validate
   IV skew on 2020-25 (§0.19) and test a spike-reversal filter. Win rate is exactly
   delta-implied today, and +1pt of win rate is worth more than +1% of fill credit.
@@ -90,7 +90,42 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
-## 0.20 Delta-target canon changed to 0.20 (2026-09-11) — CURRENT STATE
+## 0.54 Bull-regime/parity canon promoted (2026-09-16)
+
+User decision, now production canon:
+
+- `GROUND >= 0.005`, `k=4`;
+- bull puts only;
+- trade only when the **prior completed** SPY close is above its 100-session SMA; bear or unknown regime is cash;
+- same-strike option parity daily percentile **strictly > 12%**;
+- top 10 qualified trades per entry day.
+
+Parity formula per ticker/expiry chain is `median_K(call_IV(K) - put_IV(K))` over exact matched strikes whose
+absolute delta is 0.35-0.65. The sign is fitted only from years before the entry year; it is +1 for 2021-2026,
+while 2020 and missing observations are neutral at percentile 0.5. Percentiles are computed among that day's
+bull-put candidates before the GROUND and regime gates. Both option rights must therefore remain in the live fetch.
+
+The production regime lookup is strictly prior-session (`searchsorted(..., side="left")`) to avoid using the
+entry day's close at 15:00. A missing or more-than-four-calendar-day-stale benchmark classification fails closed
+to cash. The web banner uses this lagged gate; the separate live SPY-vs-SMA display is informational.
+
+Generated `report_ent_canon.py` payloads (one contract, 1.08x model fill, $1.30 commission, partial profitable
+outcomes haircutted 50%):
+
+- 2020-2025: 4,280 trades, $41,044 P&L, 46.80% full wins, 54.86% profitable, 12.14% yield,
+  1.30 weekly Sharpe, 34.76% CAGR, -23.61% max drawdown, 1.47 Calmar.
+- 2026 through 2026-09-11: 670 trades, $6,930 P&L, 47.16% full wins, 55.37% profitable, 13.58% yield,
+  3.06 weekly Sharpe, 116.47% annualized CAGR, -6.39% max drawdown, 18.23 Calmar.
+
+The 2026 period is **not** a clean holdout: it was examined while choosing this configuration. CAGR and Calmar
+for the partial 2026 window are annualized and should not be interpreted as a full-year realized return.
+
+Implementation points: `ent_canon.py` owns parity formula/sign/percentile and canonical constants;
+`spreads.py` owns lagged one-sided regime enforcement and carries the raw parity feature; `live/ranker.py` applies
+the parity and execution gates; `report_ent_canon.py` generates both web report payloads; live top-N capture/freeze
+uses `live_config.TOP_N_DISPLAY=10`.
+
+## 0.20 Delta-target canon changed to 0.20 (2026-09-11) — HISTORICAL, SUPERSEDED
 
 Production canon changed from ATM-ish 50-delta shorts to lower-delta shorts:
 

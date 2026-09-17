@@ -172,7 +172,8 @@ function renderParams(cfg) {
     ["fill",           cfg.FILL_MULT != null ? `${cfg.FILL_MULT}× model, $${cfg.COMMISSION} comm` : `—`],
     ["targets",        cfg.TARGETS || `min 1.00× model credit, target 1.04–1.10×`],
     ["exec gate",      cfg.EXEC_GATE || `qualified only if the IBKR credit ≥ min`],
-    ["regime gate",    `OFF (both directions eligible)`],
+    ["regime gate",    cfg.REGIME_GATE || `bull puts only above prior-session SPY 100d SMA; cash otherwise`],
+    ["parity gate",    cfg.PARITY_GATE || `same-strike call-IV minus put-IV percentile > 12%`],
   ];
   return chips.map(([k, v]) =>
     `<span class="chip"><span class="chip-k">${k}</span><span class="chip-v">${v}</span></span>`
@@ -354,7 +355,7 @@ async function refreshSpyLive() {
             <span style="opacity:0.7;margin-right:8px">${arrow}</span>
             <span style="font-weight:600">SPY $${rd(d.mark ?? d.last ?? 0, 2).toFixed(2)}</span>
             <span class="${chgCls}" style="margin-left:8px">${sign(d.change_pct)}${rd(d.change_pct ?? 0, 2).toFixed(2)}%</span>
-            <span class="${regCls}" style="margin-left:10px;font-weight:600">${(d.live_regime || "?").toUpperCase()}</span>
+            <span class="${regCls}" style="margin-left:10px;font-weight:600">LIVE ${(d.live_regime || "?").toUpperCase()}</span>
           </div>
         </div>
         <div id="spy-detail" style="display:${detailDisplay};margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px">
@@ -378,7 +379,7 @@ async function refreshSpyLive() {
             </div>
             <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;gap:14px">
               <div>
-                <div class="week-sub">vs ${d.sma_window}d SMA (as of ${d.sma_as_of || "—"})</div>
+                <div class="week-sub">intraday vs ${d.sma_window}d SMA (informational; gate uses prior close)</div>
                 <div class="week-title ${regCls}" style="font-size:14px">
                   ${sign(d.live_vs_sma)}${rd(d.live_vs_sma ?? 0, 2).toFixed(2)}
                   (${sign(d.live_vs_sma_pct)}${rd(d.live_vs_sma_pct ?? 0, 2).toFixed(2)}%)
@@ -462,12 +463,12 @@ function renderRegime(r) {
   const meta  = document.getElementById("regime-meta");
   if (!r || !r.regime) {
     badge.innerHTML = "";
-    meta.textContent = "regime: unknown";
+    const stale = r && r.stale_days != null ? `; source stale ${r.stale_days}d` : "";
+    meta.textContent = `regime: unknown · cash${stale}`;
     return;
   }
   const cls = r.regime === "bull" ? "dir-bull" : "dir-bear";
-  // Regime is informational only since 2026-06-05 (gate is OFF; both directions eligible).
-  const dir = r.regime === "bull" ? "BULL regime (gate off)" : "BEAR regime (gate off)";
+  const dir = r.regime === "bull" ? "BULL regime · bull puts enabled" : "BEAR regime · cash";
   badge.innerHTML = `<span class="badge ${cls === 'dir-bull' ? 'badge-WIN' : 'badge-LOSS'}" `
                   + `style="vertical-align:middle;margin-left:8px;font-size:12px">${dir}</span>`;
   const stale = (r.stale_days ?? 0) > 1
