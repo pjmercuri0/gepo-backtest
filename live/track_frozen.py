@@ -192,18 +192,33 @@ def _track_pick(df: pd.DataFrame, pick: dict, existing_rows: list = None) -> dic
         dte_days=days_to_expiry,
         spread_type=pick["spread_type"],
     )
-    # Floor at intrinsic (2026-09-15). ISRG 370/372.5 bear call with spot 377.31 --
-    # $2.50 fully ITM -- marked $0.68 because the per-leg IVs came out of a
-    # 3-point-wide illiquid book (370C 8.3/11.4) and the long leg's IV ran above
-    # the short's. A vertical can never be closed for less than its intrinsic,
-    # so the theoretical mark is floored there before the width cap.
+    # Intrinsic handling (2026-09-15, CORRECTED 2026-09-17).
+    #
+    # 2026-09-15 floored the mark at intrinsic because ISRG 370/372.5 (spot 377.31,
+    # both legs deep ITM) marked $0.68 on per-leg IVs from a 3-point-wide book.
+    # That floor is WRONG in general: for a vertical whose spot sits BETWEEN the
+    # strikes, intrinsic equals the full width -- the CAP, not a floor -- because
+    # the near-the-money long leg still carries time value. ADI 365/362.5 with spot
+    # 362.27 and a day to run was forced to max loss ($2.50) and showed -$106 on a
+    # 1.44 fill; Black-Scholes across 35-45% IV puts it at 1.43-1.48, i.e. about
+    # break-even.
+    #
+    # So: floor at intrinsic ONLY when the long leg is also comfortably ITM, which is
+    # the case the floor was written for. Otherwise trust BS and just cap at width.
+    S = spot_for_bs
+    ks, kl = float(pick["short_strike"]), float(pick["long_strike"])
     if pick["spread_type"] == "bull_put":
-        intr = max(0.0, float(pick["short_strike"]) - spot_for_bs) - max(0.0, float(pick["long_strike"]) - spot_for_bs)
+        intr = max(0.0, ks - S) - max(0.0, kl - S)
+        long_itm_by = kl - S
     else:
-        intr = max(0.0, spot_for_bs - float(pick["short_strike"])) - max(0.0, spot_for_bs - float(pick["long_strike"]))
+        intr = max(0.0, S - ks) - max(0.0, S - kl)
+        long_itm_by = S - kl
     intr = max(0.0, intr)
-    current_mark = round(min(max(bs_debit, intr), spread_w), 4)
-    mark_basis = "BS_theo" if bs_debit >= intr else "intrinsic floor (BS below intrinsic)"
+    # "Comfortably" = the long leg is at least 1% of spot beyond its strike, so its
+    # remaining time value is small and intrinsic really is the floor.
+    deep = long_itm_by > 0.01 * S
+    current_mark = round(min(max(bs_debit, intr) if deep else bs_debit, spread_w), 4)
+    mark_basis = "BS_theo" if (not deep or bs_debit >= intr) else "intrinsic floor (both legs deep ITM)"
 
     # Entry basis: canonical shared basis (actual_credit > 0.80×MID). The old
     # LAST-preferred basis disagreed with webapp/expire_frozen — e.g. BLK
