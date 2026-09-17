@@ -181,6 +181,10 @@ def build_payload(picks, end_year, label):
             'k_s':      round(float(r['short_strike']), 2),
             'k_l':      round(float(r['long_strike']), 2),
             'credit':   round(float(r['credit']), 4),
+            # Preserve fair/model credit for the static dashboard's
+            # fill/fair, price-edge, and realized-over-edge metrics.
+            'model_credit': round(float(r['model_credit']), 4)
+                if pd.notna(r.get('model_credit')) else None,
             'max_loss': round(float(r['max_loss_adj']), 4),
             'spot':     round(float(r['expiry_close']), 2),
             'qty':      int(r['_q']),
