@@ -3895,3 +3895,23 @@ Related search artifacts:
 - `side_conditional_search.csv`, `side_conditional_best_metrics.csv`
 - `dual_side_conditional_grid.csv`, `dual_side_conditional_best_metrics.csv`
 - `bear_call_min_parity_gex_pct_veto08_full_metrics.csv`
+
+## 0.52 Add a bull-put veto to the bear-call candidate (2026-09-16)
+
+Tested the current `bear_call_min_parity_gex_pct_veto08` with a side-conditional
+bull-put veto added. The bull-put score was the strike-local side-aligned
+combination of parity balance and local GEX; the bear-call rule was held fixed
+at the 8th-percentile veto.
+
+Result: no bull-put cutoff tested improved the bear-only candidate. The least
+damaging cutoff was 1%, but it still reduced PnL in both periods. A 35% cutoff
+raised 2026 PnL but damaged 2020-25 PnL and all win-rate metrics. Therefore the
+best current implementation remains bear-call-only; adding a symmetric bull-put
+veto does not balance the book profitably in this sample.
+
+Representative combined results:
+- bear-only: 2020-25 $33,688 / 44.37% full-win; 2026 $5,554 / 43.20% full-win.
+- bull veto 1% + bear veto 8%: 2020-25 $33,421 / 44.40% full-win; 2026 $4,995 / 42.81% full-win.
+- bull veto 35% + bear veto 8%: 2020-25 $32,450 / 44.32% full-win; 2026 $6,036 / 44.29% full-win.
+
+The full threshold grid is in `dual_side_conditional_grid.csv`.
