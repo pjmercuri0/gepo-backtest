@@ -3915,3 +3915,26 @@ Representative combined results:
 - bull veto 35% + bear veto 8%: 2020-25 $32,450 / 44.32% full-win; 2026 $6,036 / 44.29% full-win.
 
 The full threshold grid is in `dual_side_conditional_grid.csv`.
+
+## 0.53 Independent side-threshold portfolio (2026-09-16)
+
+Tested abandoning the global top-five cap. The selector now admits up to five
+bull puts and up to five bear calls independently each day, subject to:
+- `GROUND >= 0.005`;
+- a daily cross-sectional option score threshold;
+- separate side caps of five.
+
+The score is the average daily percentile of walk-forward-signed GEX and
+same-strike call/put signals for bull puts; bear calls use its complement.
+This avoids year-level percentile look-ahead.
+
+The coarse 7 x 11 x 11 sweep found no pair improving all six target metrics in
+both 2020-25 and 2026. The most balanced near-miss was bull cutoff 5%, bear
+cutoff 25%: 2020-25 PnL $36,557 / full-win 44.44% / weekly Sharpe 2.516;
+2026 PnL $3,425 / full-win 42.00% / weekly Sharpe 3.209. It improves 2026
+risk-adjusted performance but is not a replacement for the current bear-call
+veto candidate because 2026 PnL and 2020-25 Sharpe are weaker in this test.
+
+Reproducible code and output:
+- `threshold_side_portfolio_search.py`
+- `threshold_side_portfolio_search.csv`
