@@ -133,7 +133,34 @@ def _is_held(pick: dict) -> bool:
         return False
 
 
+def _held_cmp(pick: dict) -> str | None:
+    """Template helper mirroring the live tab's +: "same" (exact option already held,
+    blue), "better"/"worse" (same name and side, strike away from / with the move --
+    green/red), or None. Cached per request."""
+    try:
+        tk, st = pick.get("ticker"), pick.get("spread_type")
+        exp = str(pick.get("expiry_date") or "")[:10]
+        ks = round(float(pick["short_strike"]), 2)
+        kl = round(float(pick["long_strike"]), 2)
+    except (TypeError, ValueError, KeyError):
+        return None
+    if (tk, st, ks, kl, exp) in (getattr(g, "_held_keys", None) or _held_keys()):
+        return "same"
+    shortmap = getattr(g, "_held_shorts", None)
+    if shortmap is None:
+        shortmap = _held_shorts(); g._held_shorts = shortmap
+    shorts = shortmap.get((tk, st, exp))
+    if not shorts:
+        return None
+    ref = max(shorts) if st == "bear_call" else min(shorts)
+    if ks == ref:
+        return "same"
+    adverse = (ks > ref) if st == "bear_call" else (ks < ref)
+    return "worse" if adverse else "better"
+
+
 app.jinja_env.globals['is_held'] = _is_held
+app.jinja_env.globals['held_cmp'] = _held_cmp
 app.jinja_env.filters['shortdate'] = _short_date
 app.jinja_env.filters['strike'] = _strike
 
