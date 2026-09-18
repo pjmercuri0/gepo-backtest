@@ -5,14 +5,15 @@
     "expiry": "Friday (DTE 1-4)",
     "selection": "research bear sleeve selected on IS 2020-2025; 2026 attached after ranking",
     "delta": "0.55\u0394 short leg (band 0.5\u20130.6)",
-    "scoring": "G_rv: RV-implied N(d2) probs in G; rv_vs_iv DKL (BS d2, 10d RV vs IV); raw combo MID credit (canon 2026-06-10)",
-    "fill_basis": "0.80\u00d7mid (real fills ~0.82\u00d7mid, n=5); partial-WIN at 50% intrinsic",
+    "scoring": "G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G\u22121)\u00b7e^(\u2212k\u00b7D_ent)",
+    "fill_basis": "1.08\u00d7 smile-fit model credit; partial-WIN at 50% intrinsic; no commission",
     "regime": "bull puts above prior-session SPY 100d SMA; bear calls below prior-session SPY 100d and 20d SMA",
     "vol_gate": "OFF",
     "sizing": "qty=2 per pick (canonical 2026-06-05)",
     "starting_bankroll": 10000.0,
     "parity": "bull parity > canon threshold; bear mirrored parity > 25th percentile",
-    "bear_gates": "bear calls: GROUND >= 0.001, max 5/day, earnings and ex-dividend gated (ex-date through expiry+1)"
+    "bear_gates": "bear calls: GROUND >= 0.001, max 5/day, earnings and ex-dividend gated (ex-date through expiry+1)",
+    "commission": "none (2026-09-17)"
   },
   "summary": {
     "window_start": "2020-07-14",
