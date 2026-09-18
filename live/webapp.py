@@ -481,21 +481,36 @@ def _actuals_rows() -> list[dict]:
                     # between the strikes, intrinsic IS the width, so that printed max
                     # loss on a position with a day still to run (ADI 2026-09-17,
                     # -$106 shown against a true ~-$1).
-                    _bs = None
+                    # One implementation for both tabs (2026-09-17): History marks with
+                    # track_frozen._track_pick off TODAY's snapshot IVs; Actuals used to
+                    # mark off the IVs stored at entry, so the same option showed two
+                    # values -- ABT 102/103 read 0.610 on History and 0.395 here, which
+                    # flipped the sign of the P&L. Use _track_pick, falling back to the
+                    # stored IVs only when the strikes are not in today's snapshot.
+                    _bs = None; _basis = None
                     try:
-                        from live.bs_pricing import bs_spread_debit
-                        _ivs = pick.get("iv_fit_short") or pick.get("IV")
-                        _ivl = pick.get("iv_fit_long") or pick.get("long_IV") or _ivs
-                        _dte = max((ddate.fromisoformat(str(pick["expiry_date"])[:10]) - ddate.today()).days, 0)
-                        if _ivs:
-                            _bs = bs_spread_debit(spot=_sp, short_strike=ks, long_strike=kl,
-                                                  short_iv=float(_ivs), long_iv=float(_ivl),
-                                                  dte_days=_dte, spread_type=pick["spread_type"])
-                    except Exception:
-                        _bs = None
+                        _row = _track_from_snapshot(pick)
+                        if _row and _row.get("current_mark") is not None:
+                            _bs = float(_row["current_mark"])
+                            _basis = f"{_row.get('mark_basis', 'BS')} (same as History)"
+                    except Exception as _e:
+                        print(f"[actuals] snapshot mark failed {pick.get('ticker')}: {_e}", flush=True)
+                    if _bs is None:
+                        try:
+                            from live.bs_pricing import bs_spread_debit
+                            _ivs = pick.get("iv_fit_short") or pick.get("IV")
+                            _ivl = pick.get("iv_fit_long") or pick.get("long_IV") or _ivs
+                            _dte = max((ddate.fromisoformat(str(pick["expiry_date"])[:10]) - ddate.today()).days, 0)
+                            if _ivs:
+                                _bs = bs_spread_debit(spot=_sp, short_strike=ks, long_strike=kl,
+                                                      short_iv=float(_ivs), long_iv=float(_ivl),
+                                                      dte_days=_dte, spread_type=pick["spread_type"])
+                                _basis = f"BS at stored IV, {_dte}d (no combo quote)"
+                        except Exception:
+                            _bs = None
                     if _bs is not None:
                         live["current_mark"] = round(min(max(_bs, intr) if deep else _bs, w), 4)
-                        live["mark_basis"] = f"BS at stored IV, {_dte}d (no combo quote)"
+                        live["mark_basis"] = (_basis or "BS (no combo quote)")
                     else:
                         live["current_mark"] = round(intr, 4)
                         live["mark_basis"] = "intrinsic (no combo quote, no IV)"
@@ -804,8 +819,20 @@ def _frozen_history(limit: int = 60) -> list[dict]:
                 short_intr = max(0.0, spot - ss)
                 long_intr  = max(0.0, spot - ls)
             intrinsic = min(max(0.0, short_intr - long_intr), spread_w)
+            # The intrinsic floor applies ONLY when the LONG leg is also comfortably
+            # ITM (>1% of spot). Third and last copy of the 2026-09-15 floor bug: with
+            # spot between the strikes, intrinsic IS the width, so flooring there forces
+            # max loss on a position that still has time value. ABT 102/103 with spot
+            # 102.61 was held at 0.610 here while the tracker and Actuals both said
+            # 0.526, which is what made History and Actuals disagree.
+            long_itm_by = (ls - spot) if stype == "bull_put" else (spot - ls)
+            deep_long = long_itm_by > 0.01 * spot if spot else False
             close_debit = target_row.get("current_mark")
-            close_debit = intrinsic if close_debit is None else max(float(close_debit), intrinsic)
+            if close_debit is None:
+                close_debit = intrinsic
+            else:
+                close_debit = max(float(close_debit), intrinsic) if deep_long else float(close_debit)
+            close_debit = min(max(close_debit, 0.0), spread_w)
 
             pps_per_share = entry_credit - close_debit
             target_row["unrealized_pnl_per_contract"] = round(pps_per_share * 100, 2)
@@ -1306,6 +1333,42 @@ def actuals():
     fill_stats = _fill_stats(rows)
     return render_template("actuals.html", fill_stats=fill_stats, rows=rows, weeks=_actuals_weeks(rows),
                            assign_ts=risk.get("_ts"))
+
+
+_SNAP_CACHE: dict = {}
+
+
+def _track_from_snapshot(pick: dict):
+    """Mark one spread with the SAME code History uses -- track_frozen._track_pick against
+    the most recent snapshot parquet. Cached per request; returns None when the strikes are
+    not in today's chain (a position that ran deep ITM stops being fetched)."""
+    # Module-level cache keyed by path, NOT flask.g: this runs from request handlers
+    # and from scripts, and a g lookup outside an app context raised into the caller's
+    # bare except, silently reverting to the stored-IV path this was meant to replace.
+    global _SNAP_CACHE
+    if "df" not in _SNAP_CACHE:          # NOT `df == "miss"`: comparing a DataFrame to a
+        df = None                        # sentinel raises "truth value is ambiguous"
+        try:
+            import glob as _glob
+            import pandas as _pd
+            from live import track_frozen as _tf
+            p = _tf._latest_snapshot_parquet(ddate.today())
+            if p is None:
+                days = sorted(_glob.glob(str(Path(live_config.SNAPSHOTS_DIR) / "2*")), reverse=True)
+                for d_ in days:
+                    fs = sorted(_glob.glob(d_ + "/*.parquet"))
+                    if fs:
+                        p = Path(fs[-1]); break
+            if p is not None:
+                df = _pd.read_parquet(p)
+        except Exception:
+            df = None
+        _SNAP_CACHE["df"] = df
+    df = _SNAP_CACHE["df"]
+    if df is None:
+        return None
+    from live import track_frozen as _tf
+    return _tf._track_pick(df, pick)
 
 
 def _held_shorts() -> dict:
