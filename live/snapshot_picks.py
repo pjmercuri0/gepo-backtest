@@ -22,8 +22,14 @@ import pandas as pd
 
 from live import live_config
 import spreads
+import ent_canon as ec
 
-FILL_FRAC = 0.80
+# 2026-09-17: snapshots used to book 0.80 x the IBKR quote, a pre-canon basis. The
+# canon books FILL_MULT x the smile-fit MODEL credit, so every settled snap P&L was
+# on a different basis to Backtest/OOT and could not be compared with them. Capture
+# now prefers model_credit x ent_canon.FILL_MULT and only falls back to 0.80 x quote
+# when a row carries no model credit (pre-2026-09-15 scans).
+FILL_FRAC = 0.80          # legacy fallback only
 PICKS_DIR = Path(live_config.ROOT_DIR) / "intraday_picks"
 BARS_DIR = Path(live_config.ROOT_DIR).parent / "data" / "daily_bars_yahoo"
 PICK_FIELDS = [
@@ -79,7 +85,13 @@ def capture(latest_path: Path) -> None:
     picks = []
     for r in rows:
         p = {k: r.get(k) for k in PICK_FIELDS}
-        p["entry_credit"] = round(float(r["net_credit"]) * FILL_FRAC, 4)
+        _mc = r.get("model_credit")
+        if _mc:
+            p["entry_credit"] = round(float(_mc) * ec.FILL_MULT, 4)
+            p["entry_basis"] = f"{ec.FILL_MULT:g}xMODEL"
+        else:
+            p["entry_credit"] = round(float(r["net_credit"]) * FILL_FRAC, 4)
+            p["entry_basis"] = f"{FILL_FRAC:g}xQUOTE"
         p["outcome"] = None
         p["pnl"] = None
         p["expiry_close"] = None
