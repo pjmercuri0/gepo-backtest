@@ -943,10 +943,23 @@ def _wagering(payload: dict | None) -> dict | None:
     cw = sorted(float(t["credit"]) / (float(t["credit"]) + float(t["max_loss"])) for t in T if float(t["credit"]) + float(t["max_loss"]) > 0)
     if cw:
         out["cw_median"] = round(cw[len(cw) // 2], 3)
-    fm = [(float(t["credit"]), float(t["model_credit"])) for t in T if t.get("model_credit")]
+    # model_credit is present on the in-sample payload but was dropped from the OOT
+    # trades (214a159), which left fill/fair, price edge and realized/edge blank on the
+    # OOT tab. The book is booked at credit = model_credit x FILL_MULT by construction
+    # (verified exact on the in-sample rows), so recover it when the field is absent.
+    import ent_canon as _ec
+    fm = []
+    for t in T:
+        try:
+            c = float(t["credit"])
+            m = float(t["model_credit"]) if t.get("model_credit") else c / _ec.FILL_MULT
+        except (TypeError, ValueError, KeyError, ZeroDivisionError):
+            continue
+        if m > 0:
+            fm.append((c, m))
     if fm:
         ratios = sorted(c / m for c, m in fm if m > 0)
-        edge = [(c - m) * 100 - 1.30 for c, m in fm]
+        edge = [(c - m) * 100 - _ec.COMMISSION for c, m in fm]   # was a hardcoded 1.30
         out["fill_model"] = round(ratios[len(ratios) // 2], 3)
         out["edge_per_contract"] = round(sum(edge) / len(edge), 2)
         out["edge_pct_risk"] = round(100 * sum(edge) / wag, 2)
