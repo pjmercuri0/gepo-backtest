@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-16 EDT (**§0.54 is the current canon and supersedes the earlier two-sided/top-5 regime notes**). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection is now **bull puts only when the prior completed SPY close is above its 100-session SMA; cash otherwise; same-strike call-IV minus put-IV daily percentile strictly above 12%; top 10 qualified trades/day**. Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-17 EDT (**§0.54 is the current canon**; **§0.55 is the latest state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection is now **bull puts only when the prior completed SPY close is above its 100-session SMA; cash otherwise; same-strike call-IV minus put-IV daily percentile strictly above 12%; top 10 qualified trades/day**. Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -124,6 +124,117 @@ Implementation points: `ent_canon.py` owns parity formula/sign/percentile and ca
 `spreads.py` owns lagged one-sided regime enforcement and carries the raw parity feature; `live/ranker.py` applies
 the parity and execution gates; `report_ent_canon.py` generates both web report payloads; live top-N capture/freeze
 uses `live_config.TOP_N_DISPLAY=10`.
+
+## 0.55 Live-quote and mark corrections; commission to zero (2026-09-17) — CURRENT STATE
+
+A day of defects found by comparing the site against TWS tickets and against itself. All
+fixed and deployed; several were mine from earlier the same day.
+
+### Quote pipeline — three separate faults
+
+1. **Wrong venue.** `LIVE_COMBO_EXCHANGE` was pinned to `CBOE` (set 2026-09-01 when SMART
+   returned nan). SMART now quotes **10/10** candidates to CBOE's 5/10 and is tighter or
+   equal on every one. JNJ 267.5/265: SMART bid -1.25, exactly the TWS ticket; CBOE -1.57.
+   Now `SMART`.
+2. **Scan-stale prices.** Combo quotes take 2-3 s to arrive on a cold subscription (measured:
+   12 bags -> 1 quoted in 1.5 s, 8 in 3.3 s), so a targeted requote cannot be fast and the
+   page carried the scan's prices — up to 15 minutes old on a book that moves every tick.
+   `live/combo_stream.py` now holds `reqMktData` open on the ranked spreads AND the open
+   Actuals positions, publishes `live/ranked/combo_stream.json` every second, and rsyncs it
+   to Mya every 2 s over an ssh ControlMaster socket (Mya has no IBKR). `webapp._overlay_stream`
+   lays quote, spot, derived credit and `above_min` onto `/api/latest.json`; GROUND and the
+   model credit are untouched. `WEBAPP_POLL_SECONDS` 900 -> 5, and the ranked label shows both
+   clocks ("scan 10:16 · quotes 10:23:29 ET (live)").
+3. **Most spreads have no complex-order book at all.** FCX 72/71 returned nan on SMART while
+   TWS showed -0.68 / -0.29 / -0.48. Those TWS numbers are LEG arithmetic: bid = short_ask -
+   long_bid, ask = short_bid - long_ask, mid = short_mid - long_mid (1.185 - 0.70 = 0.485).
+   The daemon now subscribes to both legs of every streamed spread (deduped) and derives the
+   quote when the bag does not tick. Coverage 18/30 -> 26/26.
+
+**Line budget:** IBKR error 101 at 100 concurrent tickers. Open positions get a line first,
+the ranked board fills the rest: `LIVE_STREAM_MAX_BAGS` 26, `MAX_SPOTS` 40.
+
+**Not resolved:** the API's combo bag returns nan even when TWS's UI shows a book. Not
+explained; the leg derivation makes it moot. Separately, TWS's displayed bid becomes the
+USER'S OWN resting order once one is working, so the two will not agree while an order rests
+(FCX: TWS bid -0.57 = the limit price; ours -0.74 leg-derived). Ours is fair value and should
+stay that way.
+
+### Marks — the intrinsic floor was wrong in three places
+
+2026-09-15 floored every mark at intrinsic after ISRG 370/372.5 (both legs deep ITM) marked
+$0.68 off per-leg IVs from a 3-point-wide book. **That floor is wrong whenever spot sits
+BETWEEN the strikes**, because intrinsic then equals the full width — the CAP, not a floor —
+and the near-the-money long leg still carries time value. ADI 365/362.5 with spot 362.27 and
+one day left was forced to max loss and showed **-$106** against a true ~**-$1** (BS 1.43-1.48
+across 35-45% IV).
+
+Fixed in all three copies — `track_frozen`, the Actuals overlay, and `_frozen_history` (this
+last one found only when History and Actuals disagreed). The floor now applies only when the
+LONG leg is also comfortably ITM (>1% of spot), and every mark is clamped to [0, width].
+
+**Two implementations became one.** History marked via `track_frozen._track_pick` off today's
+snapshot IVs; Actuals marked off the IVs stored at entry. ABT 102/103 read 0.610 on History
+and 0.395 on Actuals, flipping the sign of its P&L. Actuals now calls `_track_pick` too
+(`webapp._track_from_snapshot`, process-cached), falling back to stored IVs only when the
+strikes are absent from today's chain. They now agree on every overlapping row.
+
+**A silent failure worth remembering:** that cache used `df == "miss"` as a sentinel, which
+raises "truth value of a DataFrame is ambiguous" — swallowed by a bare `except`, so two
+rounds of "fixed" changed nothing. Sentinels next to DataFrames must use `in`/`is`.
+
+**Leg-derived quotes need a sanity check.** Once the bell went, leg quotes decayed and the
+subtraction produced mid 0.0 (ADI, PM, MS) and mid -1.64 (XOM). A zero mark reads as "free to
+close", and the Actuals week card showed **+$748** on a book that was **-$256**. A derived
+quote is now published only if `short_mid > long_mid` and `0 < mid <= width`; a combo quote
+only if `0 < mid <= width`. After hours 1 of 26 spreads still has a usable quote, which is the
+honest answer — the rest mark on BS.
+
+### Commission is zero everywhere (user decision)
+
+`ent_canon.COMMISSION` 1.30 -> **0.0** ("ignore all commission everywhere"). Every book and
+every live P&L reads that constant. Found while checking the tabs: **the published OOT payload
+already omitted commission** — 473 of 571 WIN/LOSS rows reproduce exactly at comm=0 and none at
+1.30 — so it had been inconsistent with the in-sample book rather than wrong on its own.
+
+**OPEN: the in-sample payload still has $1.30 baked in** (4,978 trades x qty2 ~= **$12.9k**
+understated). `report_ent_canon.py` must be re-run on the MacBook, where the research frame
+lives; it cannot be regenerated on the mini.
+
+### Snapshots booked the wrong basis
+
+`snapshot_picks.FILL_FRAC = 0.80` applied to the IBKR quote — a pre-canon basis — while
+Backtest/OOT book `FILL_MULT` x the smile-fit model credit, so settled snap P&L could not be
+compared with either. Capture now uses `model_credit x FILL_MULT` when the row carries one and
+records `entry_basis`; 209 stored picks were rebased. Older picks have no `model_credit` and
+keep the legacy basis, so the snap aggregate still mixes bases for anything before 2026-09-15.
+
+### Fill-sensitivity chip and payload labels were stale
+
+The chip still showed the bull-only canon (1.08x -> IS $61.3k / OOT $8.7k) against a book of
+$94.0k / $16.7k. Regenerated from the live payloads with no commission: **IS $107.0k / OOT
+$16.7k**. `credit = model_credit x FILL_MULT` holds exactly, so OOT's missing `model_credit`
+(dropped by `214a159`) is recoverable as `credit / 1.08`; the `weeks` block supplies the dated
+buckets for the equity curve.
+
+The payload `config.fill_basis` strings still read "0.80xmid" and "0.80xclamped LAST" —
+pre-canon labels that survived regeneration. Corrected to the canon fill on both.
+
+### Other live fixes today
+
+- **Stale greeks at the open (NOT fixed — open defect).** IBKR's `AbsDelta` is computed off a
+  pre-open spot, so on a gap morning strike selection picks the wrong strike: USB prior close
+  59.73, opened 60.58, IBKR still reported the 60 strike at delta 0.579 when it was really
+  **0.291**. The 09:30 board's model credit, targets and ratios all come in low as a result.
+  Self-corrects within ~15 minutes (median |IBKR delta - recomputed| 0.034 at 09:30, 0.021 at
+  09:45). **Fix would be to recompute delta from live spot and IV in the candidate builder.**
+- The build step's no-LAST skip is a vendor-EOD rule: at 09:30 74% of weeklies have not traded
+  (19% at 15:45), which cut the 2026-09-16 open from 94 viable pairs to 18. It now applies only
+  under `last_clamped`; the live build prices on mid.
+- `GEPO_MKT_DATA_TYPE` env override so an out-of-hours scan can request frozen data (IBKR
+  returns -1 on every option under live data after the close). Cron still runs live.
+- Live tab: `+` on every ranked row; blue/green/red `+` on live, History and Snapshots (blue =
+  same option held, green = strike away from the move, red = strike followed the stock).
 
 ## 0.20 Delta-target canon changed to 0.20 (2026-09-11) — HISTORICAL, SUPERSEDED
 

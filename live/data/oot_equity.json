@@ -5,12 +5,13 @@
     "expiry": "Friday (DTE 1-4)",
     "selection": "top-5 per day, k=4, GROUND threshold 0.005 (all days) \u2014 FROZEN canon, no 2026 tuning",
     "delta": "0.55\u0394 short leg (band 0.5\u20130.6)",
-    "scoring": "G_rv: RV-implied N(d2) probs in G (canon 2026-06-09); rv_vs_iv DKL (BS d2, 10d RV vs IV); clamped LAST credit",
-    "fill_basis": "0.80\u00d7clamped LAST (20% haircut); partial-WIN at 50% intrinsic (pin-risk realistic)",
+    "scoring": "G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G\u22121)\u00b7e^(\u2212k\u00b7D_ent)",
+    "fill_basis": "1.08\u00d7 smile-fit model credit; partial-WIN at 50% intrinsic; no commission",
     "regime": "bull puts above prior-session 100d SMA; bear calls below prior-session 100d and 20d SMA",
     "vol_gate": "OFF",
     "sizing": "qty=2 per pick (canonical 2026-06-05)",
-    "starting_bankroll": 10000.0
+    "starting_bankroll": 10000.0,
+    "commission": "none (2026-09-17)"
   },
   "summary": {
     "window_start": "2026-01-01",
