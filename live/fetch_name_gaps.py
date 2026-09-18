@@ -5,7 +5,7 @@ symbols, index roots skipped): ~6 months of IBKR daily TRADES bars (RTH). Today'
 daily bar; if IBKR returns no bar dated today, from the first 30-minute bar of today. Each stock's gap is computed by
 ent_canon.name_gaps, the same function the backtest uses. No cross-stock average is formed anywhere.
 
-    python3 -m live.fetch_name_gaps            # cron 09:36 and 10:06 Mon-Fri; fetches only names missing today
+    python3 -m live.fetch_name_gaps            # cron 09:35 and 09:50 Mon-Fri; fetches only names missing today
     python3 -m live.fetch_name_gaps --force    # refetch every name and replace today's rows
 
 Read-only connection, client id 179. ~2.5 s per request: 96 names in ~4 min, so a 09:35 start
