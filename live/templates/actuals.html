@@ -12,6 +12,7 @@
 </div>
 {% endif %}
 
+<div class="actuals-page">
 {% if rows %}
   {# One card per expiry Friday. Every pick in a group shares an expiry, so the
      group total is the number that matters for the week: realized where the
@@ -211,6 +212,7 @@
     no actual trades added yet
   </div></div>
 {% endif %}
+</div>
 {% endblock %}
 
 {% block scripts %}
