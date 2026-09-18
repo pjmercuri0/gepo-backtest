@@ -46,8 +46,9 @@
   // with the slide-in animation on the new page.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
-  // Swipe rotation: only live ↔ history. /api is a JSON endpoint and
-  // only accessible from the nav link, not by swipe.
+  // Tab list, kept only to prefetch a sibling page so nav-link taps feel
+  // instant. Swipe-to-navigate was removed 2026-09-17 (too glitchy): a
+  // sideways pan on a wide table kept tipping into a page change.
   const PAGES = [
     "{{ url_for('index') }}",
     "{{ url_for('history') }}",
@@ -56,7 +57,6 @@
     "{{ url_for('oot') }}"
   ];
   const PULL_THRESHOLD  = 80;
-  const SWIPE_THRESHOLD = 60;
   const AXIS_LOCK_PX    = 12;   // first 12px of movement decides h vs v
 
   const indicator = document.getElementById('ptr-indicator');
@@ -79,15 +79,10 @@
   page.style.transition = 'transform 0s';
   page.style.transform  = '';
 
-  let startX = 0, startY = 0;
+  let startY = 0;
   let axis   = null;     // "h" | "v" | "ptr" | null
   let ptrArmed = false;
-  let inScrollableTable = false;  // touchstart inside .table-scroll → skip page swipe
 
-  function resetPage(animate) {
-    page.style.transition = animate ? 'transform 0.25s ease-out' : 'transform 0s';
-    page.style.transform  = '';
-  }
   function resetIndicator(animate) {
     indicator.style.transition = animate ? 'transform 0.25s ease, opacity 0.25s ease' : '';
     indicator.style.transform  = 'translate(-50%, -100%)';
@@ -97,47 +92,30 @@
   }
 
   document.addEventListener('touchstart', e => {
-    startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     axis   = null;
     ptrArmed = false;
-    // If touch begins inside a horizontally-scrollable region (table or
-    // ticker strip), the user wants to pan that content — not navigate
-    // the page.
-    inScrollableTable = !!(e.target && e.target.closest && (
-      e.target.closest('.table-scroll') ||
-      e.target.closest('.ticker-strip')
-    ));
     page.style.transition = 'transform 0s';
   }, { passive: true });
 
   document.addEventListener('touchmove', e => {
-    const dx = e.touches[0].clientX - startX;
     const dy = e.touches[0].clientY - startY;
 
     // First substantial movement locks the axis.
     if (axis === null) {
-      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        // Horizontal: page-nav UNLESS the touch started in a scrollable
-        // table, in which case let the table handle its own pan.
-        axis = inScrollableTable ? 'v' : 'h';
-      } else if (dy > 0 && page.scrollTop <= 0) {
+      // Swipe-to-navigate REMOVED 2026-09-17 (user: too glitchy). Horizontal
+      // drags are left entirely to the browser / the scrollable element, so a
+      // sideways pan on a wide table can no longer tip into a page change.
+      // Only pull-to-refresh is still gesture-driven.
+      if (Math.abs(dy) < AXIS_LOCK_PX) return;
+      if (dy > 0 && page.scrollTop <= 0) {
         axis = 'ptr';                  // downward at top of scroll container → pull to refresh
       } else {
         axis = 'v';                    // vertical scroll → leave alone
       }
     }
 
-    if (axis === 'h') {
-      // Real-time finger-follow. Damping at edges of the rotation.
-      const idx = PAGES.indexOf(window.location.pathname);
-      let drag = dx;
-      if ((dx > 0 && idx === 0) || (dx < 0 && idx === PAGES.length - 1)) {
-        drag = dx * 0.3;               // rubber-band at first/last page
-      }
-      page.style.transform = `translateX(${drag}px)`;
-    } else if (axis === 'ptr') {
+    if (axis === 'ptr') {
       const slide = Math.min(dy * 0.6, 90);
       indicator.style.transition = 'transform 0s';
       indicator.style.transform  = `translate(-50%, ${slide - 50}px)`;
@@ -155,47 +133,16 @@
   }, { passive: true });
 
   document.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
-
-    if (axis === 'h') {
-      const idx = PAGES.indexOf(window.location.pathname);
-      if (Math.abs(dx) >= SWIPE_THRESHOLD) {
-        if (dx < 0 && idx < PAGES.length - 1) {
-          // Slide old page off LEFT, then navigate. Browser prefetch
-          // primes the next page's cache so the load is near-instant.
-          page.style.transition = 'transform 0.18s ease-out';
-          page.style.transform  = 'translateX(-100vw)';
-          window.location.href = PAGES[idx + 1];
-          return;
-        } else if (dx > 0 && idx > 0) {
-          page.style.transition = 'transform 0.18s ease-out';
-          page.style.transform  = 'translateX(100vw)';
-          window.location.href = PAGES[idx - 1];
-          return;
-        }
+    // Swipe-to-navigate removed 2026-09-17; only pull-to-refresh commits here.
+    if (axis === 'ptr') {
+      if (ptrArmed && dy > PULL_THRESHOLD) {
+        indicator.textContent = 'refreshing...';
+        window.location.reload();
+        return;
       }
-      resetPage(true);
-    } else if (axis === 'ptr') {
-      if (dy > PULL_THRESHOLD) {
-        indicator.textContent = 'refreshing…';
-        indicator.style.transition = 'transform 0.15s ease';
-        indicator.style.transform  = 'translate(-50%, 20px)';
-        indicator.style.opacity    = '1';
-        setTimeout(() => location.reload(), 150);
-      } else {
-        resetIndicator(true);
-      }
+      resetIndicator(true);
     }
-    axis = null;
-  }, { passive: true });
-
-  // touchcancel fires when the OS interrupts the touch (incoming call,
-  // user dragged off-screen, etc.). Reset cleanly so no partial transform
-  // is left applied.
-  document.addEventListener('touchcancel', () => {
-    if (axis === 'h') resetPage(true);
-    else if (axis === 'ptr') resetIndicator(true);
     axis = null;
   }, { passive: true });
 })();
