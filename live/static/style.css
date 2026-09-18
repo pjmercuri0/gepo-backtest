@@ -124,20 +124,6 @@ tr.assignment-risk td:first-child::before {
    narrow table fill the card. */
 .table-scroll table { width: 100%; }
 
-/* Actuals is a dense audit table: keep all columns in the viewport instead
-   of forcing a horizontal scroll.  The regular history/snapshot tables keep
-   their normal sizing. */
-.actuals-page .week-card { padding: 12px 14px; margin-bottom: 10px; }
-.actuals-page .week-head { margin-bottom: 8px; }
-.actuals-page .week-title { font-size: 15px; }
-.actuals-page .week-pnl { font-size: 18px; }
-.actuals-page .week-sub { font-size: 11px; }
-.actuals-page table { table-layout: fixed; font-size: 10px; }
-.actuals-page th { font-size: 9px; padding: 4px 3px; }
-.actuals-page td { padding: 4px 3px; }
-.actuals-page .table-scroll { overflow-x: hidden; }
-.actuals-page .badge { padding: 1px 4px; font-size: 9px; }
-
 /* ── Mobile breakpoints ─────────────────────────────────────────────── */
 @media (max-width: 700px) {
   body { padding: 16px 12px; }
