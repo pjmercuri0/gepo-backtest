@@ -37,7 +37,7 @@
     <div class="table-scroll">
     <table>
       <thead><tr>
-        <th></th><th>Date</th><th>Time</th><th>Ticker</th>
+        <th>Date</th><th>Time</th><th>Ticker</th>
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th>
         <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">Min / Target ($/sh)</th>
         <th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
@@ -67,8 +67,8 @@
            action. Ext keeps showing the number.
            Reason is on the ticker's tooltip. #}
         <tr class="{% if arisk and (arisk.at_risk or arisk.in_pin_zone) and pin_open(p, arisk.spot, false) %}assign-watch{% endif %}">
-          <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button></td>
-          <td>{{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>
+          <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button>
+            {{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>
           <td>{{ row.source_time or '—' }}</td>
           {# Source column dropped 2026-09-03 to save width; row.source_label is
              still produced by webapp.py and used elsewhere. #}
