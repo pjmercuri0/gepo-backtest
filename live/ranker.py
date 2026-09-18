@@ -64,6 +64,12 @@ def _latest_snapshot() -> Path | None:
 # ── Ranking pipeline ────────────────────────────────────────────────────────
 
 
+# Own-gap drift coverage for the scan in progress, published on the payload so the
+# live tab can warn that a 09:30 board was scored WITHOUT drift (the gap feed runs at
+# 09:36). Reset per rank_snapshot call.
+_GAP_STATE: dict = {"names": 0, "total": 0}
+
+
 def _reprice_on_combos(candidates: pd.DataFrame) -> pd.DataFrame:
     """Replace leg-mid net_credit with IBKR's combo quote, then gate.
 
@@ -371,6 +377,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     print(f"  selection credit: {'IBKR quoted mid (uncapped)' if sel_credit == 'net_credit' else 'smile-fit model'}", flush=True)
     # §0.45 own-gap drift: each stock's own opening gap today (live/fetch_name_gaps.py, 09:36) shifts its P_real.
     gap_mu = None
+    _GAP_STATE["names"] = 0; _GAP_STATE["total"] = 0
     if entc.GAP_GAMMA:
         from live.fetch_name_gaps import load_store as _load_gaps
         _gs = _load_gaps(); _today = pd.to_datetime(priced["entry_date"]).dt.normalize().max()
@@ -380,11 +387,14 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
                   f"Refit: python3 fit_gap.py {_today.year}", flush=True)
         _have = priced["ticker"].isin(set(_gt.ticker))
         if _gt.empty:
+            _GAP_STATE["names"] = 0
+            _GAP_STATE["total"] = int(priced["ticker"].nunique())
             print(f"  WARNING: no stock gaps stored for {_today.date()} -- P_real drift is 0 today "
                   "(run: python3 -m live.fetch_name_gaps)", flush=True)
         else:
             gap_mu = entc.gap_drift(priced, closes, _gt)
             _names = priced.loc[_have, "ticker"].nunique(); _all = priced["ticker"].nunique()
+            _GAP_STATE["names"] = int(_names); _GAP_STATE["total"] = int(_all)
             print(f"  own gaps {_today.date()}: {_names}/{_all} candidate names have today's gap"
                   f"{'' if _names == _all else ' (the rest score with zero drift)'}; beta {entc.gap_fit(_today.year)[2]:.4f}; "
                   f"drift range {np.min(gap_mu) * 100:+.3f}%..{np.max(gap_mu) * 100:+.3f}% of price", flush=True)
@@ -639,6 +649,9 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
             "DKL_REF":          "D_ent = ln3 − H(Q_bs) (paper eq. 19)",
             "BELIEF":           f"P_real: {entc.WINDOW} sessions of realized moves vs the strikes",
             "GAP_DRIFT":        entc.CANON_LABELS["gap"],
+            "GAP_NAMES":        _GAP_STATE.get("names", 0),
+            "GAP_TOTAL":        _GAP_STATE.get("total", 0),
+            "GAP_APPLIED":      bool(entc.GAP_GAMMA) and _GAP_STATE.get("names", 0) > 0,
             "CREDIT_MODEL":     ("selection on IBKR credit: combo mid > fresh combo last > leg mids (uncapped); model credit for targets" if getattr(live_config, "LIVE_SELECTION_CREDIT", "quoted") == "quoted" else "smile-fit model credit (selection); IBKR quote shown"),
             "FILL_MULT":        entc.FILL_MULT,
             "COMMISSION":       entc.COMMISSION,
