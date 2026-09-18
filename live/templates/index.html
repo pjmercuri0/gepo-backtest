@@ -554,7 +554,7 @@ async function refresh() {
         const have = cfg.GAP_NAMES ?? 0, tot = cfg.GAP_TOTAL ?? 0;
         driftEl.innerHTML = `<div class="week-card" style="background:#3a2a15;border:1px solid #6b5227;padding:14px;margin-bottom:18px">
           <div style="color:#ffce8a;font-weight:600">&#9888; drift not calculated yet &mdash; do not trade these</div>
-          <div class="week-sub" style="margin-top:4px">P_real was scored with zero own-gap drift${tot ? ` (${have}/${tot} names have today's gap)` : ""}. The gap feed runs at 09:36 ET; this ranking is not the canon's. Wait for the next scan after that.</div></div>`;
+          <div class="week-sub" style="margin-top:4px">P_real was scored with zero own-gap drift${tot ? ` (${have}/${tot} names have today's gap)` : ""}. The gap feed runs at 09:36 ET; this ranking is not the canon's. Wait for the next scan.</div></div>`;
       } else if (applied === true && (cfg.GAP_TOTAL ?? 0) > 0 && (cfg.GAP_NAMES ?? 0) < (cfg.GAP_TOTAL ?? 0)) {
         driftEl.innerHTML = `<div class="week-card" style="background:#2a2a15;border:1px solid #575227;padding:10px 14px;margin-bottom:18px">
           <div style="color:#d8cf8a;font-weight:600">&#9888; partial drift &mdash; ${cfg.GAP_NAMES}/${cfg.GAP_TOTAL} names have today's gap</div>
