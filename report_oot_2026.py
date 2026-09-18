@@ -209,6 +209,18 @@ def score_year(year, min_entry_after=None):
     if candidates.empty or 'entry_date' not in candidates.columns:
         return pd.DataFrame(), expiry_close
 
+    # Regime switching: bull puts only above prior-session 100d SMA; bear
+    # calls only below prior-session 100d AND 20d SMA.  The prior-session
+    # shift keeps the signal causal for same-day entries.
+    spy = load_spy_daily().set_index('Date').sort_index()
+    spy['sma20'] = spy['Close'].rolling(20, min_periods=20).mean()
+    spy['sma100'] = spy['Close'].rolling(100, min_periods=100).mean()
+    regime = spy[['Close', 'sma20', 'sma100']].shift(1)
+    candidates = candidates.merge(regime, left_on='entry_date', right_index=True, how='left')
+    bull_ok = candidates['spread_type'].eq('bull_put') & (candidates['Close'] > candidates['sma100'])
+    bear_ok = candidates['spread_type'].eq('bear_call') & (candidates['Close'] < candidates['sma100']) & (candidates['Close'] < candidates['sma20'])
+    candidates = candidates[bull_ok | bear_ok].drop(columns=['Close', 'sma20', 'sma100'])
+
     # Per-date rolling empirical lookup (put/call split, 50w trailing window)
     parts = []
     dates = sorted(candidates['entry_date'].unique())
@@ -558,7 +570,7 @@ payload = {
         'delta':      f'{bt_config.DELTA_TARGET:g}Δ short leg (band {bt_config.DELTA_MIN:g}–{bt_config.DELTA_MAX:g})',
         'scoring':    'G_rv: RV-implied N(d2) probs in G (canon 2026-06-09); rv_vs_iv DKL (BS d2, 10d RV vs IV); clamped LAST credit',
         'fill_basis': '0.80×clamped LAST (20% haircut); partial-WIN at 50% intrinsic (pin-risk realistic)',
-        'regime':     'OFF (both directions eligible)',
+        'regime':     'bull puts above prior-session 100d SMA; bear calls below prior-session 100d and 20d SMA',
         'vol_gate':   'OFF',
         'sizing':     'qty=2 per pick (canonical 2026-06-05)',
         'starting_bankroll': START_BANKROLL,
