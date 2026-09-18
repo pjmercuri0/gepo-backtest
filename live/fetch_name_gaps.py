@@ -8,7 +8,9 @@ ent_canon.name_gaps, the same function the backtest uses. No cross-stock average
     python3 -m live.fetch_name_gaps            # cron 09:36 and 10:06 Mon-Fri; fetches only names missing today
     python3 -m live.fetch_name_gaps --force    # refetch every name and replace today's rows
 
-Read-only connection, client id 179. Pacing ~6 s per request (IBKR: ~60 historical requests / 10 min).
+Read-only connection, client id 179. ~2.5 s per request: 96 names in ~4 min, so a 09:35 start
+is done before the 09:45 scan (at 6 s it finished 09:47 and missed it). Backs off 60 s and retries
+once on a pacing violation.
 The ranker reads this file; a candidate whose stock has no row for today scores with zero drift.
 """
 from __future__ import annotations
@@ -42,7 +44,7 @@ def fetch_bars(names: list[str], today: pd.Timestamp, sleep: float) -> pd.DataFr
                 c = Stock(s, 'SMART', 'USD')
                 if not ib.qualifyContracts(c):
                     print(f'{i:>3} {s:<6} no contract', flush=True); continue
-                bars = ib.reqHistoricalData(c, endDateTime='', durationStr='6 M', barSizeSetting='1 day',
+                bars = ib.reqHistoricalData(c, endDateTime='', durationStr='4 M', barSizeSetting='1 day',
                                             whatToShow='TRADES', useRTH=True, formatDate=1)
                 b = [{'ticker': s, 'date': pd.Timestamp(x.date).normalize(), 'open': x.open, 'high': x.high, 'low': x.low, 'close': x.close} for x in bars]
                 if b and b[-1]['date'] != today:
@@ -55,7 +57,25 @@ def fetch_bars(names: list[str], today: pd.Timestamp, sleep: float) -> pd.DataFr
                 rows += b
                 print(f'{i:>3}/{len(names)} {s:<6} {len(b)} bars, last {b[-1]["date"].date() if b else "-"}', flush=True)
             except Exception as e:
-                print(f'{i:>3} {s:<6} ERR {str(e)[:80]}', flush=True)
+                msg = str(e)
+                # A pacing violation poisons every later request, so back off hard and
+                # retry this one before continuing (2026-09-18, when the interval went
+                # 6.0s -> 2.5s to finish before the 09:45 scan instead of 09:47).
+                if 'pacing' in msg.lower() or 'max rate' in msg.lower():
+                    print(f'{i:>3} {s:<6} PACING -- backing off 60s', flush=True)
+                    time.sleep(60)
+                    try:
+                        bars = ib.reqHistoricalData(c, endDateTime='', durationStr='4 M',
+                                                    barSizeSetting='1 day', whatToShow='TRADES',
+                                                    useRTH=True, formatDate=1)
+                        rows += [{'ticker': s, 'date': pd.Timestamp(x.date).normalize(),
+                                  'open': x.open, 'high': x.high, 'low': x.low, 'close': x.close}
+                                 for x in bars]
+                        print(f'{i:>3}/{len(names)} {s:<6} {len(bars)} bars (after backoff)', flush=True)
+                    except Exception as e2:
+                        print(f'{i:>3} {s:<6} ERR after backoff {str(e2)[:60]}', flush=True)
+                else:
+                    print(f'{i:>3} {s:<6} ERR {msg[:80]}', flush=True)
             time.sleep(sleep)
     finally:
         if ib.isConnected():
@@ -64,7 +84,7 @@ def fetch_bars(names: list[str], today: pd.Timestamp, sleep: float) -> pd.DataFr
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(); ap.add_argument('--force', action='store_true'); ap.add_argument('--sleep', type=float, default=6.0)
+    ap = argparse.ArgumentParser(); ap.add_argument('--force', action='store_true'); ap.add_argument('--sleep', type=float, default=2.5)
     a = ap.parse_args()
     from live.fetch_ibkr_closes import universe
     today = pd.Timestamp.now(tz='America/New_York').tz_localize(None).normalize()
