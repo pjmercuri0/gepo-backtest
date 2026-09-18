@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 09:35 and 10:06 Mon-Fri: today's per-stock opening gaps for the own-gap P_real drift (handoff §0.45).
+# 09:35 and 09:50 Mon-Fri: today's per-stock opening gaps for the own-gap P_real drift (handoff §0.45).
 # The second run is a retry: it fetches only names still missing today's gap.
 cd "$(dirname "$0")/.."
 mkdir -p live/logs
