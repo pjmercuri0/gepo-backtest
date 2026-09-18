@@ -3,12 +3,15 @@
    both pages include it. Collapsed by default: it is reference, not headline.
 
    Rows are the published trade lists repriced at m x the smile-fit model credit
-   (qty=2 on $10k, $1.30 commission, winning partials halved -- the tab headline basis). Regenerated
+   (qty=2 on $10k, NO commission (2026-09-17), winning partials halved; weekly equity curve). Regenerated
    2026-09-15 for the k=4 / thr 0.005 / full-session-P_real canon (§0.43) from the
    same selection the payloads were built from, with the exact repricer.
    Sharpe is left out on purpose: the weekly-curve convention differs between
    builders and a column that does not match the tab headline is worse than none.
-   The 1.08x row equals the tab headline P&L exactly. #}
+   2026-09-17: regenerated after the bear sleeve returned and commission went to zero.
+   The OOT payload already excluded commission; the in-sample payload still has $1.30
+   baked in, so the 1.08x IS cell reads ~$12.9k above the Backtest tab headline until
+   report_ent_canon.py is re-run on the MacBook. #}
 <details class="fill-sens">
   <summary><span class="chip-k">fill sensitivity</span><span class="chip-v">0.90× – 1.10× model</span></summary>
   <div class="table-scroll">
@@ -22,16 +25,16 @@
       </thead>
       <tbody>
       {% for r in [
-          ('0.90', '0.80', '0.44', '-$55.8k', '-426%', '-$7.3k', '-76%'),
-          ('0.94', '0.86', '0.46', '-$29.7k', '-246%', '-$3.7k', '-47%'),
-          ('0.96', '0.90', '0.47', '-$16.6k', '-162%', '-$2.0k', '-33%'),
-          ('0.98', '0.93', '0.48', '-$3.6k', '-114%', '-$0.2k', '-21%'),
-          ('1.00', '0.97', '0.49', '$9.4k', '-79%', '$1.6k', '-14%'),
-          ('1.02', '1.01', '0.50', '$22.4k', '-53%', '$3.4k', '-11%'),
-          ('1.04', '1.05', '0.51', '$35.4k', '-33%', '$5.2k', '-9%'),
-          ('1.06', '1.09', '0.52', '$48.4k', '-25%', '$7.0k', '-8%'),
-          ('1.08', '1.14', '0.53', '$61.3k', '-21%', '$8.7k', '-7%'),
-          ('1.10', '1.19', '0.54', '$74.3k', '-19%', '$10.5k', '-6%')
+          ('0.90','0.79','0.44','-$29.2k','-239%','$0.6k','-32%'),
+          ('0.94','0.86','0.46','$1.2k','-112%','$4.2k','-16%'),
+          ('0.96','0.89','0.47','$16.3k','-78%','$6.0k','-12%'),
+          ('0.98','0.93','0.48','$31.5k','-56%','$7.8k','-9%'),
+          ('1.00','0.96','0.49','$46.6k','-40%','$9.6k','-8%'),
+          ('1.02','1.00','0.50','$61.7k','-36%','$11.3k','-7%'),
+          ('1.04','1.04','0.51','$76.8k','-34%','$13.1k','-6%'),
+          ('1.06','1.08','0.52','$91.9k','-32%','$14.9k','-6%'),
+          ('1.08','1.13','0.53','$107.0k','-31%','$16.7k','-5%'),
+          ('1.10','1.17','0.54','$122.0k','-29%','$18.5k','-5%')
       ] %}
         <tr class="{% if r[0] == '1.08' %}fs-canon{% elif r[0] == '1.00' %}fs-gate{% endif %}">
           <td class="fw">{{ r[0] }}{% if r[0] == '1.08' %} <span class="fs-tag">canon</span>{% elif r[0] == '1.00' %} <span class="fs-tag">min / gate</span>{% endif %}</td>

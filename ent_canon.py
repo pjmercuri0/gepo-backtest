@@ -32,7 +32,12 @@ WINDOW       = 252        # sessions of realized moves behind P_real
 MIN_OBS      = 1          # use whatever history the name has (user 2026-09-13); the 0.5 pseudo-count per
                           # state is the only regularisation, so a name with very few sessions scores near the prior
 FILL_MULT    = 1.08       # measured on 19 real fills vs model credit
-COMMISSION   = 1.30       # $ per spread per contract, opening only (IBKR ~$0.65/leg)
+COMMISSION   = 0.0        # $ per spread per contract. 2026-09-17 (user: "ignore all
+                          # commission everywhere"). Was 1.30. Every book and every live
+                          # P&L reads this constant, so setting it here zeroes it
+                          # throughout; the published OOT payload already omitted it, and
+                          # the in-sample payload still has 1.30 baked in until
+                          # report_ent_canon.py is re-run on the MacBook.
 TOP_N        = 10
 PRIOR        = 0.5        # pseudo-count per state in P_real
 
@@ -509,6 +514,6 @@ CANON_LABELS = {
                   f'k={K:g}, GROUND ≥ {THR:g}'),
     'gap':       f'P_real drift = {GAP_GAMMA:g} × β_year σ × z(the stock\'s OWN opening gap, ATR units) × √DTE; no market average; β walk-forward, fitted on years before entry (§0.45)',
     'scoring':   'G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G−1)·e^(−k·D_ent)',
-    'fill':      f'{FILL_MULT:.2f}× smile-fit model credit (19 real fills), ${COMMISSION:.2f} commission/spread',
+    'fill':      f'{FILL_MULT:.2f}× smile-fit model credit (19 real fills), no commission',
     'targets':   f'min {MULT_MIN:.2f}× model credit, target {MULT_TARGET_LO:.2f}–{MULT_TARGET_HI:.2f}×',
 }
