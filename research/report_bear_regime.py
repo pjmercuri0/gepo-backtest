@@ -23,7 +23,7 @@ from bear_regime_sweep import (
 from sma_bull_regime_sweep import prior_spy_bull
 
 
-REGIME = "below_100_and_below_20"
+REGIME = "below_100"   # symmetric on the 100d SMA (user 2026-09-19)
 PARITY = 0.25
 GROUND = 0.001
 CAP = 5
@@ -55,18 +55,30 @@ def enrich(picks: pd.DataFrame) -> pd.DataFrame:
 def patch_config(payload: dict, oot: bool) -> dict:
     c = payload["config"]
     c["regime"] = (
-        "bull puts above prior-session SPY 100d SMA; bear calls below prior-session "
-        "SPY 100d and 20d SMA"
+        "bull puts above prior-session SPY 100d SMA; bear calls below it "
+        "(symmetric on the 100d)"
     )
     c["parity"] = "bull parity > canon threshold; bear mirrored parity > 25th percentile"
     c["bear_gates"] = (
-        "bear calls: GROUND >= 0.001, max 5/day, earnings and ex-dividend gated "
-        "(ex-date through expiry+1)"
+        "bear calls: GROUND >= 0.001, max 5/day. Earnings and ex-dividend gates "
+        "(ex-date through expiry+1) apply to BOTH sleeves as of 2026-09-19."
     )
     c["selection"] = (
         "research bear sleeve selected on IS 2020-2025; 2026 attached after ranking"
         + (" (OOT view)" if oot else "")
     )
+    # report_mid_canon.build_payload() writes the OLD canon's captions (0.80xmid
+    # fill, G_rv / rv_vs_iv scoring).  realize() actually books ec.FILL_MULT x
+    # model_credit minus ec.COMMISSION on D_ent scoring, so restate them here or
+    # the dashboard mislabels its own numbers (caught 2026-09-19).
+    c["fill_basis"] = (
+        f"{ec.FILL_MULT:.2f}\u00d7 smile-fit model credit; partial-WIN at 50% intrinsic"
+        + ("; no commission" if ec.COMMISSION == 0 else f"; ${ec.COMMISSION:.2f} commission")
+    )
+    c["scoring"] = ec.CANON_LABELS["scoring"]
+    c["dkl"] = ec.CANON_LABELS["dkl"]
+    c["gap"] = ec.CANON_LABELS["gap"]
+    c["commission"] = "none (2026-09-17)" if ec.COMMISSION == 0 else f"${ec.COMMISSION:.2f}/spread"
     return payload
 
 
@@ -85,6 +97,8 @@ def main() -> None:
 
     bull_pool = c[
         c.spread_type.eq("bull_put")
+        & ~c.exdiv_hit
+        & ~c.earnings_hit
         & prior_spy_bull(c.entry_date, spy, 100)
         & (c.parity_pct > ec.PARITY_MIN_PCT)
         & (c.GROUND >= ec.THR)

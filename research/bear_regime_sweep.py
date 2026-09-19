@@ -137,7 +137,12 @@ def add_regimes(c: pd.DataFrame, spy: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_exdiv_gate(c: pd.DataFrame) -> pd.DataFrame:
-    """Mark bear calls exposed to an ex-date from entry through expiry+1.
+    """Mark ANY spread exposed to an ex-date from entry through expiry+1.
+
+    2026-09-19 (user): applies to bull puts as well as bear calls.  The reasons
+    differ -- a short call risks early exercise into the dividend, a short put
+    just eats the ex-date price drop as a directional headwind -- but both are
+    real and the gate is now symmetric.
 
     MMC is failed closed because Yahoo returned 404 for that ticker during the
     historical-calendar build.  Other symbols with no rows were fetched
@@ -154,8 +159,6 @@ def add_exdiv_gate(c: pd.DataFrame) -> pd.DataFrame:
     }
     hit = np.zeros(len(c), dtype=bool)
     for i, row in enumerate(c.itertuples(index=False)):
-        if row.spread_type != "bear_call":
-            continue
         if row.ticker == "MMC":
             hit[i] = True
             continue
@@ -172,7 +175,10 @@ def add_exdiv_gate(c: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_earnings_gate(c: pd.DataFrame) -> pd.DataFrame:
-    """Apply the live entry-through-expiry earnings exclusion historically."""
+    """Apply the live entry-through-expiry earnings exclusion historically.
+
+    2026-09-19 (user): applies to bull puts as well as bear calls.
+    """
     if not EARNINGS.exists():
         raise FileNotFoundError(
             f"{EARNINGS} missing; run research/fetch_nasdaq_earnings_history.py"
@@ -184,8 +190,6 @@ def add_earnings_gate(c: pd.DataFrame) -> pd.DataFrame:
     }
     hit = np.zeros(len(c), dtype=bool)
     for i, row in enumerate(c.itertuples(index=False)):
-        if row.spread_type != "bear_call":
-            continue
         # MMC was the only operating-company symbol absent from the complete
         # NASDAQ pull; ETFs and indices correctly have no earnings events.
         if row.ticker == "MMC":
