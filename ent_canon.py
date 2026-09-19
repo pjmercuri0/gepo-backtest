@@ -102,6 +102,23 @@ LN3 = math.log(3.0)
 _U3 = np.array([1 / 3, 1 / 3, 1 / 3])
 
 
+def vendor_year_parquet(year: int) -> str:
+    """Path to the newest vendor chain file for *year*.
+
+    2026 was rebuilt several times; `output/2026_sp500_last.parquet` is the June
+    snapshot (ends 2026-06-05) and is SUPERSEDED by `_oot_combined` (ends 09-16).
+    Scripts that hardcoded the plain name silently produced short frames --
+    the parity feature died at 2026-06-04 that way and the fail-open 0.5
+    default hid it for three months (2026-09-19).  Always resolve through here.
+    """
+    import os
+    for suffix in ("_oot_combined", "_oot_refresh", ""):
+        cand = f"output/{year}_sp500_last{suffix}.parquet"
+        if os.path.exists(cand):
+            return cand
+    return f"output/{year}_sp500_last.parquet"
+
+
 def ncdf(x):
     x = np.asarray(x, dtype=float)
     return 0.5 * (1.0 + np.vectorize(erf)(x / math.sqrt(2.0)))

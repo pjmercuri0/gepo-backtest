@@ -20,7 +20,7 @@ import pandas as pd
 import ent_canon as ec
 
 
-FRAME = Path("research/dkl_2026_09_13/featATM6.parquet")
+FRAME = Path("research/dkl_2026_09_13/featATM7.parquet")
 GAP_SERIES = Path("output/name_gaps_backtest.parquet")
 CHAIN_FEATURES = Path(
     "research/option_direction_2026_09_16/chain_direction_features.parquet"
