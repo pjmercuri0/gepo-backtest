@@ -1,6 +1,6 @@
 """Regenerate live/data/backtest_equity.json + oot_equity.json under the D_ent canon.
 
-Candidates and pricing come from the research frame research/dkl_2026_09_13/featATM6.parquet, which
+Candidates and pricing come from the research frame research/dkl_2026_09_13/featATM7.parquet, which
 holds every 50-60 delta candidate 2020-2026 with: fitted-delta strikes, smile-fit model credit,
 D_ent and the realized outcome. P_real (p, q, ro) and EV are RECOMPUTED here on the full-session
 close series (2026-09-15); the frame's own p/q/ro were built on a sparse candidate-day series. That frame is rebuilt by
@@ -15,7 +15,7 @@ sys.path.insert(0, '.')
 import ent_canon as ec
 import report_mid_canon as rmc
 
-FRAME = 'research/dkl_2026_09_13/featATM6.parquet'
+FRAME = 'research/dkl_2026_09_13/featATM7.parquet'
 GAP_SERIES = 'output/name_gaps_backtest.parquet'   # build_name_gaps.py (per-name own gaps)
 CHAIN_FEATURES = 'research/option_direction_2026_09_16/chain_direction_features.parquet'
 SPY_CSV = 'data/spy_us_d.csv'

@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 import ent_canon as ec
 
 HERE = Path(__file__).resolve().parent
-FRAME = ROOT / "research/dkl_2026_09_13/featATM6.parquet"
+FRAME = ROOT / "research/dkl_2026_09_13/featATM7.parquet"
 GAP_SERIES = ROOT / "output/name_gaps_backtest.parquet"
 CHAIN_CACHE = HERE / "chain_direction_features.parquet"
 REPORT_TXT = HERE / "direction_signal_suite.txt"
@@ -150,7 +150,7 @@ def build_chain_cache(force: bool = False) -> pd.DataFrame:
         "AskPrice",
     ]
     for year in range(2020, 2027):
-        path = ROOT / f"output/{year}_sp500_last.parquet"
+        path = ROOT / ec.vendor_year_parquet(year)
         kk = keys[keys["DataDate"].dt.year == year]
         if kk.empty:
             continue

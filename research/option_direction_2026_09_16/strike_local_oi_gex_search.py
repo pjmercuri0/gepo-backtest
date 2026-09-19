@@ -157,7 +157,7 @@ def build_features(force: bool = False) -> pd.DataFrame:
         cand = need[need["entry_date"].dt.year.eq(year)].copy()
         if cand.empty:
             continue
-        path = ROOT / f"output/{year}_sp500_last.parquet"
+        path = ROOT / ec.vendor_year_parquet(year)
         log(f"reading {path.name}")
         ch = pd.read_parquet(path, columns=cols)
         ch["DataDate"] = pd.to_datetime(ch["DataDate"]).dt.normalize()
