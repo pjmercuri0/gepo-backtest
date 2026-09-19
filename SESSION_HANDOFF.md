@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-17 EDT (**§0.54 is the current canon**; **§0.55 is the latest state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection is now **bull puts only when the prior completed SPY close is above its 100-session SMA; cash otherwise; same-strike call-IV minus put-IV daily percentile strictly above 12%; top 10 qualified trades/day**. Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-19 EDT (**§0.56 is the current canon**; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **LIVE is bull puts only when the prior completed SPY close is above its 100-session SMA, cash otherwise, parity percentile strictly above 12%, top 10/day. The BACKTEST/OOT canon (§0.56) is two-sided and symmetric on that SMA -- bull puts above, bear calls below -- with ex-dividend and earnings gates on both sleeves.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -33,7 +33,10 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
 - The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
-- **CURRENT CANON is §0.54 (2026-09-16)**: 50-60 delta by fitted delta, G on P_real,
+- **CURRENT CANON is §0.56 (2026-09-19)**: the §0.54 cell PLUS a two-sided regime that is
+  symmetric on the 100d SMA (bull puts above, bear calls below, no dead zone) and ex-dividend +
+  earnings gates on BOTH sleeves. Backtest/OOT payloads only -- `live/ranker.py` is still bull-only.
+- **SUPERSEDED canon §0.54 (2026-09-16)**: 50-60 delta by fitted delta, G on P_real,
   D_ent = ln3 − H(Q_bs), k=4, threshold 0.005, bull-regime bull puts only, parity >12%, top 10/day.
 - **OLD (superseded) SCORING CANON §0.21 ("52:10")**: DKL = D(P_emp‖Q_iv) with outcomes
   counted directly from realized spreads, keyed (ticker, $width) with pooled
@@ -235,6 +238,91 @@ pre-canon labels that survived regeneration. Corrected to the canon fill on both
   returns -1 on every option under live data after the close). Cron still runs live.
 - Live tab: `+` on every ranked row; blue/green/red `+` on live, History and Snapshots (blue =
   same option held, green = strike away from the move, red = strike followed the stock).
+
+## 0.56 CANON: symmetric 100d regime + ex-div/earnings on both sleeves (2026-09-19)
+
+User decision, now canon for the Backtest and OOT payloads. Two changes plus one bug fix.
+
+**1. The bear regime is symmetric on the 100d SMA.** `research/report_bear_regime.py`
+`REGIME` goes `below_100_and_below_20` -> `below_100`, and `report_oot_2026.py` drops the
+`< sma20` term from `bear_ok`. Bull puts above the prior-session 100d SMA, bear calls below
+it, nothing in between.
+
+Reason: the extra 20d condition created a DEAD ZONE (below the 100d, above the 20d) where
+neither sleeve traded. That is 114 of 1,682 sessions 2020-2026 (6.8%), and **21.1% of 2022** --
+a fifth of the best bear year sat in cash. `output/bear_regime_sweep.csv` at identical gates
+shows the exclusion is not earning it: `below_100` takes 269 more bear trades that netted
+**+$16 in total** (six cents each). It bought +0.013 combined IS Sharpe by deleting volume with
+no edge, and 2026 OOT preferred keeping them. Not a validated condition either way; the simpler
+gate wins on parsimony.
+
+**2. Ex-dividend and earnings gates now apply to BOTH sleeves.** Both functions in
+`research/bear_regime_sweep.py` carried `if row.spread_type != "bear_call": continue`; removed.
+`report_bear_regime.main` applies `~exdiv_hit & ~earnings_hit` to `bull_pool` too.
+
+The reasons differ by side and that matters if the window is ever tuned: a short CALL risks
+early exercise into the dividend (the original 2026-06-09 rationale), a short PUT just eats the
+ex-date price drop as a directional headwind. Bear calls measured 0.0% hit rate, confirming the
+gate was already live there. Bull puts hit 16.6% (ex-div 10.2%, earnings 6.7%): 712 of 4,280
+trades carrying **-$1,429**, replaced by 150 better ones worth +$1,689.
+
+Calendars verified non-empty over the whole window first, since a missing join would have made
+the gate a silent no-op: `output/yahoo_dividend_history.csv` 2,614 rows / 90 symbols /
+2018-12-31..2026-09-15, `output/nasdaq_earnings_history.csv` 2,481 rows / 93 symbols /
+2020-01-14..2026-08-26. (NOT `data/earnings_calendar.csv`, which is 2026-only.)
+
+**3. BUG FIX -- the payloads were mislabelling their own numbers.**
+`report_mid_canon.build_payload()` writes the OLD canon's captions and `patch_config` never
+overrode them, so the published config said `fill_basis: 0.80xmid` and
+`scoring: G_rv / rv_vs_iv DKL` while `realize()` was booking `ec.FILL_MULT x model_credit`
+minus `ec.COMMISSION` on D_ent scoring. `patch_config` now restates `fill_basis`, `scoring`,
+`dkl`, `gap` and `commission` from `ent_canon.CANON_LABELS`. Check this whenever a payload is
+regenerated from a `report_mid_canon` base.
+
+### Published (qty2, 1.08x model credit, no commission)
+
+- **Backtest 2020-25:** 4,685 trades, $108,970 P&L, final $118,970, CAGR 57.3%,
+  weekly Sharpe 1.52, max DD -26.7%. Sleeves: bull 3,718 / $94,484, bear 967 / $14,486.
+- **OOT 2026 (through 09-11):** 626 trades, $24,538 P&L, final $34,538, weekly Sharpe 4.34,
+  max DD -6.4%.
+
+### READ THIS BEFORE QUOTING THE IMPROVEMENT
+
+The backtest went $94,028 -> $108,970, which is **NOT** a +$14,942 strategy gain. Every one of
+the 4,266 trades common to both books shifted by exactly **+$2.60** = qty 2 x the $1.30
+commission. The old payload's caption already claimed "no commission" while its numbers still
+had $1.30 baked in -- the exact discrepancy §0.55 flagged as pending.
+
+```
+OLD as published       4,978 tr   $ 94,028
+OLD restated @ 0 comm  4,978 tr   $106,971   <- the like-for-like baseline
+NEW                    4,685 tr   $108,970
+  strategy change      +$1,999   (+1.9%)
+  commission zeroing  +$12,943
+```
+
+**The strategy change is worth about +$2,000 on 2020-25, roughly 2%.** Real but small.
+
+**OOT cannot be decomposed at all.** Only 61 of 571 old trades survive into the new book and
+the per-trade shift is not uniform, because the old `oot_equity.json` came from the vendor
+`report_oot_2026.py` pipeline with a different candidate universe (§0.55/`fac7fee`). Treat
+$24,538 as a fresh number with no comparable predecessor, NOT as an improvement on $16,686.
+2026 was examined while choosing this configuration and is not a clean holdout.
+
+### Provenance change and what is NOT done
+
+- `oot_equity.json` now comes from `research/report_bear_regime.py`, not the vendor
+  `report_oot_2026.py`. This reverses `fac7fee`'s choice. The vendor path has the symmetric
+  gate applied but was NOT re-run, and it still implements NEITHER the ex-div nor the earnings
+  gate -- it has no dividend or earnings join at all.
+- **`live/ranker.py` IS STILL BULL-ONLY.** `config.REGIME_BULL_ONLY = True` makes
+  `spreads.py:168` drop every bear call at candidate build. This canon is backtest-side only;
+  live trades no bear sleeve.
+- **MAC MINI TO DO:** `git pull`, then `bash live/upload_to_mya.sh` (both payloads are in its
+  file list). The MacBook carries `live/NOT_PRODUCTION` and correctly refuses to publish, so
+  Mya does NOT have these numbers until the mini runs the upload.
+- The per-side gates remain asymmetric on purpose: bull GROUND 0.005 / parity > 0.12 / top-10,
+  bear GROUND 0.001 / mirrored parity > 0.25 / top-5.
 
 ## 0.20 Delta-target canon changed to 0.20 (2026-09-11) — HISTORICAL, SUPERSEDED
 
