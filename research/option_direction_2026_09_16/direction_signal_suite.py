@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 import ent_canon as ec
 
 HERE = Path(__file__).resolve().parent
-FRAME = ROOT / "research/dkl_2026_09_13/featATM7.parquet"
+FRAME = ROOT / "research/dkl_2026_09_13/featATM8.parquet"
 GAP_SERIES = ROOT / "output/name_gaps_backtest.parquet"
 CHAIN_CACHE = HERE / "chain_direction_features.parquet"
 REPORT_TXT = HERE / "direction_signal_suite.txt"
@@ -157,6 +157,12 @@ def build_chain_cache(force: bool = False) -> pd.DataFrame:
         log(f"reading {path.name}")
         d = pd.read_parquet(path, columns=cols)
         d["DataDate"] = pd.to_datetime(d["DataDate"]).dt.normalize()
+        # The 2026 vendor file was superseded once and the stale copy silently truncated
+        # this feature at 2026-06-04 for three months (audit 2026-09-19).  Fail loud.
+        need, have = kk["DataDate"].max(), d["DataDate"].max()
+        if have < need:
+            log(f"  WARNING: {path.name} ends {have.date()} but the frame needs "
+                f"{need.date()} -- {(kk['DataDate'] > have).sum():,} candidate-days will get NO parity")
         d["ExpirationDate"] = pd.to_datetime(d["ExpirationDate"]).dt.normalize()
         d = d.merge(kk, on=["Symbol", "DataDate"], how="inner")
         d = d[pd.to_numeric(d["DTE"], errors="coerce").between(1, 45)]

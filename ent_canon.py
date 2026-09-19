@@ -294,6 +294,33 @@ def chain_parity_signal(chain: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def warn_coverage(label: str, ok: 'pd.Series | np.ndarray', dates=None, tol: float = 0.02) -> float:
+    """Warn when a fail-open feature is missing for more than *tol* of rows.
+
+    Every gate in this file fails OPEN on missing data: parity defaults to the neutral 0.5,
+    gap drift to 0, regime to cash.  That is right for one absent name on one day and wrong
+    for an outage.  The parity feature died for three months in 2026 because nobody was told
+    (audit 2026-09-19, weakness #6).  Call this wherever a fallback is applied.
+    """
+    ok = np.asarray(ok, dtype=bool)
+    if ok.size == 0:
+        return 0.0
+    miss = 1.0 - ok.mean()
+    if miss > tol:
+        msg = f"WARNING: {label} missing for {miss:.1%} of {ok.size:,} rows (fail-open default applied)"
+        if dates is not None:
+            d = pd.to_datetime(pd.Series(np.asarray(dates))[~ok])
+            if len(d):
+                msg += f"; first {d.min().date()}, last {d.max().date()}"
+                bad = d.dt.to_period('M').value_counts()
+                full = sorted(str(m) for m, n in bad.items()
+                              if n == pd.to_datetime(pd.Series(np.asarray(dates))).dt.to_period('M').value_counts().get(m, 0))
+                if full:
+                    msg += f"; ENTIRE months absent: {', '.join(full[:12])}"
+        print(msg, flush=True)
+    return miss
+
+
 def add_parity_percentile(cands: pd.DataFrame,
                           raw_col: str = 'parity_bull_raw') -> pd.DataFrame:
     """Add causal signed parity and its daily bull-candidate percentile.
@@ -318,6 +345,7 @@ def add_parity_percentile(cands: pd.DataFrame,
         method='average', pct=True
     )
     C.loc[active, 'parity_pct'] = ranked
+    warn_coverage('parity (cp_iv_gap)', (~bull) | C['parity_bull_signed'].notna(), C['entry_date'])
     return C
 
 
@@ -429,7 +457,9 @@ def gap_drift(cands: pd.DataFrame, closes: pd.DataFrame, gaps: pd.DataFrame, gam
     x = pd.MultiIndex.from_arrays([C.ticker.values, ed.values]).map(G).values.astype(float)
     m_, s_, b_ = (np.array([gap_fit(y)[j] for y in ed.dt.year.values]) for j in range(3)) if fit is None else (np.full(len(C), fit[j]) for j in range(3))
     z = np.clip((x - m_) / s_, -GAP_CLIP, GAP_CLIP)
-    return np.nan_to_num(gamma * b_ * z * sigma_unit(C, closes))
+    su = sigma_unit(C, closes)
+    warn_coverage('own-gap drift', np.isfinite(x) & np.isfinite(su), ed)
+    return np.nan_to_num(gamma * b_ * z * su)
 
 
 # ── 4. Kelly growth (identical FOC to ground._score_row) ────────────────────
