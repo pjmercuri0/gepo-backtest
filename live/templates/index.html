@@ -98,9 +98,13 @@ function fmtContract(v, dec=0) {
 // pos/neg. Selection is argmax(Γᵢ).
 function fmtGround(v, dec=2) {
   if (v == null) return "—";
-  const x = rd(Number(v) * 100, dec);
-  const sign = x >= 0 ? "+" : "";
-  return `${sign}${x.toFixed(dec)}%`;
+  const n = Number(v) * 100;
+  const x = rd(n, dec);
+  // Take the sign from the ORIGINAL value. rd() returns -0 for a small
+  // negative, and -0 >= 0 is true in JS, so every tiny negative used to render
+  // as "+0.00%" -- a negative-edge spread displayed as a positive one.
+  // (TSLA -0.0000227 and CL -0.0000316 both showed "+0.00%" on 2026-09-20.)
+  return `${n < 0 ? "-" : "+"}${Math.abs(x).toFixed(dec)}%`;
 }
 // Wealth multiplier G = exp(g), where g (per-trade Kelly log-growth at
 // w*) is the value stored in the JSON `G` field. Renders as the
