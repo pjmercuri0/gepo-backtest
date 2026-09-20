@@ -999,16 +999,41 @@ def qr():
     )
 
 
+MARKET_OPEN_HHMM  = "0930"
+MARKET_CLOSE_HHMM = "1600"
+
+
+def _in_market_hours(hhmm: str) -> bool:
+    """True for a scan fired inside the regular session, 09:30 <= t < 16:00.
+
+    Ad-hoc and after-hours runs (00:19, 16:00, 16:30, 20:11 are all in the
+    store) are not comparable with a normal scan -- frozen quotes, no volume,
+    partial universe -- so they are excluded from the Snapshots page rather
+    than deleted from disk (user, 2026-09-20).
+    """
+    if not hhmm or len(hhmm) < 4 or not hhmm[:4].isdigit():
+        return False
+    return MARKET_OPEN_HHMM <= hhmm[:4] < MARKET_CLOSE_HHMM
+
+
 def _round_hhmm(hhmm: str) -> str:
-    """Round an HHMM string to the nearest half hour. Cron fires at :01/:31
-    but the snapshot timestamp drifts a few minutes (10:04, 14:33), which
-    splits one logical scan across multiple rows. Bucket to :00/:30 so the
-    by-time aggregate collapses the drift."""
+    """Bucket an HHMM to its cron slot by flooring to a quarter hour.
+
+    Cron fires at :00/:15/:30/:45 (`0,15,30,45 9-15`) and the snapshot
+    timestamp drifts a few minutes LATER (10:04, 14:33), so flooring recovers
+    the slot that actually fired.
+
+    This used to round to the NEAREST HALF hour, which was wrong twice over:
+    the docstring described a :01/:31 cron that no longer exists, it merged the
+    :15 and :45 slots into their neighbours, and rounding UP pushed 15:45,
+    15:46 and 15:55 into a phantom "16:00" bucket -- an aggregate row for a
+    time no in-hours scan ever runs at.
+    """
     try:
-        total = int(hhmm[:2]) * 60 + int(hhmm[2:])
+        total = int(hhmm[:2]) * 60 + int(hhmm[2:4])
     except (ValueError, IndexError):
         return hhmm
-    total = (int(round(total / 30.0)) * 30) % (24 * 60)
+    total = (total // 15) * 15
     return f"{total // 60:02d}{total % 60:02d}"
 
 
@@ -1043,7 +1068,16 @@ def snapshots():
     for fp in sorted(picks_dir.glob("*.json"), reverse=True):
         d = _read_json(fp)
         if d:
-            for scan in d.get("scans", []):
+            # Drop out-of-hours scans (00:19, 16:00, 16:30, 20:11 are all in the
+            # store) before anything downstream sees them, so they leave both the
+            # day cards AND the by-time aggregate. Filtered on the RAW time, not
+            # the bucket: 15:45/15:46/15:55 are in-hours scans and must survive.
+            # Nothing is deleted from disk.
+            kept = [sc for sc in d.get("scans", []) if _in_market_hours(sc.get("hhmm", ""))]
+            if not kept:
+                continue
+            d["scans"] = kept
+            for scan in kept:
                 hhmm = scan.get("hhmm", "")
                 scan["hhmm_actual"] = hhmm
                 scan["hhmm_round"] = _round_hhmm(hhmm)
