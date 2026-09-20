@@ -207,13 +207,16 @@ USE_DRIFT    = False
 DRIFT_WINDOW = 60
 
 # ── REGIME FILTER ────────────────────────────────────────────────────────────
-# 2026-09-16 canon: bull puts only when the PRIOR completed SPY session closed
-# above its 100-session SMA; cash in bear/unknown regimes.  The one-session lag
-# avoids using the entry day's close for a 15:00 ET decision.
+# 2026-09-19 canon (handoff 0.57, user): TWO-SIDED, symmetric on the 100d SMA.
+# Prior completed SPY close above its 100-session SMA -> bull puts only; below
+# -> bear calls only; unknown/stale -> cash (fail closed).  The one-session lag
+# avoids using the entry day's close for a 15:00 ET decision.  REGIME_BULL_ONLY
+# was True from 2026-09-16 to 2026-09-19 (bull puts or cash); the bear sleeve
+# had been backtest-only until now.  spreads.py:201-208 implements both modes.
 REGIME_FILTER = True
 REGIME_WINDOW = 100
 REGIME_SOURCE = "spy"
-REGIME_BULL_ONLY = True
+REGIME_BULL_ONLY = False
 REGIME_LAG_SESSIONS = 1
 REGIME_FAIL_CLOSED = True
 REGIME_MAX_STALE_CALENDAR_DAYS = 4
