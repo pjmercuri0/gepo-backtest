@@ -220,7 +220,9 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if "OpenInterest" in df.columns:
         before = len(df)
         df = df[df.apply(spreads.is_liquid_row, axis=1)]
-        print(f"  liquidity gate (OI>={live_config.LIVE_MIN_OPEN_INTEREST} or "
+        _oi_part = (f"OI>={live_config.LIVE_MIN_OPEN_INTEREST} or "
+                    if backtest_config.USE_OPEN_INTEREST_LIQUIDITY else "")
+        print(f"  liquidity gate ({_oi_part}"
               f"volume>={getattr(live_config, 'LIVE_MIN_VOLUME', 0)} + "
               f"BBO>={getattr(live_config, 'LIVE_MIN_BBO_SIZE', 1)}): "
               f"kept {len(df)}/{before} rows",

@@ -68,14 +68,23 @@ def _check_config() -> list[Check]:
     dte_min, dte_max = live_config.live_dte_window()
     checks.append(Check("dte-window", 0 <= dte_min <= dte_max <= 30,
                         f"[{dte_min}, {dte_max}]"))
+    # Validate the ACTIVE policy, not all three terms. OI is off for live
+    # (2026-09-20) and the volume floor is 0, so BBO size is the live floor;
+    # demanding every threshold be positive would fail a policy that is correct.
+    # What must hold: at least one term actually constrains, no term is
+    # negative, and an ENABLED OI term has a positive floor.
+    _oi_on = getattr(live_config, "LIVE_USE_OPEN_INTEREST", True)
+    _terms = []
+    if _oi_on:
+        _terms.append(f"OI>={live_config.LIVE_MIN_OPEN_INTEREST}")
+    _terms.append(f"volume>={live_config.LIVE_MIN_VOLUME}")
+    _terms.append(f"BBO>={live_config.LIVE_MIN_BBO_SIZE}")
     checks.append(Check(
         "liquidity-thresholds",
-        live_config.LIVE_MIN_OPEN_INTEREST > 0
-        and live_config.LIVE_MIN_VOLUME > 0
-        and live_config.LIVE_MIN_BBO_SIZE > 0,
-        f"OI>={live_config.LIVE_MIN_OPEN_INTEREST}, "
-        f"volume>={live_config.LIVE_MIN_VOLUME}, "
-        f"BBO>={live_config.LIVE_MIN_BBO_SIZE}",
+        live_config.LIVE_MIN_VOLUME >= 0
+        and live_config.LIVE_MIN_BBO_SIZE > 0
+        and (not _oi_on or live_config.LIVE_MIN_OPEN_INTEREST > 0),
+        ", ".join(_terms) + ("" if _oi_on else "  (OI term off)"),
     ))
     checks.append(Check(
         "feature-policy",
