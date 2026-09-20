@@ -128,13 +128,27 @@ def live_dte_window(day=None):
     """Return the active live DTE window for the given calendar day."""
     return LIVE_DTE_MIN, LIVE_DTE_MAX
 
-# --- Live OI gate ---
-# Canonical backtest uses MIN_OPEN_INTEREST = 100, but live IBKR feeds
-# often return NaN for OI mid-session (today's OI is end-of-day published).
-# Set to 0 for live so the ranker doesn't drop every row before it can
-# rank. Backtest config stays at 100 — preprocessed CSVs already filtered
-# on OI so it doesn't bite there.
-LIVE_MIN_OPEN_INTEREST = 0
+# --- Live liquidity gate ---
+# OI is often unavailable intraday, but allowing every row through when OI is
+# missing is unsafe.  Require the canonical OI floor when it is present; when
+# IBKR reports OI as missing/zero, require both legs to have enough current-day
+# volume and at least one contract at every BBO side.
+LIVE_MIN_OPEN_INTEREST       = 100
+LIVE_ALLOW_VOLUME_FALLBACK   = True
+LIVE_MIN_VOLUME              = 100
+LIVE_MIN_BBO_SIZE            = 1
+
+# --- Live missing-feature policy ---
+# Missing regime, realized-close history, parity, or own-gap data suppresses
+# affected candidates rather than silently substituting neutral values.  Quote
+# fallbacks (combo -> leg mids) remain allowed because they are execution-price
+# alternatives, not signal features.
+LIVE_FAIL_CLOSED_ON_MISSING_FEATURES = True
+LIVE_REQUIRE_PARITY                  = True
+LIVE_MIN_PARITY_PAIRS                = 1
+LIVE_REQUIRE_IBKR_CLOSES             = True
+LIVE_REQUIRE_OWN_GAP                 = True
+LIVE_REQUIRE_SNAPSHOT_MANIFEST       = True
 
 # --- Live credit basis (2026-06-10) ---
 # Backtest canon scores on BBO-clamped LAST (EOD vendor data, synchronous).

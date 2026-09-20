@@ -45,6 +45,8 @@ import config as backtest_config
 import spreads
 from live import live_config
 from live.regime import current_regime
+from live.preflight import PreflightError, run as run_preflight
+from live.provenance import snapshot_manifest, write_manifest
 
 # NYSE full-close holidays (reused from the backtest). When a weekly's Friday
 # is a holiday (e.g. Juneteenth, Good Friday), the option expires the prior
@@ -707,7 +709,15 @@ def main() -> int:
     parser.add_argument("--out", type=str, default=None,
                         help="Override output parquet path (for parallel runs that "
                              "would otherwise collide on HHMM.parquet)")
+    parser.add_argument("--allow-out-of-hours", action="store_true",
+                        help="Explicitly bypass the production market-hours check")
     args = parser.parse_args()
+
+    try:
+        run_preflight("fetch", allow_out_of_hours=args.allow_out_of_hours)
+    except PreflightError as exc:
+        print(exc, flush=True)
+        return 1
 
     tickers = _tickers_from_arg(args.tickers)
     dte_min, dte_max = live_config.live_dte_window(datetime.now().date())
@@ -725,7 +735,10 @@ def main() -> int:
         df.to_parquet(out, index=False)
     else:
         out = _write_snapshot(df)
+    manifest = snapshot_manifest(df, out, source="IBKR")
+    manifest_path = write_manifest(manifest, out)
     print(f"wrote {len(df)} rows → {out}", flush=True)
+    print(f"wrote provenance → {manifest_path}", flush=True)
     return 0
 
 

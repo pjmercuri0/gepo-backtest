@@ -40,9 +40,10 @@ fi
 # Config
 : "${MYA_SSH_HOST:?MYA_SSH_HOST not set — see header comment for setup}"
 : "${MYA_REMOTE_BASE:=/opt/vito/gepo-backtest/live}"
-SSH_OPTS=""
+SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
 if [ -n "${MYA_SSH_KEY:-}" ]; then
-  SSH_OPTS="-i $MYA_SSH_KEY"
+  printf -v _escaped_key '%q' "$MYA_SSH_KEY"
+  SSH_COMMAND+=" -i ${_escaped_key}"
 fi
 
 # Always merge Mya-side actual_credit edits into Mac's frozen files BEFORE
@@ -180,7 +181,7 @@ PYEOF
 #   --partial : keep partial transfers (helps on flaky links)
 #   --timeout=20 : bail if no progress
 #   no --delete : keep server-side history files even if pruned locally
-RSYNC="rsync -az --partial --timeout=20 -e 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new $SSH_OPTS'"
+RSYNC=(rsync -az --partial --timeout=20 -e "$SSH_COMMAND")
 
 # Selective upload — only ship files we generate from real IBKR data.
 # Mya's server generates its own mock latest.json / frozen/*.json on cron
@@ -210,12 +211,12 @@ for src in "${UPLOAD_FILES[@]}"; do
   if [ "$src" = "live/notifications/" ]; then
     # Health alerts are event payloads. Re-syncing old health-*.json on every
     # normal data upload can make Mya re-send stale alerts outside market hours.
-    eval "$RSYNC --exclude 'health-*.json' \"$src\" \"$dest\"" \
+    "${RSYNC[@]}" --exclude 'health-*.json' "$src" "$dest" \
       && echo "  ✓ uploaded $src (excluding health alerts)" \
       || echo "  ✗ rsync failed for $src"
     continue
   fi
-  eval "$RSYNC \"$src\" \"$dest\"" \
+  "${RSYNC[@]}" "$src" "$dest" \
     && echo "  ✓ uploaded $src" \
     || echo "  ✗ rsync failed for $src"
 done
