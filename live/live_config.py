@@ -142,7 +142,18 @@ def live_dte_window(day=None):
 # missing is unsafe.  Require the canonical OI floor when it is present; when
 # IBKR reports OI as missing/zero, require both legs to have enough current-day
 # volume and at least one contract at every BBO side.
-LIVE_MIN_OPEN_INTEREST       = 100
+LIVE_USE_OPEN_INTEREST       = True
+LIVE_MIN_OPEN_INTEREST       = 1      # 2026-09-20 (user): "the gate should be OI>=1". The 100
+                                      # floor is a BACKTEST/OOT gate (config.MIN_OPEN_INTEREST),
+                                      # not a live one.
+                                      # CAVEAT: this currently changes nothing. IBKR returns open
+                                      # interest as NaN for every option leg -- with and without
+                                      # generic tick 101 -- and fetcher.py stores NaN as 0, so
+                                      # `OI >= 1` is False on every row and the volume/BBO
+                                      # fallback below is what actually gates. OpenInterest == 0
+                                      # in a snapshot therefore means UNKNOWN, not "no open
+                                      # contracts". Re-check during market hours: if OI ever
+                                      # populates, this gate turns permissive at once.
 LIVE_ALLOW_VOLUME_FALLBACK   = True
 LIVE_MIN_VOLUME              = 100
 LIVE_MIN_BBO_SIZE            = 1
