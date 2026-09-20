@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-19 EDT (**§0.56 is the current canon**; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **LIVE is bull puts only when the prior completed SPY close is above its 100-session SMA, cash otherwise, parity percentile strictly above 12%, top 10/day. The BACKTEST/OOT canon (§0.56) is two-sided and symmetric on that SMA -- bull puts above, bear calls below -- with ex-dividend and earnings gates on both sleeves.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **LIVE is bull puts only when the prior completed SPY close is above its 100-session SMA, cash otherwise, parity percentile strictly above 12%, top 10/day. The BACKTEST/OOT canon (§0.56) is two-sided and symmetric on that SMA -- bull puts above, bear calls below -- with ex-dividend and earnings gates on both sleeves.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -33,7 +33,10 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
 - The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
-- **CURRENT CANON is §0.56 (2026-09-19)**: the §0.54 cell PLUS a two-sided regime that is
+- **CURRENT CANON is §0.57 (2026-09-19 evening)**: full-SP100 frame from `build_frame.py`, width <= 2.5,
+  risk-sized $200/pick, dollar-P&L Sharpe as the headline, start 2020-08-01, bankroll $20k. The old 1.52 was
+  an accidental 20-delta chain gate (see §0.57). Payload-side only; `live/ranker.py` unchanged.
+- **SUPERSEDED §0.56 (2026-09-19)**: the §0.54 cell PLUS a two-sided regime that is
   symmetric on the 100d SMA (bull puts above, bear calls below, no dead zone) and ex-dividend +
   earnings gates on BOTH sleeves. Backtest/OOT payloads only -- `live/ranker.py` is still bull-only.
 - **SUPERSEDED canon §0.54 (2026-09-16)**: 50-60 delta by fitted delta, G on P_real,
@@ -238,6 +241,75 @@ pre-canon labels that survived regeneration. Corrected to the canon fill on both
   returns -1 on every option under live data after the close). Cron still runs live.
 - Live tab: `+` on every ranked row; blue/green/red `+` on live, History and Snapshots (blue =
   same option held, green = strike away from the move, red = strike followed the stock).
+
+## 0.57 CANON: risk-sized book, dollar-P&L Sharpe, full SP100 frame (2026-09-19 evening)
+
+User decision after the second-pass audit ("this is canon now"). Commits `f4435d1`, `6a4b174`,
+`5d12ea3`, `a8498a5`. Backtest/OOT payloads and the Mya templates are live.
+
+### The mistake that was found
+
+The 1.52 Sharpe the old frame reported was an **accidental chain gate**, not strategy.
+`research/dkl_2026_09_13/band_sweep.load_pairs()` inner-joins the pair pool to smile fits on
+(ticker, entry_date, expiry_date); those fits (`is_synth` / `oot_synth`) were produced from the
+**20-delta** candidate list of the 09-11 delta-20 era (d_sh in [0.10, 0.30], OTM <= 5, width <= 2.5,
+both legs OI >= 100 and LAST > 0). So a chain entered the 55-delta frame only if a liquid 20-delta
+wing pair existed that day. Original 2026 frame chains are a strict subset of the synth chains
+(0 exceptions). It removed roughly half the ticker-days (2021: 5,134 vs 10,253) and was never chosen.
+
+Proof: featATM8 restricted to featATM7's (ticker, entry_date) pairs -> Sh 1.59 / DD -17.8% (the old
+book). Same 83 names, no restriction -> 1.17. Plus the 19 restored SP100 names -> 1.28 (they HELP,
++$49.8k). The excluded trades have the **same yield** (15.55% vs 15.54%) at **4x the max loss per
+contract** ($223 vs $53 median); under fixed qty=2 that is pure dollar variance from strike spacing.
+A ~90% replica of the 20-delta gate exists but the exact rule is unrecoverable (no builder for
+`oot_pairs_q.parquet` / `/tmp/gepo_pairs.parquet`). The live ranker has no such gate, so the
+full-universe book is the one that matches production.
+
+### Canon (payload side)
+
+- **Universe:** full `config.SP100_TICKERS` (99), every year; `build_frame.py` is the reproducible
+  builder (vectorized, ~27 s/year; output identical to the loop version). Names whose adjacent
+  strikes are > $2.5 apart drop out via the width cap (83-90 tickers/year in practice).
+- **width <= config.MAX_SPREAD_WIDTH (2.5)** restored (`band_checks.py:61`); alone worth 1.17 -> 1.32.
+- **Sizing: risk-sized.** `report_mid_canon.RISK_PER_TRADE = $200` of max loss per pick, qty =
+  floor(200 / max_loss$), min 1, max `config.MAX_CONTRACTS`. Replaces fixed qty=2 as the
+  `strategy` arm and the trade-row qty. qty1 and 1/16-Kelly arms kept.
+- **Headline metric: dollar-P&L weekly Sharpe** (`*_sharpe_dollar`, every arm). Under constant
+  $-risk this IS the Sharpe; %-of-equity Sharpe depends on the bankroll denominator (1.33 at $20k,
+  1.49 at $100k, -> the dollar figure). Weekly/daily %-Sharpe removed from the tabs.
+- **Start 2020-08-01** (`bear_regime_sweep.FRAME_START`), **bankroll $20,000** (`report_mid_canon.
+  START_BANKROLL`, `bear_regime_sweep.START`). Peak capital at risk is ~$17k; at $10k the fixed-qty
+  curve went to -$2,318 on 2020-07-24 and every ratio was meaningless.
+- Regime symmetric on the 100d SMA; ex-div + earnings gates on both sleeves (0.56); vendor path
+  resolver `ent_canon.vendor_year_parquet`; parity feature rebuilt through 2026-09-10.
+
+### Bugs fixed in `report_mid_canon.build_payload`
+
+- Calendar stopped at Dec 31, so late-December picks settling in January were listed in `trades`
+  but never booked ($1,974 in the 2025 book). Now runs through the last settlement; trade P&L sum
+  reconciles to `strategy_final - START_BANKROLL` to the dollar.
+- Weekly Sharpe dropped week 1 (`pct_change().dropna()`); seeded from START_BANKROLL.
+- Captions: `sizing` now states the rule and date.
+
+### Published (risk-sized, $20k, entries 2020-08-03..2025-12-24; settlements to 2026-01-02)
+
+| | trades | final | $-Sharpe | %-Sharpe | max DD | yield |
+|---|---|---|---|---|---|---|
+| Backtest 2020-25 | 4,846 | $137,464 | **1.80** | 1.44 | -29.6% | 15.5% |
+| OOT 2026 (to 09-10) | 662 | $48,086 | **5.10** | 4.41 | -6.4% | 27.3% |
+
+SPY $-Sharpe over the same window: 0.96. 2026 is **not** a clean holdout.
+
+### Still open
+
+- **Survivorship (audit #1):** `SP100_TICKERS` is a static present-day list applied backwards.
+  No ticker first appears after 2023. Unquantified; needs historical constituents.
+- **Entry price = 16:00 close** on 35,274/35,274 rows; live enters at 15:00.
+- `live/ranker.py` is bull-only and does not risk-size; the canon above is payload-side only.
+- Mya's checkout has local uncommitted edits (`base/history/index.html`); `backtest.html` and
+  `oot.html` were rsynced directly (TEMPLATES_AUTO_RELOAD is on). Do not `git pull` there blindly.
+- Frames are gitignored: `featATM8.parquet` regenerates with `python3 research/dkl_2026_09_13/build_frame.py`
+  (~3.5 min), then `direction_signal_suite.build_chain_cache(force=True)`, then `report_bear_regime.py`.
 
 ## 0.56 CANON: symmetric 100d regime + ex-div/earnings on both sleeves (2026-09-19)
 

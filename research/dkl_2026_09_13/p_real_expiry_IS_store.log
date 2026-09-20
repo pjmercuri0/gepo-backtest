@@ -1,0 +1,169 @@
+[   0.3s] IS candidates 38,049  2020-07-14 .. 2025-12-24
+[   0.4s] closes restricted to SPY sessions: dropped 5,301 non-session rows
+[   0.4s] MIN_OBS 1
+[   0.5s] closes 150,566 rows, 99 tickers; ATM-IV days 84,345, ffilled 143,966
+[   0.7s] EV reproduction from frame p/q/ro: max |dEV| = 3.09e-14
+[   1.6s] 2020  month  7   16.7%  (147 candidates)
+[   3.0s] 2020  month  8   33.3%  (393 candidates)
+[   5.2s] 2020  month  9   50.0%  (375 candidates)
+[   7.6s] 2020  month 10   66.7%  (573 candidates)
+[   9.8s] 2020  month 11   83.3%  (554 candidates)
+[  11.5s] 2020  month 12  100.0%  (336 candidates)
+canon (frame p/q/ro): n=332  qty1 $14,318 (+43.2%, Sh(wk) +2.21, DD -14.1%)  qty2 $18,635 (+86.3%, Sh(wk) +2.37, DD -22.6%)
+exact strikes, daily_closes: n=331  qty1 $14,251 (+42.5%, Sh(wk) +2.11, DD -13.3%)  qty2 $18,501 (+85.0%, Sh(wk) +2.26, DD -21.0%)
+delta-matched, RV20: n=347  qty1 $13,990 (+39.9%, Sh(wk) +2.09, DD -13.4%)  qty2 $17,980 (+79.8%, Sh(wk) +2.25, DD -22.1%)
+delta-matched, ATM IV: n=333  qty1 $14,985 (+49.9%, Sh(wk) +2.35, DD -13.5%)  qty2 $19,971 (+99.7%, Sh(wk) +2.46, DD -21.2%)
+expiry-matched, 52 weeks: n=344  qty1 $11,453 (+14.5%, Sh(wk) +1.69, DD -7.3%)  qty2 $12,907 (+29.1%, Sh(wk) +1.76, DD -13.2%)
+expiry-matched, 104 weeks: n=344  qty1 $11,453 (+14.5%, Sh(wk) +1.69, DD -7.3%)  qty2 $12,907 (+29.1%, Sh(wk) +1.76, DD -13.2%)
+
+=== IS to date: 2020-07-14 .. 2020-12-31  (fill 1.08x model, comm $1.3) ===
+                    variant   n  win  loss  bull_put  pnl_trade  qty1_pnl  sh_wk     dd  qty2_pnl  overlap
+       canon (frame p/q/ro) 332 47.0  37.7      85.5      13.00      4318   2.21 -14.09      8635    100.0
+exact strikes, daily_closes 331 46.8  39.0      92.7      12.84      4251   2.11 -13.33      8501     78.9
+        delta-matched, RV20 347 44.7  39.2      91.9      11.50      3990   2.09 -13.41      7980     69.7
+      delta-matched, ATM IV 333 45.9  40.8      90.7      14.97      4985   2.35 -13.50      9971     78.7
+   expiry-matched, 52 weeks 344 38.7  42.2      43.9       4.22      1453   1.69  -7.30      2907     41.6
+  expiry-matched, 104 weeks 344 38.7  42.2      43.9       4.22      1453   1.69  -7.30      2907     41.6
+
+[  15.2s] 2021  month  1    8.3%  (603 candidates)
+[  17.2s] 2021  month  2   16.7%  (498 candidates)
+[  19.2s] 2021  month  3   25.0%  (585 candidates)
+[  21.3s] 2021  month  4   33.3%  (491 candidates)
+[  23.6s] 2021  month  5   41.7%  (594 candidates)
+[  25.6s] 2021  month  6   50.0%  (547 candidates)
+[  27.8s] 2021  month  7   58.3%  (551 candidates)
+[  29.9s] 2021  month  8   66.7%  (572 candidates)
+[  31.8s] 2021  month  9   75.0%  (464 candidates)
+[  33.8s] 2021  month 10   83.3%  (526 candidates)
+[  36.4s] 2021  month 11   91.7%  (530 candidates)
+[  38.4s] 2021  month 12  100.0%  (440 candidates)
+canon (frame p/q/ro): n=1110  qty1 $20,343 (+103.4%, Sh(wk) +1.72, DD -14.9%)  qty2 $30,686 (+206.9%, Sh(wk) +1.79, DD -22.6%)
+exact strikes, daily_closes: n=1130  qty1 $19,225 (+92.2%, Sh(wk) +1.57, DD -13.4%)  qty2 $28,450 (+184.5%, Sh(wk) +1.65, DD -21.0%)
+delta-matched, RV20: n=1178  qty1 $17,512 (+75.1%, Sh(wk) +1.38, DD -13.4%)  qty2 $25,024 (+150.2%, Sh(wk) +1.50, DD -22.1%)
+delta-matched, ATM IV: n=1132  qty1 $18,016 (+80.2%, Sh(wk) +1.40, DD -13.5%)  qty2 $26,031 (+160.3%, Sh(wk) +1.51, DD -21.2%)
+expiry-matched, 52 weeks: n=1254  qty1 $16,285 (+62.9%, Sh(wk) +1.49, DD -11.8%)  qty2 $22,571 (+125.7%, Sh(wk) +1.62, DD -16.2%)
+expiry-matched, 104 weeks: n=1140  qty1 $17,458 (+74.6%, Sh(wk) +1.53, DD -23.1%)  qty2 $24,917 (+149.2%, Sh(wk) +1.54, DD -38.3%)
+
+=== IS to date: 2020-07-14 .. 2021-12-31  (fill 1.08x model, comm $1.3) ===
+                    variant    n  win  loss  bull_put  pnl_trade  qty1_pnl  sh_wk     dd  qty2_pnl  overlap
+       canon (frame p/q/ro) 1110 45.9  40.0      92.1       9.32     10343   1.72 -14.93     20686    100.0
+exact strikes, daily_closes 1130 45.3  39.6      94.3       8.16      9225   1.57 -13.39     18450     76.9
+        delta-matched, RV20 1178 44.7  40.2      93.4       6.38      7512   1.38 -13.41     15024     65.8
+      delta-matched, ATM IV 1132 43.9  41.4      93.8       7.08      8016   1.40 -13.50     16031     72.5
+   expiry-matched, 52 weeks 1254 42.7  40.6      73.8       5.01      6285   1.49 -11.82     12571     44.0
+  expiry-matched, 104 weeks 1140 42.2  41.5      64.3       6.54      7458   1.53 -23.05     14917     46.4
+
+[  45.4s] 2022  month  1    8.3%  (624 candidates)
+[  47.6s] 2022  month  2   16.7%  (621 candidates)
+[  49.8s] 2022  month  3   25.0%  (812 candidates)
+[  51.9s] 2022  month  4   33.3%  (518 candidates)
+[  54.1s] 2022  month  5   41.7%  (864 candidates)
+[  56.3s] 2022  month  6   50.0%  (747 candidates)
+[  58.5s] 2022  month  7   58.3%  (697 candidates)
+[  60.7s] 2022  month  8   66.7%  (659 candidates)
+[  63.1s] 2022  month  9   75.0%  (716 candidates)
+[  65.6s] 2022  month 10   83.3%  (988 candidates)
+[  68.0s] 2022  month 11   91.7%  (716 candidates)
+[  70.1s] 2022  month 12  100.0%  (582 candidates)
+canon (frame p/q/ro): n=1848  qty1 $24,039 (+140.4%, Sh(wk) +1.52, DD -14.9%)  qty2 $38,077 (+280.8%, Sh(wk) +1.55, DD -22.6%)
+exact strikes, daily_closes: n=1864  qty1 $20,588 (+105.9%, Sh(wk) +1.25, DD -15.9%)  qty2 $31,176 (+211.8%, Sh(wk) +1.32, DD -21.0%)
+delta-matched, RV20: n=1886  qty1 $20,512 (+105.1%, Sh(wk) +1.24, DD -18.9%)  qty2 $31,025 (+210.2%, Sh(wk) +1.31, DD -25.5%)
+delta-matched, ATM IV: n=1768  qty1 $21,590 (+115.9%, Sh(wk) +1.31, DD -13.9%)  qty2 $33,179 (+231.8%, Sh(wk) +1.36, DD -21.2%)
+expiry-matched, 52 weeks: n=2202  qty1 $18,190 (+81.9%, Sh(wk) +1.11, DD -30.0%)  qty2 $26,379 (+163.8%, Sh(wk) +1.22, DD -41.1%)
+expiry-matched, 104 weeks: n=1897  qty1 $20,953 (+109.5%, Sh(wk) +1.37, DD -23.1%)  qty2 $31,906 (+219.1%, Sh(wk) +1.36, DD -38.3%)
+
+=== IS to date: 2020-07-14 .. 2022-12-31  (fill 1.08x model, comm $1.3) ===
+                    variant    n  win  loss  bull_put  pnl_trade  qty1_pnl  sh_wk     dd  qty2_pnl  overlap
+       canon (frame p/q/ro) 1848 44.8  40.6      74.5       7.60     14039   1.52 -14.93     28077    100.0
+exact strikes, daily_closes 1864 43.8  41.2      75.1       5.68     10588   1.25 -15.92     21176     78.1
+        delta-matched, RV20 1886 44.2  41.0      76.0       5.57     10512   1.24 -18.91     21025     65.5
+      delta-matched, ATM IV 1768 43.6  41.7      79.0       6.56     11590   1.31 -13.86     23179     70.8
+   expiry-matched, 52 weeks 2202 43.6  41.8      62.6       3.72      8190   1.11 -29.96     16379     41.6
+  expiry-matched, 104 weeks 1897 43.1  42.3      67.1       5.77     10953   1.37 -23.05     21906     42.8
+
+[  80.7s] 2023  month  1    8.3%  (708 candidates)
+[  83.0s] 2023  month  2   16.7%  (566 candidates)
+[  85.4s] 2023  month  3   25.0%  (670 candidates)
+[  87.4s] 2023  month  4   33.3%  (413 candidates)
+[  89.5s] 2023  month  5   41.7%  (573 candidates)
+[  91.3s] 2023  month  6   50.0%  (405 candidates)
+[  93.4s] 2023  month  7   58.3%  (480 candidates)
+[  95.5s] 2023  month  8   66.7%  (561 candidates)
+[  97.5s] 2023  month  9   75.0%  (405 candidates)
+[  99.9s] 2023  month 10   83.3%  (751 candidates)
+[ 102.0s] 2023  month 11   91.7%  (419 candidates)
+[ 103.9s] 2023  month 12  100.0%  (372 candidates)
+canon (frame p/q/ro): n=2357  qty1 $24,040 (+140.4%, Sh(wk) +1.24, DD -14.9%)  qty2 $38,080 (+280.8%, Sh(wk) +1.28, DD -22.6%)
+exact strikes, daily_closes: n=2365  qty1 $20,416 (+104.2%, Sh(wk) +1.01, DD -15.9%)  qty2 $30,831 (+208.3%, Sh(wk) +1.08, DD -21.0%)
+delta-matched, RV20: n=2484  qty1 $20,367 (+103.7%, Sh(wk) +1.00, DD -18.9%)  qty2 $30,733 (+207.3%, Sh(wk) +1.07, DD -25.5%)
+delta-matched, ATM IV: n=2253  qty1 $21,767 (+117.7%, Sh(wk) +1.08, DD -13.9%)  qty2 $33,534 (+235.3%, Sh(wk) +1.14, DD -21.2%)
+expiry-matched, 52 weeks: n=2987  qty1 $16,692 (+66.9%, Sh(wk) +0.77, DD -30.0%)  qty2 $23,384 (+133.8%, Sh(wk) +0.88, DD -41.1%)
+expiry-matched, 104 weeks: n=2471  qty1 $24,589 (+145.9%, Sh(wk) +1.32, DD -23.1%)  qty2 $39,178 (+291.8%, Sh(wk) +1.29, DD -38.3%)
+
+=== IS to date: 2020-07-14 .. 2023-12-31  (fill 1.08x model, comm $1.3) ===
+                    variant    n  win  loss  bull_put  pnl_trade  qty1_pnl  sh_wk     dd  qty2_pnl  overlap
+       canon (frame p/q/ro) 2357 43.8  42.3      72.7       5.96     14040   1.24 -14.93     28080    100.0
+exact strikes, daily_closes 2365 42.8  42.8      73.6       4.40     10416   1.01 -15.92     20831     79.3
+        delta-matched, RV20 2484 43.2  42.1      72.3       4.17     10367   1.00 -18.91     20733     64.8
+      delta-matched, ATM IV 2253 42.7  42.9      76.8       5.22     11767   1.08 -13.86     23534     71.7
+   expiry-matched, 52 weeks 2987 42.1  43.1      63.4       2.24      6692   0.77 -29.96     13384     40.7
+  expiry-matched, 104 weeks 2471 42.3  42.9      66.1       5.90     14589   1.32 -23.05     29178     42.2
+
+[ 116.6s] 2024  month  1    8.3%  (579 candidates)
+[ 119.0s] 2024  month  2   16.7%  (494 candidates)
+[ 121.1s] 2024  month  3   25.0%  (367 candidates)
+[ 123.6s] 2024  month  4   33.3%  (671 candidates)
+[ 126.2s] 2024  month  5   41.7%  (408 candidates)
+[ 128.5s] 2024  month  6   50.0%  (449 candidates)
+[ 130.9s] 2024  month  7   58.3%  (665 candidates)
+[ 133.2s] 2024  month  8   66.7%  (665 candidates)
+[ 135.5s] 2024  month  9   75.0%  (578 candidates)
+[ 138.3s] 2024  month 10   83.3%  (809 candidates)
+[ 140.5s] 2024  month 11   91.7%  (507 candidates)
+[ 142.7s] 2024  month 12  100.0%  (529 candidates)
+canon (frame p/q/ro): n=3200  qty1 $34,058 (+240.6%, Sh(wk) +1.41, DD -14.9%)  qty2 $58,117 (+481.2%, Sh(wk) +1.38, DD -22.6%)
+exact strikes, daily_closes: n=3219  qty1 $29,192 (+191.9%, Sh(wk) +1.20, DD -15.9%)  qty2 $48,384 (+383.8%, Sh(wk) +1.21, DD -21.0%)
+delta-matched, RV20: n=3332  qty1 $26,749 (+167.5%, Sh(wk) +1.10, DD -18.9%)  qty2 $43,499 (+335.0%, Sh(wk) +1.14, DD -25.5%)
+delta-matched, ATM IV: n=3072  qty1 $31,601 (+216.0%, Sh(wk) +1.29, DD -13.9%)  qty2 $53,202 (+432.0%, Sh(wk) +1.28, DD -21.2%)
+expiry-matched, 52 weeks: n=3928  qty1 $26,200 (+162.0%, Sh(wk) +1.11, DD -30.0%)  qty2 $42,400 (+324.0%, Sh(wk) +1.16, DD -41.1%)
+expiry-matched, 104 weeks: n=3218  qty1 $33,329 (+233.3%, Sh(wk) +1.46, DD -23.1%)  qty2 $56,658 (+466.6%, Sh(wk) +1.37, DD -38.3%)
+
+=== IS to date: 2020-07-14 .. 2024-12-31  (fill 1.08x model, comm $1.3) ===
+                    variant    n  win  loss  bull_put  pnl_trade  qty1_pnl  sh_wk     dd  qty2_pnl  overlap
+       canon (frame p/q/ro) 3200 44.5  40.3      76.8       7.56     24058   1.41 -14.93     48117    100.0
+exact strikes, daily_closes 3219 43.6  40.9      77.4       6.06     19192   1.20 -15.92     38384     81.5
+        delta-matched, RV20 3332 43.4  41.0      76.0       5.12     16749   1.10 -18.91     33499     67.5
+      delta-matched, ATM IV 3072 43.4  41.5      80.9       7.13     21601   1.29 -13.86     43202     73.0
+   expiry-matched, 52 weeks 3928 43.2  41.2      68.5       4.17     16200   1.11 -29.96     32400     43.4
+  expiry-matched, 104 weeks 3218 42.9  41.5      71.4       7.23     23329   1.46 -23.05     46658     45.6
+
+[ 158.6s] 2025  month  1    8.3%  (509 candidates)
+[ 160.8s] 2025  month  2   16.7%  (570 candidates)
+[ 163.0s] 2025  month  3   25.0%  (689 candidates)
+[ 165.4s] 2025  month  4   33.3%  (708 candidates)
+[ 167.6s] 2025  month  5   41.7%  (636 candidates)
+[ 169.7s] 2025  month  6   50.0%  (550 candidates)
+[ 172.0s] 2025  month  7   58.3%  (630 candidates)
+[ 174.2s] 2025  month  8   66.7%  (648 candidates)
+[ 176.4s] 2025  month  9   75.0%  (663 candidates)
+[ 178.9s] 2025  month 10   83.3%  (877 candidates)
+[ 181.2s] 2025  month 11   91.7%  (673 candidates)
+[ 183.3s] 2025  month 12  100.0%  (529 candidates)
+canon (frame p/q/ro): n=3997  qty1 $38,347 (+283.5%, Sh(wk) +1.35, DD -14.9%)  qty2 $66,694 (+566.9%, Sh(wk) +1.32, DD -22.6%)
+exact strikes, daily_closes: n=3999  qty1 $34,422 (+244.2%, Sh(wk) +1.20, DD -15.9%)  qty2 $58,845 (+488.4%, Sh(wk) +1.19, DD -21.0%)
+delta-matched, RV20: n=4117  qty1 $31,800 (+218.0%, Sh(wk) +1.12, DD -18.9%)  qty2 $53,600 (+436.0%, Sh(wk) +1.13, DD -25.5%)
+delta-matched, ATM IV: n=3824  qty1 $33,940 (+239.4%, Sh(wk) +1.20, DD -13.9%)  qty2 $57,880 (+478.8%, Sh(wk) +1.19, DD -21.2%)
+expiry-matched, 52 weeks: n=4825  qty1 $33,286 (+232.9%, Sh(wk) +1.18, DD -30.0%)  qty2 $56,573 (+465.7%, Sh(wk) +1.20, DD -41.1%)
+expiry-matched, 104 weeks: n=4071  qty1 $37,932 (+279.3%, Sh(wk) +1.40, DD -23.1%)  qty2 $65,863 (+558.6%, Sh(wk) +1.31, DD -38.3%)
+
+=== IS to date: 2020-07-14 .. 2025-12-31  (fill 1.08x model, comm $1.3) ===
+                    variant    n  win  loss  bull_put  pnl_trade  qty1_pnl  sh_wk     dd  qty2_pnl  overlap
+       canon (frame p/q/ro) 3997 44.2  40.5      78.9       7.09     28347   1.35 -14.93     56694    100.0
+exact strikes, daily_closes 3999 43.6  40.8      79.5       6.11     24422   1.20 -15.92     48845     82.0
+        delta-matched, RV20 4117 43.4  40.8      78.0       5.30     21800   1.12 -18.91     43600     68.2
+      delta-matched, ATM IV 3824 42.9  41.9      83.1       6.26     23940   1.20 -13.86     47880     73.2
+   expiry-matched, 52 weeks 4825 43.7  40.6      71.4       4.83     23286   1.18 -29.96     46573     44.1
+  expiry-matched, 104 weeks 4071 43.3  40.8      75.0       6.86     27932   1.40 -23.05     55863     47.1
+
+[ 200.2s] exact-strike recompute vs frame: median |dp| 0.0079, 90th pct 0.0275, NaN rows 0
+[ 200.3s] done
