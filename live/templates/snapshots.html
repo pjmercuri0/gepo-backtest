@@ -8,13 +8,25 @@
 their cron slot (:00/:15/:30/:45); out-of-hours runs are not shown.
 Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or only near the close?</div>
 
-<div class="section-label" id="agg-toggle" style="cursor:pointer;user-select:none"
-     title="click to collapse / expand">
-  <span id="agg-arrow">&#9662;</span>
-  Performance by scan time of day (settled picks only)
-  <span style="color:#888780;font-weight:400">&middot; {{ agg|length }} scan times</span>
+<style>
+  /* .section-label is 11px uppercase grey -- fine for a caption, invisible as a
+     control. Give the toggle a real affordance: a button-ish row that lights up
+     on hover, with an arrow big enough to read. */
+  #agg-toggle { display:flex; align-items:center; gap:8px; cursor:pointer;
+                user-select:none; color:#c8c6c0; background:#1c1c1a;
+                border:1px solid #33322e; border-radius:6px;
+                padding:9px 12px; margin:32px 0 16px; }
+  #agg-toggle:hover { background:#232320; border-color:#4a4843; color:#e8e6e0; }
+  #agg-arrow { font-size:15px; line-height:1; width:14px; display:inline-block; }
+  #agg-hint  { margin-left:auto; font-size:11px; color:#888780; font-weight:400;
+               text-transform:none; letter-spacing:0; }
+</style>
+<div class="section-label" id="agg-toggle" title="click to collapse / expand">
+  <span id="agg-arrow">&#9656;</span>
+  <span>Performance by scan time of day (settled picks only)</span>
+  <span id="agg-hint">{{ agg|length }} scan times &middot; <span id="agg-action">show</span></span>
 </div>
-<div class="week-card" id="agg-card">
+<div class="week-card" id="agg-card" style="display:none">
   <div class="table-scroll">
   <table>
     <thead><tr>
@@ -131,13 +143,17 @@ nothing captured yet</div></div>
   var tog  = document.getElementById("agg-toggle");
   var arr  = document.getElementById("agg-arrow");
   if (!card || !tog || !arr) return;
+  var act = document.getElementById("agg-action");
   function apply(open) {
     card.style.display = open ? "" : "none";
     arr.innerHTML = open ? "&#9662;" : "&#9656;";   // down / right
+    if (act) act.textContent = open ? "hide" : "show";
   }
   var stored = null;
   try { stored = localStorage.getItem("snap-agg-expanded"); } catch (e) {}
-  apply(stored !== "0");
+  // Collapsed by default (user, 2026-09-20): only "1" opens it, so a first
+  // visit -- or a browser that blocks site data -- starts closed.
+  apply(stored === "1");
   tog.addEventListener("click", function () {
     var open = card.style.display === "none";
     apply(open);
