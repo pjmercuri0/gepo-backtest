@@ -33,7 +33,14 @@ from sma_bull_regime_sweep import (
 OUT = ROOT / "output/bear_regime_sweep.csv"
 DIVIDENDS = ROOT / "output/yahoo_dividend_history.csv"
 EARNINGS = ROOT / "output/nasdaq_earnings_history.csv"
-START = 10_000.0
+START = 20_000.0
+# P_real needs history before it means anything; featATM6 began 2020-07-14 for that reason
+# and build_frame.py now produces candidates from 2020-01-01.  Keeping the original start
+# is NOT cosmetic: the first six months contain the COVID crash, and on 2020-02-28 the
+# fixed-size book drops the $10k bankroll to $1,986 (-83.5%) and then keeps trading two
+# contracts on an account that could not fund them.  That single week is what drove the
+# published Sharpe to 1.01 against a 68% CAGR (2026-09-19).
+FRAME_START = pd.Timestamp("2020-08-01")
 REGIMES = (
     "below_100",
     "below_100_falling",
@@ -49,6 +56,10 @@ CAPS = (1, 2, 3, 5)
 def prepare() -> tuple[pd.DataFrame, pd.DataFrame]:
     c = pd.read_parquet(FRAME).dropna(subset=["EV"]).copy()
     c["entry_date"] = pd.to_datetime(c.entry_date).dt.normalize()
+    n0 = len(c)
+    c = c[c.entry_date >= FRAME_START].copy()
+    if len(c) < n0:
+        print(f"  frame start {FRAME_START.date()}: dropped {n0-len(c):,} pre-window candidates", flush=True)
     c["expiry_date"] = pd.to_datetime(c.expiry_date).dt.normalize()
     closes = ec.backtest_closes()
     mu = ec.gap_drift(c, closes, pd.read_parquet(GAP_SERIES))
