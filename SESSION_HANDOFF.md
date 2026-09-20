@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-20 EDT (**FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-20 EDT (**§0.60 has an OPEN decision: Snapshots halves PARTIAL wins and nothing else does — $3,825.40 understated**; **FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -103,6 +103,103 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - **Do not delete `data/DG_2025*/` (59.1 GB raw vendor data) yet.** The 2025 euro parquets are built, but a RUT/RUTW `UnderlyingPrice` anomaly is unresolved and may need the original CSVs to diagnose — see §0.17.
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
+
+## 0.60 Proactive bug audit (2026-09-20) — one OPEN decision on partial wins
+
+Swept for the bug CLASSES hit earlier in the session instead of waiting for the
+next symptom. Three fixed in `1b2a...`/this session; **one needs a decision and
+is deliberately NOT changed**, because it rewrites recorded P&L.
+
+### OPEN — Snapshots halves PARTIAL wins; nothing else does
+
+`live/snapshot_picks.py` (two sites, the settle loop at ~line 227 and the
+live-added-actuals loop at ~line 281) does:
+
+```python
+if oc == "PARTIAL" and pnl > 0:
+    pnl *= 0.5   # comment claims "matches backtest canon"
+```
+
+**The comment is wrong.** `spreads.calc_pnl()` already returns the EXACT
+piecewise-linear payoff in the partial zone -- `credit - (short_strike - spot)`
+-- and its docstring says it was written specifically to REPLACE an
+outcome-scaled formula. Halving it afterwards double-counts.
+
+Who else halves: **nobody.**
+
+| surface | file | halves? |
+|---|---|---|
+| Backtest + OOT (~70 scripts) | `backtest*.py`, `report_*.py`, `sweep_*.py` | NO |
+| History | `live/expire_frozen.py:245` | NO |
+| 15:45 freeze | `live/freeze_snapshot.py:220` | NO |
+| Actuals / History marks | `live/webapp.py:1182`, `:1799` | NO |
+| **Snapshots** | **`live/snapshot_picks.py:227, :281`** | **YES** |
+
+**Measured impact:** 164 PARTIAL wins across 1,982 settled Snapshot rows,
+recorded at $3,825.40 against a true $7,650.80 -- **understated by $3,825.40**.
+The same trade reads differently on Snapshots than on History.
+
+**SUGGESTED FIX — drop the haircut, do not spread it.** Delete both
+`pnl *= 0.5` lines so Snapshots matches `calc_pnl` like every other surface.
+Rationale: the backtest and OOT books that the published Sharpe/yield numbers
+come from do NOT halve, so halving in Snapshots makes the one tab meant to test
+"does GROUND select good picks at any time of day" disagree with the very books
+it is supposed to validate against. Keeping the haircut would instead require
+adding it to ~70 backtest scripts plus History, the freeze and the webapp, which
+would move every published number in §0.57.
+
+**Note it is a RESTATEMENT, not a recompute:** the stored `pnl` on those 164 rows
+is exactly half the true value, so the existing files can be corrected in place
+by doubling `pnl` where `outcome == "PARTIAL" and pnl > 0`, with no re-fetch.
+Do it as an explicit one-off migration over `live/intraday_picks/*.json`, then
+re-upload -- the webapp renders those files, it does not recompute them.
+
+If the haircut was in fact a deliberate execution-realism assumption (a partial
+means the short is ITM at expiry, so assignment may stop you realising the
+theoretical value) then say so in the code and apply it to the BACKTEST too,
+because that is where the edge estimate comes from.
+
+### Fixed in this pass
+
+1. **`live/fetcher.py` — open interest was never read for puts.**
+   `oi_val = t.callOpenInterest or t.putOpenInterest`. IBKR sends OI on tick 27
+   (call) or 28 (put) by right and leaves the other attribute NaN. **NaN is
+   TRUTHY in Python**, so `or` short-circuits on the call value and returns NaN
+   for every put -- `putOpenInterest` was unreachable. Almost certainly why
+   `OpenInterest` is 0 on 100% of live rows (see §0.59 / the liquidity policy).
+   Now selects by `c.right`. **Re-check on a market-hours scan: if OI starts
+   populating, revisit `LIVE_USE_OPEN_INTEREST`, which was turned off on the
+   assumption OI is never available.**
+
+2. **A trading gate that failed OPEN.** `live/ranker.py` and
+   `live/drift_frozen.py` used `bool(r.get("qualified", True))` -- default True,
+   and `bool(nan)` is True, so a missing or NaN field published a spread as
+   QUALIFIED. Latent (ent_canon always sets a real bool) but a gate must fail
+   closed. Both now do.
+
+3. **Silent downgrade to Yahoo prices.** `live/snapshot_picks._expiry_close` had
+   a bare `except: pass` that quietly fell from the IBKR close store to the
+   Yahoo bars -- which that function's own docstring forbids for live P&L. It
+   now logs the failure.
+
+### Classes swept, clean
+
+Falsy-zero `or` fallthrough, NaN truthiness, first-match-from-unordered-list
+(the §0.59 tradingClass bug), sign-taken-from-a-rounded-value (the two template
+bugs below), silent excepts, unknown-stored-as-zero, and canon constants copied
+rather than imported (the `MODEL_FILL_MULT` drift). No other template carries the
+sign bug, the remaining `next()` calls key on unique ids, and `IV == 0` never
+occurs in practice. **This is a sample of the code, not a proof of absence.**
+
+### Display bugs found the same day (fixed, both deployed to Mya)
+
+`fmtGround` and `fmtKellyEV` in `live/templates/index.html` both took their sign
+from the ROUNDED value. `rd()` returns `-0` for a small negative, `-0 >= 0` is
+true in JS, and `(-0).toFixed(2)` is `"0.00"` -- so every tiny negative rendered
+as **`+0.00%`**, and in `fmtKellyEV` it also got the GREEN `pos` class. TSLA and
+CL displayed as positive-edge spreads while being negative. Sign and colour now
+come from the raw value. **Templates are code: rsync + `pm2 restart
+app-gepo-ticker`, not `upload_to_mya.sh`.**
 
 ## 0.59 Truncated option chains were silently costing 6 names every session (2026-09-20)
 
