@@ -147,6 +147,9 @@ write_manifest(snapshot_manifest(merged, final, source="IBKR"), final)
 print(f"  ✓ merged {len(existing)} files → {len(merged)} unique rows (+ manifest)")
 for p in existing:
     p.unlink()
+    # fetcher.py writes a sidecar manifest per group; drop it with its parquet
+    # or every scan leaves 8 orphans behind (8 x 26 scans = ~208 files/day).
+    p.with_suffix(".manifest.json").unlink(missing_ok=True)
 PYEOF
 then
     # Pre-open / no-data firing: ranking is impossible, but the SPY tick was
