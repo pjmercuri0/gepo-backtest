@@ -437,12 +437,19 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if n_nobelief:
         print(f"  {n_nobelief} candidate(s) have NO close history (no P_real) and are unscored", flush=True)
     if n_neg:
-        print(f"  {n_neg} candidate(s) growth-negative at the selection credit (Kelly w* <= 0) and are unranked", flush=True)
+        print(f"  {n_neg} candidate(s) growth-negative at the selection credit "
+              f"(no interior Kelly optimum) — shown with GROUND '—', never qualified", flush=True)
     for i, r in scored.iterrows():
         tg = entc.credit_targets(r["dfit_short"], r["DTE"], width=r["width"], model_credit=r["model_credit"])
         for k_, v_ in tg.items():
             scored.at[i, f"tgt_{k_}"] = v_
-    ranked = scored.dropna(subset=["GROUND"]).copy()
+    # Keep growth-negative candidates (user, 2026-09-20: "dont kill kelly with
+    # <= 0"). Those rows have GROUND = NaN because kelly() finds no interior
+    # optimum, not because they are slightly negative; they serialize as null and
+    # the page renders "—" with an empty bar. They can never qualify, since
+    # `GROUND >= thr` is False for NaN. Rows with NO close history are still
+    # dropped: without P_real there is nothing to show at all.
+    ranked = scored[scored["p"].notna()].copy()
 
     # One direction per ticker (2026-06-10): bull_put and bear_call on the same
     # name are contradictory bets; keep only the better-GROUND one.
