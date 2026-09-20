@@ -193,6 +193,12 @@ GROUND_THRESHOLD = 0.005  # 2026-09-15: thr 0.005 / k=4 on full-session P_real (
 # candidate clearing the threshold is taken. Set to a positive integer to
 # fall back to the legacy top-N rule.
 TOP_N = 10  # 2026-09-16 canon: up to 10 qualified bull puts per entry day
+# Bear sleeve gates (handoff 0.57 / research/report_bear_regime.py), live from 2026-09-19:
+# selected on IS 2020-2025.  Bears get their OWN threshold, their own mirrored parity
+# percentile and their own daily cap; the two sleeves never compete for slots.
+BEAR_GROUND_THRESHOLD = 0.001
+BEAR_PARITY_MIN_PCT   = 0.25   # strict >, percentile of (cp_iv_gap x causal sign) among that day's bear calls
+BEAR_TOP_N            = 5
 
 # Sizing rule: "1" = 1 contract per spread, "2" = 2 contracts, "dyn10k" = dynamic.
 # Per-variant scripts override this.

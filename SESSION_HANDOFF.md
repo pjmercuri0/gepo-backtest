@@ -305,8 +305,11 @@ SPY $-Sharpe over the same window: 0.96. 2026 is **not** a clean holdout.
 - **Survivorship (audit #1):** `SP100_TICKERS` is a static present-day list applied backwards.
   No ticker first appears after 2023. Unquantified; needs historical constituents.
 - **Entry price = 16:00 close** on 35,274/35,274 rows; live enters at 15:00.
-- Live is now two-sided (`config.REGIME_BULL_ONLY = False`, `0c79d6a`) but does not risk-size, and applies the
-  bull gates (GROUND 0.005, parity > 0.12, top-10 shared) to bear calls too. Bear-sleeve gates are backtest-only.
+- Live is two-sided (`config.REGIME_BULL_ONLY = False`, `0c79d6a`) AND matches the backtest sleeves as of the
+  next commit: `config.BEAR_GROUND_THRESHOLD = 0.001`, `BEAR_PARITY_MIN_PCT = 0.25` (mirrored, via
+  `ent_canon.add_bear_parity_percentile`), `BEAR_TOP_N = 5`; bulls keep 0.005 / 0.12 / 10. The per-side cap is
+  applied to the QUALIFIED set inside `live/ranker.py`, so latest.json, freeze top-up and snapshots inherit it.
+  Live still does NOT risk-size (the ranker has no qty); that remains the one payload/live difference.
 - Mya's checkout has local uncommitted edits (`base/history/index.html`); `backtest.html` and
   `oot.html` were rsynced directly (TEMPLATES_AUTO_RELOAD is on). Do not `git pull` there blindly.
 - Frames are gitignored: `featATM8.parquet` regenerates with `python3 research/dkl_2026_09_13/build_frame.py`
