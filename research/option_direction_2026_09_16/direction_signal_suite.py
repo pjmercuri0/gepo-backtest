@@ -124,8 +124,9 @@ def _pin_row(x: pd.DataFrame) -> pd.Series:
     return pd.Series({"pin_strike": float(k), "pin_oi": float(z.loc[k])})
 
 
-def build_chain_cache(force: bool = False) -> pd.DataFrame:
-    if CHAIN_CACHE.exists() and not force:
+def build_chain_cache(force: bool = False, years=None) -> pd.DataFrame:
+    """years=[2026] rebuilds only those years and merges into the existing cache (incremental)."""
+    if CHAIN_CACHE.exists() and not force and not years:
         log(f"loading {CHAIN_CACHE}")
         return pd.read_parquet(CHAIN_CACHE)
 
@@ -149,7 +150,7 @@ def build_chain_cache(force: bool = False) -> pd.DataFrame:
         "BidPrice",
         "AskPrice",
     ]
-    for year in range(2020, 2027):
+    for year in (years or range(2020, 2027)):
         path = ROOT / ec.vendor_year_parquet(year)
         kk = keys[keys["DataDate"].dt.year == year]
         if kk.empty:
@@ -224,6 +225,11 @@ def build_chain_cache(force: bool = False) -> pd.DataFrame:
     F = F.rename(columns={"Symbol": "ticker", "DataDate": "entry_date", "ExpirationDate": "expiry_date"})
     F["entry_date"] = pd.to_datetime(F["entry_date"]).dt.normalize()
     F["expiry_date"] = pd.to_datetime(F["expiry_date"]).dt.normalize()
+    if years and CHAIN_CACHE.exists():
+        old = pd.read_parquet(CHAIN_CACHE); old["entry_date"] = pd.to_datetime(old["entry_date"]).dt.normalize()
+        old = old[~old["entry_date"].dt.year.isin(list(years))]
+        log(f"incremental: keeping {len(old):,} cached rows from other years")
+        F = pd.concat([old[[c for c in F.columns if c in old.columns]], F], ignore_index=True)
     F = F.sort_values(["ticker", "expiry_date", "entry_date"]).reset_index(drop=True)
     for c in ("skew25", "call_oi_band", "put_oi_band", "gex_net", "atm50_iv"):
         F[f"{c}_chg"] = F.groupby(["ticker", "expiry_date"], sort=False)[c].diff()
