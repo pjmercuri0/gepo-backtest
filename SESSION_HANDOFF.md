@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-20 EDT (**§0.58 — preflight hardening repaired; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -95,6 +95,70 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - **Do not delete `data/DG_2025*/` (59.1 GB raw vendor data) yet.** The 2025 euro parquets are built, but a RUT/RUTW `UnderlyingPrice` anomaly is unresolved and may need the original CSVs to diagnose — see §0.17.
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
+
+## 0.58 Preflight hardening was broken on arrival — fixed (2026-09-20, Sunday 00:13 test run)
+
+An out-of-hours IBKR test run (frozen data, `GEPO_MKT_DATA_TYPE=2`,
+`--allow-out-of-hours`) was done to exercise the production-hardening work that
+landed Friday evening in `2c459c0`. That hardening had **never run against a
+real scan** — it was committed 2026-09-19 21:14, after Friday's last session at
+15:45. Three defects were found and fixed; without them the Monday 09:31 scan
+would have produced **zero rankings**.
+
+1. **`config_hash()` was non-deterministic** (`0157fd2`). Two independent causes:
+   - `config.EURO_BAD_SPOT_DAYS` is a `set`, and `provenance._config_value()`
+     fell through to `repr()` for it. Set `repr` order follows string hashes,
+     which Python randomises per process — measured **2 distinct digests in 8
+     runs**, matching the set's 2 elements. `_config_value()` now sorts
+     `set`/`frozenset`.
+   - `DATA_DIR`/`OUTPUT_DIR` were `os.path.join(os.path.dirname(__file__), ...)`
+     with no resolve, so a `sys.path[0]` of `"."` leaked `/./` into the string
+     and changed the digest depending on how the interpreter was invoked. Now
+     built from `os.path.realpath(__file__)`.
+
+   Effect: `preflight/manifest-config-hash` compared the fetcher's digest to the
+   ranker's and failed even though nothing in config had changed.
+
+   The existing `test_config_hash_is_stable` only compared two calls **inside one
+   process**, which is exactly why neither bug was caught. Two cross-process
+   tests were added (`test_config_hash_is_stable_across_processes`,
+   `test_config_hash_ignores_invocation_style`); both were confirmed to fail
+   when their fix is reverted. Suite is 13 passing.
+
+2. **The merged snapshot had no manifest** (`ab38c36`). `pull_now_parallel.sh`
+   concatenates the per-group parquets into the canonical `HHMM.parquet` the
+   ranker consumes, but only `fetcher.py` wrote manifests and it writes them
+   **per group**. With `LIVE_REQUIRE_SNAPSHOT_MANIFEST = True`, every scan would
+   have failed `preflight/snapshot-manifest`. Confirmed by inspection: **no
+   merged snapshot in `live/snapshots/` has ever had a manifest.** The merge step
+   now writes one. Verified end-to-end: all four manifest checks
+   (`snapshot-manifest`, `manifest-row-count`, `manifest-config-hash`,
+   `manifest-snapshot-hash`) PASS through the production merge path.
+
+   Cron's only scan path is `cron_parallel.sh` -> `pull_now_parallel.sh`, so this
+   was the only affected entry point. `pull_now.sh` and `run_cycle.sh` call
+   `live.fetcher` directly, which writes its own manifest.
+
+### What the test run itself showed (not a code defect)
+
+- Only fetcher groups 0-2 returned data (472 rows, 22 tickers, DTE 5, expiry
+  09-25). Groups 3-7 logged **IBKR Error 1100 "Connectivity between IBKR and
+  Trader Workstation has been lost"** followed by Error 322 on every request —
+  the Saturday-night Gateway maintenance window, not a qualification bug. The
+  Gateway was reachable again on port 4001 afterwards.
+- Ranking that partial snapshot gave 4 candidates, **0 qualified, 0 top picks** —
+  expected for Sunday-midnight frozen quotes over ~22 of ~100 names. No Mya
+  upload was done and `live/ranked/latest.json` was restored to the real Friday
+  15:45 payload.
+
+### Known testability gap (open)
+
+`preflight.run()` takes `allow_out_of_hours` as a **CLI flag only** — there is no
+env override, and `pull_now_parallel.sh` does not pass one. So the full cron path
+(`cron_parallel.sh`) **cannot be rehearsed outside 09:30-16:30 ET**; only the
+individual fetcher/ranker modules can, by hand. Deliberately not "fixed" with an
+env escape hatch, since that would let a production guard be disabled silently.
+Any future change to the scan path should be validated against a live session.
 
 ## 0.54 Bull-regime/parity canon promoted (2026-09-16)
 
