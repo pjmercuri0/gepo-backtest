@@ -121,7 +121,9 @@ def drift_pick(pick: dict, row: pd.Series) -> None:
             except (TypeError, ValueError):
                 pick[k] = None
         elif k == "qualified":
-            pick[k] = bool(row.get("qualified", True))
+            # Fail closed, and NaN-safe: bool(nan) is True.
+            _q = row.get("qualified")
+            pick[k] = False if _q is None or _q != _q else bool(_q)
         else:
             pick[k] = _num(row.get(k))
 

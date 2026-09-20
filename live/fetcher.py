@@ -659,7 +659,16 @@ def _row_from_ticker(c: Option, t, spot: float, today: datetime.date) -> dict | 
     expiry_date = datetime.strptime(c.lastTradeDateOrContractMonth, "%Y%m%d").date()
     dte = (expiry_date - today).days
 
-    oi_val = t.callOpenInterest or t.putOpenInterest
+    # IBKR sends open interest on tick 27 (call) or 28 (put) depending on the
+    # contract's right, leaving the OTHER attribute as NaN. `a or b` cannot be
+    # used to pick between them: NaN is TRUTHY in Python, so
+    # `callOpenInterest or putOpenInterest` short-circuits on the call value and
+    # returns NaN for every PUT -- putOpenInterest was never read. Select by
+    # right, and fall back to whichever side is actually populated.
+    oi_val = t.putOpenInterest if c.right == "P" else t.callOpenInterest
+    if pd.isna(oi_val):
+        other = t.callOpenInterest if c.right == "P" else t.putOpenInterest
+        oi_val = other
     oi = int(oi_val) if pd.notna(oi_val) else 0
     # Volume — today's traded contracts. Updates in real time, unlike OI
     # which IBKR doesn't populate intraday. Used for live liquidity gating
