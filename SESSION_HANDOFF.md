@@ -381,12 +381,15 @@ full-universe book is the one that matches production.
 - Weekly Sharpe dropped week 1 (`pct_change().dropna()`); seeded from START_BANKROLL.
 - Captions: `sizing` now states the rule and date.
 
-### Published (qty=2, $20k, entries 2020-08-03..2025-12-24; settlements to 2026-01-02)
+### Published (qty=2, $20k, fill 1.04x, entries 2020-08-03..2025-12-24; settlements to 2026-01-02)
 
 | | trades | final | $-Sharpe | %-Sharpe | max DD | yield |
 |---|---|---|---|---|---|---|
-| Backtest 2020-25 | 4,846 | $125,175 | **1.64** | 1.35 | -32.1% | 14.7% |
-| OOT 2026 (to 09-10) | 662 | $47,360 | **6.45** | 5.45 | -2.7% | 26.6% |
+| Backtest 2020-25 | 4,846 | $96,385 | **1.20** | 1.09 | -34.8% | 9.9% |
+| OOT 2026 (to 09-17) | 682 | $44,162 | **5.68** | 4.87 | -3.3% | 22.2% |
+
+(At the previous 1.08x fill the same books were $125,175 / $-Sh 1.64 and $47,360 / $-Sh 6.45. `ent_canon.FILL_MULT`
+is also what `live/webapp.py` books for History/Actuals marks, so those views moved with it.)
 
 SPY $-Sharpe over the same window: 0.96. 2026 is **not** a clean holdout.
 

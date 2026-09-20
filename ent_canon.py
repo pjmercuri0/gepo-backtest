@@ -31,7 +31,7 @@ THR          = 0.005      # GROUND threshold
 WINDOW       = 252        # sessions of realized moves behind P_real
 MIN_OBS      = 1          # use whatever history the name has (user 2026-09-13); the 0.5 pseudo-count per
                           # state is the only regularisation, so a name with very few sessions scores near the prior
-FILL_MULT    = 1.08       # measured on 19 real fills vs model credit
+FILL_MULT    = 1.04       # user 2026-09-20: "that's what we really fill at" (was 1.08, measured on 19 early fills)
 COMMISSION   = 0.0        # $ per spread per contract. 2026-09-17 (user: "ignore all
                           # commission everywhere"). Was 1.30. Every book and every live
                           # P&L reads this constant, so setting it here zeroes it
