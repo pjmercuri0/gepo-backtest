@@ -221,14 +221,14 @@ def _settle_files(today, ib, ib_close_cache) -> None:
                 width = float(p["net_credit"]) + float(p["max_loss"])
                 credit = float(p["entry_credit"])
                 ml_adj = width - credit
-                pnl = spreads.calc_pnl(spot, ss, ls, credit, ml_adj,
-                                       p["spread_type"]) * 100
+                # settle_pnl carries the canon partial-WIN haircut; keeping a
+                # local copy of it here is what let the other surfaces drift.
+                pnl = spreads.settle_pnl(spot, ss, ls, credit, ml_adj,
+                                         p["spread_type"]) * 100
                 if p["spread_type"] == "bull_put":
                     oc = "WIN" if spot > ss else ("LOSS" if spot <= ls else "PARTIAL")
                 else:
                     oc = "WIN" if spot < ss else ("LOSS" if spot >= ls else "PARTIAL")
-                if oc == "PARTIAL" and pnl > 0:
-                    pnl *= 0.5  # partial-WIN haircut, matches backtest canon
                 p["outcome"] = oc
                 p["pnl"] = round(float(pnl), 2)
                 p["expiry_close"] = round(spot, 2)
@@ -276,13 +276,11 @@ def _settle_live_actuals(today, ib, ib_close_cache) -> None:
         ss, ls = float(p["short_strike"]), float(p["long_strike"])
         width = float(p.get("spread_width") or (float(p["net_credit"]) + float(p["max_loss"])))
         credit = float(p.get("entry_credit") or p["net_credit"])
-        pnl = spreads.calc_pnl(spot, ss, ls, credit, width - credit, p["spread_type"]) * 100
+        pnl = spreads.settle_pnl(spot, ss, ls, credit, width - credit, p["spread_type"]) * 100
         if p["spread_type"] == "bull_put":
             oc = "WIN" if spot > ss else ("LOSS" if spot <= ls else "PARTIAL")
         else:
             oc = "WIN" if spot < ss else ("LOSS" if spot >= ls else "PARTIAL")
-        if oc == "PARTIAL" and pnl > 0:
-            pnl *= 0.5
         p["outcome"] = oc; p["pnl"] = round(float(pnl), 2); p["expiry_close"] = round(spot, 2)
         changed += 1
     if changed:
