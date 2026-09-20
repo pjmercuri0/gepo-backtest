@@ -16,7 +16,23 @@ K_VAL = 10.0
 THR = 0.05
 FILL_FRAC = 0.80
 PNL_COL = 'pnl_80'
-START_BANKROLL = 10_000.0
+START_BANKROLL = 20_000.0
+# Canonical sizing 2026-09-19: every pick risks the same dollars.  Fixed qty=2 on spreads
+# whose max loss spans $50-$640 made the equity curve's variance a function of strike
+# spacing, not of the strategy (audit: same 15.5% yield, 4x the size on wide names).
+RISK_PER_TRADE = 200.0
+MAX_CONTRACTS = getattr(bt_config, 'MAX_CONTRACTS', 50)
+
+
+def risk_qty(max_loss_dollar) -> int:
+    """Contracts so that qty x max_loss ~= RISK_PER_TRADE (floor, min 1, max MAX_CONTRACTS)."""
+    try:
+        mld = float(max_loss_dollar)
+    except (TypeError, ValueError):
+        return 1
+    if not mld > 0:
+        return 1
+    return int(max(1, min(MAX_CONTRACTS, RISK_PER_TRADE // mld)))
 SPY_CSV = 'data/spy_us_d.csv'
 # Short-leg delta, read live from config.py so the params header can never
 # drift from the actual selection param (canon switched to 0.20 on 2026-09-11).
@@ -81,6 +97,8 @@ def simulate_equity(picks, sizing):
                 qty = 1
             else:
                 qty = max(1, min(5, int(frac * float(ws) * START_BANKROLL / ml_dollar)))
+        elif isinstance(sizing, str) and sizing.startswith('risk'):
+            qty = risk_qty(row['max_loss_dollar'])
         else:
             qty = int(sizing)
         pnl = qty * row['pnl_per_contract']
@@ -94,10 +112,14 @@ def simulate_equity(picks, sizing):
 def build_payload(picks, end_year, label):
     spy = pd.read_csv(SPY_CSV, parse_dates=['Date']).sort_values('Date').reset_index(drop=True)
     start_date = picks['entry_date_dt'].min().normalize()
-    spy = spy[(spy['Date'] >= start_date) & (spy['Date'] <= pd.Timestamp(f'{end_year}-12-31'))].reset_index(drop=True)
+    # Run the calendar through the LAST settlement, not the calendar year-end: picks entered
+    # in late December settle in January and were listed in `trades` but never booked
+    # into the curve (12 trades / $1,974 in the 2025 book, audit 2026-09-19).
+    end_date = max(pd.Timestamp(f'{end_year}-12-31'), pd.to_datetime(picks['realize_date']).max().normalize())
+    spy = spy[(spy['Date'] >= start_date) & (spy['Date'] <= end_date)].reset_index(drop=True)
     td = pd.DatetimeIndex(spy['Date'])
 
-    pnl_qty2 = simulate_equity(picks, '2')
+    pnl_qty2 = simulate_equity(picks, 'risk')   # canonical arm: equal $ risk per pick
     pnl_qty1 = simulate_equity(picks, '1')
     pnl_sixt = simulate_equity(picks, 'kelly_0.0625')
     eq_qty2 = START_BANKROLL + pnl_qty2.reindex(td, fill_value=0.0).cumsum()
@@ -115,9 +137,18 @@ def build_payload(picks, end_year, label):
         ret = eq_s.diff().fillna(0) / eq_s.shift(1).fillna(START_BANKROLL)
         sd = ret.std(ddof=0)
         sh = float(ret.mean()*np.sqrt(252)/sd) if sd > 0 else 0.0
-        weekly = eq_s.resample('W-FRI').last().ffill().pct_change().dropna()
+        # Seed the first week from the starting bankroll: pct_change().dropna() silently
+        # discarded week 1 (+10.8% in the 2020-08 book), biasing Sharpe low by ~0.04.
+        _w = eq_s.resample('W-FRI').last().ffill()
+        weekly = (_w / _w.shift(1).fillna(START_BANKROLL) - 1.0)
         wsd = weekly.std(ddof=0)
         wsh = float(weekly.mean()*np.sqrt(52)/wsd) if wsd > 0 else 0.0
+        # Dollar-P&L Sharpe (user 2026-09-19): the trade stream's consistency, independent of
+        # the bankroll denominator.  Under constant $-risk sizing this is THE Sharpe; the
+        # %-of-equity version above converges to it as the bankroll grows.
+        wpnl = eq_s.diff().fillna(0).resample('W-FRI').sum()
+        dsd = wpnl.std(ddof=0)
+        dsh = float(wpnl.mean()*np.sqrt(52)/dsd) if dsd > 0 else 0.0
         final = float(eq_s.iloc[-1])
         cagr = ((final/START_BANKROLL)**(1/n_years) - 1) if final > 0 else -1
         return {
@@ -126,6 +157,7 @@ def build_payload(picks, end_year, label):
             f'{name}_cagr':          round(cagr*100, 2),
             f'{name}_sharpe':        round(sh, 2),
             f'{name}_sharpe_weekly': round(wsh, 2),
+            f'{name}_sharpe_dollar': round(dsh, 2),
             f'{name}_max_dd':        round(max_dd(eq_s)*100, 2),
         }
 
@@ -146,7 +178,7 @@ def build_payload(picks, end_year, label):
         ws = r.get('w_star'); mld = r['max_loss_dollar']
         if ws is None or pd.isna(ws) or ws <= 0 or mld <= 0: return 1
         return max(1, min(5, int(frac*float(ws)*START_BANKROLL/mld)))
-    wag2 = float((ml_col*2).sum()); wag1 = float(ml_col.sum())
+    wag2 = float((ml_col.map(risk_qty)*ml_col).sum()); wag1 = float(ml_col.sum())
     wagk = float((picks.apply(_kelly_qty, axis=1)*ml_col).sum())
     summary['strategy_wagered'] = round(wag2, 2)
     summary['qty1_wagered']     = round(wag1, 2)
@@ -162,7 +194,7 @@ def build_payload(picks, end_year, label):
                'spy':      round(float(spy_eq[i]), 2)} for i, d in enumerate(td)]
 
     sp = picks.sort_values(['entry_date_dt','GROUND'], ascending=[True,False]).copy()
-    sp['_q'] = 2
+    sp['_q'] = sp['max_loss_dollar'].map(risk_qty)
     sp['_pnl'] = sp['_q'] * sp['pnl_per_contract']
     sp['_week'] = sp['entry_date_dt'].dt.to_period('W-FRI')
     running = START_BANKROLL
@@ -228,7 +260,7 @@ def build_payload(picks, end_year, label):
             'fill_basis': f'{FILL_FRAC:.2f}\u00d7mid (real fills ~0.82\u00d7mid, n=5); partial-WIN at 50% intrinsic',
             'regime':     'OFF (both directions eligible)',
             'vol_gate':   'OFF',
-            'sizing':     'qty=2 per pick (canonical 2026-06-05)',
+            'sizing':     f'risk-sized: ${RISK_PER_TRADE:.0f} max loss per pick (floor, min 1, max {MAX_CONTRACTS}); canonical 2026-09-19',
             'starting_bankroll': START_BANKROLL,
         },
         'summary': summary,

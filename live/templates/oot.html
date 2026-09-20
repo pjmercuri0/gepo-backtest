@@ -7,7 +7,7 @@
   {% set c = data.config %}
 
   <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">GEPO 2026 Out-of-Time</h1>
-  <div class="subtitle">2026 evaluation (not a clean holdout; configuration selected with 2026 in view) · D_ent canon · {{ c.delta }} · {{ c.selection }} · {{ c.regime }} · {{ c.parity }} · {{ c.fill_basis }} · qty=2</div>
+  <div class="subtitle">2026 evaluation (not a clean holdout; configuration selected with 2026 in view) · D_ent canon · {{ c.delta }} · {{ c.selection }} · {{ c.regime }} · {{ c.parity }} · {{ c.fill_basis }} · {{ c.sizing }}</div>
 
   <details class="params-fold">
     <summary><span class="chip-k">params</span><span class="chip-v">canon settings</span></summary>
@@ -56,9 +56,9 @@
       <div class="stat-value {{ 'pos' if s.strategy_yield >= 0 else 'neg' }}">{% if s.strategy_yield >= 0 %}+{% endif %}{{ s.strategy_yield }}%</div>
     </div>
     <div class="stat">
-      <div class="stat-label">Sharpe (weekly)</div>
-      <div class="stat-value">{{ '%+.2f'|format(s.strategy_sharpe_weekly) }}</div>
-      <div class="subtitle">daily {{ '%+.2f'|format(s.strategy_sharpe) }}</div>
+      <div class="stat-label">$-P&amp;L Sharpe (weekly)</div>
+      <div class="stat-value">{{ '%+.2f'|format(s.strategy_sharpe_dollar) }}</div>
+      <div class="subtitle">%-of-equity {{ '%+.2f'|format(s.strategy_sharpe_weekly) }} · daily {{ '%+.2f'|format(s.strategy_sharpe) }}</div>
     </div>
     <div class="stat">
       <div class="stat-label">max drawdown</div>
@@ -114,7 +114,7 @@
       data: {
         labels: points.map(p => p.date),
         datasets: [
-          { label: 'qty=2 (canonical)', data: points.map(p => p.strategy), borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.2, pointRadius: 0, fill: true,  tension: 0.05 },
+          { label: 'risk-sized (canonical)', data: points.map(p => p.strategy), borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.2, pointRadius: 0, fill: true,  tension: 0.05 },
           { label: 'qty=1',             data: points.map(p => p.qty1),     borderColor: '#378ADD', borderWidth: 1.6, pointRadius: 0, fill: false, tension: 0.05 },
           { label: '¹⁄₁₆ Kelly (cap=5)',data: points.map(p => p.sixteenk), borderColor: '#EF9F27', borderWidth: 1.6, pointRadius: 0, fill: false, tension: 0.05 },
           { label: 'SPY',               data: points.map(p => p.spy),      borderColor: '#888780', borderWidth: 1.5, pointRadius: 0, fill: false, borderDash: [4, 3], tension: 0.05 },
