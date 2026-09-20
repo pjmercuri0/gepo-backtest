@@ -56,9 +56,9 @@
       <div class="stat-value {{ 'pos' if s.strategy_yield >= 0 else 'neg' }}">{% if s.strategy_yield >= 0 %}+{% endif %}{{ s.strategy_yield }}%</div>
     </div>
     <div class="stat">
-      <div class="stat-label">$-P&amp;L Sharpe (weekly)</div>
+      <div class="stat-label">$-P&amp;L Sharpe</div>
       <div class="stat-value">{{ '%+.2f'|format(s.strategy_sharpe_dollar) }}</div>
-      <div class="subtitle">%-of-equity {{ '%+.2f'|format(s.strategy_sharpe_weekly) }} · daily {{ '%+.2f'|format(s.strategy_sharpe) }}</div>
+      <div class="subtitle">weekly dollar P&amp;L, annualised</div>
     </div>
     <div class="stat">
       <div class="stat-label">max drawdown</div>
@@ -70,17 +70,17 @@
     <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 final</span><span class="chip-v">${{ '{:,.0f}'.format(s.qty1_final) }}</span></span>
     <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 return</span><span class="chip-v {{ 'pos' if s.qty1_total_return >= 0 else 'neg' }}">{% if s.qty1_total_return >= 0 %}+{% endif %}{{ s.qty1_total_return }}%</span></span>
     <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 yield</span><span class="chip-v {{ 'pos' if s.qty1_yield >= 0 else 'neg' }}">{% if s.qty1_yield >= 0 %}+{% endif %}{{ s.qty1_yield }}%</span></span>
-    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 Sharpe (wk)</span><span class="chip-v">{{ '%+.2f'|format(s.qty1_sharpe_weekly) }}</span></span>
+    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.qty1_sharpe_dollar) }}</span></span>
     <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly final</span><span class="chip-v">${{ '{:,.0f}'.format(s.sixteenk_final) }}</span></span>
     <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly return</span><span class="chip-v {{ 'pos' if s.sixteenk_total_return >= 0 else 'neg' }}">{% if s.sixteenk_total_return >= 0 %}+{% endif %}{{ s.sixteenk_total_return }}%</span></span>
     <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly yield</span><span class="chip-v {{ 'pos' if s.sixteenk_yield >= 0 else 'neg' }}">{% if s.sixteenk_yield >= 0 %}+{% endif %}{{ s.sixteenk_yield }}%</span></span>
-    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly Sharpe (wk)</span><span class="chip-v">{{ '%+.2f'|format(s.sixteenk_sharpe_weekly) }}</span></span>
+    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.sixteenk_sharpe_dollar) }}</span></span>
   </div>
   <div class="params-row" style="margin-bottom:22px">
     <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY final</span><span class="chip-v">${{ '{:,.0f}'.format(s.spy_final) }}</span></span>
     <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY return</span><span class="chip-v {{ 'pos' if s.spy_total_return >= 0 else 'neg' }}">{% if s.spy_total_return >= 0 %}+{% endif %}{{ s.spy_total_return }}%</span></span>
     <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY CAGR</span><span class="chip-v {{ 'pos' if s.spy_cagr >= 0 else 'neg' }}">{% if s.spy_cagr >= 0 %}+{% endif %}{{ s.spy_cagr }}%</span></span>
-    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY Sharpe (wk)</span><span class="chip-v">{{ '%+.2f'|format(s.spy_sharpe_weekly) }}</span></span>
+    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.spy_sharpe_dollar) }}</span></span>
     <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY max DD</span><span class="chip-v neg">{{ s.spy_max_dd }}%</span></span>
   </div>
 
