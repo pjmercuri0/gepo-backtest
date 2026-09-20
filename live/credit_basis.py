@@ -23,8 +23,13 @@ vertical; it clamped to width and produced an entry credit of 4.00 (P&L
 """
 from __future__ import annotations
 
+from ent_canon import FILL_MULT as MODEL_FILL_MULT  # noqa: F401  (re-exported below)
+
 FILL_FRAC = 0.80
-MODEL_FILL_MULT = 1.08   # D_ent canon: fill = 1.08 x smile-fit model credit (ent_canon.FILL_MULT)
+# MODEL_FILL_MULT is ent_canon.FILL_MULT, imported rather than copied. It was a
+# hardcoded 1.08 here and did NOT move when the canon went to 1.04 on
+# 2026-09-20, which left History/Actuals marking at a different fill from the
+# books this module exists to keep in agreement.
 
 
 def spread_width(pick: dict) -> float:

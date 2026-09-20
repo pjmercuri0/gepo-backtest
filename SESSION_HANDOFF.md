@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-20 EDT (**§0.58 — preflight hardening repaired; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-20 EDT (**FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -33,9 +33,17 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - The previously pending `report_oot_2026.py` SPY-calendar fallback and `live/freeze_snapshot.py` 15:31 top-up fixes are integrated in `main` and deployed in the Mac mini checkout. Do not redeploy them as pending patches.
 - IBKR API access must remain read-only. Never place trades or enable trading access.
 - The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
-- **CURRENT CANON is §0.57 (2026-09-19 evening)**: full-SP100 frame from `build_frame.py`, width <= 2.5,
+- **CURRENT CANON is §0.57 (2026-09-19 evening), fill basis revised 2026-09-20**: full-SP100 frame from `build_frame.py`, width <= 2.5,
   qty=2 per pick (risk-sizing tested and set aside), dollar-P&L Sharpe as the headline, start 2020-08-01, bankroll $20k. The old 1.52 was
   an accidental 20-delta chain gate (see §0.57). Payload-side only; `live/ranker.py` unchanged.
+- **`ent_canon.FILL_MULT = 1.04` (2026-09-20, user: "that's what we really fill at")**, down from 1.08.
+  Headline moves to **backtest $96,385 / $-Sharpe 1.20 / DD -34.8% / yield 9.9%** and
+  **OOT (to 09-17) 682 tr / $44,162 / $-Sharpe 5.68 / DD -3.3% / yield 22.2%**.
+  This is the BOOKING assumption and is separate from the execution gate, which is unchanged:
+  `MULT_MIN = 1.00` (quote must be >= fair value) with a 1.04-1.10x target.
+  `live/credit_basis.py` now IMPORTS this constant instead of keeping its own copy -- it held a
+  hardcoded 1.08 that did not move with the canon, so History/Actuals marks disagreed with the
+  books for the few hours between the two commits. Every surface reads `ent_canon.FILL_MULT` now.
 - **SUPERSEDED §0.56 (2026-09-19)**: the §0.54 cell PLUS a two-sided regime that is
   symmetric on the 100d SMA (bull puts above, bear calls below, no dead zone) and ex-dividend +
   earnings gates on BOTH sleeves. Backtest/OOT payloads only -- `live/ranker.py` is still bull-only.
