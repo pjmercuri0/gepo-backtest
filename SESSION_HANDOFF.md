@@ -142,7 +142,44 @@ satisfy DTE 0-5. **Action: drop MMC from the `TICKERS` list in
 `live/pull_now_parallel.sh`** -- it burns a fetch slot every scan for nothing.
 Not done yet; it changes the traded universe, so it is the user's call.
 
-**Deeper cause found the same day: `reqSecDefOptParams` HANGS for some symbols.**
+### ROOT CAUSE FOUND AND FIXED (2026-09-20 17:25) — wrong SMART trading class
+
+`reqSecDefOptParams` returns ~41 entries per name, and **more than one of them is
+on SMART**: the standard class (`tradingClass == symbol`) and an ADJUSTED class
+from a corporate action, `"2" + symbol`, which carries a single strike. The code
+took `next(c for c in chains if c.exchange == "SMART")` — the FIRST SMART entry
+in an arbitrarily ordered list. A coin flip:
+
+    GOOGL   SMART  tradingClass=2GOOGL   strikes=  2   <- was picked
+            SMART  tradingClass=GOOGL    strikes=158   <- the real chain
+    AAPL    SMART  tradingClass=AAPL     strikes=130   <- picked, happened to be first
+            SMART  tradingClass=2AAPL    strikes=  1
+
+That is the whole bug. AAPL won the flip, GOOGL lost it. **Every symbol probed
+had a `2<SYM>` twin, so ANY name could lose it on any day** — the universe loss
+was never specific to these six, it just looked that way.
+
+**Fix:** match the trading class explicitly (`tradingClass == symbol`), falling
+back to the richest SMART entry. The MIN_CHAIN_STRIKES/EXPIRIES guard and the
+CHAIN_PARAMS_TIMEOUT bound stay as backstops.
+
+**Verified end-to-end** — all six previously-dead names, one fetch, exit 0:
+
+    GOOGL 23/23 rows   NFLX 16/16   MDT 15/16
+    WMT   14/14        PFE   8/8    MCD  16/16
+    92 option rows over 6 tickers in 29.2s   (was 0 rows in 150s)
+
+Cached chains went from 1-2 strikes to 158 / 263 / 59 / 72 / 45 / 82.
+
+Expect Monday coverage ~93 of 94 (only MMC remains, and it is a dead ticker).
+
+### Superseded diagnosis (kept for the reasoning trail)
+
+**The apparent HANG was an artifact of a stale Gateway session.** Before the
+Sunday relogin the call appeared to hang (AAPL 0.1s, GOOGL/NFLX >45s); after the
+relogin every symbol answered in 0.1-0.4s and simply returned the WRONG entry.
+The timeout bound added for it is still worth keeping, but the hang was not the
+cause.
 Bounded control test, 2026-09-20 15:00 ET, one connection, 45s cap each:
 
     AAPL   OK in 0.1s   130 strikes, 25 expiries
