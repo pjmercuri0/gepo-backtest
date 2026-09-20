@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from live import live_config
-from live.provenance import config_hash, file_sha256, manifest_path, read_manifest
+from live.provenance import manifest_path, read_manifest
 
 
 ET = ZoneInfo("America/New_York")
@@ -173,16 +173,12 @@ def _check_snapshot(path: Path, now: datetime, allow_stale: bool) -> list[Check]
             if manifest is not None:
                 checks.append(Check("manifest-row-count", manifest.get("row_count") == len(df),
                                     f"manifest={manifest.get('row_count')}, actual={len(df)}"))
-                checks.append(Check(
-                    "manifest-config-hash",
-                    manifest.get("config_hash") == config_hash(),
-                    f"manifest={manifest.get('config_hash')}, current={config_hash()}",
-                ))
-                checks.append(Check(
-                    "manifest-snapshot-hash",
-                    manifest.get("snapshot_sha256") == file_sha256(path),
-                    "snapshot hash matches manifest",
-                ))
+                # No hash gating (user, 2026-09-20). config_hash and
+                # snapshot_sha256 are still RECORDED in the manifest for
+                # forensics, but a mismatch no longer blocks a scan: the only
+                # thing it caught was a config edit between fetch and rank, and
+                # it cost a blocked run. Row count is kept -- that one catches a
+                # genuinely truncated merge.
     except Exception as exc:
         checks.append(Check("snapshot-readable", False, str(exc)))
     return checks
