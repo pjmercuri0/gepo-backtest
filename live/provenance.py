@@ -56,6 +56,10 @@ def _config_value(value):
         return value
     if isinstance(value, (list, tuple)):
         return [_config_value(v) for v in value]
+    if isinstance(value, (set, frozenset)):
+        # repr() of a set is ordered by hash, which Python randomises per
+        # process, so hashing it directly makes config_hash() non-deterministic.
+        return sorted((str(_config_value(v)) for v in value))
     if isinstance(value, dict):
         return {str(k): _config_value(v) for k, v in sorted(value.items(), key=lambda x: str(x[0]))}
     return repr(value)
