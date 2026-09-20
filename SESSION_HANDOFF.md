@@ -104,6 +104,43 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.62 Mya's config had silently drifted to pre-0.54 canon (2026-09-20)
+
+Found during the Monday readiness check, by checksumming every file Mya serves
+against the mini rather than assuming the deploys had kept up.
+
+`config.py` and `live/live_config.py` on Mya were **far older than anything in
+0.54-0.57**: `TOP_N = 5`, `REGIME_FILTER = False`, no bear sleeve
+(`BEAR_GROUND_THRESHOLD` / `BEAR_PARITY_MIN_PCT` / `BEAR_TOP_N` all absent),
+`LIVE_MIN_OPEN_INTEREST = 0`. `upload_to_mya.sh` is DATA ONLY, so months of
+canon changes never reached the host; only files someone rsynced by hand did.
+
+Both synced. **Every file Mya serves is now checksum-identical to the mini:**
+`ent_canon.py`, `spreads.py`, `config.py`, `live/credit_basis.py`,
+`live/webapp.py`, `live/live_config.py`, and the five templates.
+
+It did not visibly break the site -- the webapp renders payloads built on the
+mini, and the param chips come from the ranked payload's own `config` block, not
+from Mya's `config.py`. But it is the same drift class as the `MODEL_FILL_MULT
+= 1.08` copy that made History/Actuals disagree with the books earlier the same
+day, and it would have bitten the moment a webapp code path read a canon
+constant directly.
+
+**Add to the deploy routine:** after any canon change, checksum the files Mya
+serves against the mini. A quick form:
+
+```bash
+FILES="ent_canon.py spreads.py config.py live/credit_basis.py live/webapp.py \
+       live/live_config.py live/templates/*.html"
+for f in $FILES; do printf '%s %s\n' "$(md5 -q $f)" "$f"; done > /tmp/l.md5
+ssh "$MYA_SSH_HOST" "cd /opt/vito/gepo-backtest && for f in $FILES; do \
+  printf '%s %s\n' \"\$(md5sum \$f | cut -d' ' -f1)\" \"\$f\"; done" > /tmp/r.md5
+diff /tmp/l.md5 /tmp/r.md5
+```
+
+Remember templates and .py are CODE: rsync + `pm2 restart app-gepo-ticker`.
+`upload_to_mya.sh` will never ship them.
+
 ## 0.61 Snapshots: out-of-hours scans hidden, and the by-time bucketing fixed (2026-09-20)
 
 User: "remove any time stamp summaries that are out of market hours like 00:30
