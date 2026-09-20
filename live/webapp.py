@@ -1179,9 +1179,12 @@ def _actuals_row_pnl(row: dict):
             # Settled: recompute the realized result against the real fill.
             try:
                 aml = float(pick.get("actual_max_loss") or 0)
-                pps = spreads.calc_pnl(float(spot), float(pick["short_strike"]),
-                                       float(pick["long_strike"]), float(actual),
-                                       aml, pick["spread_type"])
+                # Settled against the expiry close -> canon settlement, which
+                # halves a partial WIN. The open-position branch below is a
+                # mark-to-market and must NOT be haircut.
+                pps = spreads.settle_pnl(float(spot), float(pick["short_strike"]),
+                                         float(pick["long_strike"]), float(actual),
+                                         aml, pick["spread_type"])
                 return round(float(pps) * 100, 2), True
             except (KeyError, TypeError, ValueError):
                 pass
@@ -1796,8 +1799,9 @@ def set_actual_credit(date: str, ticker: str):
                 row.pop("actual_pnl_per_contract", None)
             else:
                 actual_ml = spread_w - new_val
-                actual_pps = spreads.calc_pnl(float(spot), ss, ls,
-                                               float(new_val), actual_ml, stype)
+                # Settled against the expiry close -> canon settlement.
+                actual_pps = spreads.settle_pnl(float(spot), ss, ls,
+                                                float(new_val), actual_ml, stype)
                 row["actual_pnl_per_share"] = round(float(actual_pps), 4)
                 row["actual_pnl_per_contract"] = round(float(actual_pps) * 100, 2)
 

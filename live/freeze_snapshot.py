@@ -217,7 +217,8 @@ def _settle_payload_from_daily_closes(payload: dict) -> bool:
         max_loss = round(width - credit, 4)
 
         outcome_code = spreads.calc_outcome(close, short_k, long_k, spread_type)
-        pnl = spreads.calc_pnl(close, short_k, long_k, credit, max_loss, spread_type)
+        # settle_pnl: canon halves a partial WIN (2026-09-20).
+        pnl = spreads.settle_pnl(close, short_k, long_k, credit, max_loss, spread_type)
         pnl_ctr = round(float(pnl) * 100, 2)
         if outcome_code == 1.0:
             label = "WIN"; wins += 1

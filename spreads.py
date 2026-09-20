@@ -443,6 +443,36 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
     }
 
 
+def settle_pnl(spot: float, sp: float, bp: float,
+               net_credit: float, max_loss: float,
+               spread_type: str) -> float:
+    """Canon SETTLEMENT payoff per share = calc_pnl + the partial-WIN haircut.
+
+    The canon books a partial win at HALF its theoretical intrinsic. That lives
+    in research/bear_regime_sweep.py (which writes both published payloads), in
+    ~10 backtest/sweep scripts, and in live/snapshot_picks.py -- but History,
+    Actuals and the 15:45 freeze were paying partial wins IN FULL, so the same
+    trade read richer on those surfaces than in the books it is measured
+    against. One helper so the two cannot drift apart again.
+
+    The haircut is ONE-SIDED in canon: partial losses are untouched.
+
+    Zone predicate is canon's, not calc_outcome's -- calc_outcome returns a
+    FRACTION in the partial zone, never 0, so it cannot be tested for equality.
+
+    Use this only at expiry. An open position's mark-to-market is credit minus
+    the cost to close and must not be haircut.
+    """
+    pnl = calc_pnl(spot, sp, bp, net_credit, max_loss, spread_type)
+    if spread_type == "bull_put":
+        partial = (spot <= sp) and (spot > bp)
+    else:
+        partial = (spot >= sp) and (spot < bp)
+    if partial and pnl > 0:
+        pnl *= 0.5
+    return pnl
+
+
 def calc_outcome(ep: float, sp: float, bp: float,
                  spread_type: str) -> float:
     mp = (sp + bp) / 2.0

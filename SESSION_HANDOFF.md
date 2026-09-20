@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-20 EDT (**§0.60 has an OPEN decision: Snapshots halves PARTIAL wins and nothing else does — $3,825.40 understated**; **FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-20 EDT (**§0.60: History/Actuals/freeze now apply the canon partial-WIN haircut via `spreads.settle_pnl`; 26 rows in `live/frozen/` still overstated by $570.26 and need restating**; **FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -110,54 +110,54 @@ Swept for the bug CLASSES hit earlier in the session instead of waiting for the
 next symptom. Three fixed in `1b2a...`/this session; **one needs a decision and
 is deliberately NOT changed**, because it rewrites recorded P&L.
 
-### OPEN — Snapshots halves PARTIAL wins; nothing else does
+### CORRECTED — the partial-WIN haircut (2026-09-20)
 
-`live/snapshot_picks.py` (two sites, the settle loop at ~line 227 and the
-live-added-actuals loop at ~line 281) does:
+**The original §0.60 claim was WRONG and is withdrawn.** It said Snapshots was
+the only surface halving partial wins. It is not. The canon DOES halve, at
+`research/bear_regime_sweep.py:254` (which writes BOTH published payloads):
 
 ```python
-if oc == "PARTIAL" and pnl > 0:
-    pnl *= 0.5   # comment claims "matches backtest canon"
+pnl[partial & (pnl > 0)] *= 0.5
 ```
 
-**The comment is wrong.** `spreads.calc_pnl()` already returns the EXACT
-piecewise-linear payoff in the partial zone -- `credit - (short_strike - spot)`
--- and its docstring says it was written specifically to REPLACE an
-outcome-scaled formula. Halving it afterwards double-counts.
+plus ~10 backtest/sweep scripts. Verified in the published files: **393 of 393
+backtest and 57 of 57 OOT partial wins are exactly half the intrinsic.** The
+earlier grep only covered the repo root and `live/`, and only looked NEAR the
+`calc_pnl` call -- the haircut is applied on a separate later line, so it was
+missed. Snapshots was correct all along.
 
-Who else halves: **nobody.**
+**The real inconsistency was the opposite way round:** History, Actuals and the
+15:45 freeze called `calc_pnl` directly and paid partial WINS IN FULL, so a
+partial read richer on those surfaces than in the books they are measured
+against.
 
-| surface | file | halves? |
-|---|---|---|
-| Backtest + OOT (~70 scripts) | `backtest*.py`, `report_*.py`, `sweep_*.py` | NO |
-| History | `live/expire_frozen.py:245` | NO |
-| 15:45 freeze | `live/freeze_snapshot.py:220` | NO |
-| Actuals / History marks | `live/webapp.py:1182`, `:1799` | NO |
-| **Snapshots** | **`live/snapshot_picks.py:227, :281`** | **YES** |
+**Fixed** by adding `spreads.settle_pnl()` -- `calc_pnl` plus the canon
+partial-WIN haircut, one-sided (partial LOSSES untouched), using canon's own
+zone predicate rather than `calc_outcome` (which returns a FRACTION in the
+partial zone, never 0, so it cannot be tested for equality). Now used by:
 
-**Measured impact:** 164 PARTIAL wins across 1,982 settled Snapshot rows,
-recorded at $3,825.40 against a true $7,650.80 -- **understated by $3,825.40**.
-The same trade reads differently on Snapshots than on History.
+| surface | file |
+|---|---|
+| History settlement | `live/expire_frozen.py` (both the modelled and actual-credit paths) |
+| 15:45 freeze | `live/freeze_snapshot.py` |
+| Actuals / History marks | `live/webapp.py` (settled paths only) |
+| Snapshots | `live/snapshot_picks.py` (its local `*= 0.5` removed) |
 
-**SUGGESTED FIX — drop the haircut, do not spread it.** Delete both
-`pnl *= 0.5` lines so Snapshots matches `calc_pnl` like every other surface.
-Rationale: the backtest and OOT books that the published Sharpe/yield numbers
-come from do NOT halve, so halving in Snapshots makes the one tab meant to test
-"does GROUND select good picks at any time of day" disagree with the very books
-it is supposed to validate against. Keeping the haircut would instead require
-adding it to ~70 backtest scripts plus History, the freeze and the webapp, which
-would move every published number in §0.57.
+There is now ONE implementation of the haircut in `live/`. Keeping a local copy
+in `snapshot_picks` is exactly what let the others drift.
 
-**Note it is a RESTATEMENT, not a recompute:** the stored `pnl` on those 164 rows
-is exactly half the true value, so the existing files can be corrected in place
-by doubling `pnl` where `outcome == "PARTIAL" and pnl > 0`, with no re-fetch.
-Do it as an explicit one-off migration over `live/intraday_picks/*.json`, then
-re-upload -- the webapp renders those files, it does not recompute them.
+**Open-position marks are deliberately NOT haircut** -- an open MTM is credit
+minus the cost to close, not a settlement.
 
-If the haircut was in fact a deliberate execution-realism assumption (a partial
-means the short is ITM at expiry, so assignment may stop you realising the
-theoretical value) then say so in the code and apply it to the BACKTEST too,
-because that is where the edge estimate comes from.
+`tests/test_settlement_parity.py` pins `settle_pnl` to a transcription of the
+canon vectorised `realize()` across the whole payoff curve for both sleeves.
+
+**RESTATEMENT NOT DONE:** 26 PARTIAL wins across 239 settled rows in
+`live/frozen/*.json` are still recorded at the FULL value -- History/Actuals are
+**overstated by $570.26**. The code fix only affects future settlements. To
+correct the history, halve `pnl_per_contract` / `actual_pnl_per_contract` (and
+the per-share fields) where `result == "PARTIAL"` and the value is positive,
+then re-upload -- the webapp renders those files, it does not recompute them.
 
 ### Fixed in this pass
 

@@ -242,8 +242,10 @@ def main() -> int:
                     continue
 
                 outcome_code  = spreads.calc_outcome(close, short_k, long_k, spread_typ)
-                pnl_per_share = spreads.calc_pnl(close, short_k, long_k,
-                                                  credit, max_loss, spread_typ)
+                # settle_pnl, not calc_pnl: canon halves a partial WIN and
+                # History was paying it in full (2026-09-20).
+                pnl_per_share = spreads.settle_pnl(close, short_k, long_k,
+                                                   credit, max_loss, spread_typ)
                 pnl_per_ctr   = round(pnl_per_share * 100, 2)
 
                 if outcome_code == 1.0:
@@ -269,8 +271,8 @@ def main() -> int:
                 if actual_c is not None:
                     actual_c = float(actual_c)
                     actual_ml = round(spread_w - actual_c, 4)
-                    actual_pps = spreads.calc_pnl(close, short_k, long_k,
-                                                   actual_c, actual_ml, spread_typ)
+                    actual_pps = spreads.settle_pnl(close, short_k, long_k,
+                                                    actual_c, actual_ml, spread_typ)
                     actual_pnl_ctr = round(float(actual_pps) * 100, 2)
                     pick_res["actual_pnl_per_share"]   = round(float(actual_pps), 4)
                     pick_res["actual_pnl_per_contract"] = actual_pnl_ctr
