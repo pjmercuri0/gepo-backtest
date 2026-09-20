@@ -136,7 +136,14 @@ merged = merged.drop_duplicates(
     keep="last",
 )
 merged.to_parquet("$FINAL_OUT", index=False)
-print(f"  ✓ merged {len(existing)} files → {len(merged)} unique rows")
+# The ranker's preflight requires a manifest on the file it ranks
+# (LIVE_REQUIRE_SNAPSHOT_MANIFEST). fetcher.py only writes one per group, so
+# the merged snapshot needs its own or every scan fails the gate.
+sys.path.insert(0, "$ROOT")
+from live.provenance import snapshot_manifest, write_manifest
+final = Path("$FINAL_OUT")
+write_manifest(snapshot_manifest(merged, final, source="IBKR"), final)
+print(f"  ✓ merged {len(existing)} files → {len(merged)} unique rows (+ manifest)")
 for p in existing:
     p.unlink()
 PYEOF
