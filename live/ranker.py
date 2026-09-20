@@ -585,13 +585,15 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
     # below-threshold) lives in `ticker_rows` for the table below.
     qualified_only = ranked[ranked.get("qualified", False) == True] if not ranked.empty else ranked
     top = qualified_only.head(live_config.TOP_N_DISPLAY)
-    # Guard the empty case like qualified_only above. An empty `ranked` has NO
-    # columns, so ranked["GROUND"] raises KeyError — which crashed _serialize on
-    # exactly the path that prints "nothing ranked; writing empty payload
-    # anyway", so latest.json was never written and the live page froze on the
-    # last good scan. Latent until 2026-09-11, when the 0.20 delta canon started
-    # producing zero-candidate scans routinely.
-    ticker_rows = ranked[ranked["GROUND"] > 0] if not ranked.empty else ranked
+    # Every ranked candidate goes in the table, negative GROUND included (user,
+    # 2026-09-20). This used to filter to GROUND > 0, which hid negative-edge
+    # rows and made the payload's n_candidates disagree with the rendered row
+    # count. The table still dims anything below threshold or outside the top N.
+    # No GROUND lookup here any more, which also retires the empty-frame
+    # KeyError: an empty `ranked` has NO columns, so ranked["GROUND"] raised and
+    # crashed _serialize on exactly the "nothing ranked" path, leaving
+    # latest.json unwritten and the live page frozen on the last good scan.
+    ticker_rows = ranked
 
     def row_to_dict(r):
         # JSON-safe rendering of one ranked spread.
