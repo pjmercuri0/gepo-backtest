@@ -84,11 +84,23 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="featATM8.parquet")
     ap.add_argument("--min-oi", type=int, default=cfg.MIN_OPEN_INTEREST)
+    ap.add_argument("--years", type=int, nargs="+", default=None,
+                    help="Rebuild only these years and merge into the existing --out (incremental append).")
     a = ap.parse_args()
     pool = set(cfg.SP100_TICKERS)
-    print(f"universe: {len(pool)} SP100 tickers; OpenInterest >= {a.min_oi}")
-    parts = [build_year(y, pool, a.min_oi) for y in range(2020, 2027)]
+    years = a.years or list(range(2020, 2027))
+    print(f"universe: {len(pool)} SP100 tickers; OpenInterest >= {a.min_oi}; years {years}")
+    parts = [build_year(y, pool, a.min_oi) for y in years]
     C = pd.concat([p for p in parts if len(p)], ignore_index=True)
+    out = ROOT / "research/dkl_2026_09_13" / a.out
+    if a.years and out.exists():
+        # incremental: keep every other year from the existing frame untouched
+        old = pd.read_parquet(out)
+        old["entry_date"] = pd.to_datetime(old.entry_date)
+        keep = old[~old.entry_date.dt.year.isin(years)]
+        print(f"incremental: keeping {len(keep):,} rows from other years, replacing {len(old)-len(keep):,}")
+    else:
+        keep = None
 
     cl = pd.read_parquet(ROOT / "output/daily_closes.parquet")
     cl["date"] = pd.to_datetime(cl.date).dt.normalize()
@@ -106,7 +118,8 @@ def main() -> None:
     for c in ("p","q","ro","D"):
         C[c] = np.nan
     C["EV"] = 0.0          # recomputed downstream by bear_regime_sweep.prepare()
-    out = ROOT / "research/dkl_2026_09_13" / a.out
+    if keep is not None:
+        C = pd.concat([keep, C[keep.columns.intersection(C.columns)] if set(keep.columns)==set(C.columns) else C], ignore_index=True)
     C.to_parquet(out)
     print(f"\nwrote {out}: {len(C):,} rows, {C.entry_date.min().date()}..{C.entry_date.max().date()}, "
           f"{C.ticker.nunique()} tickers ({n_unsettled:,} dropped for unsettled expiry)")

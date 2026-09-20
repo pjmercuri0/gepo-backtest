@@ -365,6 +365,18 @@ full-universe book is the one that matches production.
 
 SPY $-Sharpe over the same window: 0.96. 2026 is **not** a clean holdout.
 
+### Sept 18 expiries appended (2026-09-20)
+
+`append_oot_vendor_data.py` added 09-17/09-18 to `2026_sp500_last_oot_combined.parquet` (backup
+`.bak_before_append_20260920_121536`); closes +194 rows; `build_frame.py --years 2026` and
+`build_chain_cache(years=[2026])` are the new INCREMENTAL paths (~1 min total, not 10). OOT is now
+682 trades through 09-17: the 20 Sept-14..16 entries made +$1,002. $-Sharpe 6.58.
+
+**`data/spy_us_d.csv` was extended 09-14..09-18 from the vendor SPY closes with Open/High/Low =
+Close and Volume = 0** because the proper refresher (`live/refresh_spy_history.py`) needs IBKR,
+which lives on the mini. Only Close feeds the regime/SMA and the SPY equity line. Run the
+refresher on the mini to replace those 5 placeholder rows with real OHLCV.
+
 ### Still open
 
 - **Survivorship (audit #1):** `SP100_TICKERS` is a static present-day list applied backwards.
