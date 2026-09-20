@@ -41,6 +41,9 @@ FETCH_PER_TICKER_TIMEOUT = 150    # Wall-clock budget for a fetcher group. All t
                                   # group run concurrently under one shared deadline, so this
                                   # bounds the group, not each ticker. Production groups take
                                   # 48-95s (2026-08-31 logs); 25 killed every ticker.
+CHAIN_PARAMS_TIMEOUT     = 20     # Seconds to wait for reqSecDefOptParams. Most names
+                                  # answer in ~0.1s; GOOGL/NFLX hang indefinitely, and
+                                  # unbounded one of them eats the group's 150s budget.
 MIN_CHAIN_STRIKES        = 6      # Sanity bounds on a reqSecDefOptParams response.
 MIN_CHAIN_EXPIRIES       = 4      # IBKR intermittently returns a 1-strike/1-expiry
                                   # stub; caching it silently killed GOOGL, MCD, MDT,

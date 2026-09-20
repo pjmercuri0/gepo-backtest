@@ -142,6 +142,35 @@ satisfy DTE 0-5. **Action: drop MMC from the `TICKERS` list in
 `live/pull_now_parallel.sh`** -- it burns a fetch slot every scan for nothing.
 Not done yet; it changes the traded universe, so it is the user's call.
 
+**Deeper cause found the same day: `reqSecDefOptParams` HANGS for some symbols.**
+Bounded control test, 2026-09-20 15:00 ET, one connection, 45s cap each:
+
+    AAPL   OK in 0.1s   130 strikes, 25 expiries
+    GOOGL  TIMED OUT after 45s
+    NFLX   TIMED OUT after 45s
+
+So it is not pacing (AAPL is instant) -- the call never returns for these
+symbols. The 1-strike cache was the SYMPTOM: a partial response arriving before
+the fetcher gave up, then persisted. The no-cache fix alone would therefore have
+made things WORSE, refetching and hanging on every scan instead of reading a
+fast (wrong) cache. So the call is now bounded by
+`live_config.CHAIN_PARAMS_TIMEOUT` (20s) and the symbol is skipped on timeout.
+Measured on GOOGL+NFLX+AAPL together: **150s and 0 rows before, 32.4s and AAPL's
+17 rows after.**
+
+**STILL OPEN:** GOOGL, NFLX (and probably MCD/MDT/PFE/WMT) still produce nothing,
+because the underlying IBKR call genuinely does not answer for them. Note Friday
+DID get a partial response for GOOGL, so the behaviour may differ during market
+hours -- check the first Monday scan before doing more.
+
+**Proposed real fix (NOT implemented -- changes the strike-discovery path, user's
+call):** bypass `reqSecDefOptParams` for these names. Their option contracts
+qualify fine on SMART -- GOOGL 335/340/345/350 P for 20260925 all returned conIds
+in a direct `qualifyContracts` probe -- so the strike grid can be derived
+arithmetically around spot and confirmed with `qualifyContracts`, which is fast
+and reliable. Strike increments measured 2026-09-20: GOOGL $2.50, NFLX/MDT/WMT
+$1.00, PFE $0.50.
+
 **Verified:** the guard rejects each real poisoned payload, accepts every good
 one, and a planted stub logs "cached chain looks truncated - refetching".
 **Not verified:** that the refetch then succeeds. `reqSecDefOptParams` is too slow
