@@ -118,10 +118,15 @@ function fmtMultiplier(g, dec=4) {
 // Rendered as +X.XX%.
 function fmtKellyEV(g, dec=2) {
   if (g == null) return "—";
-  const ev = rd((Math.exp(Number(g)) - 1) * 100, dec);
-  const sign = ev >= 0 ? "+" : "";
-  const cls  = ev >= 0 ? "pos" : "neg";
-  return `<span class="${cls}">${sign}${ev.toFixed(dec)}%</span>`;
+  const raw = (Math.exp(Number(g)) - 1) * 100;
+  const ev  = rd(raw, dec);
+  // Sign AND colour must come from the raw value. rd() returns -0 for a small
+  // negative and -0 >= 0 is true in JS, so a negative-EV spread rendered as
+  // "+0.00%" in the green "pos" class -- CL did exactly that on 2026-09-20.
+  const neg  = raw < 0;
+  const sign = neg ? "-" : "+";
+  const cls  = neg ? "neg" : "pos";
+  return `<span class="${cls}">${sign}${Math.abs(ev).toFixed(dec)}%</span>`;
 }
 // Entropic risk multiplier denom = exp(k·D_ent). D_ent canon 2026-09-13: D(Q_bs‖U₃) = ln3 − H(Q_bs), k=1.
 // Kept parametric so a k-sweep can be visualised.
@@ -349,7 +354,7 @@ async function refreshSpyLive() {
     const d = await r.json();
     const chgCls = (d.change_pct >= 0) ? "pos" : "neg";
     const regCls = (d.live_regime === "bull") ? "dir-bull" : "dir-bear";
-    const sign = (n) => n > 0 ? "+" : "";
+    const sign = (n) => Number(n) < 0 ? "-" : "+";   // -0 must not read as "+"
     // Collapsed-by-default summary line; click to expand the full SPY card.
     const collapsed = localStorage.getItem("spy-card-expanded") !== "1";
     const arrow = collapsed ? "▸" : "▾";
