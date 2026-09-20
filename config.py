@@ -89,6 +89,8 @@ DTE_MAX = 8    # maximum days to expiry
 # at runtime in spreads.py to both short and long legs (canonical=100,
 # bumped from 10 on 2026-05-12 to suppress stale-mid artifacts that
 # the actual-b ranker over-rewards).
+# Backtest/OOT gate on open interest; LIVE does not (live_config.LIVE_USE_OPEN_INTEREST).
+USE_OPEN_INTEREST_LIQUIDITY = True
 MIN_OPEN_INTEREST = 100
 
 # Credit basis for candidate net_credit (selection pricing).

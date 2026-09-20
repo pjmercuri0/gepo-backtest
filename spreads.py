@@ -148,13 +148,21 @@ def is_liquid_row(row: pd.Series) -> bool:
     based on current-day volume and displayed BBO size.  Missing fields never
     pass the fallback.
     """
-    min_oi = int(getattr(config, "MIN_OPEN_INTEREST", 0))
-    try:
-        oi = float(row.get("OpenInterest", float("nan")))
-    except (TypeError, ValueError):
-        oi = float("nan")
-    if np.isfinite(oi) and oi >= min_oi:
-        return True
+    # LIVE turns this off (2026-09-20, user: "i dont want >100 OI for live
+    # production, thats only for backtest and oot"). IBKR reports OpenInterest
+    # as 0 on 100% of live rows -- measured on Friday 09-18 market-hours
+    # snapshots as well as frozen ones -- so an OI floor can only ever reject.
+    # NB: lowering MIN_OPEN_INTEREST to 0 instead would be wrong: `oi >= 0` is
+    # true for every row, which returns True here and bypasses the volume/BBO
+    # test entirely, disabling the whole gate.
+    if getattr(config, "USE_OPEN_INTEREST_LIQUIDITY", True):
+        min_oi = int(getattr(config, "MIN_OPEN_INTEREST", 0))
+        try:
+            oi = float(row.get("OpenInterest", float("nan")))
+        except (TypeError, ValueError):
+            oi = float("nan")
+        if np.isfinite(oi) and oi >= min_oi:
+            return True
 
     if not getattr(config, "ALLOW_VOLUME_LIQUIDITY_FALLBACK", False):
         return False

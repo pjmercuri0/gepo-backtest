@@ -203,6 +203,9 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
 
     # Configure the live liquidity policy before any candidate construction.
     # This also covers snapshots that omit the OI column entirely.
+    backtest_config.USE_OPEN_INTEREST_LIQUIDITY = getattr(
+        live_config, "LIVE_USE_OPEN_INTEREST", True
+    )
     backtest_config.MIN_OPEN_INTEREST = live_config.LIVE_MIN_OPEN_INTEREST
     backtest_config.ALLOW_VOLUME_LIQUIDITY_FALLBACK = getattr(
         live_config, "LIVE_ALLOW_VOLUME_FALLBACK", False
@@ -246,6 +249,9 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     spreads.SLIPPAGE_CENTS    = 0.0
 
     # Override the liquidity gate inside spreads.build_candidates for live mode.
+    backtest_config.USE_OPEN_INTEREST_LIQUIDITY = getattr(
+        live_config, "LIVE_USE_OPEN_INTEREST", True
+    )
     backtest_config.MIN_OPEN_INTEREST = live_config.LIVE_MIN_OPEN_INTEREST
 
     # Live scores on mid, not clamped LAST: intraday LAST prints are
