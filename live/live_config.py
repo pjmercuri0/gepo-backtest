@@ -142,21 +142,34 @@ def live_dte_window(day=None):
 # missing is unsafe.  Require the canonical OI floor when it is present; when
 # IBKR reports OI as missing/zero, require both legs to have enough current-day
 # volume and at least one contract at every BBO side.
-LIVE_USE_OPEN_INTEREST       = True
-LIVE_MIN_OPEN_INTEREST       = 1      # 2026-09-20 (user): "the gate should be OI>=1". The 100
-                                      # floor is a BACKTEST/OOT gate (config.MIN_OPEN_INTEREST),
-                                      # not a live one.
-                                      # CAVEAT: this currently changes nothing. IBKR returns open
-                                      # interest as NaN for every option leg -- with and without
-                                      # generic tick 101 -- and fetcher.py stores NaN as 0, so
-                                      # `OI >= 1` is False on every row and the volume/BBO
-                                      # fallback below is what actually gates. OpenInterest == 0
-                                      # in a snapshot therefore means UNKNOWN, not "no open
-                                      # contracts". Re-check during market hours: if OI ever
-                                      # populates, this gate turns permissive at once.
+# --- Live liquidity policy (2026-09-20, user: "i just dont want to gate any
+# tickers for having 0 OI. i want to see all possible sp100") ---
+#
+# OI is OFF for live. IBKR returns open interest as NaN for every option leg --
+# verified through reqTickers AND reqMktData generic tick 101 -- and fetcher.py
+# stores NaN as 0, so `OpenInterest == 0` in a live snapshot means UNKNOWN, not
+# "no open contracts". Proof it is not real: on the 09-20 17:28 snapshot, 350
+# legs reported OI = 0 while trading >=500 contracts that day (NVDA 222.5C:
+# 57,954 traded, OI "0"), 1.3M contracts total. An OI term can therefore only
+# ever exclude names for a value we never received.
+#
+# NB: setting LIVE_MIN_OPEN_INTEREST = 0 is NOT the way to express this. `oi >= 0`
+# is true for every row, so is_liquid_row() returns True immediately and the
+# volume/BBO test never runs -- that silently disables the WHOLE gate. Turning
+# the term off is explicit; the remaining terms still apply.
+LIVE_USE_OPEN_INTEREST       = False
+LIVE_MIN_OPEN_INTEREST       = 100    # unused while the term is off; kept so the
+                                      # backtest-parity value is still visible here
 LIVE_ALLOW_VOLUME_FALLBACK   = True
-LIVE_MIN_VOLUME              = 100
-LIVE_MIN_BBO_SIZE            = 1
+LIVE_MIN_VOLUME              = 0      # was 100. Volume is CUMULATIVE through the
+                                      # session, so a 100 floor gated hardest at the
+                                      # open -- Friday 09:30 passed 56/960 rows (5.8%)
+                                      # vs 364/1001 (36.4%) by noon. It also excluded
+                                      # deep-book names purely for being quiet: CL
+                                      # (202x443 resting, volume 1), SO (1132x1111,
+                                      # volume 15), PG (617x326, volume 19).
+LIVE_MIN_BBO_SIZE            = 1      # the real floor now: a contract must have a
+                                      # TWO-SIDED market with size on both sides.
 
 # --- Live missing-feature policy ---
 # Missing regime, realized-close history, parity, or own-gap data suppresses
