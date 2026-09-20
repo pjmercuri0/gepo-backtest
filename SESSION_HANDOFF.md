@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-20 EDT (**§0.60: History/Actuals/freeze now apply the canon partial-WIN haircut via `spreads.settle_pnl`; 26 rows in `live/frozen/` still overstated by $570.26 and need restating**; **FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-20 EDT (**§0.60: History/Actuals/freeze now apply the canon partial-WIN haircut via `spreads.settle_pnl`; History restated, -$570.39**; **FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -152,12 +152,19 @@ minus the cost to close, not a settlement.
 `tests/test_settlement_parity.py` pins `settle_pnl` to a transcription of the
 canon vectorised `realize()` across the whole payoff curve for both sleeves.
 
-**RESTATEMENT NOT DONE:** 26 PARTIAL wins across 239 settled rows in
-`live/frozen/*.json` are still recorded at the FULL value -- History/Actuals are
-**overstated by $570.26**. The code fix only affects future settlements. To
-correct the history, halve `pnl_per_contract` / `actual_pnl_per_contract` (and
-the per-share fields) where `result == "PARTIAL"` and the value is positive,
-then re-upload -- the webapp renders those files, it does not recompute them.
+**RESTATEMENT DONE (2026-09-20).** 27 values across 21 files in
+`live/frozen/*.json` were recorded at the FULL partial value and have been
+halved; `outcome.total_pnl_per_contract` was ADJUSTED BY THE AMOUNT REMOVED
+rather than recomputed from scratch, so the pre-existing 2026-06-15 discrepancy
+(stored 96.80 vs sum -187.20) is preserved rather than silently rewritten.
+**History P&L fell by $570.39.** Backup of the originals was taken before the
+edit. Verified: all 27 equal exactly half their prior value, and deployed --
+`spreads.py` + `live/webapp.py` rsynced, frozen data uploaded, pm2 restarted,
+2026-09-17 JNJ confirmed on Mya at 40.30 (was 80.60).
+
+`live/actuals.json` needed no restatement: it stores no P&L at all
+(`actual_credit` + the pick only), so Actuals is computed at render time and
+corrected itself the moment `webapp.py` shipped.
 
 ### Fixed in this pass
 
