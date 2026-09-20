@@ -104,6 +104,50 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.59 Truncated option chains were silently costing 6 names every session (2026-09-20)
+
+**Symptom:** GOOGL, PFE, WMT, MCD, MDT, NFLX and MMC appear in ZERO of Friday
+2026-09-18's 26 scans. Not intermittent -- structural, every scan, all day.
+
+**Root cause (fixed, `live/fetcher.py`):** `reqSecDefOptParams` intermittently
+returns a stub -- one strike, one expiry -- instead of the real chain.
+`_qualify_options_for` wrote that stub to `live/cache/<date>/chain_<SYM>.json`
+with no validation, and every later scan that day read it back. The strike band
+then never intersected a listed strike, so the name reported "no qualified
+options" with a perfectly good spot price. Cached chains read:
+
+| | strikes | expiries |
+|---|---|---|
+| GOOGL | 2 | 2 |
+| NFLX / WMT / MDT / PFE / MCD | 1 | 1 |
+| AAPL | 130 | 25 |
+| CAT | 216 | 19 |
+
+WMT and MDT had cached a single MONTHLY expiry (`20261016`), outside the DTE 0-5
+window entirely, so they failed before a quote was ever requested.
+
+**Fix:** a chain must clear `MIN_CHAIN_STRIKES` / `MIN_CHAIN_EXPIRIES` (6 / 4,
+`live/live_config.py`) to be cached, and a cached chain failing the same check is
+discarded and refetched. Across 780 cached chains those bounds separate the 8
+broken responses from all 742 good ones with no overlap. A stub is still used for
+the pass that fetched it -- it just never poisons the cache. Cache dirs are
+per-day, so Monday starts clean regardless.
+
+**MMC is a separate, permanent problem.** It no longer resolves at IBKR on any
+exchange (Error 200). IBKR's symbol search maps it to **MRSH** (conId 9705, NYSE,
+"MARSH & MCLENNAN COS") -- a ticker change after the assistant's knowledge
+cutoff, so the corporate action itself is unverified. Either way MRSH is useless
+here: its option chain is **monthlies only** (nearest 2026-10-16), so it can never
+satisfy DTE 0-5. **Action: drop MMC from the `TICKERS` list in
+`live/pull_now_parallel.sh`** -- it burns a fetch slot every scan for nothing.
+Not done yet; it changes the traded universe, so it is the user's call.
+
+**Verified:** the guard rejects each real poisoned payload, accepts every good
+one, and a planted stub logs "cached chain looks truncated - refetching".
+**Not verified:** that the refetch then succeeds. `reqSecDefOptParams` is too slow
+off-hours to confirm, so **watch the first Monday scan** -- expect GOOGL, MCD,
+MDT, NFLX, PFE and WMT to start appearing, taking coverage from ~87 to ~93 of 94.
+
 ## 0.58 Preflight hardening was broken on arrival — fixed (2026-09-20, Sunday 00:13 test run)
 
 An out-of-hours IBKR test run (frozen data, `GEPO_MKT_DATA_TYPE=2`,
