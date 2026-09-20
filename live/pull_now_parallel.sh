@@ -136,9 +136,10 @@ merged = merged.drop_duplicates(
     keep="last",
 )
 merged.to_parquet("$FINAL_OUT", index=False)
-# The ranker's preflight requires a manifest on the file it ranks
-# (LIVE_REQUIRE_SNAPSHOT_MANIFEST). fetcher.py only writes one per group, so
-# the merged snapshot needs its own or every scan fails the gate.
+# Manifest for the merged snapshot. Nothing gates on it any more (2026-09-20),
+# but fetcher.py only writes one per GROUP, and the merged file is the one the
+# ranker actually reads -- so without this the snapshot you'd want to inspect
+# after a bad scan is the one with no provenance at all.
 sys.path.insert(0, "$ROOT")
 from live.provenance import snapshot_manifest, write_manifest
 final = Path("$FINAL_OUT")
