@@ -42,6 +42,45 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(provenance.config_hash(), provenance.config_hash())
         self.assertTrue(provenance.config_hash())
 
+    def test_config_hash_is_stable_across_processes(self):
+        """Same-process equality is not enough: PYTHONHASHSEED is randomised per
+        process, so a set-valued config constant used to produce a different
+        hash in the ranker than in the fetcher and fail the manifest check."""
+        import subprocess
+        import sys
+
+        root = Path(__file__).resolve().parents[1]
+        snippet = (
+            "import sys; sys.path.insert(0, %r)\n"
+            "from live.provenance import config_hash; print(config_hash())" % str(root)
+        )
+        hashes = set()
+        for _ in range(4):
+            out = subprocess.run([sys.executable, "-c", snippet], capture_output=True,
+                                 text=True, cwd=str(root), timeout=120)
+            self.assertEqual(out.returncode, 0, out.stderr[-500:])
+            hashes.add(out.stdout.strip().splitlines()[-1])
+        self.assertEqual(len(hashes), 1, f"config_hash() varies across processes: {hashes}")
+
+    def test_config_hash_ignores_invocation_style(self):
+        """DATA_DIR/OUTPUT_DIR are derived from __file__; an unresolved path made
+        the hash depend on whether sys.path[0] was relative or absolute."""
+        import subprocess
+        import sys
+
+        root = Path(__file__).resolve().parents[1]
+        hashes = set()
+        for entry in (".", str(root)):
+            snippet = (
+                "import sys; sys.path.insert(0, %r)\n"
+                "from live.provenance import config_hash; print(config_hash())" % entry
+            )
+            out = subprocess.run([sys.executable, "-c", snippet], capture_output=True,
+                                 text=True, cwd=str(root), timeout=120)
+            self.assertEqual(out.returncode, 0, out.stderr[-500:])
+            hashes.add(out.stdout.strip().splitlines()[-1])
+        self.assertEqual(len(hashes), 1, f"config_hash() depends on sys.path form: {hashes}")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,10 +5,11 @@ import os
 
 # ── DATA ─────────────────────────────────────────────────────────────────────
 # Folder containing the CSV files from Discount Option Data
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+_ROOT = os.path.dirname(os.path.realpath(__file__))
+DATA_DIR = os.path.join(_ROOT, "data")
 
 # Output folder for results
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
+OUTPUT_DIR = os.path.join(_ROOT, "output")
 
 # ── DATE RANGE ───────────────────────────────────────────────────────────────
 # Canonical extended-sample range. Per-variant scripts (regen_all, run_qtyx,
