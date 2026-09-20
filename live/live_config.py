@@ -41,6 +41,12 @@ FETCH_PER_TICKER_TIMEOUT = 150    # Wall-clock budget for a fetcher group. All t
                                   # group run concurrently under one shared deadline, so this
                                   # bounds the group, not each ticker. Production groups take
                                   # 48-95s (2026-08-31 logs); 25 killed every ticker.
+MIN_CHAIN_STRIKES        = 6      # Sanity bounds on a reqSecDefOptParams response.
+MIN_CHAIN_EXPIRIES       = 4      # IBKR intermittently returns a 1-strike/1-expiry
+                                  # stub; caching it silently killed GOOGL, MCD, MDT,
+                                  # NFLX, PFE and WMT for a whole session (2026-09-18).
+                                  # Across 780 cached chains these bounds separate the
+                                  # 8 broken responses from all 742 good ones.
 FETCH_RETRY_ON_NO_GREEKS = True   # one retry if Greeks come back None
 # Gateway can delay its initial account/execution sync when several clients
 # connect together. Retry the connection itself before dropping a whole group.

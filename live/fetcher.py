@@ -132,6 +132,18 @@ def _payload_to_contract(d: dict) -> Option:
 
 # ── Date helpers ────────────────────────────────────────────────────────────
 
+def _chain_looks_complete(strikes, expirations) -> bool:
+    """Guard against a truncated reqSecDefOptParams response.
+
+    A real SP100 chain carries dozens of strikes across many expiries; the
+    smallest legitimate one observed across 780 cached chains was well clear of
+    these bounds, while the broken responses were uniformly 1-2 of each. See
+    MIN_CHAIN_STRIKES / MIN_CHAIN_EXPIRIES in live_config.
+    """
+    return (len(strikes or []) >= live_config.MIN_CHAIN_STRIKES
+            and len(expirations or []) >= live_config.MIN_CHAIN_EXPIRIES)
+
+
 def _weekly_expiries_in_dte_window(
     today: datetime.date,
     dte_min=None,
@@ -319,10 +331,16 @@ async def _qualify_options_for(
     idx_spec = _index_spec(symbol)
     chain_path = _cache_path("chain", symbol)
     chain_payload = _read_json(chain_path)
-    if chain_payload:
+    if chain_payload and _chain_looks_complete(chain_payload.get("strikes"),
+                                               chain_payload.get("expirations")):
         available_exps = set(chain_payload.get("expirations") or [])
         all_strikes = chain_payload.get("strikes") or []
     else:
+        if chain_payload:
+            print(f"  [{symbol}] cached chain looks truncated "
+                  f"({len(chain_payload.get('strikes') or [])} strikes, "
+                  f"{len(chain_payload.get('expirations') or [])} expiries) — refetching",
+                  flush=True)
         try:
             chains = await ib.reqSecDefOptParamsAsync(stock.symbol, "", stock.secType, stock.conId)
         except Exception as e:
@@ -345,11 +363,20 @@ async def _qualify_options_for(
             return []
         available_exps = set(smart.expirations)
         all_strikes = sorted(float(s) for s in smart.strikes)
-        _write_json(chain_path, {
-            "symbol": symbol,
-            "expirations": sorted(available_exps),
-            "strikes": all_strikes,
-        })
+        # Only persist a chain that looks whole. reqSecDefOptParams intermittently
+        # returns a stub (one strike, one expiry) and the old code cached it, so
+        # every later scan that day read the stub and the name produced nothing.
+        # On 2026-09-18 that silently cost GOOGL, MCD, MDT, NFLX, PFE and WMT for
+        # all 26 scans. A stub is used for this pass but never written.
+        if _chain_looks_complete(all_strikes, available_exps):
+            _write_json(chain_path, {
+                "symbol": symbol,
+                "expirations": sorted(available_exps),
+                "strikes": all_strikes,
+            })
+        else:
+            print(f"  [{symbol}] chain came back truncated ({len(all_strikes)} strikes, "
+                  f"{len(available_exps)} expiries) — not caching", flush=True)
 
     target_exps = [e for e in expiry_strs if e in available_exps]
     if not target_exps:
