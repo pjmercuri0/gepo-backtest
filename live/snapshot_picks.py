@@ -113,8 +113,12 @@ def _expiry_close(ticker: str, expiry: str):
             d = d[(d["ticker"] == ticker) & (pd.to_datetime(d["date"]).dt.strftime("%Y-%m-%d") == expiry)]
             if not d.empty:
                 return float(d["close"].iloc[0])
-    except Exception:
-        pass
+    except Exception as exc:
+        # Do not fall through silently. The docstring above is explicit that live
+        # P&L must not lean on the Yahoo bars, so a failure to read the IBKR
+        # store has to be visible rather than quietly downgrading the source.
+        print(f"[snapshot_picks] IBKR close lookup failed for {ticker} {expiry}: "
+              f"{type(exc).__name__}: {exc} — falling back to Yahoo bars", flush=True)
     fp = BARS_DIR / f"{ticker}.csv"
     if not fp.exists():
         return None

@@ -740,7 +740,11 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             "parity_bull_signed": _num(r.get("parity_bull_signed")),
             "parity_pct":       _num(r.get("parity_pct")),
             "parity_pairs":     _num(r.get("parity_pairs")),
-            "qualified":        bool(r.get("qualified", True)),
+            # Fail CLOSED. Default was True, so a row missing the key -- or
+            # carrying NaN, which is truthy in Python -- was published as a
+            # QUALIFIED pick. ent_canon always sets a real bool today, so this
+            # is latent, but it is a trading gate: it must not fail open.
+            "qualified":        _flag(r.get("qualified")),
             "above_min":        (None if r.get("above_min") is None else bool(r.get("above_min"))),
         }
 
