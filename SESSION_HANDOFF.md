@@ -104,6 +104,41 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.61 Snapshots: out-of-hours scans hidden, and the by-time bucketing fixed (2026-09-20)
+
+User: "remove any time stamp summaries that are out of market hours like 00:30
+16:00 16:30 and 20:00".
+
+**Two things, and the second was the bigger one.**
+
+1. `live/webapp.py` now drops scans outside `09:30 <= t < 16:00` when reading
+   `live/intraday_picks/`, so they leave BOTH the day cards and the by-time
+   aggregate. Four scans go: `2026-09-03 1600`, `2026-09-15 2011`,
+   `2026-09-16 1630`, `2026-09-17 0019` (14 picks of 1,982). **Nothing is
+   deleted from disk** -- the files keep every scan; the page just stops showing
+   ad-hoc and after-hours runs, which are not comparable with a normal scan
+   (frozen quotes, no volume, partial universe).
+
+2. **`_round_hhmm` was bucketing wrongly.** It rounded to the NEAREST HALF hour,
+   with a docstring describing a `:01/:31` cron that no longer exists -- cron
+   fires **four times an hour** (`0,15,30,45 9-15`). So it merged the `:15` and
+   `:45` slots into their neighbours, and rounding UP pushed **15:45, 15:46 and
+   15:55 into a phantom "16:00" bucket**: an aggregate row for a time no
+   in-hours scan ever runs at. That is where the user's "16:00" came from, and
+   13 legitimate in-hours scans were sitting in it -- filtering on the ROUNDED
+   label would have deleted them. It now FLOORS to a quarter hour, which
+   recovers the slot that actually fired (the timestamp drifts later: 10:04 ->
+   10:00, 14:33 -> 14:30, 15:46 -> 15:45).
+
+**Aggregate buckets before:** 0030 0930 1000 1030 1100 1130 1200 1230 1300 1330
+1400 1430 1500 1530 1600 1630 2000
+**After:** 0930 0945 1000 1015 ... 1530 1545 — the real cron slots, no
+out-of-hours rows.
+
+Filtering is on the RAW time, never the bucket. Verified on the live page:
+zero occurrences of 00:30 / 16:00 / 16:30 / 20:00; 09:45 and 15:45 present.
+Deployed (webapp.py is code: rsync + `pm2 restart app-gepo-ticker`).
+
 ## 0.60 Proactive bug audit (2026-09-20) — one OPEN decision on partial wins
 
 Swept for the bug CLASSES hit earlier in the session instead of waiting for the
