@@ -3,12 +3,18 @@
 
 {% block content %}
 <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">Intraday Snapshot Picks</h1>
-<div class="subtitle">Every :01/:31 scan's threshold-qualified top-N, settled at expiry
-(entry 0.80&times;mid, partial-WIN at 50% intrinsic — same P&amp;L model as the backtest).
+<div class="subtitle">Every scan's threshold-qualified top-N, settled at expiry
+(partial-WIN at 50% intrinsic — same P&amp;L model as the backtest). Scans are bucketed to
+their cron slot (:00/:15/:30/:45); out-of-hours runs are not shown.
 Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or only near the close?</div>
 
-<div class="section-label">Performance by scan time of day (settled picks only)</div>
-<div class="week-card">
+<div class="section-label" id="agg-toggle" style="cursor:pointer;user-select:none"
+     title="click to collapse / expand">
+  <span id="agg-arrow">&#9662;</span>
+  Performance by scan time of day (settled picks only)
+  <span style="color:#888780;font-weight:400">&middot; {{ agg|length }} scan times</span>
+</div>
+<div class="week-card" id="agg-card">
   <div class="table-scroll">
   <table>
     <thead><tr>
@@ -115,5 +121,29 @@ nothing captured yet</div></div>
     </div>
   </div>
 {% endif %}
+
+<script>
+// Collapse/expand the by-time aggregate, same pattern as the SPY card on the
+// live tab: persisted per browser, defaults to EXPANDED so nothing that was
+// previously visible disappears on first load.
+(function () {
+  var card = document.getElementById("agg-card");
+  var tog  = document.getElementById("agg-toggle");
+  var arr  = document.getElementById("agg-arrow");
+  if (!card || !tog || !arr) return;
+  function apply(open) {
+    card.style.display = open ? "" : "none";
+    arr.innerHTML = open ? "&#9662;" : "&#9656;";   // down / right
+  }
+  var stored = null;
+  try { stored = localStorage.getItem("snap-agg-expanded"); } catch (e) {}
+  apply(stored !== "0");
+  tog.addEventListener("click", function () {
+    var open = card.style.display === "none";
+    apply(open);
+    try { localStorage.setItem("snap-agg-expanded", open ? "1" : "0"); } catch (e) {}
+  });
+})();
+</script>
 
 {% endblock %}
