@@ -139,6 +139,31 @@ would have produced **zero rankings**.
    was the only affected entry point. `pull_now.sh` and `run_cycle.sh` call
    `live.fetcher` directly, which writes its own manifest.
 
+### SUPERSEDED SAME DAY: all manifest gating removed (user, 2026-09-20)
+
+The user then removed the gates outright -- "I don't want any hash restrictions
+let's remove that shit", then "remove the manifest requirement too":
+
+- `2d5c833` deletes the `manifest-config-hash` and `manifest-snapshot-hash`
+  preflight checks.
+- `295de60` sets `LIVE_REQUIRE_SNAPSHOT_MANIFEST = False`, which also retires
+  `manifest-row-count` (same block).
+
+**Manifests are still WRITTEN** for every snapshot, per-group and merged -- row
+and ticker counts, per-column coverage, liquidity fractions, git sha,
+`config_hash`, `snapshot_sha256`. They are forensics now, not a gate. Keep
+writing them; they are what lets you answer "was that snapshot thin?" after a
+bad scan.
+
+Verified: a snapshot with its manifest deleted outright ranks cleanly. What
+still gates a rank: gateway up, disk space, snapshot file present/readable,
+schema, dated today, age < 30 min, rows > 0, market session.
+
+The three fixes above are NOT reverted and still matter -- `config_hash` is
+recorded in every manifest, so a randomised digest would have made the recorded
+value useless for forensics, and the merged snapshot should carry a manifest
+even though nothing checks for it.
+
 ### What the test run itself showed (not a code defect)
 
 - Only fetcher groups 0-2 returned data (472 rows, 22 tickers, DTE 5, expiry
