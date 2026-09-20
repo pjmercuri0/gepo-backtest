@@ -370,7 +370,18 @@ async def _qualify_options_for(
                 smart = next((c for c in chains
                               if c.tradingClass == idx_spec["trading_class"]), None)
         else:
-            smart = next((c for c in chains if c.exchange == "SMART"), None)
+            # reqSecDefOptParams returns ~41 entries per name and MORE THAN ONE
+            # is on SMART: the standard class (tradingClass == symbol) and an
+            # adjusted class from a corporate action, "2" + symbol, which carries
+            # a single strike. The list order is arbitrary, so taking the first
+            # SMART entry was a coin flip -- AAPL happened to win it and return
+            # 130 strikes while GOOGL lost it and returned 2 ("2GOOGL"), which is
+            # why those names produced nothing for entire sessions. Match the
+            # trading class explicitly, and fall back to the richest SMART entry.
+            smart_entries = [c for c in chains if c.exchange == "SMART"]
+            smart = next((c for c in smart_entries if c.tradingClass == symbol), None)
+            if smart is None and smart_entries:
+                smart = max(smart_entries, key=lambda c: len(c.strikes or ()))
         if smart is None:
             return []
         available_exps = set(smart.expirations)
