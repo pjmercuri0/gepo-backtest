@@ -148,7 +148,9 @@ LIVE_REQUIRE_PARITY                  = True
 LIVE_MIN_PARITY_PAIRS                = 1
 LIVE_REQUIRE_IBKR_CLOSES             = True
 LIVE_REQUIRE_OWN_GAP                 = True
-LIVE_REQUIRE_SNAPSHOT_MANIFEST       = True
+LIVE_REQUIRE_SNAPSHOT_MANIFEST       = False  # 2026-09-20 (user): no manifest gating.
+# Manifests are still WRITTEN for every snapshot (row/ticker counts, column coverage,
+# liquidity fractions, git sha) -- they are forensics only and no longer block a scan.
 
 # --- Live credit basis (2026-06-10) ---
 # Backtest canon scores on BBO-clamped LAST (EOD vendor data, synchronous).
