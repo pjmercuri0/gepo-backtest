@@ -19,7 +19,7 @@ Read-only IBKR, client id 111 (110 is the batch combo fetch, 100-109 fetchers).
 Idempotent: exits if another copy holds the lock.
 """
 from __future__ import annotations
-import json, os, sys, time
+import json, os, shlex, subprocess, sys, time
 from datetime import datetime
 from pathlib import Path
 
@@ -122,9 +122,19 @@ def _publish(last_at: float) -> float:
         return last_at
     base = os.environ.get("MYA_REMOTE_BASE", "/opt/vito/gepo-backtest/live")
     sock = "/tmp/gepo_combo_stream_%r@%h:%p"
-    ssh = ("ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "
-           f"-o ControlMaster=auto -o ControlPath={sock} -o ControlPersist=300")
-    os.system(f"rsync -az --timeout=5 -e '{ssh}' {OUT} {host}:{base}/ranked/ >/dev/null 2>&1 &")
+    ssh = [
+        "ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
+        "-o", "ControlMaster=auto", "-o", f"ControlPath={sock}",
+        "-o", "ControlPersist=300",
+    ]
+    rsync_ssh = " ".join(shlex.quote(arg) for arg in ssh)
+    destination = f"{host}:{base}/ranked/"
+    subprocess.Popen(
+        ["rsync", "-az", "--timeout=5", "-e", rsync_ssh, str(OUT), destination],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
     return time.monotonic()
 
 

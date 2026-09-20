@@ -34,6 +34,8 @@ import spreads
 import ground
 from live import live_config
 from live.regime import current_regime
+from live.preflight import PreflightError, run as run_preflight
+from live.provenance import config_hash, git_sha, ranked_provenance
 
 
 # ── D_ent canon (2026-09-13) ─────────────────────────────────────────────────
@@ -150,15 +152,28 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     """Run the full backtest-canonical ranking pipeline on a live snapshot."""
     if df.empty:
         return pd.DataFrame()
-    df_full = df.copy()   # the smile fit wants every liquid strike, before the OI gate
+    df_full = df.copy()   # parity/smile inputs are retained before candidate construction
 
-    # Liquidity gate. Live uses live_config.LIVE_MIN_OPEN_INTEREST (default 0,
-    # since IBKR returns NaN for OI mid-session and the assembler defaults to 0).
-    # Backtest path doesn't run this ranker so its MIN_OPEN_INTEREST=100 is fine.
+    # Configure the live liquidity policy before any candidate construction.
+    # This also covers snapshots that omit the OI column entirely.
+    backtest_config.MIN_OPEN_INTEREST = live_config.LIVE_MIN_OPEN_INTEREST
+    backtest_config.ALLOW_VOLUME_LIQUIDITY_FALLBACK = getattr(
+        live_config, "LIVE_ALLOW_VOLUME_FALLBACK", False
+    )
+    backtest_config.MIN_LIQUIDITY_VOLUME = getattr(live_config, "LIVE_MIN_VOLUME", 0)
+    backtest_config.MIN_LIQUIDITY_BBO_SIZE = getattr(live_config, "LIVE_MIN_BBO_SIZE", 1)
+
+    # Liquidity gate. OI is preferred; live mode may use the explicit
+    # volume/BBO fallback when intraday OI is unavailable. Apply the same
+    # predicate here and again during spread construction so neither stage can
+    # accidentally bypass the policy.
     if "OpenInterest" in df.columns:
         before = len(df)
-        df = df[df["OpenInterest"] >= live_config.LIVE_MIN_OPEN_INTEREST]
-        print(f"  OI gate {live_config.LIVE_MIN_OPEN_INTEREST}: kept {len(df)}/{before} rows",
+        df = df[df.apply(spreads.is_liquid_row, axis=1)]
+        print(f"  liquidity gate (OI>={live_config.LIVE_MIN_OPEN_INTEREST} or "
+              f"volume>={getattr(live_config, 'LIVE_MIN_VOLUME', 0)} + "
+              f"BBO>={getattr(live_config, 'LIVE_MIN_BBO_SIZE', 1)}): "
+              f"kept {len(df)}/{before} rows",
               flush=True)
     if df.empty:
         return pd.DataFrame()
@@ -172,7 +187,10 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     spreads.REGIME_PER_TICKER = False
     spreads.REGIME_BULL_ONLY  = getattr(backtest_config, "REGIME_BULL_ONLY", False)
     spreads.REGIME_LAG_SESSIONS = getattr(backtest_config, "REGIME_LAG_SESSIONS", 0)
-    spreads.REGIME_FAIL_CLOSED = getattr(backtest_config, "REGIME_FAIL_CLOSED", False)
+    spreads.REGIME_FAIL_CLOSED = (
+        getattr(backtest_config, "REGIME_FAIL_CLOSED", False)
+        or getattr(live_config, "LIVE_FAIL_CLOSED_ON_MISSING_FEATURES", False)
+    )
     spreads.REGIME_MAX_STALE_CALENDAR_DAYS = getattr(
         backtest_config, "REGIME_MAX_STALE_CALENDAR_DAYS", None
     )
@@ -180,9 +198,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     spreads.LOW_VIX_BULLPUT_FILTER = False
     spreads.SLIPPAGE_CENTS    = 0.0
 
-    # Override the OI gate inside spreads.build_candidates for live mode.
-    # IBKR returns NaN for OI mid-session, so the canonical 100 floor would
-    # drop every spread. live_config.LIVE_MIN_OPEN_INTEREST defaults to 0.
+    # Override the liquidity gate inside spreads.build_candidates for live mode.
     backtest_config.MIN_OPEN_INTEREST = live_config.LIVE_MIN_OPEN_INTEREST
 
     # Live scores on mid, not clamped LAST: intraday LAST prints are
@@ -371,6 +387,11 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if cs["rows"] == 0:
         print("  WARNING: output/ibkr_closes.parquet is EMPTY -- P_real is running on snapshot prints only. "
               "Seed it: python3 -m live.fetch_ibkr_closes --years 2", flush=True)
+        if getattr(live_config, "LIVE_FAIL_CLOSED_ON_MISSING_FEATURES", False) and getattr(
+            live_config, "LIVE_REQUIRE_IBKR_CLOSES", False
+        ):
+            print("  FAIL CLOSED: no IBKR close history; no live candidates will be qualified", flush=True)
+            return pd.DataFrame()
     else:
         print(f"  closes: IBKR store {cs['sessions']} sessions, {cs['tickers']} tickers, {cs['first']} -> {cs['last']}", flush=True)
     sel_credit = "net_credit" if getattr(live_config, "LIVE_SELECTION_CREDIT", "quoted") == "quoted" else "model_credit"
@@ -398,6 +419,13 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
             print(f"  own gaps {_today.date()}: {_names}/{_all} candidate names have today's gap"
                   f"{'' if _names == _all else ' (the rest score with zero drift)'}; beta {entc.gap_fit(_today.year)[2]:.4f}; "
                   f"drift range {np.min(gap_mu) * 100:+.3f}%..{np.max(gap_mu) * 100:+.3f}% of price", flush=True)
+    # Preserve feature coverage so missing own-gap data cannot be converted to
+    # a neutral zero drift and silently qualify a trade.
+    if entc.GAP_GAMMA and getattr(live_config, "LIVE_REQUIRE_OWN_GAP", False):
+        priced["own_gap_available"] = priced["ticker"].isin(set(_gt.ticker)) if _gt is not None and not _gt.empty else False
+    else:
+        priced["own_gap_available"] = True
+
     scored = entc.score(priced, closes, k=ground.DKL_K, thr=backtest_config.GROUND_THRESHOLD, credit_col=sel_credit, mu=gap_mu)
     scored["quoted_credit"] = scored["net_credit"]
     scored["spread_width"] = scored["width"]
@@ -437,7 +465,11 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     _r2 = lambda x: np.floor(x * 100 + 0.5) / 100
     ranked["above_min"] = _r2(ranked["net_credit"].astype(float)) >= ranked["tgt_walkaway_credit"].astype(float)
     parity_ok = (ranked["parity_pct"] > getattr(backtest_config, "PARITY_MIN_PCT", 0.12))
-    ranked["qualified"] = (ranked["GROUND"] >= thr) & parity_ok & ranked["above_min"]
+    if getattr(live_config, "LIVE_REQUIRE_PARITY", False):
+        parity_ok &= ranked["parity_bull_raw"].notna()
+        parity_ok &= ranked["parity_pairs"].fillna(0) >= getattr(live_config, "LIVE_MIN_PARITY_PAIRS", 1)
+    feature_ok = ranked["own_gap_available"].astype(bool)
+    ranked["qualified"] = (ranked["GROUND"] >= thr) & parity_ok & ranked["above_min"] & feature_ok
     n_below = int(((ranked["GROUND"] >= thr) & ~ranked["above_min"]).sum())
     if n_below:
         print(f"  execution gate: {n_below} candidate(s) above GROUND {thr} but quoted BELOW fair value (1.00x model) — not qualified", flush=True)
@@ -502,7 +534,7 @@ def _vol_gate_status(snap_time: datetime) -> dict:
     return out
 
 
-def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
+def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | None = None) -> dict:
     """Build the JSON payload consumed by the webapp."""
     snap_time = datetime.now()
     dte_min, dte_max = live_config.live_dte_window(snap_time.date())
@@ -617,6 +649,9 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
         "snapshot_ts":   snap_time.isoformat(timespec="seconds"),
         "snapshot_file": str(snapshot_path.relative_to(ROOT)),
         "data_date":     snap_time.date().isoformat(),
+        "git_sha":       git_sha(),
+        "config_hash":   config_hash(),
+        "provenance":    provenance or ranked_provenance(snapshot_path, len(ranked), int(ranked.get("qualified", pd.Series(dtype=bool)).sum()) if not ranked.empty else 0),
         "n_candidates":  int(len(ranked)),
         "config": {
             "DTE_MIN":          dte_min,
@@ -632,6 +667,17 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path) -> dict:
                 else backtest_config.MAX_CREDIT_RATIO
             ),
             "MIN_OPEN_INTEREST": backtest_config.MIN_OPEN_INTEREST,
+            "LIQUIDITY_VOLUME_FALLBACK": getattr(
+                live_config, "LIVE_ALLOW_VOLUME_FALLBACK", False
+            ),
+            "MIN_LIQUIDITY_VOLUME": getattr(live_config, "LIVE_MIN_VOLUME", 0),
+            "MIN_LIQUIDITY_BBO_SIZE": getattr(live_config, "LIVE_MIN_BBO_SIZE", 1),
+            "FAIL_CLOSED_ON_MISSING_FEATURES": getattr(
+                live_config, "LIVE_FAIL_CLOSED_ON_MISSING_FEATURES", False
+            ),
+            "REQUIRE_PARITY": getattr(live_config, "LIVE_REQUIRE_PARITY", False),
+            "REQUIRE_IBKR_CLOSES": getattr(live_config, "LIVE_REQUIRE_IBKR_CLOSES", False),
+            "REQUIRE_OWN_GAP": getattr(live_config, "LIVE_REQUIRE_OWN_GAP", False),
             "CREDIT_BASIS":     getattr(backtest_config, "CREDIT_BASIS", "last_clamped"),
             "CREDIT_SCALE":     getattr(backtest_config, "CREDIT_SCALE", 1.0),
             "MAX_MAX_LOSS":     backtest_config.MAX_MAX_LOSS,
@@ -714,6 +760,10 @@ def _atomic_write_json(path: Path, payload: dict) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--snapshot", default=None, help="Specific snapshot parquet to rank")
+    parser.add_argument("--allow-out-of-hours", action="store_true",
+                        help="Explicitly bypass the production market-hours check")
+    parser.add_argument("--allow-stale-snapshot", action="store_true",
+                        help="Explicitly allow a snapshot older than 30 minutes")
     args = parser.parse_args()
 
     if args.snapshot:
@@ -725,6 +775,16 @@ def main() -> int:
             return 1
         snap_path = latest
 
+    try:
+        run_preflight(
+            "rank", snap_path,
+            allow_out_of_hours=args.allow_out_of_hours,
+            allow_stale_snapshot=args.allow_stale_snapshot,
+        )
+    except PreflightError as exc:
+        print(exc, flush=True)
+        return 1
+
     print(f"ranking snapshot: {snap_path}", flush=True)
     df = pd.read_parquet(snap_path)
     print(f"  {len(df)} option rows loaded", flush=True)
@@ -735,7 +795,12 @@ def main() -> int:
     if ranked.empty:
         print("nothing ranked; writing empty payload anyway", flush=True)
 
-    payload = _serialize(ranked, snap_path)
+    qualified_count = int(ranked["qualified"].sum()) if not ranked.empty and "qualified" in ranked else 0
+    payload = _serialize(
+        ranked,
+        snap_path,
+        provenance=ranked_provenance(snap_path, len(ranked), qualified_count),
+    )
 
     latest_path = Path(live_config.RANKED_DIR) / "latest.json"
     archive_path = Path(live_config.RANKED_DIR) / f"{snap_path.parent.name}_{snap_path.stem}.json"

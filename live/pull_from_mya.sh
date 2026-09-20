@@ -19,13 +19,14 @@ cd "$ROOT"
 
 : "${MYA_SSH_HOST:?MYA_SSH_HOST not set — see live/upload_to_mya.sh header}"
 : "${MYA_REMOTE_BASE:=/opt/vito/gepo-backtest/live}"
-SSH_OPTS=""
+SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
 if [ -n "${MYA_SSH_KEY:-}" ]; then
-  SSH_OPTS="-i $MYA_SSH_KEY"
+  printf -v _escaped_key '%q' "$MYA_SSH_KEY"
+  SSH_COMMAND+=" -i ${_escaped_key}"
 fi
 
 # -a archive, -z compress, -u update-only-if-newer, --partial flaky-safe
-RSYNC="rsync -azu --partial --timeout=20 -e 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new $SSH_OPTS'"
+RSYNC=(rsync -azu --partial --timeout=20 -e "$SSH_COMMAND")
 
 PULL_DIRS=(
   "live/frozen/"
@@ -34,7 +35,7 @@ PULL_DIRS=(
 for sub in "${PULL_DIRS[@]}"; do
   src="$MYA_SSH_HOST:$MYA_REMOTE_BASE/${sub#live/}"
   mkdir -p "$sub"
-  if eval "$RSYNC \"$src\" \"$sub\""; then
+  if "${RSYNC[@]}" "$src" "$sub"; then
     echo "  ✓ pulled $sub"
   else
     echo "  ✗ rsync failed for $sub"

@@ -140,6 +140,39 @@ def build_candidates(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(candidates)
 
 
+def is_liquid_row(row: pd.Series) -> bool:
+    """Return whether one option leg passes the active liquidity policy.
+
+    Historical inputs use the OI floor.  Live IBKR snapshots may report zero
+    OI intraday, so live mode can explicitly opt into a conservative fallback
+    based on current-day volume and displayed BBO size.  Missing fields never
+    pass the fallback.
+    """
+    min_oi = int(getattr(config, "MIN_OPEN_INTEREST", 0))
+    try:
+        oi = float(row.get("OpenInterest", float("nan")))
+    except (TypeError, ValueError):
+        oi = float("nan")
+    if np.isfinite(oi) and oi >= min_oi:
+        return True
+
+    if not getattr(config, "ALLOW_VOLUME_LIQUIDITY_FALLBACK", False):
+        return False
+    try:
+        volume = float(row.get("Volume", float("nan")))
+        bid_size = float(row.get("BidSize", float("nan")))
+        ask_size = float(row.get("AskSize", float("nan")))
+        return (
+            np.isfinite(volume)
+            and np.isfinite(bid_size)
+            and np.isfinite(ask_size)
+            and volume >= float(getattr(config, "MIN_LIQUIDITY_VOLUME", 0))
+            and min(bid_size, ask_size) >= float(getattr(config, "MIN_LIQUIDITY_BBO_SIZE", 1))
+        )
+    except (TypeError, ValueError):
+        return False
+
+
 def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
                   expiry_date, spread_type: str) -> dict:
     if opts.empty:
@@ -265,11 +298,7 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
     long_row = long_rows.iloc[0]
 
     # Liquidity gate at candidate-construction time, applied to both legs.
-    # Preprocess already filtered short-leg OI but kept neighboring strikes
-    # regardless; this re-checks both legs against the current config so
-    # bumping MIN_OPEN_INTEREST doesn't require a parquet rebuild.
-    min_oi = getattr(config, "MIN_OPEN_INTEREST", 0)
-    if short_row["OpenInterest"] < min_oi or long_row["OpenInterest"] < min_oi:
+    if not is_liquid_row(short_row) or not is_liquid_row(long_row):
         return None
 
     # Selection uses LAST-based pricing (canonical 2026-05-30, clamped 2026-05-30).
