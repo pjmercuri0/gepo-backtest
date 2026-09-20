@@ -380,6 +380,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         priced["parity_bull_raw"] = np.nan
         priced["parity_pairs"] = 0
     priced = entc.add_parity_percentile(priced)
+    priced = entc.add_bear_parity_percentile(priced)   # mirrored percentile for bear calls (0.57)
     print(f"  parity: {priced['parity_bull_raw'].notna().sum()}/{len(priced)} candidates "
           f"have matched-strike IV pairs; veto <= {backtest_config.PARITY_MIN_PCT:.0%}", flush=True)
     closes = load_closes()
@@ -451,8 +452,15 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     if len(ranked) < before:
         print(f"  per-ticker dedupe: {before} -> {len(ranked)} rows", flush=True)
 
-    # D_ent canon: bull regime only, GROUND/parity/execution gates, top-10/day.
+    # 0.57 canon (2026-09-19): two-sided.  Each sleeve has its OWN threshold, parity rule
+    # and daily cap, matching research/report_bear_regime.py exactly:
+    #   bull puts : GROUND >= GROUND_THRESHOLD (0.005), parity_pct > PARITY_MIN_PCT (0.12), top TOP_N (10)
+    #   bear calls: GROUND >= BEAR_GROUND_THRESHOLD (0.001), bear_parity_pct > BEAR_PARITY_MIN_PCT (0.25), top BEAR_TOP_N (5)
+    # The regime gate in spreads.py means only one side is present on any day.
     thr = backtest_config.GROUND_THRESHOLD
+    bear_thr = getattr(backtest_config, "BEAR_GROUND_THRESHOLD", thr)
+    is_bear = ranked["spread_type"].eq("bear_call").to_numpy() if not ranked.empty else np.zeros(0, dtype=bool)
+    thr_side = np.where(is_bear, bear_thr, thr)
     # Execution gate (user 2026-09-13, revised same day): the IBKR credit on the table (combo mid,
     # or combo last on a too-wide book, else leg mids) must sit at or above the WALK-AWAY line,
     # 1.00 x model (ent_canon.MULT_WALKAWAY) -- fair value. Below fair the spread is sold for less
@@ -464,24 +472,38 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # screen and failed underneath. A tie at 2dp qualifies.
     _r2 = lambda x: np.floor(x * 100 + 0.5) / 100
     ranked["above_min"] = _r2(ranked["net_credit"].astype(float)) >= ranked["tgt_walkaway_credit"].astype(float)
-    parity_ok = (ranked["parity_pct"] > getattr(backtest_config, "PARITY_MIN_PCT", 0.12))
+    bull_parity_ok = (ranked["parity_pct"] > getattr(backtest_config, "PARITY_MIN_PCT", 0.12))
+    bear_parity_ok = (ranked["bear_parity_pct"] > getattr(backtest_config, "BEAR_PARITY_MIN_PCT", 0.25))
+    parity_ok = pd.Series(np.where(is_bear, bear_parity_ok, bull_parity_ok), index=ranked.index, dtype=bool)
     if getattr(live_config, "LIVE_REQUIRE_PARITY", False):
         parity_ok &= ranked["parity_bull_raw"].notna()
         parity_ok &= ranked["parity_pairs"].fillna(0) >= getattr(live_config, "LIVE_MIN_PARITY_PAIRS", 1)
     feature_ok = ranked["own_gap_available"].astype(bool)
-    ranked["qualified"] = (ranked["GROUND"] >= thr) & parity_ok & ranked["above_min"] & feature_ok
-    n_below = int(((ranked["GROUND"] >= thr) & ~ranked["above_min"]).sum())
+    above_thr = ranked["GROUND"] >= thr_side
+    ranked["qualified"] = above_thr & parity_ok & ranked["above_min"] & feature_ok
+    # Per-side daily cap, applied to the QUALIFIED set in GROUND order so every downstream
+    # consumer (latest.json, freeze_snapshot top-up, snapshot_picks) inherits it.
+    if not ranked.empty:
+        cap_side = np.where(is_bear, getattr(backtest_config, "BEAR_TOP_N", 5), backtest_config.TOP_N)
+        order = ranked.sort_values("GROUND", ascending=False)
+        pos = order[order["qualified"]].groupby("spread_type").cumcount()
+        over = pos.index[pos.values >= cap_side[pos.index]]
+        ranked.loc[over, "qualified"] = False
+    n_below = int((above_thr & ~ranked["above_min"]).sum())
     if n_below:
         print(f"  execution gate: {n_below} candidate(s) above GROUND {thr} but quoted BELOW fair value (1.00x model) — not qualified", flush=True)
-    n_parity = int(((ranked["GROUND"] >= thr) & ~parity_ok).sum())
+    n_parity = int((above_thr & ~parity_ok).sum())
     if n_parity:
-        print(f"  parity veto: dropped {n_parity} candidate(s) at or below the "
-              f"{backtest_config.PARITY_MIN_PCT:.0%} daily percentile", flush=True)
+        print(f"  parity veto: dropped {n_parity} candidate(s) (bull <= {backtest_config.PARITY_MIN_PCT:.0%}, "
+              f"bear <= {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%} daily percentile)", flush=True)
 
     # Sort by GROUND descending (qualified first, then below-threshold).
     ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
-    print(f"  qualified: {ranked['qualified'].sum()}/{len(ranked)} bull-regime candidates "
-          f"(GROUND >= {thr}, parity > {backtest_config.PARITY_MIN_PCT:.0%}, quote >= fair)", flush=True)
+    n_bull_q = int((ranked["qualified"] & ranked["spread_type"].eq("bull_put")).sum()) if not ranked.empty else 0
+    n_bear_q = int((ranked["qualified"] & ranked["spread_type"].eq("bear_call")).sum()) if not ranked.empty else 0
+    print(f"  qualified: {n_bull_q} bull puts (GROUND >= {thr}, parity > {backtest_config.PARITY_MIN_PCT:.0%}, cap {backtest_config.TOP_N}) + "
+          f"{n_bear_q} bear calls (GROUND >= {bear_thr}, bear parity > {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%}, "
+          f"cap {getattr(backtest_config, 'BEAR_TOP_N', 5)}) of {len(ranked)}; quote >= fair", flush=True)
     return ranked
 
 

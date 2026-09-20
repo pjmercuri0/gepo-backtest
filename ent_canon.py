@@ -349,6 +349,22 @@ def add_parity_percentile(cands: pd.DataFrame,
     return C
 
 
+def add_bear_parity_percentile(cands: pd.DataFrame, raw_col: str = 'parity_bull_raw') -> pd.DataFrame:
+    """Mirrored parity for bear calls: percentile of (cp_iv_gap x causal sign) among the day's
+    bear-call candidates.  High = more bearish.  Non-bear rows and missing data are neutral 0.5.
+    Same construction as research/bear_regime_sweep.prepare(); parity_bull_raw = -cp_iv_gap."""
+    C = cands.copy()
+    C['bear_parity_pct'] = 0.5
+    if C.empty or raw_col not in C:
+        return C
+    signs = pd.to_datetime(C['entry_date']).dt.year.map(parity_sign)
+    raw = -pd.to_numeric(C[raw_col], errors='coerce') * signs
+    active = C['spread_type'].eq('bear_call') & signs.ne(0) & raw.notna()
+    C.loc[active, 'bear_parity_pct'] = raw[active].groupby(C.loc[active, 'entry_date'], sort=False).rank(method='average', pct=True)
+    warn_coverage('bear parity (cp_iv_gap)', (~C['spread_type'].eq('bear_call')) | raw.notna(), C['entry_date'])
+    return C
+
+
 # ── 3. realized belief from daily closes ────────────────────────────────────
 def p_real(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW, mu=None) -> np.ndarray:
     """(p, q, ro) per candidate from the name's realized DTE-day moves vs the exact strikes.
