@@ -342,7 +342,19 @@ async def _qualify_options_for(
                   f"{len(chain_payload.get('expirations') or [])} expiries) — refetching",
                   flush=True)
         try:
-            chains = await ib.reqSecDefOptParamsAsync(stock.symbol, "", stock.secType, stock.conId)
+            # Bound it. reqSecDefOptParams returns in ~0.1s for most names but
+            # hangs indefinitely for some (GOOGL and NFLX, measured 2026-09-20:
+            # AAPL 0.1s / 130 strikes, GOOGL and NFLX still nothing at 45s).
+            # Unbounded, one such symbol burns the whole group's wall-clock
+            # budget and starves the tickers sharing it.
+            chains = await asyncio.wait_for(
+                ib.reqSecDefOptParamsAsync(stock.symbol, "", stock.secType, stock.conId),
+                timeout=live_config.CHAIN_PARAMS_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            print(f"  [{symbol}] reqSecDefOptParams timed out after "
+                  f"{live_config.CHAIN_PARAMS_TIMEOUT}s — skipped", flush=True)
+            return []
         except Exception as e:
             print(f"  [{symbol}] reqSecDefOptParams failed: {e}", flush=True)
             return []
