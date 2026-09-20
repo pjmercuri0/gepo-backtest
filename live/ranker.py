@@ -192,6 +192,13 @@ def _score_growth_negative(scored, *, k: float, credit_col: str):
     scored.loc[need, "EV"] = ev
     scored.loc[need, "GROUND"] = ev * _np.exp(-k * dent)
     scored.loc[need, "growth_negative"] = True
+    # ent_canon.kelly() clips w* into [0.01, 0.99]. A row whose optimum was
+    # BELOW the floor comes back with w_star == 0.01 and negative growth -- the
+    # same "Kelly says do not bet" verdict as the NaN rows above, reached by
+    # clipping instead. Flag those too, or the table marks TSLA/CL as ordinary
+    # candidates when Kelly wanted less than the minimum stake.
+    clipped = (scored["w_star"].astype(float) <= 0.010000001) & (scored["G"].astype(float) < 0)
+    scored.loc[clipped.fillna(False), "growth_negative"] = True
     return scored
 
 
