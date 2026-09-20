@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **LIVE is bull puts only when the prior completed SPY close is above its 100-session SMA, cash otherwise, parity percentile strictly above 12%, top 10/day. The BACKTEST/OOT canon (§0.56) is two-sided and symmetric on that SMA -- bull puts above, bear calls below -- with ex-dividend and earnings gates on both sleeves.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -305,7 +305,8 @@ SPY $-Sharpe over the same window: 0.96. 2026 is **not** a clean holdout.
 - **Survivorship (audit #1):** `SP100_TICKERS` is a static present-day list applied backwards.
   No ticker first appears after 2023. Unquantified; needs historical constituents.
 - **Entry price = 16:00 close** on 35,274/35,274 rows; live enters at 15:00.
-- `live/ranker.py` is bull-only and does not risk-size; the canon above is payload-side only.
+- Live is now two-sided (`config.REGIME_BULL_ONLY = False`, `0c79d6a`) but does not risk-size, and applies the
+  bull gates (GROUND 0.005, parity > 0.12, top-10 shared) to bear calls too. Bear-sleeve gates are backtest-only.
 - Mya's checkout has local uncommitted edits (`base/history/index.html`); `backtest.html` and
   `oot.html` were rsynced directly (TEMPLATES_AUTO_RELOAD is on). Do not `git pull` there blindly.
 - Frames are gitignored: `featATM8.parquet` regenerates with `python3 research/dkl_2026_09_13/build_frame.py`
