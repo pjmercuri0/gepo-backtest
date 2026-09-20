@@ -34,7 +34,7 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - IBKR API access must remain read-only. Never place trades or enable trading access.
 - The main remaining production improvement is a dedicated second IBKR username for the Mac mini, with market-data entitlements verified, so manual logins do not terminate its Gateway/API session.
 - **CURRENT CANON is §0.57 (2026-09-19 evening)**: full-SP100 frame from `build_frame.py`, width <= 2.5,
-  risk-sized $200/pick, dollar-P&L Sharpe as the headline, start 2020-08-01, bankroll $20k. The old 1.52 was
+  qty=2 per pick (risk-sizing tested and set aside), dollar-P&L Sharpe as the headline, start 2020-08-01, bankroll $20k. The old 1.52 was
   an accidental 20-delta chain gate (see §0.57). Payload-side only; `live/ranker.py` unchanged.
 - **SUPERSEDED §0.56 (2026-09-19)**: the §0.54 cell PLUS a two-sided regime that is
   symmetric on the 100d SMA (bull puts above, bear calls below, no dead zone) and ex-dividend +
@@ -271,9 +271,10 @@ full-universe book is the one that matches production.
   builder (vectorized, ~27 s/year; output identical to the loop version). Names whose adjacent
   strikes are > $2.5 apart drop out via the width cap (83-90 tickers/year in practice).
 - **width <= config.MAX_SPREAD_WIDTH (2.5)** restored (`band_checks.py:61`); alone worth 1.17 -> 1.32.
-- **Sizing: risk-sized.** `report_mid_canon.RISK_PER_TRADE = $200` of max loss per pick, qty =
-  floor(200 / max_loss$), min 1, max `config.MAX_CONTRACTS`. Replaces fixed qty=2 as the
-  `strategy` arm and the trade-row qty. qty1 and 1/16-Kelly arms kept.
+- **Sizing: qty=2 per pick** (user, 2026-09-19 late: "green is supposed to be quantity 2"). Risk-sizing
+  ($200 max loss per pick, `report_mid_canon.risk_qty`) was built, published for ~an hour, and set aside;
+  the helper stays in the file. On this frame qty=2 gives $-Sharpe 1.64 vs 1.80 risk-sized: the
+  wide-strike names still carry 4x the dollars per contract.
 - **Headline metric: dollar-P&L weekly Sharpe** (`*_sharpe_dollar`, every arm). Under constant
   $-risk this IS the Sharpe; %-of-equity Sharpe depends on the bankroll denominator (1.33 at $20k,
   1.49 at $100k, -> the dollar figure). Weekly/daily %-Sharpe removed from the tabs.
@@ -291,12 +292,12 @@ full-universe book is the one that matches production.
 - Weekly Sharpe dropped week 1 (`pct_change().dropna()`); seeded from START_BANKROLL.
 - Captions: `sizing` now states the rule and date.
 
-### Published (risk-sized, $20k, entries 2020-08-03..2025-12-24; settlements to 2026-01-02)
+### Published (qty=2, $20k, entries 2020-08-03..2025-12-24; settlements to 2026-01-02)
 
 | | trades | final | $-Sharpe | %-Sharpe | max DD | yield |
 |---|---|---|---|---|---|---|
-| Backtest 2020-25 | 4,846 | $137,464 | **1.80** | 1.44 | -29.6% | 15.5% |
-| OOT 2026 (to 09-10) | 662 | $48,086 | **5.10** | 4.41 | -6.4% | 27.3% |
+| Backtest 2020-25 | 4,846 | $125,175 | **1.64** | 1.35 | -32.1% | 14.7% |
+| OOT 2026 (to 09-10) | 662 | $47,360 | **6.45** | 5.45 | -2.7% | 26.6% |
 
 SPY $-Sharpe over the same window: 0.96. 2026 is **not** a clean holdout.
 

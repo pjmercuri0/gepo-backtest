@@ -119,7 +119,7 @@ def build_payload(picks, end_year, label):
     spy = spy[(spy['Date'] >= start_date) & (spy['Date'] <= end_date)].reset_index(drop=True)
     td = pd.DatetimeIndex(spy['Date'])
 
-    pnl_qty2 = simulate_equity(picks, 'risk')   # canonical arm: equal $ risk per pick
+    pnl_qty2 = simulate_equity(picks, '2')      # canonical arm: qty=2 per pick (user 2026-09-19, reverted from risk-sizing)
     pnl_qty1 = simulate_equity(picks, '1')
     pnl_sixt = simulate_equity(picks, 'kelly_0.0625')
     eq_qty2 = START_BANKROLL + pnl_qty2.reindex(td, fill_value=0.0).cumsum()
@@ -178,7 +178,7 @@ def build_payload(picks, end_year, label):
         ws = r.get('w_star'); mld = r['max_loss_dollar']
         if ws is None or pd.isna(ws) or ws <= 0 or mld <= 0: return 1
         return max(1, min(5, int(frac*float(ws)*START_BANKROLL/mld)))
-    wag2 = float((ml_col.map(risk_qty)*ml_col).sum()); wag1 = float(ml_col.sum())
+    wag2 = float((ml_col*2).sum()); wag1 = float(ml_col.sum())
     wagk = float((picks.apply(_kelly_qty, axis=1)*ml_col).sum())
     summary['strategy_wagered'] = round(wag2, 2)
     summary['qty1_wagered']     = round(wag1, 2)
@@ -194,7 +194,7 @@ def build_payload(picks, end_year, label):
                'spy':      round(float(spy_eq[i]), 2)} for i, d in enumerate(td)]
 
     sp = picks.sort_values(['entry_date_dt','GROUND'], ascending=[True,False]).copy()
-    sp['_q'] = sp['max_loss_dollar'].map(risk_qty)
+    sp['_q'] = 2
     sp['_pnl'] = sp['_q'] * sp['pnl_per_contract']
     sp['_week'] = sp['entry_date_dt'].dt.to_period('W-FRI')
     running = START_BANKROLL
@@ -260,7 +260,7 @@ def build_payload(picks, end_year, label):
             'fill_basis': f'{FILL_FRAC:.2f}\u00d7mid (real fills ~0.82\u00d7mid, n=5); partial-WIN at 50% intrinsic',
             'regime':     'OFF (both directions eligible)',
             'vol_gate':   'OFF',
-            'sizing':     f'risk-sized: ${RISK_PER_TRADE:.0f} max loss per pick (floor, min 1, max {MAX_CONTRACTS}); canonical 2026-09-19',
+            'sizing':     'qty=2 per pick (canonical; risk-sizing tested 2026-09-19 and set aside)',
             'starting_bankroll': START_BANKROLL,
         },
         'summary': summary,
