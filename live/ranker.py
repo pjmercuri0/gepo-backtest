@@ -148,6 +148,53 @@ def _reprice_on_combos(candidates: pd.DataFrame) -> pd.DataFrame:
     return candidates
 
 
+def _score_growth_negative(scored, *, k: float, credit_col: str):
+    """Give growth-negative candidates a real (negative) GROUND instead of NaN.
+
+    ent_canon.kelly() returns NaN when the optimal stake w* falls outside
+    (0, 1). For these rows w* is NEGATIVE -- Kelly's answer is "take the other
+    side" -- so log-growth is strictly decreasing in w and the best FEASIBLE
+    stake is ent_canon's own floor, w = 0.01. Evaluating the same growth formula
+    there gives the honest negative number the table should show, and keeps the
+    definition intact: GROUND is growth at the growth-optimal feasible stake.
+
+    Display-side only, and deliberately NOT in ent_canon: that module is shared
+    with the backtest, where these rows are dropped by design. `qualified` is
+    untouched -- a negative GROUND can never clear the threshold. Rows with no
+    P_real keep NaN; there is nothing to evaluate.
+    """
+    import numpy as _np
+
+    # Create the flag for EVERY row first. Left absent it comes back as NaN for
+    # untouched rows, and bool(NaN) is True, which mislabels every ordinary
+    # candidate as growth-negative.
+    scored["growth_negative"] = False
+    need = scored["GROUND"].isna() & scored["p"].notna()
+    if not need.any():
+        return scored
+    p = scored.loc[need, "p"].astype(float).to_numpy()
+    q = scored.loc[need, "q"].astype(float).to_numpy()
+    ro = scored.loc[need, "ro"].astype(float).to_numpy()
+    cr = scored.loc[need, credit_col].astype(float).to_numpy()
+    wd = scored.loc[need, "width"].astype(float).to_numpy()
+    ml = wd - cr
+    with _np.errstate(invalid="ignore", divide="ignore"):
+        b = _np.where(ml > 0, cr / ml, _np.nan)
+        a = _np.where(b >= 1.0, 0.0, (b - 1.0) / (2.0 * _np.where(b == 0, 1, b)))
+        w = 0.01  # ent_canon.kelly()'s lower clip; the best feasible stake here
+        ell = (p * _np.log(_np.clip(1 + w * b, 1e-10, None))
+               + ro * _np.log(_np.clip(1 + w * a * b, 1e-10, None))
+               + q * _np.log(_np.clip(1 - w, 1e-10, None)))
+    ev = _np.exp(ell) - 1.0
+    dent = scored.loc[need, "D_ent"].astype(float).to_numpy()
+    scored.loc[need, "w_star"] = w
+    scored.loc[need, "G"] = ell
+    scored.loc[need, "EV"] = ev
+    scored.loc[need, "GROUND"] = ev * _np.exp(-k * dent)
+    scored.loc[need, "growth_negative"] = True
+    return scored
+
+
 def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     """Run the full backtest-canonical ranking pipeline on a live snapshot."""
     if df.empty:
@@ -438,7 +485,8 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         print(f"  {n_nobelief} candidate(s) have NO close history (no P_real) and are unscored", flush=True)
     if n_neg:
         print(f"  {n_neg} candidate(s) growth-negative at the selection credit "
-              f"(no interior Kelly optimum) — shown with GROUND '—', never qualified", flush=True)
+              f"(Kelly w* < 0) — scored at the minimum stake, never qualified", flush=True)
+    scored = _score_growth_negative(scored, k=ground.DKL_K, credit_col=sel_credit)
     for i, r in scored.iterrows():
         tg = entc.credit_targets(r["dfit_short"], r["DTE"], width=r["width"], model_credit=r["model_credit"])
         for k_, v_ in tg.items():
@@ -667,6 +715,11 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             "EV":               _num(r.get("EV")),
             "DKL":              _num(r.get("DKL")),
             "GROUND":           _num(r.get("GROUND")),
+            # True when GROUND was evaluated at the minimum stake because
+            # Kelly's optimum is negative — a real number, but a "do not
+            # take this" number. Lets the table mark it apart from a
+            # small positive edge.
+            "growth_negative":  _flag(r.get("growth_negative")),
             "w_star":           _num(r.get("w_star")),
             "parity_bull_raw":  _num(r.get("parity_bull_raw")),
             "parity_bull_signed": _num(r.get("parity_bull_signed")),
@@ -742,6 +795,14 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
         "top_picks": [row_to_dict(r) for _, r in top.iterrows()],
         "ticker":    [row_to_dict(r) for _, r in ticker_rows.iterrows()],
     }
+
+
+def _flag(v) -> bool:
+    """NaN-safe truthiness. bool(float("nan")) is True, which silently turns a
+    missing flag into a set one."""
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return False
+    return bool(v)
 
 
 def _num(v):
