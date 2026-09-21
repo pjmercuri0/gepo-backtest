@@ -14,6 +14,29 @@ The user is the CEO. He reads on a phone between other things.
 He has asked for this four times, escalating to "NEVER WALL OF TEXT ME".
 Violating it again reads as not listening.
 
+# AUDIT WHAT HE SEES, NOT WHAT THE CODE RETURNS
+
+When asked to check for bugs, or before saying anything is "verified" / "clean"
+/ "correct": **fetch the rendered page and reconcile the displayed values
+against their source.** A passing function proves nothing about the page.
+
+- Parse the HTML from the LIVE site (curl), not a local test_client, and not the
+  data the helper returns.
+- Match rows on a UNIQUE key (the trade id in data-id). Ticker+strikes is not
+  unique: CSCO 111/110 exists on two expiries; JNJ 270/267.5 and 272.5/270
+  share a leg.
+- Reconcile: open P&L = (fill - mark) x 100; settled P&L = settle_pnl at the
+  recorded fill; card header = sum of its rows; mark inside [0, width]; status
+  badge = spot vs strikes; the SAME spread shows the SAME spot on every tab.
+- Check both tabs in ONE fetch pair, in parallel, or moving quotes create fake
+  mismatches.
+- Report what was actually compared. "Checked 8 rows on /actuals and /history"
+  — never a bare "all clean".
+
+Every bug he found on 2026-09-21 was visible only in the rendered HTML, and
+every "verified clean" that preceded it came from inspecting functions and data.
+He should not be the one finding them.
+
 # NEVER GUESS (override everything else)
 
 **If you do not know, run the check. If you cannot check, say "I don't know".**
