@@ -449,87 +449,8 @@ def _actuals_rows() -> list[dict]:
         # Actuals tab shows the same second-old spot and mark as the live tab instead of the
         # last scan's. The streamed mid is the book's cost to close; floor it at intrinsic
         # for the same reason the tracker does -- a vertical cannot be closed for less.
-        try:
-            _st = _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
-            _q = (_st.get("quotes") or {}).get(
-                f"{pick.get('ticker')}|{pick.get('spread_type')}|{float(pick.get('short_strike')):g}"
-                f"|{float(pick.get('long_strike')):g}|{str(pick.get('expiry_date'))[:10]}")
-            _sp = (_st.get("spots") or {}).get(pick.get("ticker"))
-            if outcome_row is None and (_q or _sp):
-                ks, kl = float(pick["short_strike"]), float(pick["long_strike"])
-                w = float(pick.get("spread_width") or abs(ks - kl))
-                live = dict(last_track or {})
-                if _sp:
-                    live["underlying_price"] = _sp
-                    live["live_status"] = _live_status(pick.get("spread_type"), _sp, ks, kl)
-                    intr = (max(0.0, ks - _sp) - max(0.0, kl - _sp)) if pick["spread_type"] == "bull_put" \
-                           else (max(0.0, _sp - ks) - max(0.0, _sp - kl))
-                    intr = min(max(0.0, intr), w)
-                    # Only treat intrinsic as a floor when the LONG leg is also
-                    # comfortably ITM (>1% of spot). With spot between the strikes
-                    # intrinsic IS the width, so flooring there forces max loss on a
-                    # position that still has time value (ADI 2026-09-17).
-                    long_itm_by = (kl - _sp) if pick["spread_type"] == "bull_put" else (_sp - kl)
-                    deep = long_itm_by > 0.01 * _sp
-                else:
-                    intr = 0.0; deep = False
-                if _q and _q.get("mid") is not None:
-                    _m = float(_q["mid"])
-                    _m = min(max(_m, 0.0), w)          # a vertical is worth 0..width, always
-                    live["current_mark"] = round(min(max(_m, intr) if deep else _m, w), 4)
-                    live["mark_basis"] = ("intrinsic floor (both legs deep ITM)"
-                                          if deep and _m < intr else "stream mid")
-                    live["ts"] = _q["ts"]
-                elif _sp:
-                    # No complex-order book for this spread (common once a position
-                    # runs ITM -- the scanner stops fetching those strikes and the
-                    # combo stops quoting). Mark it with Black-Scholes off the stored
-                    # leg IVs at the live spot rather than at intrinsic: with spot
-                    # between the strikes, intrinsic IS the width, so that printed max
-                    # loss on a position with a day still to run (ADI 2026-09-17,
-                    # -$106 shown against a true ~-$1).
-                    # One implementation for both tabs (2026-09-17): History marks with
-                    # track_frozen._track_pick off TODAY's snapshot IVs; Actuals used to
-                    # mark off the IVs stored at entry, so the same option showed two
-                    # values -- ABT 102/103 read 0.610 on History and 0.395 here, which
-                    # flipped the sign of the P&L. Use _track_pick, falling back to the
-                    # stored IVs only when the strikes are not in today's snapshot.
-                    _bs = None; _basis = None
-                    try:
-                        _row = _track_from_snapshot(pick)
-                        if _row and _row.get("current_mark") is not None:
-                            _bs = float(_row["current_mark"])
-                            _basis = f"{_row.get('mark_basis', 'BS')} (same as History)"
-                    except Exception as _e:
-                        print(f"[actuals] snapshot mark failed {pick.get('ticker')}: {_e}", flush=True)
-                    if _bs is None:
-                        try:
-                            from live.bs_pricing import bs_spread_debit
-                            _ivs = pick.get("iv_fit_short") or pick.get("IV")
-                            _ivl = pick.get("iv_fit_long") or pick.get("long_IV") or _ivs
-                            _dte = max((ddate.fromisoformat(str(pick["expiry_date"])[:10]) - ddate.today()).days, 0)
-                            if _ivs:
-                                _bs = bs_spread_debit(spot=_sp, short_strike=ks, long_strike=kl,
-                                                      short_iv=float(_ivs), long_iv=float(_ivl),
-                                                      dte_days=_dte, spread_type=pick["spread_type"])
-                                _basis = f"BS at stored IV, {_dte}d (no combo quote)"
-                        except Exception:
-                            _bs = None
-                    if _bs is not None:
-                        live["current_mark"] = round(min(max(_bs, intr) if deep else _bs, w), 4)
-                        live["mark_basis"] = (_basis or "BS (no combo quote)")
-                    else:
-                        live["current_mark"] = round(intr, 4)
-                        live["mark_basis"] = "intrinsic (no combo quote, no IV)"
-                    live["ts"] = _st.get("ts")
-                ac = pick.get("actual_credit")
-                if live.get("current_mark") is not None and ac is not None:
-                    live["unrealized_pnl_per_contract"] = round((float(ac) - live["current_mark"]) * 100, 2)
-                last_track = live
-                if live.get("current_mark") is not None:
-                    last_marked = live
-        except (TypeError, ValueError, KeyError):
-            pass
+        last_track, last_marked = _stream_overlay(
+            pick, last_track, last_marked, outcome_row)
 
         # Actuals display basis = the IBKR credit on the pick (combo last > combo mid >
         # leg mids, i.e. quoted_credit/net_credit), NOT the modelled 0.80x mid /
@@ -707,6 +628,103 @@ def _basket_totals(picks: list) -> dict:
         out["day_sum_max_loss_actual"] = round(sum_actual_ml, 2) if sum_actual_ml else None
         out["day_decimal_odds_actual"] = round(sum_actual_c / sum_actual_ml, 3) if sum_actual_ml > 0 else None
     return out
+
+
+def _stream_overlay(pick, last_track, last_marked, outcome_row):
+    """Live spot + mark for ONE open pick, straight off combo_stream.
+
+    Extracted 2026-09-21 so History and Actuals cannot diverge again. They
+    had three different answers for the same spread in one afternoon: the
+    assignment-risk cron payload, the per-scan tracker file, and the stream.
+    XOM 160/157.5 marked 1.3667 on Actuals (recomputed at the live spot) and
+    1.2002 on History (the 15:46 tracker sample) at the same moment.
+
+    Returns (last_track, last_marked) -- unchanged when there is nothing to
+    overlay, so callers can assign unconditionally.
+    """
+    _out_track, _out_marked = last_track, last_marked
+    try:
+        _st = _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
+        _q = (_st.get("quotes") or {}).get(
+            f"{pick.get('ticker')}|{pick.get('spread_type')}|{float(pick.get('short_strike')):g}"
+            f"|{float(pick.get('long_strike')):g}|{str(pick.get('expiry_date'))[:10]}")
+        _sp = (_st.get("spots") or {}).get(pick.get("ticker"))
+        if outcome_row is None and (_q or _sp):
+            ks, kl = float(pick["short_strike"]), float(pick["long_strike"])
+            w = float(pick.get("spread_width") or abs(ks - kl))
+            live = dict(last_track or {})
+            if _sp:
+                live["underlying_price"] = _sp
+                live["live_status"] = _live_status(pick.get("spread_type"), _sp, ks, kl)
+                intr = (max(0.0, ks - _sp) - max(0.0, kl - _sp)) if pick["spread_type"] == "bull_put" \
+                       else (max(0.0, _sp - ks) - max(0.0, _sp - kl))
+                intr = min(max(0.0, intr), w)
+                # Only treat intrinsic as a floor when the LONG leg is also
+                # comfortably ITM (>1% of spot). With spot between the strikes
+                # intrinsic IS the width, so flooring there forces max loss on a
+                # position that still has time value (ADI 2026-09-17).
+                long_itm_by = (kl - _sp) if pick["spread_type"] == "bull_put" else (_sp - kl)
+                deep = long_itm_by > 0.01 * _sp
+            else:
+                intr = 0.0; deep = False
+            if _q and _q.get("mid") is not None:
+                _m = float(_q["mid"])
+                _m = min(max(_m, 0.0), w)          # a vertical is worth 0..width, always
+                live["current_mark"] = round(min(max(_m, intr) if deep else _m, w), 4)
+                live["mark_basis"] = ("intrinsic floor (both legs deep ITM)"
+                                      if deep and _m < intr else "stream mid")
+                live["ts"] = _q["ts"]
+            elif _sp:
+                # No complex-order book for this spread (common once a position
+                # runs ITM -- the scanner stops fetching those strikes and the
+                # combo stops quoting). Mark it with Black-Scholes off the stored
+                # leg IVs at the live spot rather than at intrinsic: with spot
+                # between the strikes, intrinsic IS the width, so that printed max
+                # loss on a position with a day still to run (ADI 2026-09-17,
+                # -$106 shown against a true ~-$1).
+                # One implementation for both tabs (2026-09-17): History marks with
+                # track_frozen._track_pick off TODAY's snapshot IVs; Actuals used to
+                # mark off the IVs stored at entry, so the same option showed two
+                # values -- ABT 102/103 read 0.610 on History and 0.395 here, which
+                # flipped the sign of the P&L. Use _track_pick, falling back to the
+                # stored IVs only when the strikes are not in today's snapshot.
+                _bs = None; _basis = None
+                try:
+                    _row = _track_from_snapshot(pick)
+                    if _row and _row.get("current_mark") is not None:
+                        _bs = float(_row["current_mark"])
+                        _basis = f"{_row.get('mark_basis', 'BS')} (same as History)"
+                except Exception as _e:
+                    print(f"[actuals] snapshot mark failed {pick.get('ticker')}: {_e}", flush=True)
+                if _bs is None:
+                    try:
+                        from live.bs_pricing import bs_spread_debit
+                        _ivs = pick.get("iv_fit_short") or pick.get("IV")
+                        _ivl = pick.get("iv_fit_long") or pick.get("long_IV") or _ivs
+                        _dte = max((ddate.fromisoformat(str(pick["expiry_date"])[:10]) - ddate.today()).days, 0)
+                        if _ivs:
+                            _bs = bs_spread_debit(spot=_sp, short_strike=ks, long_strike=kl,
+                                                  short_iv=float(_ivs), long_iv=float(_ivl),
+                                                  dte_days=_dte, spread_type=pick["spread_type"])
+                            _basis = f"BS at stored IV, {_dte}d (no combo quote)"
+                    except Exception:
+                        _bs = None
+                if _bs is not None:
+                    live["current_mark"] = round(min(max(_bs, intr) if deep else _bs, w), 4)
+                    live["mark_basis"] = (_basis or "BS (no combo quote)")
+                else:
+                    live["current_mark"] = round(intr, 4)
+                    live["mark_basis"] = "intrinsic (no combo quote, no IV)"
+                live["ts"] = _st.get("ts")
+            ac = pick.get("actual_credit")
+            if live.get("current_mark") is not None and ac is not None:
+                live["unrealized_pnl_per_contract"] = round((float(ac) - live["current_mark"]) * 100, 2)
+            _out_track = live
+            if live.get("current_mark") is not None:
+                _out_marked = live
+    except (TypeError, ValueError, KeyError):
+        pass
+    return _out_track, _out_marked
 
 
 def _frozen_history(limit: int = 60) -> list[dict]:
@@ -1134,14 +1152,36 @@ def snapshots():
 
 @app.route("/history")
 def history():
+    # The template reads the LAST tracker sample for spot/status, and the tracker
+    # only runs per scan -- so History showed CVX at 203.68 (15:31 sample) while
+    # Actuals and the live tab showed 204.07 off combo_stream, seconds old. Append
+    # a synthetic tracker sample from the stream for any UNSETTLED pick so all
+    # three tabs agree on the underlying. Stream-only: nothing is written to disk.
     # Load today's close alert (if any) so the template can show a
     # banner with rec_debit prices for any open expiring picks.
     today_iso = datetime.now().date().isoformat()
     close_alert = _read_json(
         Path(live_config.NOTIFICATIONS_DIR) / f"close_alert_{today_iso}.json"
     )
+    entries = _frozen_history()
+    # Same overlay Actuals uses, so the two tabs cannot report different spots or
+    # marks for the same spread. The template reads the LAST tracking sample, so
+    # append the freshly-computed one.
+    for _e in entries:
+        _tracking = _e.get("tracking")
+        if not isinstance(_tracking, dict):
+            continue
+        for _p in (_e.get("top_picks") or []):
+            _tk = _p.get("ticker")
+            _arr = _tracking.get(_tk)
+            # Settled picks keep their expiry close; only open rows move.
+            if _p.get("pnl") is not None or not isinstance(_arr, list) or not _arr:
+                continue
+            _fresh, _ = _stream_overlay(_p, _arr[-1], None, None)
+            if isinstance(_fresh, dict) and _fresh is not _arr[-1]:
+                _arr.append(_fresh)
     return render_template("history.html",
-                           entries=_frozen_history(),
+                           entries=entries,
                            close_alert=close_alert)
 
 
