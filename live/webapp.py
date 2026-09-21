@@ -326,13 +326,20 @@ def _live_status(spread_type: str, spot, short_strike, long_strike):
         spot = float(spot); ss = float(short_strike); ls = float(long_strike)
     except (TypeError, ValueError):
         return None
+    # Symmetric $0.01 clearance at BOTH strikes. WINNING has always required
+    # spot to clear the short by a cent; LOSING used to trigger at `spot <= ls`,
+    # i.e. sitting exactly ON the long strike was badged a full LOSS. That
+    # contradicts the pin terminology -- between/at the strikes is PINNED, never
+    # max loss -- and it is the same assignment-risk argument that makes sitting
+    # at the short strike PARTIAL. FCX 73/72 at spot 72.00 read "L" on
+    # 2026-09-21 because of it.
     if spread_type == "bull_put":
         if spot >= ss + 0.01:
             return "WINNING"
-        return "LOSING" if spot <= ls else "PARTIAL"
+        return "LOSING" if spot <= ls - 0.01 else "PARTIAL"
     if spot <= ss - 0.01:
         return "WINNING"
-    return "LOSING" if spot >= ls else "PARTIAL"
+    return "LOSING" if spot >= ls + 0.01 else "PARTIAL"
 
 
 def _actuals_rows() -> list[dict]:
