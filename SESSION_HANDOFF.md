@@ -104,6 +104,47 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.63 SPY / QQQ / IWM added to the live universe (2026-09-20)
+
+The backtest's **#1, #2 and #34 most-traded names were ETFs the live scanner had
+never looked at**. Found by building a per-ticker frequency table of both books:
+
+| | trades | share | P&L share |
+|---|---|---|---|
+| SPY + QQQ + IWM, backtest | 637 of 4,846 | 13.1% | 15.5% ($11,852) |
+| SPY + QQQ + IWM, OOT | 57 of 682 | 8.4% | 5.7% |
+
+So the published Sharpe/yield were not measuring the strategy actually being
+run. All three are now in `TICKERS` in `live/pull_now_parallel.sh`. They are
+ordinary US equity options -- physically settled, same Stock path as the rest,
+no `_index_spec` handling needed (that is for cash-settled SPX/XSP roots).
+`output/ibkr_closes.parquet` already holds 504 sessions for each, so `P_real`
+scores them from the first scan; nothing to backfill.
+
+**GROUP_SIZE 12 -> 13, and this was NOT optional.** The fetch loop slices
+`TICKERS` into `NUM_GROUPS` blocks of `GROUP_SIZE`, so capacity was exactly
+**8 x 12 = 96** against 94 tickers -- headroom of two. Adding three ETFs would
+have pushed the list to 97 and **silently dropped the tail**: no error, no log
+line, the name simply never scanned. A guard now fails the run loudly instead:
+
+    FATAL: 96 tickers but only 40 slots (GROUP_SIZE=5 x NUM_GROUPS=8).
+           Raise GROUP_SIZE or NUM_GROUPS; the tail would be dropped without warning.
+
+That cliff was latent regardless of this change -- any future ticker addition
+would have hit it. Capacity is now 104 with 97 tickers, headroom 7.
+
+**Verified on a full scan:** 8 groups of 13, 43-52s each (budget 150s, so the
+extra ticker per group costs ~4s), exit 0, no gate errors. SPY returned
+spot $764.87 with 66 contracts qualified and QQQ $725.00 with 62 -- both then
+dropped for missing Greeks, which is the Sunday-evening artifact (§ the ADP/BA
+case), not an ETF problem. IWM proved the path end-to-end earlier with 28/28
+rows.
+
+**Still open from the same table:** 11 names in the live universe have NEVER been
+picked in the backtest (AON APD BLK CB CCI ITW LIN MMC REGN SYK ZTS) and 27 have
+never been picked in OOT. MMC is the dead ticker of §0.59. Worth deciding
+whether the never-picked names earn their fetch slot.
+
 ## 0.62 Mya's config had silently drifted to pre-0.54 canon (2026-09-20)
 
 Found during the Monday readiness check, by checksumming every file Mya serves

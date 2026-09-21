@@ -21,14 +21,30 @@ TICKERS=(
     "FCX" "AON" "PNC" "NSC" "CCI" "WM" "APD" "F" "GM" "GE"
     "BA" "CAT" "DE" "MMM" "IBM" "INTC" "CSCO" "VZ" "T" "DIS"
     "NFLX" "CRM" "NOW" "PYPL"
+    # ETFs (2026-09-20). SPY/QQQ/IWM are the #1/#2/#34 names in the backtest --
+    # 637 of 4,846 trades, 13.1% of them and 15.5% of its P&L -- but were never
+    # in the live universe, so the published book was not measuring the strategy
+    # actually being run.
+    # Ordinary US equity options, physically settled; same Stock path as the rest.
+    "SPY" "QQQ" "IWM"
 )
 
 # Eight IB clients (100-107), each running its tickers concurrently via
 # asyncio.gather inside fetcher.py. This keeps groups smaller/faster than the
 # conservative 6-client setting while staying below the old 10-client burst
 # that repeatedly timed out during Gateway's account/execution-sync handshake.
-GROUP_SIZE=12
+GROUP_SIZE=13
 NUM_GROUPS=8
+
+# The fetch loop slices TICKERS into NUM_GROUPS blocks of GROUP_SIZE. If the list
+# is longer than GROUP_SIZE*NUM_GROUPS the tail is SILENTLY DROPPED -- no error,
+# no log line, the names just never get scanned. Fail loudly instead.
+if [ "${#TICKERS[@]}" -gt "$((GROUP_SIZE * NUM_GROUPS))" ]; then
+    echo "FATAL: ${#TICKERS[@]} tickers but only $((GROUP_SIZE * NUM_GROUPS)) slots" \
+         "(GROUP_SIZE=$GROUP_SIZE x NUM_GROUPS=$NUM_GROUPS)." >&2
+    echo "       Raise GROUP_SIZE or NUM_GROUPS; the tail would be dropped without warning." >&2
+    exit 1
+fi
 
 NOW="$(date '+%Y-%m-%d')"
 HHMM="$(date '+%H%M')"
