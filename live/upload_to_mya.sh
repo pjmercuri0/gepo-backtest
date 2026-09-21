@@ -202,6 +202,22 @@ UPLOAD_FILES=(
   "live/data/oot_equity.json"       # 2026 out-of-time equity curve (OOT tab)
 )
 
+# TODAY's snapshot parquet. The webapp prices every OPEN position's mark from it
+# (_track_from_snapshot); without it Mya fell all the way through to INTRINSIC,
+# which on a multi-day spread is max loss or full win and nothing in between --
+# the Actuals card read -$233 on 2026-09-21 against a true -$40. Only today's
+# folder is sent: history marks come from the frozen files, not from parquets.
+_SNAP_DAY="live/snapshots/$(date '+%Y-%m-%d')"
+if [ -d "$_SNAP_DAY" ]; then
+  if $SSH_COMMAND "$MYA_SSH_HOST" "mkdir -p '$MYA_REMOTE_BASE/snapshots/$(date '+%Y-%m-%d')'" 2>/dev/null; then
+    "${RSYNC[@]}" "$_SNAP_DAY/" "$MYA_SSH_HOST:$MYA_REMOTE_BASE/snapshots/$(date '+%Y-%m-%d')/" \
+      && echo "  ✓ uploaded $_SNAP_DAY" \
+      || echo "  ✗ rsync failed for $_SNAP_DAY"
+  else
+    echo "  ✗ could not create remote snapshot dir"
+  fi
+fi
+
 for src in "${UPLOAD_FILES[@]}"; do
   if [ ! -e "$src" ]; then
     echo "  · skip $src (not present)"
