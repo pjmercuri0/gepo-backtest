@@ -1198,11 +1198,17 @@ def history():
         _tracking = _e.get("tracking")
         if not isinstance(_tracking, dict):
             continue
+        # A settled day records its results under outcome.results, and leaves
+        # pick["pnl"] as None -- so testing the pick alone treats a closed row as
+        # open and overlays a live spot onto it. The template happens to prefer
+        # outcome_row, but the tracking array must not be fed live data either.
+        _settled = set((( _e.get("outcome") or {}).get("results") or {}).keys())
         for _p in (_e.get("top_picks") or []):
             _tk = _p.get("ticker")
             _arr = _tracking.get(_tk)
             # Settled picks keep their expiry close; only open rows move.
-            if _p.get("pnl") is not None or not isinstance(_arr, list) or not _arr:
+            if (_p.get("pnl") is not None or _tk in _settled
+                    or not isinstance(_arr, list) or not _arr):
                 continue
             _fresh, _ = _stream_overlay(_p, _arr[-1], None, None)
             if isinstance(_fresh, dict) and _fresh is not _arr[-1]:
