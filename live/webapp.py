@@ -1336,6 +1336,7 @@ def _fill_stats(rows: list[dict]) -> dict:
 def actuals():
     rows = _actuals_rows()
     risk = _assignment_lookup()
+    _stream_spots = (_read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}).get("spots") or {}
     for r in rows:
         pk = r.get("pick") or {}
         try:
@@ -1360,14 +1361,26 @@ def actuals():
         # from spot moves together. Patching only the Spot cell left SBUX
         # showing 105.80 while its status still read PARTIAL off the stale
         # 106.25 — the page disagreeing with itself is worse than being stale.
-        if ar and ar.get("spot") and not r.get("outcome_row"):
+        # Prefer the STREAMED spot over the assignment-risk payload's. That
+        # payload is written by a cron job (15:16:21 today) while combo_stream is
+        # seconds old, so Actuals was showing CVX at 204.99 while History and the
+        # live tab showed 204.70 off the same underlying -- up to a full scan
+        # interval stale, and the two tabs disagreeing with each other.
+        _spot = _stream_spots.get(pk.get("ticker")) or (ar or {}).get("spot")
+        if _spot and not r.get("outcome_row"):
             lt = r.get("last_track")
+            if not isinstance(lt, dict):
+                # No tracker row yet (a pick added from Snapshots has none), so
+                # there was nothing to overwrite and the row fell back to the
+                # entry spot. Create it.
+                lt = {}
+                r["last_track"] = lt
             if isinstance(lt, dict):
-                lt["underlying_price"] = ar["spot"]
+                lt["underlying_price"] = _spot
                 st = (r.get("pick") or {}).get("spread_type")
                 ss = (r.get("pick") or {}).get("short_strike")
                 ls = (r.get("pick") or {}).get("long_strike")
-                new_status = _live_status(st, ar["spot"], ss, ls)
+                new_status = _live_status(st, _spot, ss, ls)
                 if new_status:
                     lt["live_status"] = new_status
                     # Keep the older tracker flag in step; the template falls
@@ -1380,10 +1393,10 @@ def actuals():
                     today_d = ddate.today()
                     # Same rule as the tracker flag above: short ITM AND long
                     # OTM. Both legs ITM settles to cash and is not a delivery.
-                    short_itm = ((st == "bull_put" and ar["spot"] < float(ss)) or
-                                 (st == "bear_call" and ar["spot"] > float(ss)))
-                    long_otm = ((st == "bull_put" and ar["spot"] > float(ls)) or
-                                (st == "bear_call" and ar["spot"] < float(ls)))
+                    short_itm = ((st == "bull_put" and _spot < float(ss)) or
+                                 (st == "bear_call" and _spot > float(ss)))
+                    long_otm = ((st == "bull_put" and _spot > float(ls)) or
+                                (st == "bear_call" and _spot < float(ls)))
                     lt["assignment_risk"] = bool(
                         exp_d == today_d and today_d.weekday() == 4
                         and short_itm and long_otm)
