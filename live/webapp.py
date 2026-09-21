@@ -416,6 +416,7 @@ def _actuals_rows() -> list[dict]:
                     "pnl_per_contract": pick.get("pnl"),
                     "underlying_price": pick.get("expiry_close"),
                 }
+                _mk_actual_settled(outcome_row, pick)
             if not pick.get("fill_targets"):
                 mid_c = float(pick.get("net_credit") or pick.get("entry_credit") or 0)
                 width = float(pick.get("spread_width") or (mid_c + float(pick.get("max_loss") or 0)) or 0)
@@ -444,6 +445,7 @@ def _actuals_rows() -> list[dict]:
                     "pnl_per_contract": pick.get("pnl"),
                     "underlying_price": pick.get("expiry_close"),
                 }
+                _mk_actual_settled(outcome_row, pick)
 
         # Live overlay (2026-09-16): combo_stream.py also holds the open positions, so the
         # Actuals tab shows the same second-old spot and mark as the live tab instead of the
@@ -725,6 +727,31 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row):
     except (TypeError, ValueError, KeyError):
         pass
     return _out_track, _out_marked
+
+
+def _mk_actual_settled(outcome_row: dict, pick: dict) -> None:
+    """Settle a closed row against the USER'S fill, not the canon credit.
+
+    The stored `pnl` on a snapshot/frozen pick is the modelled result at the
+    canon entry credit. When the user recorded a real fill the table must show
+    what THEY made: MA 570/567.5 settled PARTIAL at 569.19 and showed 29.50
+    (canon credit 1.40) against 17.00 on the user's 1.15 fill.
+
+    settle_pnl, so the canon partial-WIN haircut applies exactly once.
+    """
+    ac = pick.get("actual_credit")
+    spot = outcome_row.get("underlying_price")
+    if ac is None or spot is None or not pick.get("spread_type"):
+        return
+    try:
+        ss, ls = float(pick["short_strike"]), float(pick["long_strike"])
+        aml = pick.get("actual_max_loss")
+        aml = float(aml) if aml is not None else abs(ss - ls) - float(ac)
+        pps = spreads.settle_pnl(float(spot), ss, ls, float(ac), aml,
+                                 pick["spread_type"])
+    except (KeyError, TypeError, ValueError):
+        return
+    outcome_row["actual_pnl_per_contract"] = round(float(pps) * 100, 2)
 
 
 def _frozen_history(limit: int = 60) -> list[dict]:
