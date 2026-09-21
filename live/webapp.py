@@ -1509,13 +1509,19 @@ def _track_from_snapshot(pick: dict):
 
 
 def _held_shorts() -> dict:
-    """(ticker, spread_type, expiry) -> the short strikes already held, unexpired."""
+    """(ticker, spread_type, expiry) -> the short strikes held for that expiry.
+
+    EXPIRED positions are included (user, 2026-09-21). History shows past weeks
+    and must colour them against what was held AT THE TIME; filtering to
+    unexpired left every row before the current week with a plain +. The key
+    carries the expiry, so an expired holding can never match a live pick --
+    a Sep 18 position and a Sep 25 pick are different keys.
+    """
     out = {}
-    today = ddate.today().isoformat()
     for t in (_actuals_store().get("trades") or []):
         p = t.get("pick") or {}
         exp = str(p.get("expiry_date") or "")[:10]
-        if not exp or exp < today:
+        if not exp:
             continue
         try:
             out.setdefault((p.get("ticker"), p.get("spread_type"), exp), []).append(float(p["short_strike"]))
@@ -1525,15 +1531,18 @@ def _held_shorts() -> dict:
 
 
 def _held_keys() -> set:
-    """(ticker, spread_type, short, long, expiry) of every actuals row not yet expired.
-    IBKR refuses a second order on an option you already hold, so the live tab paints
-    those names blue (user 2026-09-15)."""
+    """(ticker, spread_type, short, long, expiry) of every actuals row.
+
+    IBKR refuses a second order on an option you already hold, so the live tab
+    paints those names blue (user 2026-09-15). Expired rows are kept so History
+    can colour past weeks against what was held at the time; the expiry is part
+    of the key, so they cannot match a live pick.
+    """
     out = set()
-    today = ddate.today().isoformat()
     for t in (_actuals_store().get("trades") or []):
         p = t.get("pick") or {}
         exp = str(p.get("expiry_date") or "")[:10]
-        if not exp or exp < today:
+        if not exp:
             continue
         try:
             out.add((p.get("ticker"), p.get("spread_type"), round(float(p.get("short_strike")), 2),
