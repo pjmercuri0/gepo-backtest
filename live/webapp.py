@@ -718,9 +718,18 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row):
                     live["current_mark"] = round(intr, 4)
                     live["mark_basis"] = "intrinsic (no combo quote, no IV)"
                 live["ts"] = _st.get("ts")
-            ac = pick.get("actual_credit")
-            if live.get("current_mark") is not None and ac is not None:
-                live["unrealized_pnl_per_contract"] = round((float(ac) - live["current_mark"]) * 100, 2)
+            # Recompute the P&L whenever the mark moved. Guarding this on
+            # actual_credit left History -- whose picks carry no fill -- showing a
+            # REFRESHED mark beside a STALE P&L off the previous mark: CSCO
+            # 111/110 on 2026-09-22 rendered mark $1.00 (correct, both legs deep
+            # ITM at 108.41) next to -$9, which was the figure for the old 0.5678
+            # mark. The true number was -$52.
+            # No fill -> book the canon credit, the basis History displays.
+            _ac = pick.get("actual_credit")
+            _basis_credit = float(_ac) if _ac is not None else credit_basis.entry_credit(pick)
+            if live.get("current_mark") is not None and _basis_credit is not None:
+                live["unrealized_pnl_per_contract"] = round(
+                    (float(_basis_credit) - live["current_mark"]) * 100, 2)
             _out_track = live
             if live.get("current_mark") is not None:
                 _out_marked = live
