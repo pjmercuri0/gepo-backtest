@@ -666,7 +666,13 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row):
                 # intrinsic IS the width, so flooring there forces max loss on a
                 # position that still has time value (ADI 2026-09-17).
                 long_itm_by = (kl - _sp) if pick["spread_type"] == "bull_put" else (_sp - kl)
-                deep = long_itm_by > 0.01 * _sp
+                # Never floor at intrinsic once intrinsic IS the whole width --
+                # that is exactly max loss, and a spread with days left is not
+                # worth its full width. CVX 207.5/205 at spot 202.43 with 3 DTE
+                # was marked 2.50 (max loss, -$119) while IBKR marked it 1.49
+                # (-$18). Below the long strike the BS estimate is the honest
+                # number; the floor is only meaningful while intrinsic < width.
+                deep = (long_itm_by > 0.01 * _sp) and (intr < w - 1e-9)
             else:
                 intr = 0.0; deep = False
             if _q and _q.get("mid") is not None:
