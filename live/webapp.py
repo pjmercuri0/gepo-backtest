@@ -1794,6 +1794,13 @@ def add_actual_from_live(index: int):
     fill, but nothing tracks or settles it. ?dry=1 returns the resolved source
     without saving."""
     payload = _read_json(Path(live_config.RANKED_DIR) / "latest.json")
+    # Overlay the live stream exactly as /api/latest.json does before picking the
+    # row. Without it the + saved the SCAN's credit while the page displayed the
+    # streamed one: EOG 143/142 on 2026-09-23 showed 0.53 (stream_mid) and was
+    # saved at 0.43 (leg_mid from the scan), taking its fill targets with it.
+    # What gets stored has to be what he was looking at.
+    if payload:
+        _overlay_stream(payload)
     rows = (payload or {}).get("ticker") or []
     if index < 0 or index >= len(rows):
         abort(404)
