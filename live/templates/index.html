@@ -354,7 +354,10 @@ async function refreshSpyLive() {
     const d = await r.json();
     const chgCls = (d.change_pct >= 0) ? "pos" : "neg";
     const regCls = (d.live_regime === "bull") ? "dir-bull" : "dir-bear";
-    const sign = (n) => Number(n) < 0 ? "-" : "+";   // -0 must not read as "+"
+    // Prefix only. toFixed() already carries a minus, so values must print as
+    // ABS or "-0.28%" renders as "--0.28%" (SPY card, 2026-09-24).
+    const sign = (n) => Number(n) < 0 ? "-" : "+";
+    const mag  = (n, d=2) => Math.abs(rd(Number(n) || 0, d)).toFixed(d);
     // Collapsed-by-default summary line; click to expand the full SPY card.
     const collapsed = localStorage.getItem("spy-card-expanded") !== "1";
     const arrow = collapsed ? "▸" : "▾";
@@ -365,7 +368,7 @@ async function refreshSpyLive() {
           <div>
             <span style="opacity:0.7;margin-right:8px">${arrow}</span>
             <span style="font-weight:600">SPY $${rd(d.mark ?? d.last ?? 0, 2).toFixed(2)}</span>
-            <span class="${chgCls}" style="margin-left:8px">${sign(d.change_pct)}${rd(d.change_pct ?? 0, 2).toFixed(2)}%</span>
+            <span class="${chgCls}" style="margin-left:8px">${sign(d.change_pct)}${mag(d.change_pct)}%</span>
             <span class="${regCls}" style="margin-left:10px;font-weight:600">LIVE ${(d.live_regime || "?").toUpperCase()}</span>
           </div>
         </div>
@@ -376,8 +379,8 @@ async function refreshSpyLive() {
                 <div class="week-sub">SPY · ${d.source}</div>
                 <div class="week-title">$${rd(d.mark ?? d.last ?? 0, 2).toFixed(2)}
                   <span class="${chgCls}" style="font-size:14px;margin-left:6px">
-                    ${sign(d.change)}${rd(d.change ?? 0, 2).toFixed(2)}
-                    (${sign(d.change_pct)}${rd(d.change_pct ?? 0, 2).toFixed(2)}%)
+                    ${sign(d.change)}${mag(d.change)}
+                    (${sign(d.change_pct)}${mag(d.change_pct)}%)
                   </span>
                 </div>
               </div>
@@ -392,8 +395,8 @@ async function refreshSpyLive() {
               <div>
                 <div class="week-sub">intraday vs ${d.sma_window}d SMA (informational; gate uses prior close)</div>
                 <div class="week-title ${regCls}" style="font-size:14px">
-                  ${sign(d.live_vs_sma)}${rd(d.live_vs_sma ?? 0, 2).toFixed(2)}
-                  (${sign(d.live_vs_sma_pct)}${rd(d.live_vs_sma_pct ?? 0, 2).toFixed(2)}%)
+                  ${sign(d.live_vs_sma)}${mag(d.live_vs_sma)}
+                  (${sign(d.live_vs_sma_pct)}${mag(d.live_vs_sma_pct)}%)
                   · ${(d.live_regime || "?").toUpperCase()}
                 </div>
               </div>
