@@ -712,28 +712,25 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row):
             # better number whenever it has the spread; mark_actuals exists for
             # the strikes that have left the scan band, where the stream has
             # nothing and the old code fell through to intrinsic (= max loss).
-            if _q and _q.get("mid") is not None:
-                # LAST TRADED price first -- it is what IBKR marks at, verified
-                # 2026-09-24: AAPL 2.15, BAC 0.52, FCX 0.67 matched the broker
-                # exactly. The mid is the fallback when the spread has not
-                # traded.
-                #
-                # No intrinsic floor. It was wrong: before expiry a fully-ITM
-                # vertical is worth slightly LESS than its width (the short leg
-                # can still be rallied through), so flooring at intrinsic printed
-                # max loss -- AAPL 2.50 against a real 2.15, IBM 2.50 against
-                # 1.93. Intrinsic is an upper bound there, not a lower one.
-                _last = _q.get("last")
-                _px = None
-                if _last is not None:
-                    _v = -float(_last) if float(_last) < 0 else float(_last)
-                    if 0.0 <= _v <= w + 1e-9:
-                        _px, _basis = _v, "combo last (as IBKR marks)"
-                if _px is None:
-                    _px, _basis = min(max(float(_q["mid"]), 0.0), w), "stream mid"
+            # Order (user, 2026-09-24): LAST traded price, then Black-Scholes.
+            # The combo mid is NOT used -- these books run very wide when a
+            # spread has not traded (AMGN 405/402.5 quoted 0.05 to 1.69 on a 2.50
+            # spread), so its midpoint is a guess between two numbers 1.64 apart.
+            # BS off the position's own leg IVs is the better estimate there.
+            _last = (_q or {}).get("last")
+            _px = _basis = None
+            if _last is not None:
+                _v = -float(_last) if float(_last) < 0 else float(_last)
+                if 0.0 <= _v <= w + 1e-9:
+                    _px, _basis = _v, "combo last (as IBKR marks)"
+            if _px is None and _am and _am.get("mark_bs") is not None:
+                _bs = float(_am["mark_bs"])
+                if 0.0 <= _bs <= w + 1e-9:
+                    _px, _basis = _bs, "BS at own-leg IV"
+            if _px is not None:
                 live["current_mark"] = round(min(max(_px, 0.0), w), 4)
                 live["mark_basis"] = _basis
-                live["ts"] = _q["ts"]
+                live["ts"] = (_q or {}).get("ts") or _am.get("ts")
             elif _am and _am.get("mark") is not None:
                 # Same arbitrage bound as the stream branch: never below
                 # intrinsic, never above the width. FCX 73/72 at spot 71.53 came
