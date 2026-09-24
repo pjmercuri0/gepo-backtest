@@ -41,6 +41,12 @@ FETCH_PER_TICKER_TIMEOUT = 150    # Wall-clock budget for a fetcher group. All t
                                   # group run concurrently under one shared deadline, so this
                                   # bounds the group, not each ticker. Production groups take
                                   # 48-95s (2026-08-31 logs); 25 killed every ticker.
+# How the Actuals/History tabs mark an OPEN spread (user, 2026-09-24).
+#   "bs"    -> Black-Scholes at the live spot off today's snapshot IVs
+#   "quote" -> the streamed combo mid, falling back to BS when there is no book
+# Set to "bs" so every row is priced the same way. The quote path is still
+# maintained and one word away.
+ACTUALS_MARK_BASIS       = "bs"
 CHAIN_PARAMS_TIMEOUT     = 20     # Seconds to wait for reqSecDefOptParams. Most names
                                   # answer in ~0.1s; GOOGL/NFLX hang indefinitely, and
                                   # unbounded one of them eats the group's 150s budget.

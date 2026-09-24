@@ -632,6 +632,23 @@ def _basket_totals(picks: list) -> dict:
     return out
 
 
+def _actuals_marks() -> dict:
+    """Marks written by live/mark_actuals.py, keyed by spread identity.
+
+    Cached per request: the overlay runs once per row and this file is read for
+    every one of them.
+    """
+    try:
+        cached = getattr(g, "_actuals_marks", None)
+    except RuntimeError:            # called outside a request (scripts, tests)
+        return (_read_json(Path(live_config.RANKED_DIR) / "actuals_marks.json") or {}).get("marks") or {}
+    if cached is None:
+        blob = _read_json(Path(live_config.RANKED_DIR) / "actuals_marks.json") or {}
+        cached = blob.get("marks") or {}
+        g._actuals_marks = cached
+    return cached
+
+
 def _stream_overlay(pick, last_track, last_marked, outcome_row):
     """Live spot + mark for ONE open pick, straight off combo_stream.
 
@@ -675,7 +692,23 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row):
                 deep = (long_itm_by > 0.01 * _sp) and (intr < w - 1e-9)
             else:
                 intr = 0.0; deep = False
-            if _q and _q.get("mid") is not None:
+            # MARK_BASIS (user, 2026-09-24): "do it black scholes". The combo
+            # book is skipped entirely and every open mark is modelled, so one
+            # method prices the whole tab instead of some rows off a quote and
+            # some off a model. Flip back by setting this to "quote".
+            # live/mark_actuals.py prices each open position off ITS OWN legs
+            # every scan, so a strike that has left the scan band is still
+            # quoted. Prefer it over everything else.
+            _am = (_actuals_marks() or {}).get(
+                f"{pick.get('ticker')}|{pick.get('spread_type')}"
+                f"|{float(pick.get('short_strike')):g}|{float(pick.get('long_strike')):g}"
+                f"|{str(pick.get('expiry_date'))[:10]}")
+            _use_quote = getattr(live_config, "ACTUALS_MARK_BASIS", "bs") == "quote"
+            if _am and _am.get("mark") is not None:
+                live["current_mark"] = round(min(max(float(_am["mark"]), 0.0), w), 4)
+                live["mark_basis"] = _am.get("basis") or "mark_actuals"
+                live["ts"] = _am.get("ts")
+            elif _use_quote and _q and _q.get("mid") is not None:
                 _m = float(_q["mid"])
                 _m = min(max(_m, 0.0), w)          # a vertical is worth 0..width, always
                 live["current_mark"] = round(min(max(_m, intr) if deep else _m, w), 4)

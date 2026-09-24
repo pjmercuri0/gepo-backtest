@@ -1,0 +1,17 @@
+
+# BEGIN GEPO MAC MINI
+# Scan: every 15 min on the quarter hour, 9:00-16:00 Mon-Fri.
+0,15,30,45 9-15 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_parallel.sh
+0 16 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_parallel.sh
+1 16 * * 4,5 /Users/securio/Downloads/gepo-backtest/live/cron_expire.sh
+1,31 9-15 * * 4,5 /Users/securio/Downloads/gepo-backtest/live/cron_track_expiring.sh
+1 15 * * 4,5 /Users/securio/Downloads/gepo-backtest/live/cron_close_alert.sh
+1 17 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_daily_bars.sh
+1 17 * * 5 /Users/securio/Downloads/gepo-backtest/live/cron_calendar_refresh.sh
+# Health: 5 min after each scan, 9:05-16:05 Mon-Fri.
+5,20,35,50 9-15 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_health.sh
+5 16 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_health.sh
+31 17 * * 5 /Users/securio/Downloads/gepo-backtest/live/cron_pool_refresh.sh
+# END GEPO MAC MINI
+35 9 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_name_gaps.sh
+50 9 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_name_gaps.sh
