@@ -242,3 +242,24 @@ if [ -n "${MYA_SSH_HOST:-}" ]; then
 else
     echo "  (skip Mya upload — MYA_SSH_HOST not set)"
 fi
+
+# Price every OPEN Actuals position off ITS OWN legs. Last step on purpose: the
+# fetchers have disconnected by now, so it is not competing for the Gateway.
+#
+# Needed because the scan's strike band is sized to find NEW candidates near
+# spot -- 1 sigma x sqrt(DTE/365), floored at +/-2% -- so a position whose price
+# has moved falls outside it and stops being quoted, in EITHER direction. With
+# no quote and no IV the webapp fell through to INTRINSIC, which below both
+# strikes is the full width: AAPL 342.5/340 marked at max loss against a real
+# 1.80 market, XOM marked at zero (2026-09-24).
+#
+# Soft-fail: a marking problem must never fail the scan.
+echo "Marking open Actuals positions..."
+"${GEPO_PYTHON:-python3}" -m live.mark_actuals 2>&1 | sed "s/^/  [Marks] /" \
+    || echo "  ✗ mark_actuals failed (non-fatal)"
+if [ -n "${MYA_SSH_HOST:-}" ] && [ -f live/ranked/actuals_marks.json ]; then
+    rsync -az --timeout=20 -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+        live/ranked/actuals_marks.json \
+        "$MYA_SSH_HOST:${MYA_REMOTE_BASE:-/opt/vito/gepo-backtest/live}/ranked/actuals_marks.json" \
+        && echo "  [Marks] ✓ uploaded" || echo "  [Marks] ✗ upload failed (non-fatal)"
+fi
