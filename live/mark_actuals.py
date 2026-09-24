@@ -40,7 +40,10 @@ from live.fetcher import _connect_with_retry
 CLIENT_ID = int(getattr(live_config, "MARK_ACTUALS_CLIENT_ID", 120))
 OUT = Path(live_config.RANKED_DIR) / "actuals_marks.json"
 LOCK = Path(live_config.ROOT_DIR) / "logs" / "mark_actuals.lock"
-QUOTE_WAIT_S = float(getattr(live_config, "MARK_ACTUALS_WAIT_S", 6.0))
+# 6s was not enough for 28 legs to populate: some came back empty, fell through
+# to Black-Scholes, and the book printed +15 when fresh leg mids said -26
+# (2026-09-24). Wait longer, and poll rather than sleep a fixed time.
+QUOTE_WAIT_S = float(getattr(live_config, "MARK_ACTUALS_WAIT_S", 15.0))
 
 
 def _key(p: dict) -> str:
@@ -120,7 +123,18 @@ def mark_positions(ib: IB, picks: list[dict]) -> dict:
     stock_t = [ib.reqMktData(c, "", False, False) for c in stocks if getattr(c, "conId", 0)]
 
     tickers = [ib.reqMktData(c, "", False, False) for c in live_c]
-    ib.sleep(QUOTE_WAIT_S)
+    # Poll until every leg has a two-sided quote, up to the budget. A fixed
+    # sleep left late legs empty and silently degraded them to BS.
+    _waited = 0.0
+    while _waited < QUOTE_WAIT_S:
+        ib.sleep(1.0)
+        _waited += 1.0
+        _missing = sum(1 for t in tickers if _leg_mid(t) is None)
+        if _missing == 0:
+            break
+    if _missing:
+        print(f"[mark_actuals] {_missing}/{len(tickers)} legs still unquoted "
+              f"after {_waited:.0f}s", flush=True)
 
     spot_of = {}
     for t in stock_t:
