@@ -194,6 +194,7 @@ RSYNC=(rsync -az --partial --timeout=20 -e "$SSH_COMMAND")
 UPLOAD_FILES=(
   "live/ranked/spy_intraday.json"   # always real (IBKR live tick)
   "live/ranked/latest.json"         # real ranked picks (OPRA live as of 2026-05-20)
+  "live/ranked/actuals_marks.json"  # open-position marks off their OWN legs (mark_actuals.py)
   "live/notifications/"             # health alerts and (later) 15:45 freeze payloads
   "live/frozen/"                    # daily 15:45 freeze snapshots (History tab)
   "live/intraday_picks/"            # every :01/:31 scan's qualified picks (Snapshots tab)
