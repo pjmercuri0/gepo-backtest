@@ -227,10 +227,27 @@ def main() -> int:
         try:
             ib.reqMarketDataType(int(live_config.IB_MKT_DATA_TYPE))
             marks = mark_positions(ib, picks)
+            # After the bell the live book is gone: the 16:01 run on 2026-09-24
+            # got 0/28 legs and every row fell through to the stale-IV path,
+            # printing -354 against IBKR's -138. Frozen data serves the closing
+            # quotes, so retry with it rather than publish nothing.
+            if not any(v.get("mark") is not None for v in marks.values()):
+                print("[mark_actuals] no live quotes — retrying on frozen data",
+                      flush=True)
+                ib.reqMarketDataType(2)
+                marks = mark_positions(ib, picks)
         finally:
             ib.disconnect()
 
         priced = sum(1 for v in marks.values() if v.get("mark") is not None)
+        # A run that prices NOTHING must not overwrite good marks. The 16:01:40
+        # run on 2026-09-24 fired as the book closed, got 0/14 legs, and every
+        # row fell through to the stale-IV path that pins deep-ITM spreads at max
+        # loss -- the card read -354 against IBKR's -138.
+        if priced == 0 and OUT.exists():
+            print(f"[mark_actuals] priced 0/{len(marks)} — keeping the previous "
+                  f"marks rather than overwriting with nothing", flush=True)
+            return 0
         OUT.parent.mkdir(parents=True, exist_ok=True)
         tmp = OUT.with_suffix(".tmp")
         tmp.write_text(json.dumps(
