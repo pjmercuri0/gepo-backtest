@@ -703,18 +703,23 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row):
                 f"{pick.get('ticker')}|{pick.get('spread_type')}"
                 f"|{float(pick.get('short_strike')):g}|{float(pick.get('long_strike')):g}"
                 f"|{str(pick.get('expiry_date'))[:10]}")
-            _use_quote = getattr(live_config, "ACTUALS_MARK_BASIS", "bs") == "quote"
-            if _am and _am.get("mark") is not None:
-                live["current_mark"] = round(min(max(float(_am["mark"]), 0.0), w), 4)
-                live["mark_basis"] = _am.get("basis") or "mark_actuals"
-                live["ts"] = _am.get("ts")
-            elif _use_quote and _q and _q.get("mid") is not None:
+            # Order (user, 2026-09-24): the STREAM first -- it is a second old
+            # and the page refreshes every 5s -- then mark_actuals, which prices
+            # the position's own legs but only once per scan. The stream is the
+            # better number whenever it has the spread; mark_actuals exists for
+            # the strikes that have left the scan band, where the stream has
+            # nothing and the old code fell through to intrinsic (= max loss).
+            if _q and _q.get("mid") is not None:
                 _m = float(_q["mid"])
                 _m = min(max(_m, 0.0), w)          # a vertical is worth 0..width, always
                 live["current_mark"] = round(min(max(_m, intr) if deep else _m, w), 4)
                 live["mark_basis"] = ("intrinsic floor (both legs deep ITM)"
                                       if deep and _m < intr else "stream mid")
                 live["ts"] = _q["ts"]
+            elif _am and _am.get("mark") is not None:
+                live["current_mark"] = round(min(max(float(_am["mark"]), 0.0), w), 4)
+                live["mark_basis"] = f"{_am.get('basis') or 'mark_actuals'} (last scan)"
+                live["ts"] = _am.get("ts")
             elif _sp:
                 # No complex-order book for this spread (common once a position
                 # runs ITM -- the scanner stops fetching those strikes and the
