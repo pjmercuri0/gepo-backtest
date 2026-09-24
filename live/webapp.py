@@ -683,13 +683,16 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row):
                 # intrinsic IS the width, so flooring there forces max loss on a
                 # position that still has time value (ADI 2026-09-17).
                 long_itm_by = (kl - _sp) if pick["spread_type"] == "bull_put" else (_sp - kl)
-                # Never floor at intrinsic once intrinsic IS the whole width --
-                # that is exactly max loss, and a spread with days left is not
-                # worth its full width. CVX 207.5/205 at spot 202.43 with 3 DTE
-                # was marked 2.50 (max loss, -$119) while IBKR marked it 1.49
-                # (-$18). Below the long strike the BS estimate is the honest
-                # number; the floor is only meaningful while intrinsic < width.
-                deep = (long_itm_by > 0.01 * _sp) and (intr < w - 1e-9)
+                # ALWAYS floor at intrinsic. A vertical cannot trade below it --
+                # that is an arbitrage, not a price. On 2026-09-24 the streamed
+                # mids had AAPL 342.5/340 at 1.80 against an intrinsic of 2.50
+                # (spot 337.90) and IBM at 1.30 against 2.50, and CSCO showed a
+                # POSITIVE P&L on a position that is deep in the money.
+                #
+                # This floor was removed on 2026-09-23 because AAPL then looked
+                # wrong against IBKR's -39. That comparison was invalid: the
+                # IBKR column is DAILY P&L, not P&L since entry. Restored.
+                deep = True
             else:
                 intr = 0.0; deep = False
             # MARK_BASIS (user, 2026-09-24): "do it black scholes". The combo
@@ -717,7 +720,11 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row):
                                       if deep and _m < intr else "stream mid")
                 live["ts"] = _q["ts"]
             elif _am and _am.get("mark") is not None:
-                live["current_mark"] = round(min(max(float(_am["mark"]), 0.0), w), 4)
+                # Same arbitrage bound as the stream branch: never below
+                # intrinsic, never above the width. FCX 73/72 at spot 71.53 came
+                # back 0.6588 from its own-leg BS against an intrinsic of 1.00.
+                live["current_mark"] = round(
+                    min(max(float(_am["mark"]), intr, 0.0), w), 4)
                 live["mark_basis"] = f"{_am.get('basis') or 'mark_actuals'} (last scan)"
                 live["ts"] = _am.get("ts")
             elif _sp:
