@@ -246,8 +246,19 @@ def main() -> int:
             for k, (_bag, t) in subs.items():
                 bid, ask, last = t.bid, t.ask, t.last
                 if ok(bid) and ok(ask):
-                    _m = -(float(bid) + float(ask)) / 2.0
                     _w = widths.get(k)
+                    # Validate EACH SIDE against [0, width] before averaging. A
+                    # vertical cannot be worth more than its width, so a quote
+                    # outside that is junk -- and averaging it in poisons the mid.
+                    # AMGN 405/402.5 on 2026-09-24 streamed bid -4.87 / ask -0.05
+                    # on a 2.50-wide spread: the bid is impossible, but the mean
+                    # landed at 2.46, inside [0, width], so the old clamp passed
+                    # it. A WINNING spread (spot 407.83, short 405) was marked at
+                    # near max loss and showed -$80.
+                    _cb, _ca = -float(bid), -float(ask)          # cost to close
+                    _lo, _hi = (0.0, _w + 1e-9) if _w else (0.0, float("inf"))
+                    _sides = [v for v in (_cb, _ca) if _lo <= v <= _hi]
+                    _m = (sum(_sides) / len(_sides)) if _sides else -1.0
                     if _m > 0 and (_w is None or _m <= _w + 1e-9):
                         quotes[k] = {"bid": float(bid), "ask": float(ask), "mid": round(_m, 4),
                                      "last": (float(last) if ok(last) else None),
