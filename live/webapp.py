@@ -738,6 +738,13 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row):
                 live["current_mark"] = round(min(max(_px, 0.0), w), 4)
                 live["mark_basis"] = _basis
                 live["ts"] = _am.get("ts")
+            elif last_track and last_track.get("current_mark") is not None:
+                # No fresh mark for this spread. KEEP the last good one rather
+                # than falling through to the stale-IV path below, which prices
+                # deep-ITM spreads at max loss.
+                live["current_mark"] = last_track["current_mark"]
+                live["mark_basis"] = f"{last_track.get('mark_basis') or 'mark'} (held)"
+                live["ts"] = last_track.get("ts")
             elif _am and _am.get("mark") is not None:
                 # Same arbitrage bound as the stream branch: never below
                 # intrinsic, never above the width. FCX 73/72 at spot 71.53 came
