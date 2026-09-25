@@ -66,7 +66,19 @@
            say — and on a book closed Friday afternoon it never became an
            action. Ext keeps showing the number.
            Reason is on the ticker's tooltip. #}
-        <tr class="{% if arisk and (arisk.at_risk or arisk.in_pin_zone) and pin_open(p, arisk.spot, false) %}assign-watch{% endif %}">
+        {# Pin highlight off the LIVE spot -- the same value this row displays.
+           It used to read arisk.spot from the assignment-risk cron payload AND
+           require that payload to flag the row, so KO 88/87 sat at 87.94 on
+           expiry day, plainly between the strikes, with no highlight
+           (2026-09-25). Pin is purely spot vs strikes on expiry day. #}
+        {# Highlight straight off the STATUS BADGE, so the two can never
+           disagree: yellow exactly when the badge reads P on expiry day. Two
+           separate spot comparisons is what let KO 88/87 show P at 87.94 with
+           no highlight (2026-09-25). #}
+        {% set _pin_row = (outcome_row is none
+                           and last_track and last_track.live_status == 'PARTIAL'
+                           and p.expiry_date and (p.expiry_date|string)[:10] == today_iso) %}
+        <tr class="{% if _pin_row %}assign-watch{% endif %}">
           <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button>
             {{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>
           <td>{{ row.source_time or '—' }}</td>
