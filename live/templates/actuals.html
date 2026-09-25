@@ -108,7 +108,32 @@ document.addEventListener('click', e => {
       const html = await r.text();
       // Re-check: the fetch is async; the user may have started typing during it.
       if (editing()) return;
-      if (html.trim()) host.innerHTML = html;
+      if (!html.trim()) return;
+
+      // The swap destroys every .table-scroll, so a card scrolled right to read
+      // the P&L columns would snap back to the ticker column every 5s. Record
+      // each card's horizontal offset by its expiry title -- a stable key that
+      // survives rows being added, settled or removed -- and put it back.
+      const scrollKey = el => {
+        const card = el.closest('.week-card');
+        const t = card && card.querySelector('.week-title');
+        return t ? t.textContent.trim() : null;
+      };
+      const saved = new Map();
+      host.querySelectorAll('.table-scroll').forEach(el => {
+        const k = scrollKey(el);
+        if (k && el.scrollLeft) saved.set(k, el.scrollLeft);
+      });
+      const pageY = window.scrollY;
+
+      host.innerHTML = html;
+
+      host.querySelectorAll('.table-scroll').forEach(el => {
+        const k = scrollKey(el);
+        if (k && saved.has(k)) el.scrollLeft = saved.get(k);
+      });
+      // A card changing height (a row settling) would otherwise jump the page.
+      if (window.scrollY !== pageY) window.scrollTo(0, pageY);
     } catch (e) {
       // A dropped poll is not worth an alert; the next tick retries.
     } finally {
