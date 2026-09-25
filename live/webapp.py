@@ -1560,9 +1560,15 @@ def actuals():
                         exp_d == today_d and today_d.weekday() == 4
                         and short_itm and long_otm)
     fill_stats = _fill_stats(rows)
-    return render_template("actuals.html", fill_stats=fill_stats, rows=rows, weeks=_actuals_weeks(rows),
-                           assign_ts=risk.get("_ts"),
-                           today_iso=ddate.today().isoformat())
+    ctx = dict(fill_stats=fill_stats, rows=rows, weeks=_actuals_weeks(rows),
+               assign_ts=risk.get("_ts"),
+               today_iso=ddate.today().isoformat(),
+               poll_seconds=live_config.WEBAPP_POLL_SECONDS)
+    # ?fragment=1 returns just the cards, rendered by the SAME template the full
+    # page includes, so the polled markup cannot drift from the loaded markup.
+    if request.args.get("fragment"):
+        return render_template("_actuals_cards.html", **ctx)
+    return render_template("actuals.html", **ctx)
 
 
 _SNAP_CACHE: dict = {}
