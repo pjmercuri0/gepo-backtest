@@ -1,0 +1,211 @@
+{% if rows %}
+  {# One card per expiry Friday. Every pick in a group shares an expiry, so the
+     group total is the number that matters for the week: realized where the
+     trade settled, marked where it is still open. #}
+  {% for wk in weeks %}
+  <div class="week-card">
+    <div class="week-head">
+      <div class="week-title">Expires {{ wk.expiry_label }}{% if wk.expiry_dow %} ({{ wk.expiry_dow }}){% endif %}</div>
+      <div class="week-pnl {% if wk.total is not none and wk.total > 0 %}pos{% elif wk.total is not none and wk.total < 0 %}neg{% endif %}">
+        {% if wk.total is not none %}${{ '%+.0f'|format(wk.total) }}{% if wk.open %}<span class="live-dot" style="margin-left:6px"></span>{% endif %}{% else %}—{% endif %}
+      </div>
+    </div>
+    <div class="week-sub">
+      {{ wk.n }} trade{{ '' if wk.n == 1 else 's' }}
+      &middot; {{ wk.settled }} settled, {{ wk.open }} open
+      &middot; credit ${{ '%.0f'|format(wk.credit) }}
+      &middot; risk ${{ '%.0f'|format(wk.max_loss) }}
+      {% if wk.pct_of_credit is not none %}&middot; {{ '%+.1f'|format(wk.pct_of_credit) }}% of credit{% endif %}
+      {% if wk.settled and wk.open %}
+        &middot; realized ${{ '%+.0f'|format(wk.realized) }}, marked ${{ '%+.0f'|format(wk.unrealized) }}
+      {% endif %}
+    </div>
+    <div class="table-scroll">
+    <table class="actuals-table">
+      <thead><tr>
+        <th>Date</th><th>Time</th><th>Ticker</th>
+        <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th>
+        <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">Min / Target ($/sh)</th>
+        <th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
+        <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>
+      </tr></thead>
+      <tbody>
+      {% for row in wk.rows %}
+        {% set p = row.pick %}
+        {% set outcome_row = row.outcome_row %}
+        {% set last_track = row.last_track %}
+        {% set last_marked = row.last_marked %}
+        {# Red flashing row for anything at risk of assignment: in the pin zone
+           at expiry, or a rational early-exercise case on any day. Reason is
+           spelled out under the ticker so it is not just a colour. #}
+        {% set arisk = row.assign_risk %}
+        {# A WATCH is not an alert: extrinsic has collapsed but no rational
+           exercise case exists yet. It gets a static amber row, never the
+           flash, so a real risk still stands out. #}
+        {# ONE state: YELLOW = PIN risk. Spot inside the strikes (inclusive of
+           both ends), so at settlement the short is assigned, the long expires
+           worthless, and real shares are delivered. It is the only shape that
+           puts stock in the account, and the only thing warned on here.
+
+           Extrinsic collapse no longer raises anything (2026-09-11). It fired
+           on every deep-ITM spread — which the Ext column and the P&L already
+           say — and on a book closed Friday afternoon it never became an
+           action. Ext keeps showing the number.
+           Reason is on the ticker's tooltip. #}
+        {# Pin highlight off the LIVE spot -- the same value this row displays.
+           It used to read arisk.spot from the assignment-risk cron payload AND
+           require that payload to flag the row, so KO 88/87 sat at 87.94 on
+           expiry day, plainly between the strikes, with no highlight
+           (2026-09-25). Pin is purely spot vs strikes on expiry day. #}
+        {# Highlight straight off the STATUS BADGE, so the two can never
+           disagree: yellow exactly when the badge reads P on expiry day. Two
+           separate spot comparisons is what let KO 88/87 show P at 87.94 with
+           no highlight (2026-09-25). #}
+        {% set _pin_row = (outcome_row is none
+                           and last_track and last_track.live_status == 'PARTIAL'
+                           and p.expiry_date and (p.expiry_date|string)[:10] == today_iso) %}
+        <tr class="{% if _pin_row %}assign-watch{% endif %}">
+          <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button>
+            {{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>
+          <td>{{ row.source_time or '—' }}</td>
+          {# Source column dropped 2026-09-03 to save width; row.source_label is
+             still produced by webapp.py and used elsewhere. #}
+          <td class="fw"{% if arisk and arisk.at_risk %} title="{{ arisk.reasons | join('; ') }}"{% elif arisk and arisk.in_pin_zone %} title="PIN risk: spot {{ arisk.spot }} inside {{ arisk.pin_zone[0] }}-{{ arisk.pin_zone[1] }} — short assigned, long expires worthless, shares delivered"{% elif arisk and arisk.extrinsic_unknown %} title="ASSIGNMENT risk: parity leg not quoting, extrinsic UNKNOWN on a short leg {{ arisk.short_itm_by }} ITM"{% elif arisk and arisk.extrinsic_watch %} title="ASSIGNMENT risk: extrinsic {{ arisk.extrinsic }} on a short leg {{ arisk.short_itm_by }} ITM"{% endif %}>{{ p.ticker }}
+            {% if p.spread_type == 'bull_put' %}
+              <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
+            {% elif p.spread_type == 'bear_call' %}
+              <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600" title="bear-call">▼ BC</span>
+            {% endif %}
+          </td>
+          {# Spot precedence. A settled row keeps its settlement price. For an
+             OPEN row, assignment_risk's spot wins over the tracker's: it quotes
+             each position's own underlying on every run, whereas last_track
+             carries the spot from the last SCAN, which can be hours old and
+             goes missing entirely once a position drifts outside the scan's
+             strike band. On 2026-09-03 the tracker had HD at 318.07 while the
+             live quote was 318.56, and DE was out by 1.41. #}
+          <td>
+            {% if outcome_row and outcome_row.underlying_price is defined %}
+              ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}
+            {% elif last_track and 'underlying_price' in last_track and last_track.underlying_price %}
+              <span{% if arisk and arisk.spot %} title="quoted {{ assign_ts }}"{% endif %}>${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}</span>
+            {% elif p.entry_price is not none %}
+              ${{ "%.2f"|format(p.entry_price|rd(2)) }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>${{ p.short_strike|strike }} / ${{ p.long_strike|strike }}</td>
+          <td style="color:#e8b366;font-weight:600">{{ p.suggested_qty or 1 }}×</td>
+          {% if p.fill_targets %}
+            {% set cr = p.fill_targets[0].credit %}
+            {% set ml = p.fill_targets[0].max_loss %}
+          {% elif p.entry_credit is defined and p.entry_credit is not none %}
+            {% set cr = p.entry_credit %}
+            {% set ml = (p.spread_width or ((p.net_credit or 0) + (p.max_loss or 0))) - p.entry_credit %}
+          {% else %}
+            {% set cr = p.net_credit %}
+            {% set ml = p.max_loss %}
+          {% endif %}
+          {# Click the (+) / ($X.XX) to record the credit you actually filled at.
+             Once set it drives this row's P&L and the week total above. #}
+          <td>${{ "%.2f"|format(cr|rd(2)) }}
+            {% if p.actual_credit is defined and p.actual_credit is not none %}
+              <span class="actual-trade-edit actual-shown" data-id="{{ row.id }}" data-current="{{ "%.2f"|format(p.actual_credit|rd(2)) }}"
+                    style="color:#7ec99a"
+                    title="your actual fill — click to edit">(${{ "%.2f"|format(p.actual_credit|rd(2)) }})</span>
+            {% else %}
+              <span class="actual-trade-edit" data-id="{{ row.id }}" data-current=""
+                    style="color:#666"
+                    title="click to record your actual fill">(+)</span>
+            {% endif %}
+          </td>
+          {# Min / target credit from the model (D_ent canon): min is 1.00x this
+             spread's model credit (= the gate), target 1.04-1.10x. Shown as reference only --
+             the fill-grade tag was dropped 2026-09-13. IBKR quotes are untouched. #}
+          {% set tg = p.credit_targets %}
+          {% if tg and tg.min_credit is defined %}
+            <td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }}); breakeven ${{ '%.2f'|format(tg.breakeven_credit) }}">
+              <span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span>
+              <span style="opacity:0.6"> / </span>
+              <span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>
+            </td>
+          {% else %}
+            <td>—</td>
+          {% endif %}
+          <td>${{ "%.2f"|format(ml|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span class="actual-shown" style="color:#7ec99a">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>
+          {# Modelled ratio, plus the ratio on your real fill once recorded.
+             All recorded values use the one light green (#7ec99a). History
+             darkens to #5b9474 when a fill came in worse than modelled, but
+             here credit and ratio sat beside an always-light max-loss in the
+             same row, so the shade read as a mismatched colour rather than as
+             a signal. #}
+          <td>{% if (ml|rd(2)) > 0 %}{{ "%.2f"|format(((cr|rd(2)) / (ml|rd(2)))|rd(2)) }}{% else %}—{% endif %}
+            {%- if p.actual_credit is defined and p.actual_credit is not none
+                  and p.actual_max_loss is defined and p.actual_max_loss is not none
+                  and (p.actual_max_loss|rd(2)) > 0 %}
+              {%- set ar = ((p.actual_credit|rd(2)) / (p.actual_max_loss|rd(2)))|rd(2) %}
+              <span class="actual-shown" style="color:#7ec99a">({{ "%.2f"|format(ar) }})</span>
+            {%- endif %}
+          </td>
+          <td class="fw">{% if p.GROUND is not none %}{{ "%.1f"|format((p.GROUND * 100)|rd(1)) }}%{% else %}—{% endif %}</td>
+          <td>{% if p.short_delta is defined and p.short_delta is not none %}{{ "%.2f"|format(p.short_delta|rd(2)) }}{% else %}—{% endif %}</td>
+          <td>{{ p.DTE if p.DTE is not none else '—' }}</td>
+          {% if outcome_row and outcome_row.result %}
+            <td><span class="badge {% if outcome_row.result == 'WIN' %}badge-WIN{% elif outcome_row.result == 'LOSS' %}badge-LOSS{% elif outcome_row.result == 'PARTIAL' %}badge-PARTIAL{% else %}badge-FROZEN{% endif %}" title="{{ outcome_row.result }}">{{ outcome_row.result[0] }}</span></td>
+          {% elif p.outcome %}
+            <td><span class="badge badge-{{ p.outcome }}" title="{{ p.outcome }}">{{ p.outcome[0] }}</span></td>
+          {% elif last_track and last_track.live_status %}
+            <td><span class="badge {% if last_track.live_status == 'WINNING' %}badge-WIN{% elif last_track.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}" title="{{ last_track.live_status }}">{{ last_track.live_status[0] }}</span><span class="live-dot" style="margin-left:6px;margin-right:0"></span></td>
+          {% else %}
+            <td><span style="color:#888780">open</span></td>
+          {% endif %}
+          {% if outcome_row %}
+            <td>—</td>
+          {% elif last_marked %}
+            <td>${{ "%.2f"|format(last_marked.current_mark|rd(2)) }}</td>
+          {% else %}
+            <td>—</td>
+          {% endif %}
+          {# Ext = extrinsic on the short leg. Sits beside Mark because the two
+             fail differently: Mark goes blank exactly when a position moves
+             deep ITM and drops out of the scan's strike band (DE, 7.63% from
+             spot, had no mark at all), while assignment_risk fetches each
+             position's own strikes and always has this. Red under the alert
+             floor on an ITM short leg. #}
+          {% if outcome_row %}
+            <td>—</td>
+          {% elif arisk and arisk.extrinsic is not none %}
+            <td class="fw{% if arisk.extrinsic_watch %} neg{% endif %}"
+                title="short leg {{ arisk.short_itm_by }} ITM">${{ "%.2f"|format(arisk.extrinsic|rd(2)) }}</td>
+          {% elif arisk and arisk.extrinsic_unknown %}
+            <td class="fw neg" title="no quote on the parity leg — extrinsic unknown, short leg {{ arisk.short_itm_by }} ITM">n/a</td>
+          {% else %}
+            <td>—</td>
+          {% endif %}
+          {# One source of truth: row.row_pnl is _actuals_row_pnl, the same
+             function the card header sums. The old chain ended at
+             last_track.unrealized_pnl_per_contract, which the tracker computes
+             against the MODELLED entry (0.80 x mid) rather than the fill you
+             recorded — so on 2026-09-08 the Sep 11 card read -49 while its
+             three rows showed -11 / +2 / +24, and ABT and ISRG rendered as
+             winners when both were losses. #}
+          {% if row.row_pnl is not none %}
+            <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}"
+                style="text-align:right"
+                title="{{ 'realized' if row.row_pnl_realized else 'marked' }}{% if p.actual_credit is not none %} against your fill {{ p.actual_credit }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
+          {% else %}
+            <td style="text-align:right">—</td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="week-card"><div class="week-sub" style="color:#888780;padding:12px">
+    no actual trades added yet
+  </div></div>
+{% endif %}
