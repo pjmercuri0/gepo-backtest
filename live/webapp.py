@@ -1561,7 +1561,8 @@ def actuals():
                         and short_itm and long_otm)
     fill_stats = _fill_stats(rows)
     return render_template("actuals.html", fill_stats=fill_stats, rows=rows, weeks=_actuals_weeks(rows),
-                           assign_ts=risk.get("_ts"))
+                           assign_ts=risk.get("_ts"),
+                           today_iso=ddate.today().isoformat())
 
 
 _SNAP_CACHE: dict = {}
