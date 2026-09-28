@@ -189,6 +189,28 @@ D_ent ranking is within noise of GROUND ranking at every cut and D_ent ceilings 
 clears the §0.64 row on both windows. (The thr=-1 row differs from `thr_sweep.csv` only because OOT now
 runs through 09-25.)
 
+### Gate ablation on the drift-free canon (2026-09-29, `results_ablate.csv`)
+
+Which gate carries the yield. Bull sleeve gates removed one at a time; bear sleeve stays canon unless noted.
+
+| variant | IS n | IS final | IS $-Sh | IS DD | OOT n | OOT $-Sh | OOT DD |
+|---|---|---|---|---|---|---|---|
+| §0.64 canon | 4994 | $95,251 | 1.36 | -29.9% | 839 | 3.51 | -8.3% |
+| no bear sleeve | 4019 | $89,160 | 1.42 | -33.1% | 757 | 2.59 | -8.3% |
+| - regime | 6088 | $107,666 | 1.66 | -29.9% | 963 | 3.27 | -8.3% |
+| - parity | 5164 | $96,215 | 1.35 | -29.9% | 896 | 3.45 | -7.1% |
+| - earnings | 5317 | $89,428 | 1.20 | -31.2% | 884 | 3.64 | -8.5% |
+| - exdiv | 5456 | $91,920 | 1.23 | -35.5% | 871 | 3.44 | -8.2% |
+| - GROUND thr | 8019 | $127,171 | 1.29 | -33.5% | 1255 | 3.15 | -18.1% |
+| - all gates, top-10 bull puts any day | 10685 | $113,582 | 1.11 | -45.1% | 1435 | 3.03 | -9.4% |
+| - all gates, bull only | 9710 | $107,491 | 0.92 | -56.9% | 1353 | 1.50 | -38.9% |
+
+Reading: the bare structure (top-10 55-delta bull puts every day, no gates, no bear sleeve) is $-Sh 0.92 with
+a -57% drawdown. The gates and the bear sleeve take it to 1.36 / -30%. Earnings and ex-div gates are the two
+that pay in sample (+0.16 and +0.13 $-Sh). Parity does nothing on either window. The 100d regime gate COSTS
+0.30 $-Sh and $12k in sample and buys 0.24 in 2026. The GROUND threshold mostly buys 2026 drawdown. The bear
+sleeve costs 0.06 in sample and buys 0.9 in 2026. No gate was changed; user decides.
+
 ## 0.64 CANON: drift-free P_real, GROUND >= 0.0005; OOT through 09-25 (2026-09-28)
 
 **User decision.** Canon P_real counted RAW 1-4 day returns over the trailing 252 sessions, so each
