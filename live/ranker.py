@@ -796,7 +796,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             "DKL_K":            getattr(ground, "DKL_K", 1.0),
             "ALPHA":            "(b-1)/(2b)",
             "DKL_REF":          "D_ent = ln3 − H(Q_bs) (paper eq. 19)",
-            "BELIEF":           f"P_real: {entc.WINDOW} sessions of realized moves vs the strikes",
+            "BELIEF":           f"P_real: {entc.WINDOW} sessions of realized moves vs the strikes" + (", drift-free" if entc.P_REAL_DEMEAN else ""),
             "GAP_DRIFT":        entc.CANON_LABELS["gap"],
             "GAP_NAMES":        _GAP_STATE.get("names", 0),
             "GAP_TOTAL":        _GAP_STATE.get("total", 0),

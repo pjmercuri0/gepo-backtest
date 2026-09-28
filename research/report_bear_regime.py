@@ -75,6 +75,9 @@ def patch_config(payload: dict, oot: bool) -> dict:
         f"{ec.FILL_MULT:.2f}\u00d7 smile-fit model credit; partial-WIN at 50% intrinsic"
         + ("; no commission" if ec.COMMISSION == 0 else f"; ${ec.COMMISSION:.2f} commission")
     )
+    c["window"] = ec.CANON_LABELS["window"]
+    c["selection"] = (f"bull puts: GROUND >= {ec.THR:g}, parity > {ec.PARITY_MIN_PCT:.0%}, top-{ec.TOP_N}/day; "
+                      + c["selection"])
     c["scoring"] = ec.CANON_LABELS["scoring"]
     c["dkl"] = ec.CANON_LABELS["dkl"]
     c["gap"] = ec.CANON_LABELS["gap"]
