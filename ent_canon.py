@@ -27,8 +27,12 @@ from math import erf
 # ── canon parameters ────────────────────────────────────────────────────────
 DELTA_TARGET, DELTA_MIN, DELTA_MAX = 0.55, 0.50, 0.60
 K            = 4.0        # exp(-K * D_ent). 2026-09-15: k=4 / thr=0.005, middle of the k=3-6 plateau on full-session P_real (handoff §0.43). Was 1.0 / 0.01.
-THR          = 0.005      # GROUND threshold
+THR          = 0.0005     # GROUND threshold. 2026-09-28: 0.0005 with the drift-free P_real (was 0.005 with raw-drift
+                          # P_real); drift-free edges are ~10x smaller, this admits the same trade count (research/p_real_demean_2026_09_28)
 WINDOW       = 252        # sessions of realized moves behind P_real
+P_REAL_DEMEAN = True      # 2026-09-28 (user): subtract each name's window-mean return before counting strike crossings.
+                          # Raw returns bake the past-year drift into p, so picks tilted to last year's leaders (median +31%
+                          # trailing-1y return vs +3% drift-free). False reproduces the pre-2026-09-28 canon.
 MIN_OBS      = 1          # use whatever history the name has (user 2026-09-13); the 0.5 pseudo-count per
                           # state is the only regularisation, so a name with very few sessions scores near the prior
 FILL_MULT    = 1.04       # user 2026-09-20: "that's what we really fill at" (was 1.08, measured on 19 early fills)
@@ -394,7 +398,10 @@ def p_real(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW, mu=N
             p0 = pos[m]; sub = g[m]; bp = (sub.spread_type == 'bull_put').values
             ths = sub.short_strike.values / sub.entry_price.values - 1; thl = sub.long_strike.values / sub.entry_price.values - 1
             idx = (p0 - d - 1)[:, None] - np.arange(window)[None, :]; ok = idx >= 0
-            r = np.where(ok, R[np.clip(idx, 0, len(R) - 1)] + MU[sub.index.values][:, None], np.nan)
+            raw = np.where(ok, R[np.clip(idx, 0, len(R) - 1)], np.nan)
+            if P_REAL_DEMEAN:
+                raw = raw - np.nanmean(raw, axis=1, keepdims=True)   # drift-free: the window's own mean return is removed
+            r = raw + MU[sub.index.values][:, None]
             bs_ = np.where(bp[:, None], r <= ths[:, None], r >= ths[:, None]) & ok
             bl = np.where(bp[:, None], r <= thl[:, None], r >= thl[:, None]) & ok
             n = ok.sum(1); ns = bs_.sum(1); nl = bl.sum(1)
@@ -571,7 +578,7 @@ def grade_fill(actual_credit, width, targets: dict) -> str | None:
 CANON_LABELS = {
     'delta':     f'{DELTA_TARGET:g}Δ short leg (fitted delta, band {DELTA_MIN:g}–{DELTA_MAX:g})',
     'dkl':       'D_ent = D(Q_bs‖U₃) = ln3 − H(Q_bs), Q_bs = N(d2) at the smile-fit IVs (Mercurio–Wu–Xie 2020 eq. 19)',
-    'window':    f'{WINDOW} full sessions of realized DTE-matched moves vs the exact strikes (P_real, every trading day)',
+    'window':    f'{WINDOW} full sessions of realized DTE-matched moves vs the exact strikes (P_real, every trading day)' + (', drift-free: each name\'s window-mean return removed before counting' if P_REAL_DEMEAN else ''),
     'selection': (f'bull puts only; prior-close SPY>100d SMA; '
                   f'parity percentile > {PARITY_MIN_PCT:.0%}; top-{TOP_N}/day; '
                   f'k={K:g}, GROUND ≥ {THR:g}'),
