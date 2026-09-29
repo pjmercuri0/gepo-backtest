@@ -151,6 +151,66 @@ thr=-1.0 "no score filter" row in `research/p_real_demean_2026_09_28/thr_sweep.c
 Day-of-week, credit/width and bull-vs-bear splits were checked too and flip sign between IS and OOT; not worth a
 run. Do NOT use the payload `spot` field as an entry feature: it is the expiry close (0%/100% win by bucket).
 
+### §0.65 results (MacBook Air, 2026-09-29) — neither variant promoted; canon unchanged
+
+Both run through `research/report_bear_regime.py` on the §0.64 drift-free canon, OOT through 09-25.
+Scripts and CSVs in `research/model_beats_market_2026_09_29/`.
+
+**Task 1 — G(model) > G(market) at the same credit.** The frame carries the market triple as
+`q_win/q_loss/q_part` (what live shows as p_hat/q_hat/ro_hat); no rebuild needed.
+
+| variant | IS n | IS final | IS $-Sh | IS DD | OOT n | OOT final | OOT $-Sh | OOT DD |
+|---|---|---|---|---|---|---|---|---|
+| §0.64 baseline | 4994 | $95,251 | 1.36 | -29.9% | 839 | $41,499 | 3.51 | -8.3% |
+| bull: G_mod > G_mkt | 3348 | $65,841 | 1.11 | -27.4% | 552 | $40,032 | 3.97 | -4.3% |
+| bull: margin > 0.001 | 3131 | $61,477 | 1.04 | -29.8% | 506 | $39,026 | 3.87 | -4.7% |
+| bull: margin > 0.002 | 2727 | $54,488 | 0.94 | -28.6% | 439 | $37,163 | 3.74 | -3.6% |
+| both sleeves: G_mod > G_mkt | 3236 | $69,370 | 1.24 | -19.6% | 545 | $40,696 | 3.97 | -4.3% |
+
+The gate drops a third of the bull picks, costs ~$30k and 0.25 $-Sharpe in sample, and improves 2026 only
+on drawdown. Not a clean win. On the "unexplained" note: across ALL candidates the market triple gives
+G_mkt > 0 for 59% (mean +0.0027) and a positive linear EV at the model credit (mean +0.025 of max loss);
+66% when b >= 1 vs 50% when b < 1. So "fair growth sits near 0" is false as built; the 3-state triple at
+the smile-fit credit is not payoff-neutral. Cause not determined.
+
+**Task 2 — rank on D_ent alone.**
+
+| variant | IS n | IS final | IS $-Sh | IS DD | OOT n | OOT final | OOT $-Sh | OOT DD |
+|---|---|---|---|---|---|---|---|---|
+| §0.64 baseline | 4994 | $95,251 | 1.36 | -29.9% | 839 | $41,499 | 3.51 | -8.3% |
+| no score filter, rank GROUND | 8019 | $127,171 | 1.29 | -33.5% | 1255 | $43,825 | 3.15 | -18.1% |
+| rank lowest D_ent, no threshold | 8019 | $125,599 | 1.26 | -33.6% | 1255 | $45,964 | 3.60 | -8.7% |
+| GROUND >= 0.0005 then rank lowest D_ent | 4994 | $92,487 | 1.31 | -31.4% | 839 | $41,679 | 3.53 | -8.3% |
+| D_ent <= 0.050 (p20) | 2322 | $51,633 | 0.95 | -25.3% | 260 | $34,222 | 3.34 | -2.5% |
+| D_ent <= 0.086 (p40) | 3929 | $71,738 | 1.17 | -30.5% | 535 | $33,807 | 2.85 | -7.1% |
+| D_ent <= 0.128 (p60) | 5895 | $104,881 | 1.35 | -30.5% | 901 | $41,692 | 3.70 | -8.6% |
+
+D_ent ranking is within noise of GROUND ranking at every cut and D_ent ceilings hurt in sample. Nothing here
+clears the §0.64 row on both windows. (The thr=-1 row differs from `thr_sweep.csv` only because OOT now
+runs through 09-25.)
+
+### Gate ablation on the drift-free canon (2026-09-29, `results_ablate.csv`)
+
+Which gate carries the yield. Bull sleeve gates removed one at a time; bear sleeve stays canon unless noted.
+
+| variant | IS n | IS final | IS $-Sh | IS DD | OOT n | OOT $-Sh | OOT DD |
+|---|---|---|---|---|---|---|---|
+| §0.64 canon | 4994 | $95,251 | 1.36 | -29.9% | 839 | 3.51 | -8.3% |
+| no bear sleeve | 4019 | $89,160 | 1.42 | -33.1% | 757 | 2.59 | -8.3% |
+| - regime | 6088 | $107,666 | 1.66 | -29.9% | 963 | 3.27 | -8.3% |
+| - parity | 5164 | $96,215 | 1.35 | -29.9% | 896 | 3.45 | -7.1% |
+| - earnings | 5317 | $89,428 | 1.20 | -31.2% | 884 | 3.64 | -8.5% |
+| - exdiv | 5456 | $91,920 | 1.23 | -35.5% | 871 | 3.44 | -8.2% |
+| - GROUND thr | 8019 | $127,171 | 1.29 | -33.5% | 1255 | 3.15 | -18.1% |
+| - all gates, top-10 bull puts any day | 10685 | $113,582 | 1.11 | -45.1% | 1435 | 3.03 | -9.4% |
+| - all gates, bull only | 9710 | $107,491 | 0.92 | -56.9% | 1353 | 1.50 | -38.9% |
+
+Reading: the bare structure (top-10 55-delta bull puts every day, no gates, no bear sleeve) is $-Sh 0.92 with
+a -57% drawdown. The gates and the bear sleeve take it to 1.36 / -30%. Earnings and ex-div gates are the two
+that pay in sample (+0.16 and +0.13 $-Sh). Parity does nothing on either window. The 100d regime gate COSTS
+0.30 $-Sh and $12k in sample and buys 0.24 in 2026. The GROUND threshold mostly buys 2026 drawdown. The bear
+sleeve costs 0.06 in sample and buys 0.9 in 2026. No gate was changed; user decides.
+
 ## 0.64 CANON: drift-free P_real, GROUND >= 0.0005; OOT through 09-25 (2026-09-28)
 
 **User decision.** Canon P_real counted RAW 1-4 day returns over the trailing 252 sessions, so each
