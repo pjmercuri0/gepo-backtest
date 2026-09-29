@@ -139,6 +139,12 @@ gunicorn HUP'd (workers restarted 13:52:28). Verified on the LIVE pages: /backte
 (a) its next scan re-uploads ITS payload copies over these (same trap as §0.64), and (b) live picks still run
 thr 0.0005 with the parity and regime gates on.
 
+**Wallet (2026-09-29, user):** the site's starting bankroll is now **$10,000** (`report_mid_canon.START_BANKROLL`, was
+20,000). Dollar P&L and $-Sharpe are unchanged; only the % lines move. Deployed payloads: IS qty2 $62,685 / DD -30.6%,
+qty1 $36,342 / DD -17.6%, SPY $22,443; OOT qty2 $24,692 / DD -4.8%, qty1 $17,346, SPY $11,276. Lowest equity IS $9,419
+(qty2). Side run of both floors at $10k/$20k: `research/ground_rank_2026_09_29/wallet10k.csv`. Mya backups
+`*.bak_pre10k_*`. The mini TO DO above still stands (pull + upload).
+
 ## 0.66 Rank-ordering audit + GROUND threshold 0.003 on the parity/regime-off canon (2026-09-29, MacBook Air)
 
 **User asks:** a strategy that wins IS and OOT, AND where GROUND, G and DKL rank-order. All runs through
