@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-28 EDT (**§0.64: drift-free P_real canon, thr 0.0005, OOT through 09-25; mini must pull**). Prior: 2026-09-20 EDT (**§0.60: History/Actuals/freeze now apply the canon partial-WIN haircut via `spreads.settle_pnl`; History restated, -$570.39**; **FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-29 EDT (**§0.67: CANON thr 0.003, bull parity + regime gates OFF; site rebuilt; mini must pull**). Prior: 2026-09-28 EDT (**§0.64: drift-free P_real canon, thr 0.0005, OOT through 09-25; mini must pull**). Prior: 2026-09-20 EDT (**§0.60: History/Actuals/freeze now apply the canon partial-WIN haircut via `spreads.settle_pnl`; History restated, -$570.39**; **FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -103,6 +103,102 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - **Do not delete `data/DG_2025*/` (59.1 GB raw vendor data) yet.** The 2025 euro parquets are built, but a RUT/RUTW `UnderlyingPrice` anomaly is unresolved and may need the original CSVs to diagnose — see §0.17.
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
+
+## 0.67 CANON: bull GROUND >= 0.003, bull parity veto OFF, bull regime gate OFF; site rebuilt (2026-09-29)
+
+**User decision** ("make this the new canon") on the §0.66 result. Bull sleeve: GROUND >= 0.003, no parity veto,
+bull puts fire EVERY day (not only above the SPY 100d SMA), cap 10. Bear sleeve unchanged: only below the 100d
+SMA, GROUND >= 0.001, mirrored parity > 0.25, cap 5. Drift-free P_real (§0.64), k=4, 0.55-delta, FILL 1.04 unchanged.
+
+Code (one commit): `ent_canon.THR` 0.0005 -> 0.003; new `ent_canon.BULL_PARITY_GATE = False`,
+`ent_canon.BULL_REGIME_GATE = False` (the generator `research/report_bear_regime.py` reads both, captions follow);
+`config.GROUND_THRESHOLD` 0.003, `config.PARITY_FILTER = False`, new `config.REGIME_BULL_ALWAYS = True`;
+`spreads.py` new `REGIME_BULL_ALWAYS` mode (bull puts skip the regime veto, bear calls need regime == bear, fail
+closed on unknown); `live/ranker.py` sets it and skips the bull parity veto (and the LIVE_REQUIRE_PARITY data-presence
+check) when `PARITY_FILTER` is off, bears keep theirs; `live/mock_data.py` gate captions follow config;
+`test_canon_direction_overlay.py` constants test updated (it had been asserting the 0.005 canon since 09-16).
+
+Payloads rebuilt with `research/report_bear_regime.py` and reconciled to `research/ground_rank_2026_09_29/sweep3.csv`:
+
+| | IS 2020-25 | OOT 2026 (thru 09-25) |
+|---|---|---|
+| trades | 3198 (was 4994) | 547 (was 839) |
+| qty2 final | $72,685 (was $95,251) | $34,692 (was $41,499) |
+| $-Sharpe | 1.66 (was 1.36) | 3.65 (was 3.51) |
+| max DD | -17.6% (was -29.9%) | -3.5% (was -8.3%) |
+| yield on risk | 11.6% (was 10.2%) | 19.2% (was 17.0%) |
+
+Fewer trades, less final $ at fixed qty 2; more per dollar risked. At equal dollars wagered (qty 4) it is $125k /
+$49k vs the old $95k / $41k (`qty4.csv`). Every year positive.
+
+**Deploy state (MacBook Air, 13:52 EDT).** Mya: payloads, `config.py`, `ent_canon.py`, `spreads.py`,
+`live/mock_data.py`, `live/ranker.py` rsynced; server-side backups `live/data/*.bak_prethr003_20260929_135110`;
+gunicorn HUP'd (workers restarted 13:52:28). Verified on the LIVE pages: /backtest shows 3198 / $72,685 / 1.66 /
+-17.6% and /oot shows 547 / $34,692 / 3.65 / -3.5%, both with the captions "GROUND >= 0.003", "no parity veto",
+"bull puts every day". **MAC MINI TO DO: `git pull`, then `bash live/upload_to_mya.sh`.** Until the mini pulls,
+(a) its next scan re-uploads ITS payload copies over these (same trap as §0.64), and (b) live picks still run
+thr 0.0005 with the parity and regime gates on.
+
+## 0.66 Rank-ordering audit + GROUND threshold 0.003 on the parity/regime-off canon (2026-09-29, MacBook Air)
+
+**User asks:** a strategy that wins IS and OOT, AND where GROUND, G and DKL rank-order. All runs through
+`research/report_bear_regime.py` machinery on the drift-free canon (§0.64), bull sleeve with parity and regime
+gates OFF (§0.65 ablation, user chose to drop both), bear sleeve canon. Scripts and CSVs in
+`research/ground_rank_2026_09_29/` (scripts take the scratch dir as argv[1]; `dump_pool.py` first).
+
+**1. Per-trade dollars are not rank-ordered by anything** (`audit1_rank_dollars.txt`, 30 candidate scores on the
+16,117-candidate bull pool: GROUND, G, D_ent, G_mkt, G_mod-G_mkt, p-q_win, q-q_loss, KL(P||Q), KL(Q||P), H(P),
+credit/width, b, delta, dist, width, fit_rmse, cp_iv_gap, parity_pct, GROUND at k=0/8/16, GROUND with KL or H(P)
+in the denominator). Best Spearman with $/trade is credit/width at 0.06 IS / 0.13 OOT, which is mechanical. GROUND:
+0.006 / 0.008. Same under every P_real construction tried (`preal_variants.csv`: windows 63/126/252/504, demean
+on/off, gap drift on/off): top quintile beats bottom (t 1-4) on both windows, never monotone, rho <= 0.06.
+
+**2. What DOES rank-order, on both windows, is the full-loss rate** (`audit2_rank_targets.txt`,
+`quintile_books.csv`). Quintiles low -> high, % of trades that are a full loss:
+
+| | IS | OOT |
+|---|---|---|
+| GROUND | 46.0 41.9 37.7 37.9 35.4 | 52.4 45.0 45.1 39.5 37.8 |
+| G | 46.0 41.8 36.5 38.3 36.4 | 51.1 45.6 43.6 40.8 38.6 |
+| D_ent | 28.2 38.0 40.5 44.3 48.1 | 31.5 41.8 44.3 51.7 50.5 |
+
+t(top-bottom) on P(not full loss): GROUND +8.0 IS / +4.6 OOT; D_ent -15.5 / -6.1. D_ent is the market's full-loss
+probability in disguise: corr(D_ent, q_loss) = 0.82, corr(D_ent, q_part) = -0.89, corr(D_ent, b) = 0.55; q_win is
+flat at 0.43 across D_ent quintiles while q_loss runs 0.34 -> 0.52. So exp(-k D_ent) penalises exactly the trades
+that lose in full. Dollars do not follow because credit offsets it (mean b by GROUND quintile 1.12 -> 0.99).
+Quintile BOOKS of GROUND: $-Sh IS 0.55 0.45 0.80 0.84 1.53, OOT -0.76 1.07 -0.89 0.83 1.78; OOT DD -44 -29 -46 -27 -6.
+Top quintile is the best book on both windows; the middle is noise.
+
+**3. GROUND threshold sweep, cap 10, parity+regime off** (`sweep2.csv`, `sweep3.csv`, `sweep3_years.csv`). The cap
+never binds above 10 at thr >= 0.001. Tiered sizing by GROUND tercile (1/2/3, 0/1/2) does not beat a plain
+higher floor (`sweep2.csv`).
+
+| thr | IS n | IS final | IS $-Sh | IS DD | IS yield | OOT n | OOT final | OOT $-Sh | OOT DD | OOT yield |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0.0005 | 6331 | $109,837 | 1.67 | -29.9% | 9.6% | 1023 | $37,041 | 3.08 | -7.1% | 11.0% |
+| 0.0015 | 4486 | $86,294 | 1.66 | -26.8% | 10.2% | 775 | $35,620 | 3.38 | -4.5% | 13.8% |
+| 0.002 | 3952 | $78,403 | 1.57 | -26.6% | 10.3% | 673 | $34,194 | 3.38 | -5.9% | 14.7% |
+| 0.0025 | 3535 | $76,604 | 1.65 | -23.1% | 11.2% | 600 | $33,598 | 3.33 | -5.7% | 16.1% |
+| **0.003** | 3198 | $72,685 | 1.66 | -17.6% | 11.6% | 547 | $34,692 | 3.65 | -3.5% | 19.2% |
+| 0.0035 | 2954 | $68,403 | 1.60 | -14.4% | 11.6% | 493 | $31,509 | 2.93 | -4.9% | 16.8% |
+| 0.004 | 2745 | $59,897 | 1.34 | -16.8% | 10.4% | 464 | $29,087 | 2.26 | -6.3% | 14.1% |
+| 0.005 | 2368 | $53,310 | 1.16 | -17.9% | 10.2% | 400 | $27,914 | 1.95 | -6.1% | 14.5% |
+
+IS $-Sharpe is a plateau 0.0005-0.0035 (1.57-1.67). IS drawdown and yield improve monotonically with the floor up to
+0.003/0.0035. OOT Sharpe, DD and yield all peak at 0.003 (547 trades; 0.0025 and 0.0035 neighbours are within
+noise). Above 0.0035 everything decays and 2020 goes negative at 0.0045. Every year positive at 0.003 (2022 +$3.5k
+qty1; canon-thr 0.0005 has 2022 at -$0.2k). Picks' median 1y return -5.2% IS / +1.0% OOT (no momentum tilt).
+
+**At equal dollars wagered** (`qty4.csv`; thr 0.003 at qty 4 wagers $908k IS vs $934k for thr 0.0005 at qty 2):
+IS $125,370 vs $109,837, $-Sh 1.66 vs 1.67, DD -30.6% vs -29.9%; OOT $49,383 vs $37,041, 3.65 vs 3.08, -4.8% vs
+-7.1%. Trades/week 12.0 IS / 15.6 OOT vs 23.1 / 29.2.
+
+**Reading.** GROUND ranks RISK (the full-loss rate), not return per trade, and it does so on both windows; D_ent is
+the component doing it. The threshold is where that ranking is monetised: yield on risk and drawdown improve with
+the floor up to 0.003 on both windows. A per-trade $ ranker does not exist in this frame under any P_real
+construction; do not keep looking for one. Not promoted; user decides. thr=0.003 is one value from a 9-point grid
+picked with OOT visible, so the OOT 3.65 is not a clean holdout number; the IS plateau and the monotone DD/yield
+are the evidence.
 
 ## 0.65 OPEN (MacBook Air): backtest a "model must beat market" gate (2026-09-29)
 
@@ -210,6 +306,21 @@ a -57% drawdown. The gates and the bear sleeve take it to 1.36 / -30%. Earnings 
 that pay in sample (+0.16 and +0.13 $-Sh). Parity does nothing on either window. The 100d regime gate COSTS
 0.30 $-Sh and $12k in sample and buys 0.24 in 2026. The GROUND threshold mostly buys 2026 drawdown. The bear
 sleeve costs 0.06 in sample and buys 0.9 in 2026. No gate was changed; user decides.
+
+### Combined ablation: - parity - regime (2026-09-29, `results_noparity_noregime.csv`)
+
+The two gates that did nothing or cost money in sample, removed together. Bear sleeve canon unless noted.
+
+| variant | IS n | IS final | IS $-Sh | IS DD | OOT n | OOT final | OOT $-Sh | OOT DD |
+|---|---|---|---|---|---|---|---|---|
+| §0.64 canon | 4994 | $95,251 | 1.36 | -29.9% | 839 | $41,499 | 3.51 | -8.3% |
+| - parity - regime | 6331 | $109,837 | 1.67 | -29.9% | 1023 | $37,041 | 3.08 | -7.1% |
+| - parity - regime, bull only | 5356 | $103,746 | 1.39 | -30.0% | 941 | $28,492 | 1.32 | -26.9% |
+
+Same shape as `- regime` alone: +$14.6k and +0.31 $-Sh in sample, -$4.5k and -0.43 $-Sh in 2026, drawdown
+unchanged IS and slightly better OOT. Dropping the bear sleeve on top of that gives back the 2026 protection
+entirely (DD -27%, $-Sh 1.32). Picks' median 1y return goes to -2.1% IS. Not promoted; user decides. The
+session crashed after this run before it was recorded; the CSV was complete.
 
 ## 0.64 CANON: drift-free P_real, GROUND >= 0.0005; OOT through 09-25 (2026-09-28)
 

@@ -27,7 +27,9 @@ from math import erf
 # ── canon parameters ────────────────────────────────────────────────────────
 DELTA_TARGET, DELTA_MIN, DELTA_MAX = 0.55, 0.50, 0.60
 K            = 4.0        # exp(-K * D_ent). 2026-09-15: k=4 / thr=0.005, middle of the k=3-6 plateau on full-session P_real (handoff §0.43). Was 1.0 / 0.01.
-THR          = 0.0005     # GROUND threshold. 2026-09-28: 0.0005 with the drift-free P_real (was 0.005 with raw-drift
+THR          = 0.003      # GROUND threshold. 2026-09-29 (user, handoff §0.66/§0.67): 0.003 with the bull parity and regime
+                          # gates OFF; yield-on-risk and drawdown improve monotonically with the floor to 0.003 on IS and OOT.
+                          # Was 0.0005 (2026-09-28: 0.0005 with the drift-free P_real; was 0.005 with raw-drift
                           # P_real); drift-free edges are ~10x smaller, this admits the same trade count (research/p_real_demean_2026_09_28)
 WINDOW       = 252        # sessions of realized moves behind P_real
 P_REAL_DEMEAN = True      # 2026-09-28 (user): subtract each name's window-mean return before counting strike crossings.
@@ -53,6 +55,9 @@ PRIOR        = 0.5        # pseudo-count per state in P_real
 # Missing parity data is also neutral/fail-open.  The veto itself is strict:
 # parity_pct must be > 0.12.
 PARITY_MIN_PCT = 0.12
+BULL_PARITY_GATE = False  # 2026-09-29 (user, §0.66): bull parity veto OFF. Ablation: parity does nothing on either window.
+BULL_REGIME_GATE = False  # 2026-09-29 (user, §0.66): bull puts fire every day, not only above the SPY 100d SMA. The gate cost
+                          # 0.30 $-Sharpe and $12k in sample and made 2022 worse. Bear calls still fire only BELOW the SMA.
 PARITY_SIGN_BY_YEAR = {
     2020: 0.0,
     2021: 1.0,
@@ -579,9 +584,9 @@ CANON_LABELS = {
     'delta':     f'{DELTA_TARGET:g}Δ short leg (fitted delta, band {DELTA_MIN:g}–{DELTA_MAX:g})',
     'dkl':       'D_ent = D(Q_bs‖U₃) = ln3 − H(Q_bs), Q_bs = N(d2) at the smile-fit IVs (Mercurio–Wu–Xie 2020 eq. 19)',
     'window':    f'{WINDOW} full sessions of realized DTE-matched moves vs the exact strikes (P_real, every trading day)' + (', drift-free: each name\'s window-mean return removed before counting' if P_REAL_DEMEAN else ''),
-    'selection': (f'bull puts only; prior-close SPY>100d SMA; '
-                  f'parity percentile > {PARITY_MIN_PCT:.0%}; top-{TOP_N}/day; '
-                  f'k={K:g}, GROUND ≥ {THR:g}'),
+    'selection': (f'bull puts every day' if not BULL_REGIME_GATE else 'bull puts when prior-close SPY>100d SMA') + '; '
+                 + (f'parity percentile > {PARITY_MIN_PCT:.0%}; ' if BULL_PARITY_GATE else 'no parity veto; ')
+                 + f'top-{TOP_N}/day; k={K:g}, GROUND ≥ {THR:g}',
     'gap':       f'P_real drift = {GAP_GAMMA:g} × β_year σ × z(the stock\'s OWN opening gap, ATR units) × √DTE; no market average; β walk-forward, fitted on years before entry (§0.45)',
     'scoring':   'G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G−1)·e^(−k·D_ent)',
     'fill':      f'{FILL_MULT:.2f}× smile-fit model credit (19 real fills), no commission',

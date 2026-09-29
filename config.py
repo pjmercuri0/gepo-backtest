@@ -187,7 +187,7 @@ LOG_BASE = _math.e
 # so a 0.0010 cutoff = 0.10% per-trade hurdle on variance-adjusted EV
 # after the entropic ambiguity discount. See paper §7 for the threshold
 # sweep and the comparison against the legacy top-N=5 rule.
-GROUND_THRESHOLD = 0.0005  # 2026-09-28: 0.0005 with drift-free P_real (ent_canon.P_REAL_DEMEAN); was 0.005. 2026-09-15: thr 0.005 / k=4 on full-session P_real (§0.43); was 0.01. D_ent canon 2026-09-13: 0.05 was set on inflated EVs and passes 0.35 trades/day at fillable
+GROUND_THRESHOLD = 0.003  # 2026-09-29 (user, handoff §0.66/§0.67): 0.003 with bull parity + regime gates off. 2026-09-28: 0.0005 with drift-free P_real (ent_canon.P_REAL_DEMEAN); was 0.005. 2026-09-15: thr 0.005 / k=4 on full-session P_real (§0.43); was 0.01. D_ent canon 2026-09-13: 0.05 was set on inflated EVs and passes 0.35 trades/day at fillable
                          # credit; 0.01 = 3.8/day (0.015 conservative). SESSION_HANDOFF.md §0.33.
 
 # ── SELECTION ────────────────────────────────────────────────────────────────
@@ -226,13 +226,17 @@ REGIME_FILTER = True
 REGIME_WINDOW = 100
 REGIME_SOURCE = "spy"
 REGIME_BULL_ONLY = False
+# 2026-09-29 canon (handoff §0.66/§0.67, user): bull puts fire EVERY day regardless of the SMA;
+# bear calls still fire only when the prior SPY close is BELOW the 100d SMA (fail closed when
+# unknown). The bull-side regime gate cost 0.30 $-Sharpe in sample and made 2022 worse.
+REGIME_BULL_ALWAYS = True
 REGIME_LAG_SESSIONS = 1
 REGIME_FAIL_CLOSED = True
 REGIME_MAX_STALE_CALENDAR_DAYS = 4
 
 # Daily cross-sectional same-strike call/put IV veto.  Strictly greater than
 # the 12th percentile; missing observations are neutral (0.5) and pass.
-PARITY_FILTER = True
+PARITY_FILTER = False  # 2026-09-29 (user, §0.66): bull parity veto OFF; bear keeps BEAR_PARITY_MIN_PCT
 PARITY_MIN_PCT = 0.12
 
 # ── BANKROLL ─────────────────────────────────────────────────────────────────

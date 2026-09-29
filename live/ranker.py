@@ -245,6 +245,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     spreads.REGIME_FILTER     = backtest_config.REGIME_FILTER
     spreads.REGIME_PER_TICKER = False
     spreads.REGIME_BULL_ONLY  = getattr(backtest_config, "REGIME_BULL_ONLY", False)
+    spreads.REGIME_BULL_ALWAYS = getattr(backtest_config, "REGIME_BULL_ALWAYS", False)
     spreads.REGIME_LAG_SESSIONS = getattr(backtest_config, "REGIME_LAG_SESSIONS", 0)
     spreads.REGIME_FAIL_CLOSED = (
         getattr(backtest_config, "REGIME_FAIL_CLOSED", False)
@@ -542,12 +543,16 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # screen and failed underneath. A tie at 2dp qualifies.
     _r2 = lambda x: np.floor(x * 100 + 0.5) / 100
     ranked["above_min"] = _r2(ranked["net_credit"].astype(float)) >= ranked["tgt_walkaway_credit"].astype(float)
-    bull_parity_ok = (ranked["parity_pct"] > getattr(backtest_config, "PARITY_MIN_PCT", 0.12))
+    # 2026-09-29 canon (§0.66/§0.67): the bull parity veto is OFF (config.PARITY_FILTER False); bears keep theirs.
+    bull_gate_on = bool(getattr(backtest_config, "PARITY_FILTER", True))
+    bull_parity_ok = (ranked["parity_pct"] > getattr(backtest_config, "PARITY_MIN_PCT", 0.12)) if bull_gate_on \
+        else pd.Series(True, index=ranked.index)
     bear_parity_ok = (ranked["bear_parity_pct"] > getattr(backtest_config, "BEAR_PARITY_MIN_PCT", 0.25))
     parity_ok = pd.Series(np.where(is_bear, bear_parity_ok, bull_parity_ok), index=ranked.index, dtype=bool)
     if getattr(live_config, "LIVE_REQUIRE_PARITY", False):
-        parity_ok &= ranked["parity_bull_raw"].notna()
-        parity_ok &= ranked["parity_pairs"].fillna(0) >= getattr(live_config, "LIVE_MIN_PARITY_PAIRS", 1)
+        gated = pd.Series(is_bear | bull_gate_on, index=ranked.index)   # data-presence check only where a parity gate is live
+        parity_ok &= ~gated | ranked["parity_bull_raw"].notna()
+        parity_ok &= ~gated | (ranked["parity_pairs"].fillna(0) >= getattr(live_config, "LIVE_MIN_PARITY_PAIRS", 1))
     feature_ok = ranked["own_gap_available"].astype(bool)
     above_thr = ranked["GROUND"] >= thr_side
     ranked["qualified"] = above_thr & parity_ok & ranked["above_min"] & feature_ok
