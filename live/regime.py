@@ -91,7 +91,10 @@ def current_regime() -> dict:
         "close":             round(float(latest["Close"]), 2),
         "sma":               round(float(latest["SMA"]), 2),
         "window":            int(backtest_config.REGIME_WINDOW),
-        "allowed_direction": "bull_put" if regime == "bull" else None,
+        # 2026-09-29 canon: bull puts every day; bear calls only in a bear regime.
+        "allowed_direction": (("bull_put+bear_call" if regime == "bear" else "bull_put")
+                              if getattr(backtest_config, "REGIME_BULL_ALWAYS", False)
+                              else ("bull_put" if regime == "bull" else "bear_call")),
         "stale_days":        int(stale_days),
         "source":            "Yahoo daily (prior session)",
     }
