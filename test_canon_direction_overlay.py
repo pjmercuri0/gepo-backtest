@@ -45,10 +45,11 @@ def test_daily_parity_percentile_and_2020_neutral():
 
 
 def test_canonical_constants_are_synchronized():
-    assert config.GROUND_THRESHOLD == ec.THR == 0.005
+    assert config.GROUND_THRESHOLD == ec.THR == 0.003
     assert config.TOP_N == ec.TOP_N == 10
     assert config.PARITY_MIN_PCT == ec.PARITY_MIN_PCT == 0.12
-    assert config.REGIME_FILTER and config.REGIME_BULL_ONLY
+    assert (not config.PARITY_FILTER) and (not ec.BULL_PARITY_GATE)
+    assert config.REGIME_FILTER and config.REGIME_BULL_ALWAYS and (not ec.BULL_REGIME_GATE)
     assert config.REGIME_LAG_SESSIONS == 1
     assert config.REGIME_FAIL_CLOSED
     assert config.REGIME_MAX_STALE_CALENDAR_DAYS == 4

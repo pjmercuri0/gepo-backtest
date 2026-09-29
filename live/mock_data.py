@@ -267,8 +267,11 @@ def _build_payload(when: datetime, n_candidates: int = 30, seed: int = 0,
             "TOP_N":             live_config.TOP_N_DISPLAY,
             "DKL_K":             DKL_K,
             "ALPHA":             "(b-1)/(2b)",
-            "REGIME_GATE":       "bull puts only when prior-session SPY close > 100d SMA; cash otherwise",
-            "PARITY_GATE":       f"same-strike call-IV minus put-IV daily percentile > {backtest_config.PARITY_MIN_PCT:.0%}",
+            "REGIME_GATE":       ("bull puts every day; bear calls only when prior-session SPY close < 100d SMA"
+                                  if getattr(backtest_config, "REGIME_BULL_ALWAYS", False)
+                                  else "bull puts above prior-session SPY 100d SMA; bear calls below"),
+            "PARITY_GATE":       (f"same-strike call-IV minus put-IV daily percentile > {backtest_config.PARITY_MIN_PCT:.0%}"
+                                  if getattr(backtest_config, "PARITY_FILTER", True) else "bull parity veto off (2026-09-29); bear > 25%"),
         },
         "regime":    regime_info,
         "top_picks": top_picks,
