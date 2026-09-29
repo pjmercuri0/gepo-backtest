@@ -16,7 +16,7 @@ K_VAL = 10.0
 THR = 0.05
 FILL_FRAC = 0.80
 PNL_COL = 'pnl_80'
-START_BANKROLL = 20_000.0
+START_BANKROLL = 10_000.0   # 2026-09-29 (user): site shows a $10k starting wallet; was 20_000 (dollar P&L unchanged, only % lines move)
 # Canonical sizing 2026-09-19: every pick risks the same dollars.  Fixed qty=2 on spreads
 # whose max loss spans $50-$640 made the equity curve's variance a function of strike
 # spacing, not of the strategy (audit: same 15.5% yield, 4x the size on wide names).

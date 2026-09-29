@@ -10,7 +10,7 @@
     "regime": "bull puts every day; bear calls only below the prior-session SPY 100d SMA (2026-09-29)",
     "vol_gate": "OFF",
     "sizing": "qty=2 per pick (canonical; risk-sizing tested 2026-09-19 and set aside)",
-    "starting_bankroll": 20000.0,
+    "starting_bankroll": 10000.0,
     "parity": "no bull parity veto (2026-09-29); bear mirrored parity > 25th percentile",
     "bear_gates": "bear calls: GROUND >= 0.001, max 5/day. Earnings and ex-dividend gates (ex-date through expiry+1) apply to BOTH sleeves as of 2026-09-19.",
     "window": "252 full sessions of realized DTE-matched moves vs the exact strikes (P_real, every trading day), drift-free: each name's window-mean return removed before counting",
@@ -24,28 +24,28 @@
     "years": 0.72,
     "trading_days": 183,
     "n_trades": 547,
-    "strategy_final": 34691.5,
-    "strategy_total_return": 73.46,
-    "strategy_cagr": 114.88,
-    "strategy_sharpe": 3.43,
-    "strategy_sharpe_weekly": 3.77,
+    "strategy_final": 24691.5,
+    "strategy_total_return": 146.91,
+    "strategy_cagr": 250.88,
+    "strategy_sharpe": 3.47,
+    "strategy_sharpe_weekly": 3.82,
     "strategy_sharpe_dollar": 3.65,
-    "strategy_max_dd": -3.5,
-    "qty1_final": 27345.75,
-    "qty1_total_return": 36.73,
-    "qty1_cagr": 54.41,
-    "qty1_sharpe": 3.4,
-    "qty1_sharpe_weekly": 3.73,
+    "strategy_max_dd": -4.84,
+    "qty1_final": 17345.75,
+    "qty1_total_return": 73.46,
+    "qty1_cagr": 114.88,
+    "qty1_sharpe": 3.43,
+    "qty1_sharpe_weekly": 3.77,
     "qty1_sharpe_dollar": 3.65,
-    "qty1_max_dd": -2.25,
-    "sixteenk_final": 33688.9,
-    "sixteenk_total_return": 68.44,
-    "sixteenk_cagr": 106.3,
-    "sixteenk_sharpe": 2.66,
-    "sixteenk_sharpe_weekly": 2.81,
-    "sixteenk_sharpe_dollar": 2.69,
+    "qty1_max_dd": -3.5,
+    "sixteenk_final": 18491.83,
+    "sixteenk_total_return": 84.92,
+    "sixteenk_cagr": 134.84,
+    "sixteenk_sharpe": 2.54,
+    "sixteenk_sharpe_weekly": 2.66,
+    "sixteenk_sharpe_dollar": 2.55,
     "sixteenk_max_dd": -7.35,
-    "spy_final": 22551.31,
+    "spy_final": 11275.65,
     "spy_total_return": 12.76,
     "spy_cagr": 18.14,
     "spy_sharpe": 1.32,
@@ -54,1292 +54,1292 @@
     "spy_max_dd": -8.88,
     "strategy_wagered": 76618.16,
     "qty1_wagered": 38309.08,
-    "sixteenk_wagered": 95991.89,
+    "sixteenk_wagered": 60628.9,
     "strategy_yield": 19.17,
     "qty1_yield": 19.17,
-    "sixteenk_yield": 14.26
+    "sixteenk_yield": 14.01
   },
   "points": [
     {
       "date": "2026-01-05",
-      "strategy": 20000.0,
-      "qty1": 20000.0,
-      "sixteenk": 20000.0,
-      "spy": 20000.0
+      "strategy": 10000.0,
+      "qty1": 10000.0,
+      "sixteenk": 10000.0,
+      "spy": 10000.0
     },
     {
       "date": "2026-01-06",
-      "strategy": 20000.0,
-      "qty1": 20000.0,
-      "sixteenk": 20000.0,
-      "spy": 20118.95
+      "strategy": 10000.0,
+      "qty1": 10000.0,
+      "sixteenk": 10000.0,
+      "spy": 10059.47
     },
     {
       "date": "2026-01-07",
-      "strategy": 20000.0,
-      "qty1": 20000.0,
-      "sixteenk": 20000.0,
-      "spy": 20054.1
+      "strategy": 10000.0,
+      "qty1": 10000.0,
+      "sixteenk": 10000.0,
+      "spy": 10027.05
     },
     {
       "date": "2026-01-08",
-      "strategy": 20000.0,
-      "qty1": 20000.0,
-      "sixteenk": 20000.0,
-      "spy": 20052.06
+      "strategy": 10000.0,
+      "qty1": 10000.0,
+      "sixteenk": 10000.0,
+      "spy": 10026.03
     },
     {
       "date": "2026-01-09",
-      "strategy": 20705.0,
-      "qty1": 20352.5,
-      "sixteenk": 20039.83,
-      "spy": 20184.67
+      "strategy": 10705.0,
+      "qty1": 10352.5,
+      "sixteenk": 9966.13,
+      "spy": 10092.34
     },
     {
       "date": "2026-01-12",
-      "strategy": 20705.0,
-      "qty1": 20352.5,
-      "sixteenk": 20039.83,
-      "spy": 20216.37
+      "strategy": 10705.0,
+      "qty1": 10352.5,
+      "sixteenk": 9966.13,
+      "spy": 10108.18
     },
     {
       "date": "2026-01-13",
-      "strategy": 20705.0,
-      "qty1": 20352.5,
-      "sixteenk": 20039.83,
-      "spy": 20175.95
+      "strategy": 10705.0,
+      "qty1": 10352.5,
+      "sixteenk": 9966.13,
+      "spy": 10087.97
     },
     {
       "date": "2026-01-14",
-      "strategy": 20705.0,
-      "qty1": 20352.5,
-      "sixteenk": 20039.83,
-      "spy": 20076.78
+      "strategy": 10705.0,
+      "qty1": 10352.5,
+      "sixteenk": 9966.13,
+      "spy": 10038.39
     },
     {
       "date": "2026-01-15",
-      "strategy": 20705.0,
-      "qty1": 20352.5,
-      "sixteenk": 20039.83,
-      "spy": 20131.45
+      "strategy": 10705.0,
+      "qty1": 10352.5,
+      "sixteenk": 9966.13,
+      "spy": 10065.73
     },
     {
       "date": "2026-01-16",
-      "strategy": 20806.17,
-      "qty1": 20403.08,
-      "sixteenk": 19533.74,
-      "spy": 20114.58
+      "strategy": 10806.17,
+      "qty1": 10403.08,
+      "sixteenk": 9545.13,
+      "spy": 10057.29
     },
     {
       "date": "2026-01-20",
-      "strategy": 20806.17,
-      "qty1": 20403.08,
-      "sixteenk": 19533.74,
-      "spy": 19705.12
+      "strategy": 10806.17,
+      "qty1": 10403.08,
+      "sixteenk": 9545.13,
+      "spy": 9852.56
     },
     {
       "date": "2026-01-21",
-      "strategy": 20806.17,
-      "qty1": 20403.08,
-      "sixteenk": 19533.74,
-      "spy": 19932.53
+      "strategy": 10806.17,
+      "qty1": 10403.08,
+      "sixteenk": 9545.13,
+      "spy": 9966.27
     },
     {
       "date": "2026-01-22",
-      "strategy": 20806.17,
-      "qty1": 20403.08,
-      "sixteenk": 19533.74,
-      "spy": 20036.65
+      "strategy": 10806.17,
+      "qty1": 10403.08,
+      "sixteenk": 9545.13,
+      "spy": 10018.32
     },
     {
       "date": "2026-01-23",
-      "strategy": 21379.33,
-      "qty1": 20689.67,
-      "sixteenk": 20966.25,
-      "spy": 20043.91
+      "strategy": 11379.33,
+      "qty1": 10689.66,
+      "sixteenk": 10286.05,
+      "spy": 10021.96
     },
     {
       "date": "2026-01-26",
-      "strategy": 21379.33,
-      "qty1": 20689.67,
-      "sixteenk": 20966.25,
-      "spy": 20145.7
+      "strategy": 11379.33,
+      "qty1": 10689.66,
+      "sixteenk": 10286.05,
+      "spy": 10072.85
     },
     {
       "date": "2026-01-27",
-      "strategy": 21379.33,
-      "qty1": 20689.67,
-      "sixteenk": 20966.25,
-      "spy": 20225.97
+      "strategy": 11379.33,
+      "qty1": 10689.66,
+      "sixteenk": 10286.05,
+      "spy": 10112.98
     },
     {
       "date": "2026-01-28",
-      "strategy": 21379.33,
-      "qty1": 20689.67,
-      "sixteenk": 20966.25,
-      "spy": 20223.93
+      "strategy": 11379.33,
+      "qty1": 10689.66,
+      "sixteenk": 10286.05,
+      "spy": 10111.96
     },
     {
       "date": "2026-01-29",
-      "strategy": 21379.33,
-      "qty1": 20689.67,
-      "sixteenk": 20966.25,
-      "spy": 20183.8
+      "strategy": 11379.33,
+      "qty1": 10689.66,
+      "sixteenk": 10286.05,
+      "spy": 10091.9
     },
     {
       "date": "2026-01-30",
-      "strategy": 21390.9,
-      "qty1": 20695.45,
-      "sixteenk": 19988.85,
-      "spy": 20123.6
+      "strategy": 11390.9,
+      "qty1": 10695.45,
+      "sixteenk": 9657.3,
+      "spy": 10061.8
     },
     {
       "date": "2026-02-02",
-      "strategy": 21390.9,
-      "qty1": 20695.45,
-      "sixteenk": 19988.85,
-      "spy": 20223.64
+      "strategy": 11390.9,
+      "qty1": 10695.45,
+      "sixteenk": 9657.3,
+      "spy": 10111.82
     },
     {
       "date": "2026-02-03",
-      "strategy": 21390.9,
-      "qty1": 20695.45,
-      "sixteenk": 19988.85,
-      "spy": 20052.64
+      "strategy": 11390.9,
+      "qty1": 10695.45,
+      "sixteenk": 9657.3,
+      "spy": 10026.32
     },
     {
       "date": "2026-02-04",
-      "strategy": 21390.9,
-      "qty1": 20695.45,
-      "sixteenk": 19988.85,
-      "spy": 19955.51
+      "strategy": 11390.9,
+      "qty1": 10695.45,
+      "sixteenk": 9657.3,
+      "spy": 9977.75
     },
     {
       "date": "2026-02-05",
-      "strategy": 21390.9,
-      "qty1": 20695.45,
-      "sixteenk": 19988.85,
-      "spy": 19706.28
+      "strategy": 11390.9,
+      "qty1": 10695.45,
+      "sixteenk": 9657.3,
+      "spy": 9853.14
     },
     {
       "date": "2026-02-06",
-      "strategy": 21829.57,
-      "qty1": 20914.78,
-      "sixteenk": 19624.36,
-      "spy": 20084.34
+      "strategy": 11829.57,
+      "qty1": 10914.78,
+      "sixteenk": 9574.84,
+      "spy": 10042.17
     },
     {
       "date": "2026-02-09",
-      "strategy": 21829.57,
-      "qty1": 20914.78,
-      "sixteenk": 19624.36,
-      "spy": 20181.18
+      "strategy": 11829.57,
+      "qty1": 10914.78,
+      "sixteenk": 9574.84,
+      "spy": 10090.59
     },
     {
       "date": "2026-02-10",
-      "strategy": 21829.57,
-      "qty1": 20914.78,
-      "sixteenk": 19624.36,
-      "spy": 20127.96
+      "strategy": 11829.57,
+      "qty1": 10914.78,
+      "sixteenk": 9574.84,
+      "spy": 10063.98
     },
     {
       "date": "2026-02-11",
-      "strategy": 21829.57,
-      "qty1": 20914.78,
-      "sixteenk": 19624.36,
-      "spy": 20123.31
+      "strategy": 11829.57,
+      "qty1": 10914.78,
+      "sixteenk": 9574.84,
+      "spy": 10061.65
     },
     {
       "date": "2026-02-12",
-      "strategy": 21829.57,
-      "qty1": 20914.78,
-      "sixteenk": 19624.36,
-      "spy": 19812.43
+      "strategy": 11829.57,
+      "qty1": 10914.78,
+      "sixteenk": 9574.84,
+      "spy": 9906.21
     },
     {
       "date": "2026-02-13",
-      "strategy": 22040.35,
-      "qty1": 21020.17,
-      "sixteenk": 20146.84,
-      "spy": 19826.38
+      "strategy": 12040.35,
+      "qty1": 11020.17,
+      "sixteenk": 9978.01,
+      "spy": 9913.19
     },
     {
       "date": "2026-02-17",
-      "strategy": 22040.35,
-      "qty1": 21020.17,
-      "sixteenk": 20146.84,
-      "spy": 19858.37
+      "strategy": 12040.35,
+      "qty1": 11020.17,
+      "sixteenk": 9978.01,
+      "spy": 9929.19
     },
     {
       "date": "2026-02-18",
-      "strategy": 22040.35,
-      "qty1": 21020.17,
-      "sixteenk": 20146.84,
-      "spy": 19958.41
+      "strategy": 12040.35,
+      "qty1": 11020.17,
+      "sixteenk": 9978.01,
+      "spy": 9979.21
     },
     {
       "date": "2026-02-19",
-      "strategy": 22040.35,
-      "qty1": 21020.17,
-      "sixteenk": 20146.84,
-      "spy": 19905.77
+      "strategy": 12040.35,
+      "qty1": 11020.17,
+      "sixteenk": 9978.01,
+      "spy": 9952.89
     },
     {
       "date": "2026-02-20",
-      "strategy": 22336.9,
-      "qty1": 21168.45,
-      "sixteenk": 20484.01,
-      "spy": 20049.73
+      "strategy": 12336.9,
+      "qty1": 11168.45,
+      "sixteenk": 10194.5,
+      "spy": 10024.87
     },
     {
       "date": "2026-02-23",
-      "strategy": 22336.9,
-      "qty1": 21168.45,
-      "sixteenk": 20484.01,
-      "spy": 19845.0
+      "strategy": 12336.9,
+      "qty1": 11168.45,
+      "sixteenk": 10194.5,
+      "spy": 9922.5
     },
     {
       "date": "2026-02-24",
-      "strategy": 22336.9,
-      "qty1": 21168.45,
-      "sixteenk": 20484.01,
-      "spy": 19989.24
+      "strategy": 12336.9,
+      "qty1": 11168.45,
+      "sixteenk": 10194.5,
+      "spy": 9994.62
     },
     {
       "date": "2026-02-25",
-      "strategy": 22336.9,
-      "qty1": 21168.45,
-      "sixteenk": 20484.01,
-      "spy": 20157.92
+      "strategy": 12336.9,
+      "qty1": 11168.45,
+      "sixteenk": 10194.5,
+      "spy": 10078.96
     },
     {
       "date": "2026-02-26",
-      "strategy": 22336.9,
-      "qty1": 21168.45,
-      "sixteenk": 20484.01,
-      "spy": 20045.95
+      "strategy": 12336.9,
+      "qty1": 11168.45,
+      "sixteenk": 10194.5,
+      "spy": 10022.98
     },
     {
       "date": "2026-02-27",
-      "strategy": 23872.02,
-      "qty1": 21936.01,
-      "sixteenk": 23046.56,
-      "spy": 19949.69
+      "strategy": 13872.02,
+      "qty1": 11936.01,
+      "sixteenk": 11691.19,
+      "spy": 9974.85
     },
     {
       "date": "2026-03-02",
-      "strategy": 23872.02,
-      "qty1": 21936.01,
-      "sixteenk": 23046.56,
-      "spy": 19961.03
+      "strategy": 13872.02,
+      "qty1": 11936.01,
+      "sixteenk": 11691.19,
+      "spy": 9980.52
     },
     {
       "date": "2026-03-03",
-      "strategy": 23872.02,
-      "qty1": 21936.01,
-      "sixteenk": 23046.56,
-      "spy": 19785.09
+      "strategy": 13872.02,
+      "qty1": 11936.01,
+      "sixteenk": 11691.19,
+      "spy": 9892.55
     },
     {
       "date": "2026-03-04",
-      "strategy": 23872.02,
-      "qty1": 21936.01,
-      "sixteenk": 23046.56,
-      "spy": 19924.68
+      "strategy": 13872.02,
+      "qty1": 11936.01,
+      "sixteenk": 11691.19,
+      "spy": 9962.34
     },
     {
       "date": "2026-03-05",
-      "strategy": 23872.02,
-      "qty1": 21936.01,
-      "sixteenk": 23046.56,
-      "spy": 19813.59
+      "strategy": 13872.02,
+      "qty1": 11936.01,
+      "sixteenk": 11691.19,
+      "spy": 9906.8
     },
     {
       "date": "2026-03-06",
-      "strategy": 23979.86,
-      "qty1": 21989.93,
-      "sixteenk": 23152.51,
-      "spy": 19553.89
+      "strategy": 13979.86,
+      "qty1": 11989.93,
+      "sixteenk": 11760.31,
+      "spy": 9776.95
     },
     {
       "date": "2026-03-09",
-      "strategy": 23979.86,
-      "qty1": 21989.93,
-      "sixteenk": 23152.51,
-      "spy": 19725.18
+      "strategy": 13979.86,
+      "qty1": 11989.93,
+      "sixteenk": 11760.31,
+      "spy": 9862.59
     },
     {
       "date": "2026-03-10",
-      "strategy": 23979.86,
-      "qty1": 21989.93,
-      "sixteenk": 23152.51,
-      "spy": 19693.48
+      "strategy": 13979.86,
+      "qty1": 11989.93,
+      "sixteenk": 11760.31,
+      "spy": 9846.74
     },
     {
       "date": "2026-03-11",
-      "strategy": 23979.86,
-      "qty1": 21989.93,
-      "sixteenk": 23152.51,
-      "spy": 19668.76
+      "strategy": 13979.86,
+      "qty1": 11989.93,
+      "sixteenk": 11760.31,
+      "spy": 9834.38
     },
     {
       "date": "2026-03-12",
-      "strategy": 23979.86,
-      "qty1": 21989.93,
-      "sixteenk": 23152.51,
-      "spy": 19370.1
+      "strategy": 13979.86,
+      "qty1": 11989.93,
+      "sixteenk": 11760.31,
+      "spy": 9685.05
     },
     {
       "date": "2026-03-13",
-      "strategy": 26871.06,
-      "qty1": 23435.53,
-      "sixteenk": 25029.56,
-      "spy": 19260.46
+      "strategy": 16871.06,
+      "qty1": 13435.53,
+      "sixteenk": 13473.64,
+      "spy": 9630.23
     },
     {
       "date": "2026-03-16",
-      "strategy": 26871.06,
-      "qty1": 23435.53,
-      "sixteenk": 25029.56,
-      "spy": 19456.47
+      "strategy": 16871.06,
+      "qty1": 13435.53,
+      "sixteenk": 13473.64,
+      "spy": 9728.23
     },
     {
       "date": "2026-03-17",
-      "strategy": 26871.06,
-      "qty1": 23435.53,
-      "sixteenk": 25029.56,
-      "spy": 19507.65
+      "strategy": 16871.06,
+      "qty1": 13435.53,
+      "sixteenk": 13473.64,
+      "spy": 9753.82
     },
     {
       "date": "2026-03-18",
-      "strategy": 26871.06,
-      "qty1": 23435.53,
-      "sixteenk": 25029.56,
-      "spy": 19235.45
+      "strategy": 16871.06,
+      "qty1": 13435.53,
+      "sixteenk": 13473.64,
+      "spy": 9617.72
     },
     {
       "date": "2026-03-19",
-      "strategy": 26871.06,
-      "qty1": 23435.53,
-      "sixteenk": 25029.56,
-      "spy": 19188.04
+      "strategy": 16871.06,
+      "qty1": 13435.53,
+      "sixteenk": 13473.64,
+      "spy": 9594.02
     },
     {
       "date": "2026-03-20",
-      "strategy": 28961.84,
-      "qty1": 24480.92,
-      "sixteenk": 25505.31,
-      "spy": 18912.97
+      "strategy": 18961.84,
+      "qty1": 14480.92,
+      "sixteenk": 14138.31,
+      "spy": 9456.48
     },
     {
       "date": "2026-03-23",
-      "strategy": 28961.84,
-      "qty1": 24480.92,
-      "sixteenk": 25505.31,
-      "spy": 19111.55
+      "strategy": 18961.84,
+      "qty1": 14480.92,
+      "sixteenk": 14138.31,
+      "spy": 9555.78
     },
     {
       "date": "2026-03-24",
-      "strategy": 28961.84,
-      "qty1": 24480.92,
-      "sixteenk": 25505.31,
-      "spy": 19047.4
+      "strategy": 18961.84,
+      "qty1": 14480.92,
+      "sixteenk": 14138.31,
+      "spy": 9523.7
     },
     {
       "date": "2026-03-25",
-      "strategy": 28961.84,
-      "qty1": 24480.92,
-      "sixteenk": 25505.31,
-      "spy": 19153.55
+      "strategy": 18961.84,
+      "qty1": 14480.92,
+      "sixteenk": 14138.31,
+      "spy": 9576.77
     },
     {
       "date": "2026-03-26",
-      "strategy": 28961.84,
-      "qty1": 24480.92,
-      "sixteenk": 25505.31,
-      "spy": 18811.49
+      "strategy": 18961.84,
+      "qty1": 14480.92,
+      "sixteenk": 14138.31,
+      "spy": 9405.74
     },
     {
       "date": "2026-03-27",
-      "strategy": 30991.98,
-      "qty1": 25495.99,
-      "sixteenk": 26786.01,
-      "spy": 18490.72
+      "strategy": 20991.98,
+      "qty1": 15495.99,
+      "sixteenk": 15072.84,
+      "spy": 9245.36
     },
     {
       "date": "2026-03-30",
-      "strategy": 30991.98,
-      "qty1": 25495.99,
-      "sixteenk": 26786.01,
-      "spy": 18428.9
+      "strategy": 20991.98,
+      "qty1": 15495.99,
+      "sixteenk": 15072.84,
+      "spy": 9214.45
     },
     {
       "date": "2026-03-31",
-      "strategy": 30991.98,
-      "qty1": 25495.99,
-      "sixteenk": 26786.01,
-      "spy": 18964.58
+      "strategy": 20991.98,
+      "qty1": 15495.99,
+      "sixteenk": 15072.84,
+      "spy": 9482.29
     },
     {
       "date": "2026-04-01",
-      "strategy": 30991.98,
-      "qty1": 25495.99,
-      "sixteenk": 26786.01,
-      "spy": 19107.47
+      "strategy": 20991.98,
+      "qty1": 15495.99,
+      "sixteenk": 15072.84,
+      "spy": 9553.74
     },
     {
       "date": "2026-04-02",
-      "strategy": 30991.98,
-      "qty1": 25495.99,
-      "sixteenk": 26786.01,
-      "spy": 19124.68
+      "strategy": 20991.98,
+      "qty1": 15495.99,
+      "sixteenk": 15072.84,
+      "spy": 9562.34
     },
     {
       "date": "2026-04-06",
-      "strategy": 30991.98,
-      "qty1": 25495.99,
-      "sixteenk": 26786.01,
-      "spy": 19215.08
+      "strategy": 20991.98,
+      "qty1": 15495.99,
+      "sixteenk": 15072.84,
+      "spy": 9607.54
     },
     {
       "date": "2026-04-07",
-      "strategy": 30991.98,
-      "qty1": 25495.99,
-      "sixteenk": 26786.01,
-      "spy": 19223.53
+      "strategy": 20991.98,
+      "qty1": 15495.99,
+      "sixteenk": 15072.84,
+      "spy": 9611.77
     },
     {
       "date": "2026-04-08",
-      "strategy": 30991.98,
-      "qty1": 25495.99,
-      "sixteenk": 26786.01,
-      "spy": 19713.15
+      "strategy": 20991.98,
+      "qty1": 15495.99,
+      "sixteenk": 15072.84,
+      "spy": 9856.57
     },
     {
       "date": "2026-04-09",
-      "strategy": 30991.98,
-      "qty1": 25495.99,
-      "sixteenk": 26786.01,
-      "spy": 19826.87
+      "strategy": 20991.98,
+      "qty1": 15495.99,
+      "sixteenk": 15072.84,
+      "spy": 9913.44
     },
     {
       "date": "2026-04-10",
-      "strategy": 31035.6,
-      "qty1": 25517.8,
-      "sixteenk": 27753.81,
-      "spy": 19813.75
+      "strategy": 21035.6,
+      "qty1": 15517.8,
+      "sixteenk": 15321.97,
+      "spy": 9906.88
     },
     {
       "date": "2026-04-13",
-      "strategy": 31035.6,
-      "qty1": 25517.8,
-      "sixteenk": 27753.81,
-      "spy": 20007.38
+      "strategy": 21035.6,
+      "qty1": 15517.8,
+      "sixteenk": 15321.97,
+      "spy": 10003.69
     },
     {
       "date": "2026-04-14",
-      "strategy": 31035.6,
-      "qty1": 25517.8,
-      "sixteenk": 27753.81,
-      "spy": 20251.17
+      "strategy": 21035.6,
+      "qty1": 15517.8,
+      "sixteenk": 15321.97,
+      "spy": 10125.58
     },
     {
       "date": "2026-04-15",
-      "strategy": 31035.6,
-      "qty1": 25517.8,
-      "sixteenk": 27753.81,
-      "spy": 20410.97
+      "strategy": 21035.6,
+      "qty1": 15517.8,
+      "sixteenk": 15321.97,
+      "spy": 10205.48
     },
     {
       "date": "2026-04-16",
-      "strategy": 31035.6,
-      "qty1": 25517.8,
-      "sixteenk": 27753.81,
-      "spy": 20461.13
+      "strategy": 21035.6,
+      "qty1": 15517.8,
+      "sixteenk": 15321.97,
+      "spy": 10230.56
     },
     {
       "date": "2026-04-17",
-      "strategy": 31855.57,
-      "qty1": 25927.78,
-      "sixteenk": 29982.09,
-      "spy": 20708.41
+      "strategy": 21855.57,
+      "qty1": 15927.78,
+      "sixteenk": 16733.2,
+      "spy": 10354.21
     },
     {
       "date": "2026-04-20",
-      "strategy": 31855.57,
-      "qty1": 25927.78,
-      "sixteenk": 29982.09,
-      "spy": 20667.0
+      "strategy": 21855.57,
+      "qty1": 15927.78,
+      "sixteenk": 16733.2,
+      "spy": 10333.5
     },
     {
       "date": "2026-04-21",
-      "strategy": 31855.57,
-      "qty1": 25927.78,
-      "sixteenk": 29982.09,
-      "spy": 20531.7
+      "strategy": 21855.57,
+      "qty1": 15927.78,
+      "sixteenk": 16733.2,
+      "spy": 10265.85
     },
     {
       "date": "2026-04-22",
-      "strategy": 31855.57,
-      "qty1": 25927.78,
-      "sixteenk": 29982.09,
-      "spy": 20739.62
+      "strategy": 21855.57,
+      "qty1": 15927.78,
+      "sixteenk": 16733.2,
+      "spy": 10369.81
     },
     {
       "date": "2026-04-23",
-      "strategy": 31855.57,
-      "qty1": 25927.78,
-      "sixteenk": 29982.09,
-      "spy": 20659.13
+      "strategy": 21855.57,
+      "qty1": 15927.78,
+      "sixteenk": 16733.2,
+      "spy": 10329.57
     },
     {
       "date": "2026-04-24",
-      "strategy": 31449.13,
-      "qty1": 25724.56,
-      "sixteenk": 29503.42,
-      "spy": 20819.23
+      "strategy": 21449.13,
+      "qty1": 15724.56,
+      "sixteenk": 16495.51,
+      "spy": 10409.61
     },
     {
       "date": "2026-04-27",
-      "strategy": 31449.13,
-      "qty1": 25724.56,
-      "sixteenk": 29503.42,
-      "spy": 20855.09
+      "strategy": 21449.13,
+      "qty1": 15724.56,
+      "sixteenk": 16495.51,
+      "spy": 10427.55
     },
     {
       "date": "2026-04-28",
-      "strategy": 31449.13,
-      "qty1": 25724.56,
-      "sixteenk": 29503.42,
-      "spy": 20753.61
+      "strategy": 21449.13,
+      "qty1": 15724.56,
+      "sixteenk": 16495.51,
+      "spy": 10376.81
     },
     {
       "date": "2026-04-29",
-      "strategy": 31449.13,
-      "qty1": 25724.56,
-      "sixteenk": 29503.42,
-      "spy": 20750.4
+      "strategy": 21449.13,
+      "qty1": 15724.56,
+      "sixteenk": 16495.51,
+      "spy": 10375.2
     },
     {
       "date": "2026-04-30",
-      "strategy": 31449.13,
-      "qty1": 25724.56,
-      "sixteenk": 29503.42,
-      "spy": 20956.86
+      "strategy": 21449.13,
+      "qty1": 15724.56,
+      "sixteenk": 16495.51,
+      "spy": 10478.43
     },
     {
       "date": "2026-05-01",
-      "strategy": 31598.09,
-      "qty1": 25799.04,
-      "sixteenk": 29944.19,
-      "spy": 21014.9
+      "strategy": 21598.09,
+      "qty1": 15799.05,
+      "sixteenk": 16610.95,
+      "spy": 10507.45
     },
     {
       "date": "2026-05-04",
-      "strategy": 31598.09,
-      "qty1": 25799.04,
-      "sixteenk": 29944.19,
-      "spy": 20937.91
+      "strategy": 21598.09,
+      "qty1": 15799.05,
+      "sixteenk": 16610.95,
+      "spy": 10468.96
     },
     {
       "date": "2026-05-05",
-      "strategy": 31598.09,
-      "qty1": 25799.04,
-      "sixteenk": 29944.19,
-      "spy": 21105.88
+      "strategy": 21598.09,
+      "qty1": 15799.05,
+      "sixteenk": 16610.95,
+      "spy": 10552.94
     },
     {
       "date": "2026-05-06",
-      "strategy": 31598.09,
-      "qty1": 25799.04,
-      "sixteenk": 29944.19,
-      "spy": 21399.24
+      "strategy": 21598.09,
+      "qty1": 15799.05,
+      "sixteenk": 16610.95,
+      "spy": 10699.62
     },
     {
       "date": "2026-05-07",
-      "strategy": 31598.09,
-      "qty1": 25799.04,
-      "sixteenk": 29944.19,
-      "spy": 21333.62
+      "strategy": 21598.09,
+      "qty1": 15799.05,
+      "sixteenk": 16610.95,
+      "spy": 10666.81
     },
     {
       "date": "2026-05-08",
-      "strategy": 31277.71,
-      "qty1": 25638.85,
-      "sixteenk": 29480.23,
-      "spy": 21509.76
+      "strategy": 21277.71,
+      "qty1": 15638.85,
+      "sixteenk": 16196.62,
+      "spy": 10754.88
     },
     {
       "date": "2026-05-11",
-      "strategy": 31277.71,
-      "qty1": 25638.85,
-      "sixteenk": 29480.23,
-      "spy": 21558.75
+      "strategy": 21277.71,
+      "qty1": 15638.85,
+      "sixteenk": 16196.62,
+      "spy": 10779.37
     },
     {
       "date": "2026-05-12",
-      "strategy": 31277.71,
-      "qty1": 25638.85,
-      "sixteenk": 29480.23,
-      "spy": 21526.09
+      "strategy": 21277.71,
+      "qty1": 15638.85,
+      "sixteenk": 16196.62,
+      "spy": 10763.04
     },
     {
       "date": "2026-05-13",
-      "strategy": 31277.71,
-      "qty1": 25638.85,
-      "sixteenk": 29480.23,
-      "spy": 21646.52
+      "strategy": 21277.71,
+      "qty1": 15638.85,
+      "sixteenk": 16196.62,
+      "spy": 10823.26
     },
     {
       "date": "2026-05-14",
-      "strategy": 31277.71,
-      "qty1": 25638.85,
-      "sixteenk": 29480.23,
-      "spy": 21817.41
+      "strategy": 21277.71,
+      "qty1": 15638.85,
+      "sixteenk": 16196.62,
+      "spy": 10908.7
     },
     {
       "date": "2026-05-15",
-      "strategy": 32202.49,
-      "qty1": 26101.24,
-      "sixteenk": 29976.8,
-      "spy": 21554.96
+      "strategy": 22202.49,
+      "qty1": 16101.24,
+      "sixteenk": 16599.11,
+      "spy": 10777.48
     },
     {
       "date": "2026-05-18",
-      "strategy": 32202.49,
-      "qty1": 26101.24,
-      "sixteenk": 29976.8,
-      "spy": 21539.8
+      "strategy": 22202.49,
+      "qty1": 16101.24,
+      "sixteenk": 16599.11,
+      "spy": 10769.9
     },
     {
       "date": "2026-05-19",
-      "strategy": 32202.49,
-      "qty1": 26101.24,
-      "sixteenk": 29976.8,
-      "spy": 21396.32
+      "strategy": 22202.49,
+      "qty1": 16101.24,
+      "sixteenk": 16599.11,
+      "spy": 10698.16
     },
     {
       "date": "2026-05-20",
-      "strategy": 32202.49,
-      "qty1": 26101.24,
-      "sixteenk": 29976.8,
-      "spy": 21615.61
+      "strategy": 22202.49,
+      "qty1": 16101.24,
+      "sixteenk": 16599.11,
+      "spy": 10807.81
     },
     {
       "date": "2026-05-21",
-      "strategy": 32202.49,
-      "qty1": 26101.24,
-      "sixteenk": 29976.8,
-      "spy": 21658.48
+      "strategy": 22202.49,
+      "qty1": 16101.24,
+      "sixteenk": 16599.11,
+      "spy": 10829.24
     },
     {
       "date": "2026-05-22",
-      "strategy": 32135.25,
-      "qty1": 26067.62,
-      "sixteenk": 29414.52,
-      "spy": 21743.63
+      "strategy": 22135.25,
+      "qty1": 16067.62,
+      "sixteenk": 16183.38,
+      "spy": 10871.81
     },
     {
       "date": "2026-05-26",
-      "strategy": 32135.25,
-      "qty1": 26067.62,
-      "sixteenk": 29414.52,
-      "spy": 21887.98
+      "strategy": 22135.25,
+      "qty1": 16067.62,
+      "sixteenk": 16183.38,
+      "spy": 10943.99
     },
     {
       "date": "2026-05-27",
-      "strategy": 32135.25,
-      "qty1": 26067.62,
-      "sixteenk": 29414.52,
-      "spy": 21884.19
+      "strategy": 22135.25,
+      "qty1": 16067.62,
+      "sixteenk": 16183.38,
+      "spy": 10942.09
     },
     {
       "date": "2026-05-28",
-      "strategy": 32135.25,
-      "qty1": 26067.62,
-      "sixteenk": 29414.52,
-      "spy": 22004.91
+      "strategy": 22135.25,
+      "qty1": 16067.62,
+      "sixteenk": 16183.38,
+      "spy": 11002.46
     },
     {
       "date": "2026-05-29",
-      "strategy": 32400.23,
-      "qty1": 26200.12,
-      "sixteenk": 29621.41,
-      "spy": 22059.73
+      "strategy": 22400.23,
+      "qty1": 16200.12,
+      "sixteenk": 16185.61,
+      "spy": 11029.87
     },
     {
       "date": "2026-06-01",
-      "strategy": 32400.23,
-      "qty1": 26200.12,
-      "sixteenk": 29621.41,
-      "spy": 22119.81
+      "strategy": 22400.23,
+      "qty1": 16200.12,
+      "sixteenk": 16185.61,
+      "spy": 11059.9
     },
     {
       "date": "2026-06-02",
-      "strategy": 32400.23,
-      "qty1": 26200.12,
-      "sixteenk": 29621.41,
-      "spy": 22149.84
+      "strategy": 22400.23,
+      "qty1": 16200.12,
+      "sixteenk": 16185.61,
+      "spy": 11074.92
     },
     {
       "date": "2026-06-03",
-      "strategy": 32400.23,
-      "qty1": 26200.12,
-      "sixteenk": 29621.41,
-      "spy": 21994.41
+      "strategy": 22400.23,
+      "qty1": 16200.12,
+      "sixteenk": 16185.61,
+      "spy": 10997.21
     },
     {
       "date": "2026-06-04",
-      "strategy": 32400.23,
-      "qty1": 26200.12,
-      "sixteenk": 29621.41,
-      "spy": 22077.52
+      "strategy": 22400.23,
+      "qty1": 16200.12,
+      "sixteenk": 16185.61,
+      "spy": 11038.76
     },
     {
       "date": "2026-06-05",
-      "strategy": 32503.96,
-      "qty1": 26251.98,
-      "sixteenk": 30140.35,
-      "spy": 21507.72
+      "strategy": 22503.96,
+      "qty1": 16251.98,
+      "sixteenk": 16381.48,
+      "spy": 10753.86
     },
     {
       "date": "2026-06-08",
-      "strategy": 32503.96,
-      "qty1": 26251.98,
-      "sixteenk": 30140.35,
-      "spy": 21556.41
+      "strategy": 22503.96,
+      "qty1": 16251.98,
+      "sixteenk": 16381.48,
+      "spy": 10778.21
     },
     {
       "date": "2026-06-09",
-      "strategy": 32503.96,
-      "qty1": 26251.98,
-      "sixteenk": 30140.35,
-      "spy": 21493.14
+      "strategy": 22503.96,
+      "qty1": 16251.98,
+      "sixteenk": 16381.48,
+      "spy": 10746.57
     },
     {
       "date": "2026-06-10",
-      "strategy": 32503.96,
-      "qty1": 26251.98,
-      "sixteenk": 30140.35,
-      "spy": 21154.28
+      "strategy": 22503.96,
+      "qty1": 16251.98,
+      "sixteenk": 16381.48,
+      "spy": 10577.14
     },
     {
       "date": "2026-06-11",
-      "strategy": 32503.96,
-      "qty1": 26251.98,
-      "sixteenk": 30140.35,
-      "spy": 21513.84
+      "strategy": 22503.96,
+      "qty1": 16251.98,
+      "sixteenk": 16381.48,
+      "spy": 10756.92
     },
     {
       "date": "2026-06-12",
-      "strategy": 33341.74,
-      "qty1": 26670.87,
-      "sixteenk": 31247.89,
-      "spy": 21630.19
+      "strategy": 23341.74,
+      "qty1": 16670.87,
+      "sixteenk": 16735.54,
+      "spy": 10815.1
     },
     {
       "date": "2026-06-15",
-      "strategy": 33341.74,
-      "qty1": 26670.87,
-      "sixteenk": 31247.89,
-      "spy": 22011.62
+      "strategy": 23341.74,
+      "qty1": 16670.87,
+      "sixteenk": 16735.54,
+      "spy": 11005.81
     },
     {
       "date": "2026-06-16",
-      "strategy": 33341.74,
-      "qty1": 26670.87,
-      "sixteenk": 31247.89,
-      "spy": 21880.4
+      "strategy": 23341.74,
+      "qty1": 16670.87,
+      "sixteenk": 16735.54,
+      "spy": 10940.2
     },
     {
       "date": "2026-06-17",
-      "strategy": 33341.74,
-      "qty1": 26670.87,
-      "sixteenk": 31247.89,
-      "spy": 21607.16
+      "strategy": 23341.74,
+      "qty1": 16670.87,
+      "sixteenk": 16735.54,
+      "spy": 10803.58
     },
     {
       "date": "2026-06-18",
-      "strategy": 33341.74,
-      "qty1": 26670.87,
-      "sixteenk": 31247.89,
-      "spy": 21831.81
+      "strategy": 23341.74,
+      "qty1": 16670.87,
+      "sixteenk": 16735.54,
+      "spy": 10915.9
     },
     {
       "date": "2026-06-22",
-      "strategy": 33341.74,
-      "qty1": 26670.87,
-      "sixteenk": 31247.89,
-      "spy": 21763.1
+      "strategy": 23341.74,
+      "qty1": 16670.87,
+      "sixteenk": 16735.54,
+      "spy": 10881.55
     },
     {
       "date": "2026-06-23",
-      "strategy": 33341.74,
-      "qty1": 26670.87,
-      "sixteenk": 31247.89,
-      "spy": 21447.06
+      "strategy": 23341.74,
+      "qty1": 16670.87,
+      "sixteenk": 16735.54,
+      "spy": 10723.53
     },
     {
       "date": "2026-06-24",
-      "strategy": 33341.74,
-      "qty1": 26670.87,
-      "sixteenk": 31247.89,
-      "spy": 21437.12
+      "strategy": 23341.74,
+      "qty1": 16670.87,
+      "sixteenk": 16735.54,
+      "spy": 10718.56
     },
     {
       "date": "2026-06-25",
-      "strategy": 33341.74,
-      "qty1": 26670.87,
-      "sixteenk": 31247.89,
-      "spy": 21468.11
+      "strategy": 23341.74,
+      "qty1": 16670.87,
+      "sixteenk": 16735.54,
+      "spy": 10734.05
     },
     {
       "date": "2026-06-26",
-      "strategy": 34936.57,
-      "qty1": 27468.28,
-      "sixteenk": 34040.72,
-      "spy": 21312.86
+      "strategy": 24936.57,
+      "qty1": 17468.28,
+      "sixteenk": 18399.94,
+      "spy": 10656.43
     },
     {
       "date": "2026-06-29",
-      "strategy": 34936.57,
-      "qty1": 27468.28,
-      "sixteenk": 34040.72,
-      "spy": 21663.99
+      "strategy": 24936.57,
+      "qty1": 17468.28,
+      "sixteenk": 18399.94,
+      "spy": 10832.0
     },
     {
       "date": "2026-06-30",
-      "strategy": 34936.57,
-      "qty1": 27468.28,
-      "sixteenk": 34040.72,
-      "spy": 21832.68
+      "strategy": 24936.57,
+      "qty1": 17468.28,
+      "sixteenk": 18399.94,
+      "spy": 10916.34
     },
     {
       "date": "2026-07-01",
-      "strategy": 34936.57,
-      "qty1": 27468.28,
-      "sixteenk": 34040.72,
-      "spy": 21803.15
+      "strategy": 24936.57,
+      "qty1": 17468.28,
+      "sixteenk": 18399.94,
+      "spy": 10901.58
     },
     {
       "date": "2026-07-02",
-      "strategy": 34936.57,
-      "qty1": 27468.28,
-      "sixteenk": 34040.72,
-      "spy": 21774.5
+      "strategy": 24936.57,
+      "qty1": 17468.28,
+      "sixteenk": 18399.94,
+      "spy": 10887.25
     },
     {
       "date": "2026-07-06",
-      "strategy": 34936.57,
-      "qty1": 27468.28,
-      "sixteenk": 34040.72,
-      "spy": 21964.54
+      "strategy": 24936.57,
+      "qty1": 17468.28,
+      "sixteenk": 18399.94,
+      "spy": 10982.27
     },
     {
       "date": "2026-07-07",
-      "strategy": 34936.57,
-      "qty1": 27468.28,
-      "sixteenk": 34040.72,
-      "spy": 21860.16
+      "strategy": 24936.57,
+      "qty1": 17468.28,
+      "sixteenk": 18399.94,
+      "spy": 10930.08
     },
     {
       "date": "2026-07-08",
-      "strategy": 34936.57,
-      "qty1": 27468.28,
-      "sixteenk": 34040.72,
-      "spy": 21792.63
+      "strategy": 24936.57,
+      "qty1": 17468.28,
+      "sixteenk": 18399.94,
+      "spy": 10896.31
     },
     {
       "date": "2026-07-09",
-      "strategy": 34936.57,
-      "qty1": 27468.28,
-      "sixteenk": 34040.72,
-      "spy": 21977.11
+      "strategy": 24936.57,
+      "qty1": 17468.28,
+      "sixteenk": 18399.94,
+      "spy": 10988.55
     },
     {
       "date": "2026-07-10",
-      "strategy": 34371.81,
-      "qty1": 27185.9,
-      "sixteenk": 33551.29,
-      "spy": 22071.83
+      "strategy": 24371.81,
+      "qty1": 17185.9,
+      "sixteenk": 17919.59,
+      "spy": 11035.92
     },
     {
       "date": "2026-07-13",
-      "strategy": 34371.81,
-      "qty1": 27185.9,
-      "sixteenk": 33551.29,
-      "spy": 21902.85
+      "strategy": 24371.81,
+      "qty1": 17185.9,
+      "sixteenk": 17919.59,
+      "spy": 10951.42
     },
     {
       "date": "2026-07-14",
-      "strategy": 34371.81,
-      "qty1": 27185.9,
-      "sixteenk": 33551.29,
-      "spy": 21980.62
+      "strategy": 24371.81,
+      "qty1": 17185.9,
+      "sixteenk": 17919.59,
+      "spy": 10990.31
     },
     {
       "date": "2026-07-15",
-      "strategy": 34371.81,
-      "qty1": 27185.9,
-      "sixteenk": 33551.29,
-      "spy": 22067.74
+      "strategy": 24371.81,
+      "qty1": 17185.9,
+      "sixteenk": 17919.59,
+      "spy": 11033.87
     },
     {
       "date": "2026-07-16",
-      "strategy": 34371.81,
-      "qty1": 27185.9,
-      "sixteenk": 33551.29,
-      "spy": 21948.17
+      "strategy": 24371.81,
+      "qty1": 17185.9,
+      "sixteenk": 17919.59,
+      "spy": 10974.08
     },
     {
       "date": "2026-07-17",
-      "strategy": 34145.1,
-      "qty1": 27072.55,
-      "sixteenk": 33212.45,
-      "spy": 21730.94
+      "strategy": 24145.1,
+      "qty1": 17072.55,
+      "sixteenk": 17776.19,
+      "spy": 10865.47
     },
     {
       "date": "2026-07-20",
-      "strategy": 34145.1,
-      "qty1": 27072.55,
-      "sixteenk": 33212.45,
-      "spy": 21695.86
+      "strategy": 24145.1,
+      "qty1": 17072.55,
+      "sixteenk": 17776.19,
+      "spy": 10847.93
     },
     {
       "date": "2026-07-21",
-      "strategy": 34145.1,
-      "qty1": 27072.55,
-      "sixteenk": 33212.45,
-      "spy": 21876.83
+      "strategy": 24145.1,
+      "qty1": 17072.55,
+      "sixteenk": 17776.19,
+      "spy": 10938.41
     },
     {
       "date": "2026-07-22",
-      "strategy": 34145.1,
-      "qty1": 27072.55,
-      "sixteenk": 33212.45,
-      "spy": 21851.39
+      "strategy": 24145.1,
+      "qty1": 17072.55,
+      "sixteenk": 17776.19,
+      "spy": 10925.7
     },
     {
       "date": "2026-07-23",
-      "strategy": 34145.1,
-      "qty1": 27072.55,
-      "sixteenk": 33212.45,
-      "spy": 21581.54
+      "strategy": 24145.1,
+      "qty1": 17072.55,
+      "sixteenk": 17776.19,
+      "spy": 10790.77
     },
     {
       "date": "2026-07-24",
-      "strategy": 34760.02,
-      "qty1": 27380.01,
-      "sixteenk": 34462.92,
-      "spy": 21603.47
+      "strategy": 24760.02,
+      "qty1": 17380.01,
+      "sixteenk": 18661.86,
+      "spy": 10801.74
     },
     {
       "date": "2026-07-27",
-      "strategy": 34760.02,
-      "qty1": 27380.01,
-      "sixteenk": 34462.92,
-      "spy": 21608.15
+      "strategy": 24760.02,
+      "qty1": 17380.01,
+      "sixteenk": 18661.86,
+      "spy": 10804.07
     },
     {
       "date": "2026-07-28",
-      "strategy": 34760.02,
-      "qty1": 27380.01,
-      "sixteenk": 34462.92,
-      "spy": 21659.9
+      "strategy": 24760.02,
+      "qty1": 17380.01,
+      "sixteenk": 18661.86,
+      "spy": 10829.95
     },
     {
       "date": "2026-07-29",
-      "strategy": 34760.02,
-      "qty1": 27380.01,
-      "sixteenk": 34462.92,
-      "spy": 21326.61
+      "strategy": 24760.02,
+      "qty1": 17380.01,
+      "sixteenk": 18661.86,
+      "spy": 10663.3
     },
     {
       "date": "2026-07-30",
-      "strategy": 34760.02,
-      "qty1": 27380.01,
-      "sixteenk": 34462.92,
-      "spy": 21684.16
+      "strategy": 24760.02,
+      "qty1": 17380.01,
+      "sixteenk": 18661.86,
+      "spy": 10842.08
     },
     {
       "date": "2026-07-31",
-      "strategy": 34586.47,
-      "qty1": 27293.24,
-      "sixteenk": 33984.54,
-      "spy": 21840.28
+      "strategy": 24586.47,
+      "qty1": 17293.24,
+      "sixteenk": 18216.95,
+      "spy": 10920.14
     },
     {
       "date": "2026-08-03",
-      "strategy": 34586.47,
-      "qty1": 27293.24,
-      "sixteenk": 33984.54,
-      "spy": 22151.36
+      "strategy": 24586.47,
+      "qty1": 17293.24,
+      "sixteenk": 18216.95,
+      "spy": 11075.68
     },
     {
       "date": "2026-08-04",
-      "strategy": 34586.47,
-      "qty1": 27293.24,
-      "sixteenk": 33984.54,
-      "spy": 22550.72
+      "strategy": 24586.47,
+      "qty1": 17293.24,
+      "sixteenk": 18216.95,
+      "spy": 11275.36
     },
     {
       "date": "2026-08-05",
-      "strategy": 34586.47,
-      "qty1": 27293.24,
-      "sixteenk": 33984.54,
-      "spy": 22505.7
+      "strategy": 24586.47,
+      "qty1": 17293.24,
+      "sixteenk": 18216.95,
+      "spy": 11252.85
     },
     {
       "date": "2026-08-06",
-      "strategy": 34586.47,
-      "qty1": 27293.24,
-      "sixteenk": 33984.54,
-      "spy": 22469.74
+      "strategy": 24586.47,
+      "qty1": 17293.24,
+      "sixteenk": 18216.95,
+      "spy": 11234.87
     },
     {
       "date": "2026-08-07",
-      "strategy": 35239.53,
-      "qty1": 27619.76,
-      "sixteenk": 35713.49,
-      "spy": 22607.15
+      "strategy": 25239.53,
+      "qty1": 17619.76,
+      "sixteenk": 19333.15,
+      "spy": 11303.57
     },
     {
       "date": "2026-08-10",
-      "strategy": 35239.53,
-      "qty1": 27619.76,
-      "sixteenk": 35713.49,
-      "spy": 22600.42
+      "strategy": 25239.53,
+      "qty1": 17619.76,
+      "sixteenk": 19333.15,
+      "spy": 11300.21
     },
     {
       "date": "2026-08-11",
-      "strategy": 35239.53,
-      "qty1": 27619.76,
-      "sixteenk": 35713.49,
-      "spy": 22528.21
+      "strategy": 25239.53,
+      "qty1": 17619.76,
+      "sixteenk": 19333.15,
+      "spy": 11264.11
     },
     {
       "date": "2026-08-12",
-      "strategy": 35239.53,
-      "qty1": 27619.76,
-      "sixteenk": 35713.49,
-      "spy": 22584.64
+      "strategy": 25239.53,
+      "qty1": 17619.76,
+      "sixteenk": 19333.15,
+      "spy": 11292.32
     },
     {
       "date": "2026-08-13",
-      "strategy": 35239.53,
-      "qty1": 27619.76,
-      "sixteenk": 35713.49,
-      "spy": 22742.22
+      "strategy": 25239.53,
+      "qty1": 17619.76,
+      "sixteenk": 19333.15,
+      "spy": 11371.11
     },
     {
       "date": "2026-08-14",
-      "strategy": 35277.95,
-      "qty1": 27638.97,
-      "sixteenk": 35600.52,
-      "spy": 22697.2
+      "strategy": 25277.95,
+      "qty1": 17638.97,
+      "sixteenk": 19505.94,
+      "spy": 11348.6
     },
     {
       "date": "2026-08-17",
-      "strategy": 35277.95,
-      "qty1": 27638.97,
-      "sixteenk": 35600.52,
-      "spy": 22589.9
+      "strategy": 25277.95,
+      "qty1": 17638.97,
+      "sixteenk": 19505.94,
+      "spy": 11294.95
     },
     {
       "date": "2026-08-18",
-      "strategy": 35277.95,
-      "qty1": 27638.97,
-      "sixteenk": 35600.52,
-      "spy": 22437.29
+      "strategy": 25277.95,
+      "qty1": 17638.97,
+      "sixteenk": 19505.94,
+      "spy": 11218.64
     },
     {
       "date": "2026-08-19",
-      "strategy": 35277.95,
-      "qty1": 27638.97,
-      "sixteenk": 35600.52,
-      "spy": 22484.36
+      "strategy": 25277.95,
+      "qty1": 17638.97,
+      "sixteenk": 19505.94,
+      "spy": 11242.18
     },
     {
       "date": "2026-08-20",
-      "strategy": 35277.95,
-      "qty1": 27638.97,
-      "sixteenk": 35600.52,
-      "spy": 22295.49
+      "strategy": 25277.95,
+      "qty1": 17638.97,
+      "sixteenk": 19505.94,
+      "spy": 11147.75
     },
     {
       "date": "2026-08-21",
-      "strategy": 35948.65,
-      "qty1": 27974.32,
-      "sixteenk": 36363.05,
-      "spy": 22386.71
+      "strategy": 25948.65,
+      "qty1": 17974.32,
+      "sixteenk": 19958.96,
+      "spy": 11193.35
     },
     {
       "date": "2026-08-24",
-      "strategy": 35948.65,
-      "qty1": 27974.32,
-      "sixteenk": 36363.05,
-      "spy": 22320.93
+      "strategy": 25948.65,
+      "qty1": 17974.32,
+      "sixteenk": 19958.96,
+      "spy": 11160.46
     },
     {
       "date": "2026-08-25",
-      "strategy": 35948.65,
-      "qty1": 27974.32,
-      "sixteenk": 36363.05,
-      "spy": 22392.26
+      "strategy": 25948.65,
+      "qty1": 17974.32,
+      "sixteenk": 19958.96,
+      "spy": 11196.13
     },
     {
       "date": "2026-08-26",
-      "strategy": 35948.65,
-      "qty1": 27974.32,
-      "sixteenk": 36363.05,
-      "spy": 22397.23
+      "strategy": 25948.65,
+      "qty1": 17974.32,
+      "sixteenk": 19958.96,
+      "spy": 11198.62
     },
     {
       "date": "2026-08-27",
-      "strategy": 35948.65,
-      "qty1": 27974.32,
-      "sixteenk": 36363.05,
-      "spy": 22544.0
+      "strategy": 25948.65,
+      "qty1": 17974.32,
+      "sixteenk": 19958.96,
+      "spy": 11272.0
     },
     {
       "date": "2026-08-28",
-      "strategy": 35553.47,
-      "qty1": 27776.73,
-      "sixteenk": 36039.16,
-      "spy": 22492.84
+      "strategy": 25553.47,
+      "qty1": 17776.73,
+      "sixteenk": 19855.1,
+      "spy": 11246.42
     },
     {
       "date": "2026-08-31",
-      "strategy": 35553.47,
-      "qty1": 27776.73,
-      "sixteenk": 36039.16,
-      "spy": 22425.59
+      "strategy": 25553.47,
+      "qty1": 17776.73,
+      "sixteenk": 19855.1,
+      "spy": 11212.8
     },
     {
       "date": "2026-09-01",
-      "strategy": 35553.47,
-      "qty1": 27776.73,
-      "sixteenk": 36039.16,
-      "spy": 22271.52
+      "strategy": 25553.47,
+      "qty1": 17776.73,
+      "sixteenk": 19855.1,
+      "spy": 11135.76
     },
     {
       "date": "2026-09-02",
-      "strategy": 35553.47,
-      "qty1": 27776.73,
-      "sixteenk": 36039.16,
-      "spy": 22370.34
+      "strategy": 25553.47,
+      "qty1": 17776.73,
+      "sixteenk": 19855.1,
+      "spy": 11185.17
     },
     {
       "date": "2026-09-03",
-      "strategy": 35553.47,
-      "qty1": 27776.73,
-      "sixteenk": 36039.16,
-      "spy": 22604.52
+      "strategy": 25553.47,
+      "qty1": 17776.73,
+      "sixteenk": 19855.1,
+      "spy": 11302.26
     },
     {
       "date": "2026-09-04",
-      "strategy": 35354.05,
-      "qty1": 27677.02,
-      "sixteenk": 34965.97,
-      "spy": 22517.39
+      "strategy": 25354.05,
+      "qty1": 17677.02,
+      "sixteenk": 19261.79,
+      "spy": 11258.7
     },
     {
       "date": "2026-09-08",
-      "strategy": 35354.05,
-      "qty1": 27677.02,
-      "sixteenk": 34965.97,
-      "spy": 22393.72
+      "strategy": 25354.05,
+      "qty1": 17677.02,
+      "sixteenk": 19261.79,
+      "spy": 11196.86
     },
     {
       "date": "2026-09-09",
-      "strategy": 35354.05,
-      "qty1": 27677.02,
-      "sixteenk": 34965.97,
-      "spy": 22289.64
+      "strategy": 25354.05,
+      "qty1": 17677.02,
+      "sixteenk": 19261.79,
+      "spy": 11144.82
     },
     {
       "date": "2026-09-10",
-      "strategy": 35354.05,
-      "qty1": 27677.02,
-      "sixteenk": 34965.97,
-      "spy": 22156.03
+      "strategy": 25354.05,
+      "qty1": 17677.02,
+      "sixteenk": 19261.79,
+      "spy": 11078.02
     },
     {
       "date": "2026-09-11",
-      "strategy": 35453.21,
-      "qty1": 27726.6,
-      "sixteenk": 35213.87,
-      "spy": 22344.9
+      "strategy": 25453.21,
+      "qty1": 17726.6,
+      "sixteenk": 19460.11,
+      "spy": 11172.45
     },
     {
       "date": "2026-09-14",
-      "strategy": 35453.21,
-      "qty1": 27726.6,
-      "sixteenk": 35213.87,
-      "spy": 22245.21
+      "strategy": 25453.21,
+      "qty1": 17726.6,
+      "sixteenk": 19460.11,
+      "spy": 11122.6
     },
     {
       "date": "2026-09-15",
-      "strategy": 35453.21,
-      "qty1": 27726.6,
-      "sixteenk": 35213.87,
-      "spy": 22143.17
+      "strategy": 25453.21,
+      "qty1": 17726.6,
+      "sixteenk": 19460.11,
+      "spy": 11071.59
     },
     {
       "date": "2026-09-16",
-      "strategy": 35453.21,
-      "qty1": 27726.6,
-      "sixteenk": 35213.87,
-      "spy": 22045.52
+      "strategy": 25453.21,
+      "qty1": 17726.6,
+      "sixteenk": 19460.11,
+      "spy": 11022.76
     },
     {
       "date": "2026-09-17",
-      "strategy": 35453.21,
-      "qty1": 27726.6,
-      "sixteenk": 35213.87,
-      "spy": 22295.49
+      "strategy": 25453.21,
+      "qty1": 17726.6,
+      "sixteenk": 19460.11,
+      "spy": 11147.75
     },
     {
       "date": "2026-09-18",
-      "strategy": 35316.21,
-      "qty1": 27658.1,
-      "sixteenk": 34625.33,
-      "spy": 22268.89
+      "strategy": 25316.21,
+      "qty1": 17658.1,
+      "sixteenk": 19106.45,
+      "spy": 11134.44
     },
     {
       "date": "2026-09-21",
-      "strategy": 35316.21,
-      "qty1": 27658.1,
-      "sixteenk": 34625.33,
-      "spy": 22614.17
+      "strategy": 25316.21,
+      "qty1": 17658.1,
+      "sixteenk": 19106.45,
+      "spy": 11307.08
     },
     {
       "date": "2026-09-22",
-      "strategy": 35316.21,
-      "qty1": 27658.1,
-      "sixteenk": 34625.33,
-      "spy": 22610.66
+      "strategy": 25316.21,
+      "qty1": 17658.1,
+      "sixteenk": 19106.45,
+      "spy": 11305.33
     },
     {
       "date": "2026-09-23",
-      "strategy": 35316.21,
-      "qty1": 27658.1,
-      "sixteenk": 34625.33,
-      "spy": 22447.81
+      "strategy": 25316.21,
+      "qty1": 17658.1,
+      "sixteenk": 19106.45,
+      "spy": 11223.91
     },
     {
       "date": "2026-09-24",
-      "strategy": 35316.21,
-      "qty1": 27658.1,
-      "sixteenk": 34625.33,
-      "spy": 22429.39
+      "strategy": 25316.21,
+      "qty1": 17658.1,
+      "sixteenk": 19106.45,
+      "spy": 11214.7
     },
     {
       "date": "2026-09-25",
-      "strategy": 34691.5,
-      "qty1": 27345.75,
-      "sixteenk": 33688.9,
-      "spy": 22551.31
+      "strategy": 24691.5,
+      "qty1": 17345.75,
+      "sixteenk": 18491.83,
+      "spy": 11275.65
     }
   ],
   "trades": [
@@ -11201,8 +11201,8 @@
       "pnl": 705.0,
       "credit": 1605.0,
       "risk": 1695.0,
-      "pre_bank": 20000.0,
-      "post_bank": 20705.0,
+      "pre_bank": 10000.0,
+      "post_bank": 10705.0,
       "max_g": 0.036959,
       "trades": [
         {
@@ -11415,8 +11415,8 @@
       "pnl": 101.17,
       "credit": 2096.04,
       "risk": 2003.96,
-      "pre_bank": 20705.0,
-      "post_bank": 20806.17,
+      "pre_bank": 10705.0,
+      "post_bank": 10806.17,
       "max_g": 0.027028,
       "trades": [
         {
@@ -11701,8 +11701,8 @@
       "pnl": 573.16,
       "credit": 1658.34,
       "risk": 1641.66,
-      "pre_bank": 20806.17,
-      "post_bank": 21379.33,
+      "pre_bank": 10806.17,
+      "post_bank": 11379.33,
       "max_g": 0.081323,
       "trades": [
         {
@@ -11969,8 +11969,8 @@
       "pnl": 11.57,
       "credit": 2133.42,
       "risk": 2066.58,
-      "pre_bank": 21379.33,
-      "post_bank": 21390.9,
+      "pre_bank": 11379.33,
+      "post_bank": 11390.9,
       "max_g": 0.06042,
       "trades": [
         {
@@ -12255,8 +12255,8 @@
       "pnl": 438.67,
       "credit": 2184.4,
       "risk": 2115.6,
-      "pre_bank": 21390.9,
-      "post_bank": 21829.57,
+      "pre_bank": 11390.9,
+      "post_bank": 11829.57,
       "max_g": 0.031367,
       "trades": [
         {
@@ -12523,8 +12523,8 @@
       "pnl": 210.78,
       "credit": 1330.9,
       "risk": 1169.1,
-      "pre_bank": 21829.57,
-      "post_bank": 22040.35,
+      "pre_bank": 11829.57,
+      "post_bank": 12040.35,
       "max_g": 0.033234,
       "trades": [
         {
@@ -12773,8 +12773,8 @@
       "pnl": 296.55,
       "credit": 1264.18,
       "risk": 1035.82,
-      "pre_bank": 22040.35,
-      "post_bank": 22336.9,
+      "pre_bank": 12040.35,
+      "post_bank": 12336.9,
       "max_g": 0.036481,
       "trades": [
         {
@@ -12951,8 +12951,8 @@
       "pnl": 1535.12,
       "credit": 2719.12,
       "risk": 2380.88,
-      "pre_bank": 22336.9,
-      "post_bank": 23872.02,
+      "pre_bank": 12336.9,
+      "post_bank": 13872.02,
       "max_g": 0.036226,
       "trades": [
         {
@@ -13273,8 +13273,8 @@
       "pnl": 107.84,
       "credit": 3434.94,
       "risk": 3365.06,
-      "pre_bank": 23872.02,
-      "post_bank": 23979.86,
+      "pre_bank": 13872.02,
+      "post_bank": 13979.86,
       "max_g": 0.018756,
       "trades": [
         {
@@ -13631,8 +13631,8 @@
       "pnl": 2891.2,
       "credit": 6429.9,
       "risk": 5870.1,
-      "pre_bank": 23979.86,
-      "post_bank": 26871.06,
+      "pre_bank": 13979.86,
+      "post_bank": 16871.06,
       "max_g": 0.079452,
       "trades": [
         {
@@ -14295,8 +14295,8 @@
       "pnl": 2090.78,
       "credit": 5756.78,
       "risk": 5143.22,
-      "pre_bank": 26871.06,
-      "post_bank": 28961.84,
+      "pre_bank": 16871.06,
+      "post_bank": 18961.84,
       "max_g": 0.023986,
       "trades": [
         {
@@ -14941,8 +14941,8 @@
       "pnl": 2030.14,
       "credit": 5416.72,
       "risk": 5283.28,
-      "pre_bank": 28961.84,
-      "post_bank": 30991.98,
+      "pre_bank": 18961.84,
+      "post_bank": 20991.98,
       "max_g": 0.049968,
       "trades": [
         {
@@ -15497,8 +15497,8 @@
       "pnl": 43.62,
       "credit": 6218.72,
       "risk": 5581.28,
-      "pre_bank": 30991.98,
-      "post_bank": 31035.6,
+      "pre_bank": 20991.98,
+      "post_bank": 21035.6,
       "max_g": 0.031176,
       "trades": [
         {
@@ -16179,8 +16179,8 @@
       "pnl": 819.97,
       "credit": 2490.28,
       "risk": 2309.72,
-      "pre_bank": 31035.6,
-      "post_bank": 31855.57,
+      "pre_bank": 21035.6,
+      "post_bank": 21855.57,
       "max_g": 0.039889,
       "trades": [
         {
@@ -16501,8 +16501,8 @@
       "pnl": -406.44,
       "credit": 2114.76,
       "risk": 1985.24,
-      "pre_bank": 31855.57,
-      "post_bank": 31449.13,
+      "pre_bank": 21855.57,
+      "post_bank": 21449.13,
       "max_g": 0.030334,
       "trades": [
         {
@@ -16751,8 +16751,8 @@
       "pnl": 148.96,
       "credit": 2115.02,
       "risk": 1884.98,
-      "pre_bank": 31449.13,
-      "post_bank": 31598.09,
+      "pre_bank": 21449.13,
+      "post_bank": 21598.09,
       "max_g": 0.039617,
       "trades": [
         {
@@ -17037,8 +17037,8 @@
       "pnl": -320.38,
       "credit": 2288.38,
       "risk": 2111.62,
-      "pre_bank": 31598.09,
-      "post_bank": 31277.71,
+      "pre_bank": 21598.09,
+      "post_bank": 21277.71,
       "max_g": 0.03057,
       "trades": [
         {
@@ -17287,8 +17287,8 @@
       "pnl": 924.78,
       "credit": 3061.08,
       "risk": 2938.92,
-      "pre_bank": 31277.71,
-      "post_bank": 32202.49,
+      "pre_bank": 21277.71,
+      "post_bank": 22202.49,
       "max_g": 0.041863,
       "trades": [
         {
@@ -17699,8 +17699,8 @@
       "pnl": -67.24,
       "credit": 1855.58,
       "risk": 1744.42,
-      "pre_bank": 32202.49,
-      "post_bank": 32135.25,
+      "pre_bank": 22202.49,
+      "post_bank": 22135.25,
       "max_g": 0.037499,
       "trades": [
         {
@@ -18021,8 +18021,8 @@
       "pnl": 264.98,
       "credit": 2397.18,
       "risk": 2202.82,
-      "pre_bank": 32135.25,
-      "post_bank": 32400.23,
+      "pre_bank": 22135.25,
+      "post_bank": 22400.23,
       "max_g": 0.034808,
       "trades": [
         {
@@ -18271,8 +18271,8 @@
       "pnl": 103.73,
       "credit": 1990.58,
       "risk": 1809.42,
-      "pre_bank": 32400.23,
-      "post_bank": 32503.96,
+      "pre_bank": 22400.23,
+      "post_bank": 22503.96,
       "max_g": 0.036633,
       "trades": [
         {
@@ -18575,8 +18575,8 @@
       "pnl": 837.78,
       "credit": 1937.78,
       "risk": 1762.22,
-      "pre_bank": 32503.96,
-      "post_bank": 33341.74,
+      "pre_bank": 22503.96,
+      "post_bank": 23341.74,
       "max_g": 0.024877,
       "trades": [
         {
@@ -18843,8 +18843,8 @@
       "pnl": 1594.83,
       "credit": 1960.04,
       "risk": 1939.96,
-      "pre_bank": 33341.74,
-      "post_bank": 34936.57,
+      "pre_bank": 23341.74,
+      "post_bank": 24936.57,
       "max_g": 0.035697,
       "trades": [
         {
@@ -19183,8 +19183,8 @@
       "pnl": -564.76,
       "credit": 1738.08,
       "risk": 1461.92,
-      "pre_bank": 34936.57,
-      "post_bank": 34371.81,
+      "pre_bank": 24936.57,
+      "post_bank": 24371.81,
       "max_g": 0.036065,
       "trades": [
         {
@@ -19397,8 +19397,8 @@
       "pnl": -226.71,
       "credit": 1882.28,
       "risk": 1917.72,
-      "pre_bank": 34371.81,
-      "post_bank": 34145.1,
+      "pre_bank": 24371.81,
+      "post_bank": 24145.1,
       "max_g": 0.052127,
       "trades": [
         {
@@ -19665,8 +19665,8 @@
       "pnl": 614.92,
       "credit": 614.92,
       "risk": 685.08,
-      "pre_bank": 34145.1,
-      "post_bank": 34760.02,
+      "pre_bank": 24145.1,
+      "post_bank": 24760.02,
       "max_g": 0.034661,
       "trades": [
         {
@@ -19789,8 +19789,8 @@
       "pnl": -173.55,
       "credit": 1419.54,
       "risk": 1180.46,
-      "pre_bank": 34760.02,
-      "post_bank": 34586.47,
+      "pre_bank": 24760.02,
+      "post_bank": 24586.47,
       "max_g": 0.053638,
       "trades": [
         {
@@ -20003,8 +20003,8 @@
       "pnl": 653.06,
       "credit": 2568.56,
       "risk": 2331.44,
-      "pre_bank": 34586.47,
-      "post_bank": 35239.53,
+      "pre_bank": 24586.47,
+      "post_bank": 25239.53,
       "max_g": 0.082679,
       "trades": [
         {
@@ -20343,8 +20343,8 @@
       "pnl": 38.42,
       "credit": 2708.42,
       "risk": 2291.58,
-      "pre_bank": 35239.53,
-      "post_bank": 35277.95,
+      "pre_bank": 25239.53,
+      "post_bank": 25277.95,
       "max_g": 0.052525,
       "trades": [
         {
@@ -20629,8 +20629,8 @@
       "pnl": 670.7,
       "credit": 1470.7,
       "risk": 1329.3,
-      "pre_bank": 35277.95,
-      "post_bank": 35948.65,
+      "pre_bank": 25277.95,
+      "post_bank": 25948.65,
       "max_g": 0.149779,
       "trades": [
         {
@@ -20807,8 +20807,8 @@
       "pnl": -395.18,
       "credit": 1434.28,
       "risk": 1265.72,
-      "pre_bank": 35948.65,
-      "post_bank": 35553.47,
+      "pre_bank": 25948.65,
+      "post_bank": 25553.47,
       "max_g": 0.048655,
       "trades": [
         {
@@ -20985,8 +20985,8 @@
       "pnl": -199.42,
       "credit": 1629.36,
       "risk": 1570.64,
-      "pre_bank": 35553.47,
-      "post_bank": 35354.05,
+      "pre_bank": 25553.47,
+      "post_bank": 25354.05,
       "max_g": 0.053599,
       "trades": [
         {
@@ -21181,8 +21181,8 @@
       "pnl": 99.16,
       "credit": 99.16,
       "risk": 100.84,
-      "pre_bank": 35354.05,
-      "post_bank": 35453.21,
+      "pre_bank": 25354.05,
+      "post_bank": 25453.21,
       "max_g": 0.035676,
       "trades": [
         {
@@ -21215,8 +21215,8 @@
       "pnl": -137.0,
       "credit": 1417.0,
       "risk": 1283.0,
-      "pre_bank": 35453.21,
-      "post_bank": 35316.21,
+      "pre_bank": 25453.21,
+      "post_bank": 25316.21,
       "max_g": 0.032569,
       "trades": [
         {
@@ -21429,8 +21429,8 @@
       "pnl": -624.71,
       "credit": 1440.4,
       "risk": 1159.6,
-      "pre_bank": 35316.21,
-      "post_bank": 34691.5,
+      "pre_bank": 25316.21,
+      "post_bank": 24691.5,
       "max_g": 0.094621,
       "trades": [
         {
