@@ -104,6 +104,34 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.65 OPEN (MacBook Air): backtest a "model must beat market" gate (2026-09-29)
+
+**Finding, first live day on the drift-free canon.** Nothing in canon requires the model's belief to
+add anything over the market. A pick qualifies when Kelly growth on its OWN triple (p, q, ro) at the
+selection credit clears GROUND >= 0.0005; the market triple (p_hat, q_hat, ro_hat) is never compared.
+So a spread can qualify purely because its smile-fit model credit is rich, even when P_real is WORSE
+than the market's odds. ORCL 2026-09-29 is the case.
+
+Recomputed with `ent_canon.kelly` on the four 2026-09-29 actuals (reproduces the live G exactly):
+
+| trade | b | G on model triple | G on market triple | score comes from |
+|---|---|---|---|---|
+| IBM 225/222.5 | 1.273 | +0.0019 | -0.0001 | model: full loss 44% vs market 49% |
+| SCHW 99/98 | 1.068 | +0.0011 | -0.0002 | model: full loss 38% vs market 45% |
+| PYPL 54/53 | 0.921 | +0.0053 | +0.0021 | both |
+| **ORCL 144/143** | 1.415 | +0.0021 | **+0.0040** | **credit only; model view is worse** |
+
+Unexplained, not investigated: why the market triple gives POSITIVE growth at the smile-fit model credit
+(ORCL, PYPL). If p_hat/q_hat/ro_hat and model_credit came from the same smile, fair growth should sit near 0.
+
+**Task for the MacBook Air (user request, not yet run):** backtest the current drift-free canon (§0.64)
+with one added gate: qualify only if G(model triple) > G(market triple) at the same credit (variant: require
+the margin to exceed a small epsilon). Run IS 2020-2025 and OOT 2026 through the same generator §0.64 used
+(`research/report_bear_regime.py`), and compare to the §0.64 drift-free row: trades, final qty2, $-Sharpe,
+max DD, picks' median 1y return. First confirm the backtest frame carries p_hat/q_hat/ro_hat per candidate;
+if it does not, that has to be added before the gate can be tested. **Canon stays unchanged until the user
+decides on the result.**
+
 ## 0.64 CANON: drift-free P_real, GROUND >= 0.0005; OOT through 09-25 (2026-09-28)
 
 **User decision.** Canon P_real counted RAW 1-4 day returns over the trailing 252 sessions, so each
