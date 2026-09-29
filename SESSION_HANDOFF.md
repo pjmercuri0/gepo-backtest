@@ -1,6 +1,6 @@
 # GEPO session handoff — 2026-06-10 (canon) · 2026-07-08 (live-ops) · 2026-07-17 (IBKR/health ops) · 2026-08-19 (Mac mini cutover) · 2026-08-24 (OOT/history repair) · 2026-09-01 (cross-machine integration) · 2026-09-03 (euro lane) · 2026-09-11 (assignment monitor + IV skew + delta canon)
 
-**Last updated:** 2026-09-28 EDT (**§0.64: drift-free P_real canon, thr 0.0005, OOT through 09-25; mini must pull**). Prior: 2026-09-20 EDT (**§0.60: History/Actuals/freeze now apply the canon partial-WIN haircut via `spreads.settle_pnl`; History restated, -$570.39**; **FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
+**Last updated:** 2026-09-29 EDT (**§0.67: CANON thr 0.003, bull parity + regime gates OFF; site rebuilt; mini must pull**). Prior: 2026-09-28 EDT (**§0.64: drift-free P_real canon, thr 0.0005, OOT through 09-25; mini must pull**). Prior: 2026-09-20 EDT (**§0.60: History/Actuals/freeze now apply the canon partial-WIN haircut via `spreads.settle_pnl`; History restated, -$570.39**; **FILL_MULT -> 1.04**; **§0.58 — preflight hardening repaired and then removed; read it before Monday's open**). Prior: 2026-09-19 EDT, evening (**§0.57 is the current canon**; §0.56 folded in; **§0.55 is the latest live-ops state** — live-quote and mark corrections, commission zeroed). Current production is D_ent with fitted 0.55-delta shorts (0.50-0.60 band), `k=4`, `GROUND >= 0.005`, own-gap P_real drift, and model-credit ranking. Direction/selection: **two-sided and symmetric on the 100d SMA, LIVE and backtest (`config.REGIME_BULL_ONLY = False`, commit `0c79d6a`, 2026-09-19 evening): bull puts when the prior completed SPY close is above its 100-session SMA, bear calls below, cash if unknown. Live still applies ONE GROUND threshold (0.005) and ONE parity rule to both sides; the backtest bear sleeve uses 0.001 / mirrored parity > 0.25 / cap 5.** Execution remains quote >= 1.00x model, with a 1.04-1.10x target. The 2026-09-11 20-delta canon and the later two-sided/top-5 variants are superseded. The Mac mini remains the production runner and must pull GitHub `main` for this change.
 
 ## The strategy in three sentences (user, 2026-09-15 — verbatim, do not reword)
 
@@ -103,6 +103,41 @@ This block and the two safety/workflow blocks immediately below it are the autho
 - **Do not delete `data/DG_2025*/` (59.1 GB raw vendor data) yet.** The 2025 euro parquets are built, but a RUT/RUTW `UnderlyingPrice` anomaly is unresolved and may need the original CSVs to diagnose — see §0.17.
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
+
+## 0.67 CANON: bull GROUND >= 0.003, bull parity veto OFF, bull regime gate OFF; site rebuilt (2026-09-29)
+
+**User decision** ("make this the new canon") on the §0.66 result. Bull sleeve: GROUND >= 0.003, no parity veto,
+bull puts fire EVERY day (not only above the SPY 100d SMA), cap 10. Bear sleeve unchanged: only below the 100d
+SMA, GROUND >= 0.001, mirrored parity > 0.25, cap 5. Drift-free P_real (§0.64), k=4, 0.55-delta, FILL 1.04 unchanged.
+
+Code (one commit): `ent_canon.THR` 0.0005 -> 0.003; new `ent_canon.BULL_PARITY_GATE = False`,
+`ent_canon.BULL_REGIME_GATE = False` (the generator `research/report_bear_regime.py` reads both, captions follow);
+`config.GROUND_THRESHOLD` 0.003, `config.PARITY_FILTER = False`, new `config.REGIME_BULL_ALWAYS = True`;
+`spreads.py` new `REGIME_BULL_ALWAYS` mode (bull puts skip the regime veto, bear calls need regime == bear, fail
+closed on unknown); `live/ranker.py` sets it and skips the bull parity veto (and the LIVE_REQUIRE_PARITY data-presence
+check) when `PARITY_FILTER` is off, bears keep theirs; `live/mock_data.py` gate captions follow config;
+`test_canon_direction_overlay.py` constants test updated (it had been asserting the 0.005 canon since 09-16).
+
+Payloads rebuilt with `research/report_bear_regime.py` and reconciled to `research/ground_rank_2026_09_29/sweep3.csv`:
+
+| | IS 2020-25 | OOT 2026 (thru 09-25) |
+|---|---|---|
+| trades | 3198 (was 4994) | 547 (was 839) |
+| qty2 final | $72,685 (was $95,251) | $34,692 (was $41,499) |
+| $-Sharpe | 1.66 (was 1.36) | 3.65 (was 3.51) |
+| max DD | -17.6% (was -29.9%) | -3.5% (was -8.3%) |
+| yield on risk | 11.6% (was 10.2%) | 19.2% (was 17.0%) |
+
+Fewer trades, less final $ at fixed qty 2; more per dollar risked. At equal dollars wagered (qty 4) it is $125k /
+$49k vs the old $95k / $41k (`qty4.csv`). Every year positive.
+
+**Deploy state (MacBook Air, 13:52 EDT).** Mya: payloads, `config.py`, `ent_canon.py`, `spreads.py`,
+`live/mock_data.py`, `live/ranker.py` rsynced; server-side backups `live/data/*.bak_prethr003_20260929_135110`;
+gunicorn HUP'd (workers restarted 13:52:28). Verified on the LIVE pages: /backtest shows 3198 / $72,685 / 1.66 /
+-17.6% and /oot shows 547 / $34,692 / 3.65 / -3.5%, both with the captions "GROUND >= 0.003", "no parity veto",
+"bull puts every day". **MAC MINI TO DO: `git pull`, then `bash live/upload_to_mya.sh`.** Until the mini pulls,
+(a) its next scan re-uploads ITS payload copies over these (same trap as §0.64), and (b) live picks still run
+thr 0.0005 with the parity and regime gates on.
 
 ## 0.66 Rank-ordering audit + GROUND threshold 0.003 on the parity/regime-off canon (2026-09-29, MacBook Air)
 

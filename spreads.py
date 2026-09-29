@@ -58,6 +58,7 @@ REGIME_FILTER     = False
 REGIME_LOOKUP     = None   # pd.Series (global) OR dict[ticker -> pd.Series] (per-ticker)
 REGIME_PER_TICKER = False  # if True, REGIME_LOOKUP is dict keyed by ticker
 REGIME_BULL_ONLY  = False
+REGIME_BULL_ALWAYS = False  # 2026-09-29 canon: bull puts ignore the regime; bear calls only in a bear regime
 REGIME_LAG_SESSIONS = 0
 REGIME_FAIL_CLOSED = False
 REGIME_MAX_STALE_CALENDAR_DAYS = None
@@ -206,7 +207,10 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
                 if (REGIME_MAX_STALE_CALENDAR_DAYS is None
                         or stale_days <= REGIME_MAX_STALE_CALENDAR_DAYS):
                     regime = regime_series.iloc[idx]
-        if REGIME_BULL_ONLY:
+        if REGIME_BULL_ALWAYS:
+            if spread_type == "bear_call" and regime != "bear":
+                return None
+        elif REGIME_BULL_ONLY:
             if regime != "bull" or spread_type != "bull_put":
                 return None
         elif regime == "bull" and spread_type == "bear_call":
