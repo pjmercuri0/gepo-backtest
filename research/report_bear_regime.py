@@ -55,10 +55,12 @@ def enrich(picks: pd.DataFrame) -> pd.DataFrame:
 def patch_config(payload: dict, oot: bool) -> dict:
     c = payload["config"]
     c["regime"] = (
-        "bull puts above prior-session SPY 100d SMA; bear calls below it "
-        "(symmetric on the 100d)"
+        "bull puts above prior-session SPY 100d SMA; bear calls below it (symmetric on the 100d)"
+        if ec.BULL_REGIME_GATE else
+        "bull puts every day; bear calls only below the prior-session SPY 100d SMA (2026-09-29)"
     )
-    c["parity"] = "bull parity > canon threshold; bear mirrored parity > 25th percentile"
+    c["parity"] = ("bull parity > canon threshold; bear mirrored parity > 25th percentile" if ec.BULL_PARITY_GATE
+                   else "no bull parity veto (2026-09-29); bear mirrored parity > 25th percentile")
     c["bear_gates"] = (
         "bear calls: GROUND >= 0.001, max 5/day. Earnings and ex-dividend gates "
         "(ex-date through expiry+1) apply to BOTH sleeves as of 2026-09-19."
@@ -76,7 +78,8 @@ def patch_config(payload: dict, oot: bool) -> dict:
         + ("; no commission" if ec.COMMISSION == 0 else f"; ${ec.COMMISSION:.2f} commission")
     )
     c["window"] = ec.CANON_LABELS["window"]
-    c["selection"] = (f"bull puts: GROUND >= {ec.THR:g}, parity > {ec.PARITY_MIN_PCT:.0%}, top-{ec.TOP_N}/day; "
+    c["selection"] = (f"bull puts: GROUND >= {ec.THR:g}, " + (f"parity > {ec.PARITY_MIN_PCT:.0%}, " if ec.BULL_PARITY_GATE else "no parity veto, ")
+                      + f"top-{ec.TOP_N}/day; "
                       + c["selection"])
     c["scoring"] = ec.CANON_LABELS["scoring"]
     c["dkl"] = ec.CANON_LABELS["dkl"]
@@ -98,14 +101,12 @@ def main() -> None:
     c = add_exdiv_gate(c)
     c = add_earnings_gate(c)
 
-    bull_pool = c[
-        c.spread_type.eq("bull_put")
-        & ~c.exdiv_hit
-        & ~c.earnings_hit
-        & prior_spy_bull(c.entry_date, spy, 100)
-        & (c.parity_pct > ec.PARITY_MIN_PCT)
-        & (c.GROUND >= ec.THR)
-    ]
+    bull_mask = c.spread_type.eq("bull_put") & ~c.exdiv_hit & ~c.earnings_hit & (c.GROUND >= ec.THR)
+    if ec.BULL_REGIME_GATE:      # OFF since 2026-09-29 (§0.66/§0.67): bull puts every day
+        bull_mask &= prior_spy_bull(c.entry_date, spy, 100)
+    if ec.BULL_PARITY_GATE:      # OFF since 2026-09-29
+        bull_mask &= c.parity_pct > ec.PARITY_MIN_PCT
+    bull_pool = c[bull_mask]
     bear_pool = c[
         c.spread_type.eq("bear_call")
         & ~c.exdiv_hit
