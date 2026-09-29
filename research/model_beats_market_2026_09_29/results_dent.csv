@@ -1,0 +1,17 @@
+variant,win,n,final,sh_dollar,max_dd,yield_pct,med_1y,med_dent
+"§0.64 baseline: GROUND>=0.0005, rank GROUND",IS,4994,95251.21,1.36,-29.87,10.18,2.5,0.106
+"§0.64 baseline: GROUND>=0.0005, rank GROUND",OOT,839,41499.39,3.51,-8.31,16.97,6.6,0.105
+"no score filter, rank GROUND (thr=-1)",IS,8019,127171.06,1.29,-33.53,8.84,9.2,0.113
+"no score filter, rank GROUND (thr=-1)",OOT,1255,43825.42,3.15,-18.14,11.97,11.6,0.115
+"rank lowest D_ent, no threshold",IS,8019,125598.63,1.26,-33.57,8.57,9.6,0.098
+"rank lowest D_ent, no threshold",OOT,1255,45964.18,3.6,-8.7,12.49,13.8,0.101
+GROUND>=0.0005 then rank lowest D_ent,IS,4994,92486.95,1.31,-31.42,9.78,2.3,0.104
+GROUND>=0.0005 then rank lowest D_ent,OOT,839,41679.03,3.53,-8.31,17.05,7.8,0.103
+"D_ent <= 0.050 (p20), rank GROUND",IS,2322,51633.13,0.95,-25.25,8.58,5.2,0.034
+"D_ent <= 0.050 (p20), rank GROUND",OOT,260,34222.47,3.34,-2.51,33.02,17.4,0.036
+"D_ent <= 0.086 (p40), rank GROUND",IS,3929,71737.54,1.17,-30.5,8.34,6.0,0.053
+"D_ent <= 0.086 (p40), rank GROUND",OOT,535,33806.78,2.85,-7.13,15.31,14.5,0.057
+"D_ent <= 0.128 (p60), rank GROUND",IS,5895,104880.92,1.35,-30.5,9.21,7.1,0.076
+"D_ent <= 0.128 (p60), rank GROUND",OOT,901,41692.35,3.7,-8.58,14.64,12.3,0.083
+"D_ent <= 0.086 (p40), rank lowest D_ent",IS,3929,71491.94,1.16,-30.77,8.31,5.9,0.053
+"D_ent <= 0.086 (p40), rank lowest D_ent",OOT,535,33792.5,2.85,-7.13,15.29,14.5,0.057
