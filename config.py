@@ -201,6 +201,8 @@ TOP_N = 10  # 2026-09-16 canon: up to 10 qualified bull puts per entry day
 # percentile and their own daily cap; the two sleeves never compete for slots.
 BEAR_GROUND_THRESHOLD = 0.001
 BEAR_PARITY_MIN_PCT   = 0.25   # strict >, percentile of (cp_iv_gap x causal sign) among that day's bear calls
+BEAR_PARITY_FILTER    = False  # 2026-09-29 (user, handoff §0.67 bear ablation): bear parity veto OFF; it added nothing on
+                               # either window. Parity is now off for BOTH sleeves. The bear REGIME gate stays (it is the sleeve).
 BEAR_TOP_N            = 5
 
 # Sizing rule: "1" = 1 contract per spread, "2" = 2 contracts, "dyn10k" = dynamic.
