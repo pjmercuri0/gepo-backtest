@@ -587,8 +587,8 @@ CANON_LABELS = {
     'selection': (f'bull puts every day' if not BULL_REGIME_GATE else 'bull puts when prior-close SPY>100d SMA') + '; '
                  + (f'parity percentile > {PARITY_MIN_PCT:.0%}; ' if BULL_PARITY_GATE else 'no parity veto; ')
                  + f'top-{TOP_N}/day; k={K:g}, GROUND ≥ {THR:g}',
-    'gap':       f'P_real drift = {GAP_GAMMA:g} × β_year σ × z(the stock\'s OWN opening gap, ATR units) × √DTE; no market average; β walk-forward, fitted on years before entry (§0.45)',
+    'gap':       f'P_real drift = {GAP_GAMMA:g} × β_year σ × z(the stock\'s OWN opening gap, ATR units) × √DTE; no market average',
     'scoring':   'G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G−1)·e^(−k·D_ent)',
-    'fill':      f'{FILL_MULT:.2f}× smile-fit model credit (19 real fills), no commission',
+    'fill':      f'{FILL_MULT:.2f}× smile-fit model credit, no commission',
     'targets':   f'min {MULT_MIN:.2f}× model credit, target {MULT_TARGET_LO:.2f}–{MULT_TARGET_HI:.2f}×',
 }

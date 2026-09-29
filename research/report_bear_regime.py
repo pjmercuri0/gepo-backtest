@@ -58,17 +58,13 @@ def patch_config(payload: dict, oot: bool) -> dict:
     c["regime"] = (
         "bull puts above prior-session SPY 100d SMA; bear calls below it (symmetric on the 100d)"
         if ec.BULL_REGIME_GATE else
-        "bull puts every day; bear calls only below the prior-session SPY 100d SMA (2026-09-29)"
+        "bull puts every day; bear calls only below the prior-session SPY 100d SMA"
     )
     c["parity"] = (("bull parity > canon threshold; " if ec.BULL_PARITY_GATE else "no bull parity veto; ")
-                   + ("bear mirrored parity > 25th percentile" if PARITY_GATE else "no bear parity veto (both off 2026-09-29)"))
+                   + ("bear mirrored parity > 25th percentile" if PARITY_GATE else "no bear parity veto"))
     c["bear_gates"] = (
-        "bear calls: GROUND >= 0.001, max 5/day. Earnings and ex-dividend gates "
-        "(ex-date through expiry+1) apply to BOTH sleeves as of 2026-09-19."
-    )
-    c["selection"] = (
-        "research bear sleeve selected on IS 2020-2025; 2026 attached after ranking"
-        + (" (OOT view)" if oot else "")
+        f"bear calls: GROUND >= {GROUND:g}, max 5/day. Earnings and ex-dividend gates "
+        "(ex-date through expiry+1) apply to both sleeves."
     )
     # report_mid_canon.build_payload() writes the OLD canon's captions (0.80xmid
     # fill, G_rv / rv_vs_iv scoring).  realize() actually books ec.FILL_MULT x
@@ -80,12 +76,11 @@ def patch_config(payload: dict, oot: bool) -> dict:
     )
     c["window"] = ec.CANON_LABELS["window"]
     c["selection"] = (f"bull puts: GROUND >= {ec.THR:g}, " + (f"parity > {ec.PARITY_MIN_PCT:.0%}, " if ec.BULL_PARITY_GATE else "no parity veto, ")
-                      + f"top-{ec.TOP_N}/day; "
-                      + c["selection"])
+                      + f"top-{ec.TOP_N}/day; bear calls: GROUND >= {GROUND:g}, top-5/day")
     c["scoring"] = ec.CANON_LABELS["scoring"]
     c["dkl"] = ec.CANON_LABELS["dkl"]
     c["gap"] = ec.CANON_LABELS["gap"]
-    c["commission"] = "none (2026-09-17)" if ec.COMMISSION == 0 else f"${ec.COMMISSION:.2f}/spread"
+    c["commission"] = "none" if ec.COMMISSION == 0 else f"${ec.COMMISSION:.2f}/spread"
     return payload
 
 

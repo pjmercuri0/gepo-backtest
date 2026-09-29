@@ -578,8 +578,11 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
     n_bull_q = int((ranked["qualified"] & ranked["spread_type"].eq("bull_put")).sum()) if not ranked.empty else 0
     n_bear_q = int((ranked["qualified"] & ranked["spread_type"].eq("bear_call")).sum()) if not ranked.empty else 0
-    print(f"  qualified: {n_bull_q} bull puts (GROUND >= {thr}, parity > {backtest_config.PARITY_MIN_PCT:.0%}, cap {backtest_config.TOP_N}) + "
-          f"{n_bear_q} bear calls (GROUND >= {bear_thr}, bear parity > {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%}, "
+    _bull_par = (f"parity > {backtest_config.PARITY_MIN_PCT:.0%}" if getattr(backtest_config, "PARITY_FILTER", True) else "no parity veto")
+    _bear_par = (f"bear parity > {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%}"
+                 if getattr(backtest_config, "BEAR_PARITY_FILTER", True) else "no parity veto")
+    print(f"  qualified: {n_bull_q} bull puts (GROUND >= {thr}, {_bull_par}, cap {backtest_config.TOP_N}) + "
+          f"{n_bear_q} bear calls (GROUND >= {bear_thr}, {_bear_par}, "
           f"cap {getattr(backtest_config, 'BEAR_TOP_N', 5)}) of {len(ranked)}; quote >= fair", flush=True)
     return ranked
 
@@ -785,7 +788,9 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             "FAIL_CLOSED_ON_MISSING_FEATURES": getattr(
                 live_config, "LIVE_FAIL_CLOSED_ON_MISSING_FEATURES", False
             ),
-            "REQUIRE_PARITY": getattr(live_config, "LIVE_REQUIRE_PARITY", False),
+            # Only meaningful while a parity veto is live; both are off since 2026-09-29.
+            "REQUIRE_PARITY": bool(getattr(live_config, "LIVE_REQUIRE_PARITY", False)) and (
+                bool(getattr(backtest_config, "PARITY_FILTER", True)) or bool(getattr(backtest_config, "BEAR_PARITY_FILTER", True))),
             "REQUIRE_IBKR_CLOSES": getattr(live_config, "LIVE_REQUIRE_IBKR_CLOSES", False),
             "REQUIRE_OWN_GAP": getattr(live_config, "LIVE_REQUIRE_OWN_GAP", False),
             "CREDIT_BASIS":     getattr(backtest_config, "CREDIT_BASIS", "last_clamped"),
@@ -800,6 +805,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
                 else backtest_config.GROUND_THRESHOLD
             ),
             "TOP_N":            live_config.TOP_N_DISPLAY,
+            "BEAR_GROUND_THRESHOLD": getattr(backtest_config, "BEAR_GROUND_THRESHOLD", 0.001),
+            "BEAR_TOP_N":       getattr(backtest_config, "BEAR_TOP_N", 5),
             "DKL_K":            getattr(ground, "DKL_K", 1.0),
             "ALPHA":            "(b-1)/(2b)",
             "DKL_REF":          "D_ent = ln3 − H(Q_bs) (paper eq. 19)",
@@ -818,8 +825,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
                                  else "bull puts above prior-session SPY 100d SMA; bear calls below"),
             "PARITY_GATE":      (f"same-strike call-IV minus put-IV daily percentile > {backtest_config.PARITY_MIN_PCT:.0%}"
                                  if getattr(backtest_config, "PARITY_FILTER", True)
-                                 else ("parity veto off for both sleeves (2026-09-29)" if not getattr(backtest_config, "BEAR_PARITY_FILTER", True)
-                                       else f"bull parity veto off (2026-09-29); bear > {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%}")),
+                                 else ("off (bull puts and bear calls)" if not getattr(backtest_config, "BEAR_PARITY_FILTER", True)
+                                       else f"bull off; bear > {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%}")),
         },
         "regime":    current_regime(),
         "vol_gate":  gate,
