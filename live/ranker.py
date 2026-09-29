@@ -811,8 +811,12 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             "COMMISSION":       entc.COMMISSION,
             "TARGETS":          entc.CANON_LABELS["targets"],
             "EXEC_GATE":        "qualified only if the IBKR credit ≥ fair value (1.00×model, the walk-away line)",
-            "REGIME_GATE":      "bull puts only when prior-session SPY close > 100d SMA; cash otherwise",
-            "PARITY_GATE":      f"same-strike call-IV minus put-IV daily percentile > {backtest_config.PARITY_MIN_PCT:.0%}",
+            "REGIME_GATE":      ("bull puts every day; bear calls only when prior-session SPY close < 100d SMA"
+                                 if getattr(backtest_config, "REGIME_BULL_ALWAYS", False)
+                                 else "bull puts above prior-session SPY 100d SMA; bear calls below"),
+            "PARITY_GATE":      (f"same-strike call-IV minus put-IV daily percentile > {backtest_config.PARITY_MIN_PCT:.0%}"
+                                 if getattr(backtest_config, "PARITY_FILTER", True)
+                                 else f"bull parity veto off (2026-09-29); bear > {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%}"),
         },
         "regime":    current_regime(),
         "vol_gate":  gate,

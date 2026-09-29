@@ -145,6 +145,13 @@ qty1 $36,342 / DD -17.6%, SPY $22,443; OOT qty2 $24,692 / DD -4.8%, qty1 $17,346
 (qty2). Side run of both floors at $10k/$20k: `research/ground_rank_2026_09_29/wallet10k.csv`. Mya backups
 `*.bak_pre10k_*`. The mini TO DO above still stands (pull + upload).
 
+**Live confirmation (14:01 EDT scan on Mya `ranked/latest.json`):** the mini ran the scan at git sha c6c86b9 (its merge of the
+canon commit 5a0d940, 13:53), `GROUND_THRESHOLD 0.003`, 50 candidates, 0 qualified. So live picks are on the new canon
+from 14:01. The 50 candidates' scores live only on the mini (SSH from the Air times out), so WHY none cleared 0.003 at
+14:01 is unverified; check the 14:45 scan. Two stale captions fixed after that scan: `live/ranker.py` REGIME_GATE /
+PARITY_GATE strings now follow config, and `live/regime.py` `allowed_direction` reports `bull_put` in a bull regime and
+`bull_put+bear_call` in a bear regime (was `None` = cash in bear). Captions only; no selection logic in either.
+
 ## 0.66 Rank-ordering audit + GROUND threshold 0.003 on the parity/regime-off canon (2026-09-29, MacBook Air)
 
 **User asks:** a strategy that wins IS and OOT, AND where GROUND, G and DKL rank-order. All runs through
