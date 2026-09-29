@@ -152,6 +152,21 @@ from 14:01. The 50 candidates' scores live only on the mini (SSH from the Air ti
 PARITY_GATE strings now follow config, and `live/regime.py` `allowed_direction` reports `bull_put` in a bull regime and
 `bull_put+bear_call` in a bear regime (was `None` = cash in bear). Captions only; no selection logic in either.
 
+**Bear sleeve ablation (2026-09-29, user asked why bears still need parity; `bear_ablate.csv`).** Bull side at canon.
+
+| bear variant | IS bear n / P&L | IS $-Sh | IS DD | OOT bear n / P&L | OOT $-Sh | OOT DD |
+|---|---|---|---|---|---|---|
+| canon (regime, parity > 0.25, G >= 0.001) | 975 / $3,046 | 1.66 | -30.6% | 82 / $4,274 | 3.65 | -4.8% |
+| no bear parity | 1049 / $3,563 | 1.67 | -30.6% | 83 / $4,364 | 3.90 | -4.8% |
+| bear parity > 0.12 | 1021 / $4,164 | 1.74 | -30.6% | 82 / $4,391 | 3.78 | -4.8% |
+| bear parity > 0.50 | 797 / $1,755 | 1.72 | -30.6% | 74 / $3,520 | 3.90 | -5.1% |
+| no bear regime (bears any day) | 3988 / -$703 | 1.13 | -39.8% | 631 / $1,823 | 1.76 | -29.9% |
+| no bear sleeve | 0 | 1.62 | -30.6% | 0 | 2.10 | -10.6% |
+
+Bear parity does nothing (removing it is +$0.5k / +0.01 IS, +0.25 OOT, within noise). The bear REGIME gate is the
+sleeve: bears on any day lose money in sample and take OOT to 1.76 / -30%. The sleeve itself pays in 2026 (no
+sleeve: OOT 2.10 / -10.6%). Not changed; user decides whether to drop bear parity and remove parity from the system.
+
 ## 0.66 Rank-ordering audit + GROUND threshold 0.003 on the parity/regime-off canon (2026-09-29, MacBook Air)
 
 **User asks:** a strategy that wins IS and OOT, AND where GROUND, G and DKL rank-order. All runs through
