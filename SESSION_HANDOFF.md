@@ -104,6 +104,67 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.66 Rank-ordering audit + GROUND threshold 0.003 on the parity/regime-off canon (2026-09-29, MacBook Air)
+
+**User asks:** a strategy that wins IS and OOT, AND where GROUND, G and DKL rank-order. All runs through
+`research/report_bear_regime.py` machinery on the drift-free canon (§0.64), bull sleeve with parity and regime
+gates OFF (§0.65 ablation, user chose to drop both), bear sleeve canon. Scripts and CSVs in
+`research/ground_rank_2026_09_29/` (scripts take the scratch dir as argv[1]; `dump_pool.py` first).
+
+**1. Per-trade dollars are not rank-ordered by anything** (`audit1_rank_dollars.txt`, 30 candidate scores on the
+16,117-candidate bull pool: GROUND, G, D_ent, G_mkt, G_mod-G_mkt, p-q_win, q-q_loss, KL(P||Q), KL(Q||P), H(P),
+credit/width, b, delta, dist, width, fit_rmse, cp_iv_gap, parity_pct, GROUND at k=0/8/16, GROUND with KL or H(P)
+in the denominator). Best Spearman with $/trade is credit/width at 0.06 IS / 0.13 OOT, which is mechanical. GROUND:
+0.006 / 0.008. Same under every P_real construction tried (`preal_variants.csv`: windows 63/126/252/504, demean
+on/off, gap drift on/off): top quintile beats bottom (t 1-4) on both windows, never monotone, rho <= 0.06.
+
+**2. What DOES rank-order, on both windows, is the full-loss rate** (`audit2_rank_targets.txt`,
+`quintile_books.csv`). Quintiles low -> high, % of trades that are a full loss:
+
+| | IS | OOT |
+|---|---|---|
+| GROUND | 46.0 41.9 37.7 37.9 35.4 | 52.4 45.0 45.1 39.5 37.8 |
+| G | 46.0 41.8 36.5 38.3 36.4 | 51.1 45.6 43.6 40.8 38.6 |
+| D_ent | 28.2 38.0 40.5 44.3 48.1 | 31.5 41.8 44.3 51.7 50.5 |
+
+t(top-bottom) on P(not full loss): GROUND +8.0 IS / +4.6 OOT; D_ent -15.5 / -6.1. D_ent is the market's full-loss
+probability in disguise: corr(D_ent, q_loss) = 0.82, corr(D_ent, q_part) = -0.89, corr(D_ent, b) = 0.55; q_win is
+flat at 0.43 across D_ent quintiles while q_loss runs 0.34 -> 0.52. So exp(-k D_ent) penalises exactly the trades
+that lose in full. Dollars do not follow because credit offsets it (mean b by GROUND quintile 1.12 -> 0.99).
+Quintile BOOKS of GROUND: $-Sh IS 0.55 0.45 0.80 0.84 1.53, OOT -0.76 1.07 -0.89 0.83 1.78; OOT DD -44 -29 -46 -27 -6.
+Top quintile is the best book on both windows; the middle is noise.
+
+**3. GROUND threshold sweep, cap 10, parity+regime off** (`sweep2.csv`, `sweep3.csv`, `sweep3_years.csv`). The cap
+never binds above 10 at thr >= 0.001. Tiered sizing by GROUND tercile (1/2/3, 0/1/2) does not beat a plain
+higher floor (`sweep2.csv`).
+
+| thr | IS n | IS final | IS $-Sh | IS DD | IS yield | OOT n | OOT final | OOT $-Sh | OOT DD | OOT yield |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0.0005 | 6331 | $109,837 | 1.67 | -29.9% | 9.6% | 1023 | $37,041 | 3.08 | -7.1% | 11.0% |
+| 0.0015 | 4486 | $86,294 | 1.66 | -26.8% | 10.2% | 775 | $35,620 | 3.38 | -4.5% | 13.8% |
+| 0.002 | 3952 | $78,403 | 1.57 | -26.6% | 10.3% | 673 | $34,194 | 3.38 | -5.9% | 14.7% |
+| 0.0025 | 3535 | $76,604 | 1.65 | -23.1% | 11.2% | 600 | $33,598 | 3.33 | -5.7% | 16.1% |
+| **0.003** | 3198 | $72,685 | 1.66 | -17.6% | 11.6% | 547 | $34,692 | 3.65 | -3.5% | 19.2% |
+| 0.0035 | 2954 | $68,403 | 1.60 | -14.4% | 11.6% | 493 | $31,509 | 2.93 | -4.9% | 16.8% |
+| 0.004 | 2745 | $59,897 | 1.34 | -16.8% | 10.4% | 464 | $29,087 | 2.26 | -6.3% | 14.1% |
+| 0.005 | 2368 | $53,310 | 1.16 | -17.9% | 10.2% | 400 | $27,914 | 1.95 | -6.1% | 14.5% |
+
+IS $-Sharpe is a plateau 0.0005-0.0035 (1.57-1.67). IS drawdown and yield improve monotonically with the floor up to
+0.003/0.0035. OOT Sharpe, DD and yield all peak at 0.003 (547 trades; 0.0025 and 0.0035 neighbours are within
+noise). Above 0.0035 everything decays and 2020 goes negative at 0.0045. Every year positive at 0.003 (2022 +$3.5k
+qty1; canon-thr 0.0005 has 2022 at -$0.2k). Picks' median 1y return -5.2% IS / +1.0% OOT (no momentum tilt).
+
+**At equal dollars wagered** (`qty4.csv`; thr 0.003 at qty 4 wagers $908k IS vs $934k for thr 0.0005 at qty 2):
+IS $125,370 vs $109,837, $-Sh 1.66 vs 1.67, DD -30.6% vs -29.9%; OOT $49,383 vs $37,041, 3.65 vs 3.08, -4.8% vs
+-7.1%. Trades/week 12.0 IS / 15.6 OOT vs 23.1 / 29.2.
+
+**Reading.** GROUND ranks RISK (the full-loss rate), not return per trade, and it does so on both windows; D_ent is
+the component doing it. The threshold is where that ranking is monetised: yield on risk and drawdown improve with
+the floor up to 0.003 on both windows. A per-trade $ ranker does not exist in this frame under any P_real
+construction; do not keep looking for one. Not promoted; user decides. thr=0.003 is one value from a 9-point grid
+picked with OOT visible, so the OOT 3.65 is not a clean holdout number; the IS plateau and the monotone DD/yield
+are the evidence.
+
 ## 0.65 OPEN (MacBook Air): backtest a "model must beat market" gate (2026-09-29)
 
 **Finding, first live day on the drift-free canon.** Nothing in canon requires the model's belief to
