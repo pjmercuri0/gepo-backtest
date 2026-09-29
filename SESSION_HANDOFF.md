@@ -211,6 +211,21 @@ that pay in sample (+0.16 and +0.13 $-Sh). Parity does nothing on either window.
 0.30 $-Sh and $12k in sample and buys 0.24 in 2026. The GROUND threshold mostly buys 2026 drawdown. The bear
 sleeve costs 0.06 in sample and buys 0.9 in 2026. No gate was changed; user decides.
 
+### Combined ablation: - parity - regime (2026-09-29, `results_noparity_noregime.csv`)
+
+The two gates that did nothing or cost money in sample, removed together. Bear sleeve canon unless noted.
+
+| variant | IS n | IS final | IS $-Sh | IS DD | OOT n | OOT final | OOT $-Sh | OOT DD |
+|---|---|---|---|---|---|---|---|---|
+| §0.64 canon | 4994 | $95,251 | 1.36 | -29.9% | 839 | $41,499 | 3.51 | -8.3% |
+| - parity - regime | 6331 | $109,837 | 1.67 | -29.9% | 1023 | $37,041 | 3.08 | -7.1% |
+| - parity - regime, bull only | 5356 | $103,746 | 1.39 | -30.0% | 941 | $28,492 | 1.32 | -26.9% |
+
+Same shape as `- regime` alone: +$14.6k and +0.31 $-Sh in sample, -$4.5k and -0.43 $-Sh in 2026, drawdown
+unchanged IS and slightly better OOT. Dropping the bear sleeve on top of that gives back the 2026 protection
+entirely (DD -27%, $-Sh 1.32). Picks' median 1y return goes to -2.1% IS. Not promoted; user decides. The
+session crashed after this run before it was recorded; the CSV was complete.
+
 ## 0.64 CANON: drift-free P_real, GROUND >= 0.0005; OOT through 09-25 (2026-09-28)
 
 **User decision.** Canon P_real counted RAW 1-4 day returns over the trailing 252 sessions, so each
