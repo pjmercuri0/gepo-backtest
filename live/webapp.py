@@ -323,7 +323,10 @@ def _live_status(spread_type: str, spot, short_strike, long_strike):
     of showing every open pick as a flat "open".
     """
     try:
-        spot = float(spot); ss = float(short_strike); ls = float(long_strike)
+        # Badge the spot the page SHOWS: rows render spot rounded half-up to the
+        # cent, and IBKR prints sub-penny lasts. BAC 55/54 displayed 55.01 on
+        # 2026-09-29 while badged P off an unrounded last just under 55.01.
+        spot = _round_half_up(float(spot), 2); ss = float(short_strike); ls = float(long_strike)
     except (TypeError, ValueError):
         return None
     # Symmetric $0.01 clearance at BOTH strikes. WINNING has always required
@@ -976,22 +979,10 @@ def _frozen_history(limit: int = 60) -> list[dict]:
             target_row["unrealized_pnl_per_contract"] = round(pps_per_share * 100, 2)
             target_row["current_mark"] = round(close_debit, 4)
 
-            # Live status — WINNING requires spot to clear short_strike by ≥$0.01.
-            # Right AT the strike = PARTIAL (assignment risk if it closes there).
-            if stype == "bull_put":
-                if spot >= ss + 0.01:
-                    target_row["live_status"] = "WINNING"
-                elif spot <= ls:
-                    target_row["live_status"] = "LOSING"
-                else:
-                    target_row["live_status"] = "PARTIAL"
-            else:  # bear_call
-                if spot <= ss - 0.01:
-                    target_row["live_status"] = "WINNING"
-                elif spot >= ls:
-                    target_row["live_status"] = "LOSING"
-                else:
-                    target_row["live_status"] = "PARTIAL"
+            # Live status: the one shared rule (_live_status), so History and
+            # Actuals cannot badge the same spread differently. This block used
+            # to carry its own copy that badged spot == long strike as LOSING.
+            target_row["live_status"] = _live_status(stype, spot, ss, ls)
             # Assignment-risk flag (canonical 2026-06-05): set when today is the
             # pick's expiry day AND short leg is ITM (i.e., spot crossed short_strike
             # in the wrong direction). User must close to avoid weekend assignment.
