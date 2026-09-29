@@ -260,7 +260,7 @@ def build_payload(picks, end_year, label):
             'fill_basis': f'{FILL_FRAC:.2f}\u00d7mid (real fills ~0.82\u00d7mid, n=5); partial-WIN at 50% intrinsic',
             'regime':     'OFF (both directions eligible)',
             'vol_gate':   'OFF',
-            'sizing':     'qty=2 per pick (canonical; risk-sizing tested 2026-09-19 and set aside)',
+            'sizing':     'qty=2 per pick',
             'starting_bankroll': START_BANKROLL,
         },
         'summary': summary,
