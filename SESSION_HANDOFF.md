@@ -132,6 +132,25 @@ max DD, picks' median 1y return. First confirm the backtest frame carries p_hat/
 if it does not, that has to be added before the gate can be tested. **Canon stays unchanged until the user
 decides on the result.**
 
+**Second task for the Air (user approved 2026-09-29): rank on D_ent alone.** Under drift-free P_real the
+GROUND score does not rank. Quintiles of `ground` in the current payloads (live/data/backtest_equity.json IS
+4994 trades; oot_equity.json OOT 839), $/trade at qty2:
+
+| GROUND quintile | IS | OOT |
+|---|---|---|
+| lowest | $20.85 | $9.26 |
+| 2 | $5.72 | $31.79 |
+| 3 | $8.46 | $51.48 |
+| 4 | $18.25 | $20.23 |
+| highest | $22.07 | $15.51 |
+
+D_ent (`dkl`) quintiles are monotonic IS (lowest $24.48 -> highest $9.11 per trade) but NOT OOT (lowest $33.01,
+highest $38.19). Test: same drift-free canon, same gates and caps, but select/rank by lowest D_ent (variants: a
+D_ent ceiling, and top-N by D_ent) instead of GROUND >= 0.0005. Compare to the §0.64 drift-free row and to the
+thr=-1.0 "no score filter" row in `research/p_real_demean_2026_09_28/thr_sweep.csv` (IS $-Sh 1.29, OOT 3.54).
+Day-of-week, credit/width and bull-vs-bear splits were checked too and flip sign between IS and OOT; not worth a
+run. Do NOT use the payload `spot` field as an entry feature: it is the expiry close (0%/100% win by bucket).
+
 ## 0.64 CANON: drift-free P_real, GROUND >= 0.0005; OOT through 09-25 (2026-09-28)
 
 **User decision.** Canon P_real counted RAW 1-4 day returns over the trailing 252 sessions, so each
