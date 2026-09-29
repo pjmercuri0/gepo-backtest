@@ -25,6 +25,7 @@ from sma_bull_regime_sweep import prior_spy_bull
 
 REGIME = "below_100"   # symmetric on the 100d SMA (user 2026-09-19)
 PARITY = 0.25
+PARITY_GATE = False    # 2026-09-29 (user): bear parity veto OFF (§0.67 bear ablation: no effect on either window)
 GROUND = 0.001
 CAP = 5
 
@@ -59,8 +60,8 @@ def patch_config(payload: dict, oot: bool) -> dict:
         if ec.BULL_REGIME_GATE else
         "bull puts every day; bear calls only below the prior-session SPY 100d SMA (2026-09-29)"
     )
-    c["parity"] = ("bull parity > canon threshold; bear mirrored parity > 25th percentile" if ec.BULL_PARITY_GATE
-                   else "no bull parity veto (2026-09-29); bear mirrored parity > 25th percentile")
+    c["parity"] = (("bull parity > canon threshold; " if ec.BULL_PARITY_GATE else "no bull parity veto; ")
+                   + ("bear mirrored parity > 25th percentile" if PARITY_GATE else "no bear parity veto (both off 2026-09-29)"))
     c["bear_gates"] = (
         "bear calls: GROUND >= 0.001, max 5/day. Earnings and ex-dividend gates "
         "(ex-date through expiry+1) apply to BOTH sleeves as of 2026-09-19."
@@ -107,14 +108,10 @@ def main() -> None:
     if ec.BULL_PARITY_GATE:      # OFF since 2026-09-29
         bull_mask &= c.parity_pct > ec.PARITY_MIN_PCT
     bull_pool = c[bull_mask]
-    bear_pool = c[
-        c.spread_type.eq("bear_call")
-        & ~c.exdiv_hit
-        & ~c.earnings_hit
-        & c[REGIME]
-        & (c.bear_parity_pct > PARITY)
-        & (c.GROUND >= GROUND)
-    ]
+    bear_mask = c.spread_type.eq("bear_call") & ~c.exdiv_hit & ~c.earnings_hit & c[REGIME] & (c.GROUND >= GROUND)
+    if PARITY_GATE:              # OFF since 2026-09-29
+        bear_mask &= c.bear_parity_pct > PARITY
+    bear_pool = c[bear_mask]
     all_picks = pd.concat(
         [realize(bull_pool, ec.TOP_N), realize(bear_pool, CAP)],
         ignore_index=True,

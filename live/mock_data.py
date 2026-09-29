@@ -271,7 +271,7 @@ def _build_payload(when: datetime, n_candidates: int = 30, seed: int = 0,
                                   if getattr(backtest_config, "REGIME_BULL_ALWAYS", False)
                                   else "bull puts above prior-session SPY 100d SMA; bear calls below"),
             "PARITY_GATE":       (f"same-strike call-IV minus put-IV daily percentile > {backtest_config.PARITY_MIN_PCT:.0%}"
-                                  if getattr(backtest_config, "PARITY_FILTER", True) else "bull parity veto off (2026-09-29); bear > 25%"),
+                                  if getattr(backtest_config, "PARITY_FILTER", True) else "parity veto off for both sleeves (2026-09-29)"),
         },
         "regime":    regime_info,
         "top_picks": top_picks,

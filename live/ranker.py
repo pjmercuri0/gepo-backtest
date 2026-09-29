@@ -547,10 +547,12 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     bull_gate_on = bool(getattr(backtest_config, "PARITY_FILTER", True))
     bull_parity_ok = (ranked["parity_pct"] > getattr(backtest_config, "PARITY_MIN_PCT", 0.12)) if bull_gate_on \
         else pd.Series(True, index=ranked.index)
-    bear_parity_ok = (ranked["bear_parity_pct"] > getattr(backtest_config, "BEAR_PARITY_MIN_PCT", 0.25))
+    bear_gate_on = bool(getattr(backtest_config, "BEAR_PARITY_FILTER", True))   # OFF since 2026-09-29
+    bear_parity_ok = (ranked["bear_parity_pct"] > getattr(backtest_config, "BEAR_PARITY_MIN_PCT", 0.25)) if bear_gate_on \
+        else pd.Series(True, index=ranked.index)
     parity_ok = pd.Series(np.where(is_bear, bear_parity_ok, bull_parity_ok), index=ranked.index, dtype=bool)
     if getattr(live_config, "LIVE_REQUIRE_PARITY", False):
-        gated = pd.Series(is_bear | bull_gate_on, index=ranked.index)   # data-presence check only where a parity gate is live
+        gated = pd.Series((is_bear & bear_gate_on) | (~is_bear & bull_gate_on), index=ranked.index)   # data-presence check only where a parity gate is live
         parity_ok &= ~gated | ranked["parity_bull_raw"].notna()
         parity_ok &= ~gated | (ranked["parity_pairs"].fillna(0) >= getattr(live_config, "LIVE_MIN_PARITY_PAIRS", 1))
     feature_ok = ranked["own_gap_available"].astype(bool)
@@ -816,7 +818,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
                                  else "bull puts above prior-session SPY 100d SMA; bear calls below"),
             "PARITY_GATE":      (f"same-strike call-IV minus put-IV daily percentile > {backtest_config.PARITY_MIN_PCT:.0%}"
                                  if getattr(backtest_config, "PARITY_FILTER", True)
-                                 else f"bull parity veto off (2026-09-29); bear > {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%}"),
+                                 else ("parity veto off for both sleeves (2026-09-29)" if not getattr(backtest_config, "BEAR_PARITY_FILTER", True)
+                                       else f"bull parity veto off (2026-09-29); bear > {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%}")),
         },
         "regime":    current_regime(),
         "vol_gate":  gate,
