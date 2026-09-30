@@ -157,6 +157,11 @@ do not fill; Actuals only records fills, so unfillable orders are invisible to t
 mid >= 1.00 x model credit (user cannot fill below model). Six weeks at 1.04 x model booking: 95 picks, 60% win, +$4,032,
 5/6 weeks, worst -$51 (ungated: 100 picks, +$4,450). Bulls 54 / +$2,092; bears 41 / +$1,941.
 
+**Pooled cap (2026-09-30, final).** `config.FABLE_POOLED = True`, `FABLE_TOP_N = 6`: both sides ranked together by quoted
+credit/width, top 6 per scan; History = 15:30 scan, 15:45 tops up to 6 total. Six weeks at 1.04 x model: 114 picks, 61% win,
++$4,356, 6/6 weeks, worst +$75, yield 40%, $-Sharpe 9.5, max weekly risk $2.2k. (3 per side was +$4,032, 5/6, yield 43%;
+user chose the pooled cap for the no-losing-week record.) Pooling tilts toward bulls (72 / 42).
+
 **History = variant B (commit `f5ad4a9`).** Frozen day = the 15:30 scan, both sides, then the 15:45 scan tops each side up
 to the cap with new names; booked at 0.951 x mid (`credit_basis.entry_credit` for rows carrying `fable: True`); drift skipped
 for fable-frozen days; `live_config.FREEZE_AT = "15:30"`. Mya deployed 2026-09-30 evening (all code + templates).
