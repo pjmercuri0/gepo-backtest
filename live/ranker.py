@@ -579,7 +579,9 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
                  & (ranked["IV"].astype(float) > float(backtest_config.FABLE_MIN_IV))
                  & (ranked["cw_fill"] >= float(backtest_config.FABLE_MIN_CW))
                  & feature_ok & ranked["qedge"].notna())
-        _keep = ranked[_elig].sort_values("qedge", ascending=False).index[:int(backtest_config.FABLE_TOP_N)]
+        # 2026-09-30 16:xx (user): both sleeves rank by GROUND (was qedge for bulls; live archive
+        # at 15:30: bulls by GROUND +$1,774 6/6 vs qedge +$2,145 6/6 -- aligned for one visible key).
+        _keep = ranked[_elig].sort_values("GROUND", ascending=False).index[:int(backtest_config.FABLE_TOP_N)]
         # Bear sleeve: bear calls every day, IV < FABLE_BEAR_MAX_IV, credit > FABLE_BEAR_MIN_CW x width,
         # top FABLE_BEAR_TOP_N by GROUND (the bear side ranks by GROUND, not qedge -- live archive).
         _elig_b = (ranked["spread_type"].eq("bear_call")
@@ -591,9 +593,9 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         ranked.loc[_keep, "qualified"] = True
         ranked.loc[_keep_b, "qualified"] = True
         # Display order: bull picks by qedge, bear picks by GROUND, then the rest.
-        ranked["fable_rank"] = np.where(ranked["spread_type"].eq("bear_call"), ranked["GROUND"].astype(float), ranked["qedge"].astype(float))
+        ranked["fable_rank"] = ranked["GROUND"].astype(float)
         print(f"  Fable Canon: {int(_elig.sum())} eligible bull put(s) (IV > {backtest_config.FABLE_MIN_IV:g}, "
-              f"credit >= {backtest_config.FABLE_MIN_CW:g}x width at {_ff:g}x mid); top {backtest_config.FABLE_TOP_N} by qedge qualified; "
+              f"credit >= {backtest_config.FABLE_MIN_CW:g}x width at {_ff:g}x mid); top {backtest_config.FABLE_TOP_N} by GROUND qualified; "
               f"{int(_elig_b.sum())} eligible bear call(s) (IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}, "
               f"credit > {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width); top {getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} by GROUND qualified", flush=True)
     n_below = int((above_thr & ~ranked["above_min"]).sum())
@@ -616,7 +618,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
                  if getattr(backtest_config, "BEAR_PARITY_FILTER", True) else "no parity veto")
     if _fable:
         print(f"  qualified: {n_bull_q} bull puts (Fable Canon: IV > {backtest_config.FABLE_MIN_IV:g}, "
-              f"credit >= {backtest_config.FABLE_MIN_CW:g}x width, top {backtest_config.FABLE_TOP_N} by qedge) + "
+              f"credit >= {backtest_config.FABLE_MIN_CW:g}x width, top {backtest_config.FABLE_TOP_N} by GROUND) + "
               f"{n_bear_q} bear calls (IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}, credit > {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width, "
               f"top {getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} by GROUND) of {len(ranked)}", flush=True)
         return ranked
@@ -849,7 +851,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             "SELECTION_MODE":   getattr(backtest_config, "SELECTION_MODE", "ground"),
             "SELECTION":        (f"Fable Canon: bull puts every day; IV > {backtest_config.FABLE_MIN_IV:g}; "
                                  f"credit >= {backtest_config.FABLE_MIN_CW:g}x width at {backtest_config.FABLE_FILL_FRAC:g}x mid; "
-                                 f"top {backtest_config.FABLE_TOP_N} per scan by qedge (q_hat - q); bear calls every day: IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}, "
+                                 f"top {backtest_config.FABLE_TOP_N} per scan by GROUND; bear calls every day: IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}, "
                                  f"credit > {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width, top {getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} by GROUND; "
                                  f"no GROUND threshold, no parity, no quote gate"
                                  if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable"
