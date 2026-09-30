@@ -300,3 +300,8 @@ FABLE_FLOOR_MULT  = 1.0
 # credit -- the same basis as Backtest/OOT/Snap -- not at 0.951 x the quoted mid. Ranking still
 # uses the quoted mid. "quoted" restores 0.951 x mid bookings.
 FABLE_BOOK_BASIS = "model"
+# 2026-09-30 (user): bear sleeve = model floor > 0.45 x width AND IV < FABLE_BEAR_MAX_IV (0.35);
+# bulls keep no IV filter. Live archive (5 bear weeks), booked 1.04x model: 42 picks, 62% win,
+# +$2,111, 5/5 weeks, worst +$43. The 0.50 floor left 16 picks and lost money.
+FABLE_BEAR_MIN_CW        = 0.45
+FABLE_BEAR_USE_IV_FILTER = True

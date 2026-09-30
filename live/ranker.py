@@ -584,6 +584,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
             ranked["cw_floor"] = ranked["cw_fill"]
             _floor_lbl = f"{_ff:g}x mid"
         _use_iv = bool(getattr(backtest_config, "FABLE_USE_IV_FILTER", True))
+        _use_iv_b = bool(getattr(backtest_config, "FABLE_BEAR_USE_IV_FILTER", _use_iv))
         _rk = str(getattr(backtest_config, "FABLE_RANK_KEY", "GROUND"))
         _elig = (ranked["spread_type"].eq("bull_put")
                  & ((ranked["IV"].astype(float) > float(backtest_config.FABLE_MIN_IV)) if _use_iv else True)
@@ -595,7 +596,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         # Bear sleeve: bear calls every day, IV < FABLE_BEAR_MAX_IV, credit > FABLE_BEAR_MIN_CW x width,
         # top FABLE_BEAR_TOP_N by GROUND (the bear side ranks by GROUND, not qedge -- live archive).
         _elig_b = (ranked["spread_type"].eq("bear_call")
-                   & ((ranked["IV"].astype(float) < float(getattr(backtest_config, "FABLE_BEAR_MAX_IV", 0.35))) if _use_iv else True)
+                   & ((ranked["IV"].astype(float) < float(getattr(backtest_config, "FABLE_BEAR_MAX_IV", 0.35))) if _use_iv_b else True)
                    & (ranked["cw_floor"] > float(getattr(backtest_config, "FABLE_BEAR_MIN_CW", 0.50)))
                    & feature_ok)
         _keep_b = ranked[_elig_b].sort_values(_rk, ascending=False).index[:int(getattr(backtest_config, "FABLE_BEAR_TOP_N", 5))]
@@ -605,7 +606,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         # Display order: bull picks by qedge, bear picks by GROUND, then the rest.
         ranked["fable_rank"] = ranked[_rk].astype(float)
         _ivs = f"IV > {backtest_config.FABLE_MIN_IV:g}, " if _use_iv else ""
-        _ivb = f"IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}, " if _use_iv else ""
+        _ivb = f"IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}, " if _use_iv_b else ""
         print(f"  Fable Canon: {int(_elig.sum())} eligible bull put(s) ({_ivs}credit >= {backtest_config.FABLE_MIN_CW:g}x width at {_floor_lbl}); "
               f"top {backtest_config.FABLE_TOP_N} by {_rk} qualified; {int(_elig_b.sum())} eligible bear call(s) ({_ivb}"
               f"credit > {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width); top {getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} by {_rk} qualified", flush=True)
@@ -866,7 +867,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
                                  f"(floor on {getattr(backtest_config, 'FABLE_FLOOR_MULT', 1.0):g}x model credit; rank on {backtest_config.FABLE_FILL_FRAC:g}x quoted mid); "
                                  f"bear calls every day, credit > {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width; "
                                  f"top {backtest_config.FABLE_TOP_N} per side per scan by {getattr(backtest_config, 'FABLE_RANK_KEY', 'GROUND')}"
-                                 + (f"; IV split bulls > {backtest_config.FABLE_MIN_IV:g} / bears < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}" if getattr(backtest_config, "FABLE_USE_IV_FILTER", True) else "; no IV filter")
+                                 + (f"; bulls IV > {backtest_config.FABLE_MIN_IV:g}" if getattr(backtest_config, "FABLE_USE_IV_FILTER", True) else "; bulls no IV filter")
+                                 + (f"; bears IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}" if getattr(backtest_config, "FABLE_BEAR_USE_IV_FILTER", False) else "; bears no IV filter")
                                  + "; no GROUND threshold, no parity, no quote gate"
                                  if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable"
                                  else f"GROUND >= {backtest_config.GROUND_THRESHOLD:g}, top {live_config.TOP_N_DISPLAY}"),
