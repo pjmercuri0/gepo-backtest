@@ -5,10 +5,11 @@ import pandas as pd, matplotlib
 matplotlib.use("Agg"); import matplotlib.pyplot as plt
 HERE = Path(__file__).resolve().parent
 df = pd.read_csv(HERE / "k_sweep_C_ext.csv").sort_values("k")
+df["IS_dd"] = -df.IS_dd; df["OOT_dd"] = -df.OOT_dd   # depth, positive: higher = worse
 SURF, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e8e7e3"
 C_IS, C_OOT = "#2a78d6", "#eb6834"
 panels = [("$-Sharpe (weekly P&L)", "IS_dsh", "OOT_dsh", "{:.2f}"),
-          ("Max drawdown, qty 2 from $10k", "IS_dd", "OOT_dd", "{:.0f}%"),
+          ("Max drawdown DEPTH, qty 2 from $10k  (higher = worse)", "IS_dd", "OOT_dd", "{:.0f}%"),
           ("Yield on dollars risked", "IS_yield", "OOT_yield", "{:.1f}%")]
 fig, axes = plt.subplots(3, 1, figsize=(7.2, 10.5), dpi=180, facecolor=SURF, sharex=True)
 fig.suptitle("Strategy C, k sweep: GROUND = EV · e^(−k·D_ent)\npooled top 6/day by GROUND, 252-session start, booked 1.04× model",
