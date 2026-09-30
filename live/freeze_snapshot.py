@@ -140,9 +140,13 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
             for p in existing_picks:
                 per_side[p.get("spread_type")] = per_side.get(p.get("spread_type"), 0) + 1
             additions = []
+            pooled = bool(getattr(backtest_config, "FABLE_POOLED", False))
             for pick in latest_picks:
                 side = pick.get("spread_type")
-                if per_side.get(side, 0) >= cap or _dedupe_key(pick) in seen:
+                if pooled:
+                    if len(existing_picks) + len(additions) >= cap or _dedupe_key(pick) in seen:
+                        continue
+                elif per_side.get(side, 0) >= cap or _dedupe_key(pick) in seen:
                     continue
                 additions.append(_with_added_marker(pick, latest_hhmm)); seen.add(_dedupe_key(pick))
                 per_side[side] = per_side.get(side, 0) + 1

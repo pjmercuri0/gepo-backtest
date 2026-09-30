@@ -308,3 +308,8 @@ FABLE_BEAR_USE_IV_FILTER = True
 # 2026-09-30 (user): quoted mid must be >= FABLE_QUOTE_GATE x model credit (he cannot fill below
 # model). Live archive at 1.04x model booking: 95 picks, 60% win, +$4,032, 5/6 weeks (vs +$4,450 ungated).
 FABLE_QUOTE_GATE = 1.00
+# 2026-09-30 (user, last): POOLED cap -- both sides ranked together by quoted credit/width, top 6
+# per scan (History: 15:30 scan, 15:45 tops up to 6 total). Six weeks at 1.04x model: 114 picks,
+# 61% win, +$4,356, 6/6 weeks, worst +$75, yield 40%, max weekly risk $2.2k.
+FABLE_POOLED = True
+FABLE_TOP_N  = 6
