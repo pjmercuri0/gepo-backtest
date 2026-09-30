@@ -104,6 +104,35 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.68 FABLE CANON live (2026-09-30 15:16): selection fitted on the LIVE candidate archive
+
+**User decision** ("Do that. Call it Fable Canon"), first live scan 15:16 (commit `6c24c72`). `config.SELECTION_MODE = "fable"`
+replaces the §0.67 GROUND selection in `live/ranker.py`: **bull puts only, every day; IV > 0.40; 0.951 x quoted mid >= 0.45 x
+width; each scan qualifies the top 5 by qedge = q_hat - q** (market full-loss odds minus the model's). No GROUND threshold, no
+parity, no quote >= model gate; earnings/ex-div gates and the delta band still apply upstream. GROUND/D_ent still computed and
+shown. `"ground"` restores §0.67. The webapp keeps the ranker's `qualified` flag in fable mode (`_overlay_stream`).
+
+**Evidence (all real IBKR quotes, real Friday closes).** Every archived scan `live/ranked/2026-*_HHMM.json` 08-20..09-25, bull
+puts, expiries 08-21..09-25, settled with `spreads.settle_pnl` at 0.951 x quoted mid (the user's measured fill ratio, 57 fills):
+2,563 first-sighted spreads, 6 expiries. Findings: (1) the system's own qualified picks made +$6,586 (5/6 weeks) while the 33
+of them the user took made -$279 -- the picks work, hand-selection did not; (2) qedge is the only feature whose top quartile beat
+its bottom quartile in 6/6 expiries; short_delta < 0.50 and higher IV also helped; GROUND did not rank (3/6). Rule search
+(~400 rules): `IV > 0.40 & credit >= 0.45x width, top 5/day by qedge` = +$4,668, 6/6 weeks, worst week +$296, 44% yield on
+risk, 57% win, max weekly risk $2.6k, still +$3,446 6/6 at 0.85x mid -- BUT that ranked across the whole day (lookahead).
+Per-scan, live-executable versions: fixed 15:30 scan +$2,145 (17 days, 6/6, worst +$78); 13:30 +$2,915 (20 days, 6/6);
+15:15 +$2,067 (13 days). Every rule tested loses at touch fills: limits near mid are mandatory. Scratch scripts and parquets
+were in the session scratchpad, not the repo; `research/fable_canon_2026_09_30/` does not exist yet -- rebuild from
+`live/ranked/*.json` + `output/ibkr_closes.parquet` if needed.
+
+**Caveats.** Chosen from ~400 rules on 6 weeks (selection bias); the archive spans four ranking canons; first Fable expiry is
+10-02. User is trading it at 1 contract (BA, TSLA, QCOM, FCX taken 09-30 15:16).
+
+**TO DO.** (a) Backtest/OOT tabs still describe and show the §0.67 GROUND canon -- the Air should backtest Fable on the vendor
+frame (needs q_hat per candidate: the Q_bs triple from `ent_canon.price_spreads`) and rebuild payloads, or the tabs should say
+they are not the live selection. (b) `live/templates/index.html` still labels cards "Top 5 by GROUND rank". (c) Mya has the
+new `config.py`/`ranker.py`/`webapp.py` NOT deployed (rsync was blocked in the session); the site rendered the 15:16 picks
+correctly regardless because `top_picks` and the ranker's `qualified` flags came through in `latest.json`.
+
 ## 0.67 CANON: bull GROUND >= 0.003, bull parity veto OFF, bull regime gate OFF; site rebuilt (2026-09-29)
 
 **User decision** ("make this the new canon") on the §0.66 result. Bull sleeve: GROUND >= 0.003, no parity veto,
