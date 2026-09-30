@@ -296,3 +296,7 @@ FABLE_BEAR_TOP_N    = 3
 # exists), variant B top 3/side: +$1,553, 51% win; ranking by model credit instead: -$235.
 FABLE_FLOOR_BASIS = "model"   # "model" = FABLE_FLOOR_MULT x model_credit / width; "quoted" = FABLE_FILL_FRAC x mid / width
 FABLE_FLOOR_MULT  = 1.0
+# 2026-09-30 (user): Fable picks are BOOKED at the canon fill, ent_canon.FILL_MULT (1.04) x model
+# credit -- the same basis as Backtest/OOT/Snap -- not at 0.951 x the quoted mid. Ranking still
+# uses the quoted mid. "quoted" restores 0.951 x mid bookings.
+FABLE_BOOK_BASIS = "model"

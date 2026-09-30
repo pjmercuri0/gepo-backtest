@@ -57,6 +57,8 @@ def entry_credit(pick: dict) -> float:
     if pick.get("fable") or pick.get("cw_fill") is not None:
         try:
             import config as _cfg
+            if str(getattr(_cfg, "FABLE_BOOK_BASIS", "model")) != "quoted":
+                raise ValueError("book at FILL_MULT x model below")
             _nc = float(pick.get("net_credit") or 0)
             if _nc > 0:
                 return min(round(_nc * float(getattr(_cfg, "FABLE_FILL_FRAC", 0.951)), 4), round(width, 4))
