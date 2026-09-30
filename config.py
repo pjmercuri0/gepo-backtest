@@ -319,3 +319,7 @@ FABLE_TOP_N  = 6
 # 54% win, +$2,669, 5/6 weeks, yield 33%, $-Sharpe 6.9. Vendor frame (Air, §0.69, no gate): IS $100.5k / 1.64, OOT 3.47.
 FABLE_RANK_KEY       = "GROUND"
 FABLE_BEAR_EVERY_DAY = False
+# 2026-09-30 (user): the June one-direction-per-ticker dedupe is OFF in fable mode. The vendor frame
+# behind the site's strategy-C book carries both sides of every name; the regime gate and the
+# GROUND ranking decide. Set True to restore the old behaviour.
+FABLE_PER_TICKER_DEDUPE = False

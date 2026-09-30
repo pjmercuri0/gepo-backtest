@@ -518,8 +518,11 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # One direction per ticker (2026-06-10): bull_put and bear_call on the same
     # name are contradictory bets; keep only the better-GROUND one.
     before = len(ranked)
-    ranked = (ranked.sort_values("GROUND", ascending=False)
-                    .groupby("ticker", as_index=False).head(1))
+    _dedupe = not (getattr(backtest_config, "SELECTION_MODE", "ground") == "fable"
+                   and not getattr(backtest_config, "FABLE_PER_TICKER_DEDUPE", True))
+    if _dedupe:
+        ranked = (ranked.sort_values("GROUND", ascending=False)
+                        .groupby("ticker", as_index=False).head(1))
     if len(ranked) < before:
         print(f"  per-ticker dedupe: {before} -> {len(ranked)} rows", flush=True)
 
