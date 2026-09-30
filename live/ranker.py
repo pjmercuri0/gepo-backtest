@@ -600,7 +600,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         # top FABLE_BEAR_TOP_N by GROUND (the bear side ranks by GROUND, not qedge -- live archive).
         _elig_b = (ranked["spread_type"].eq("bear_call")
                    & ((ranked["IV"].astype(float) < float(getattr(backtest_config, "FABLE_BEAR_MAX_IV", 0.35))) if _use_iv_b else True)
-                   & (ranked["cw_floor"] > float(getattr(backtest_config, "FABLE_BEAR_MIN_CW", 0.50)))
+                   & (ranked["cw_floor"] >= float(getattr(backtest_config, "FABLE_BEAR_MIN_CW", 0.50)))
                    & _quote_ok & feature_ok)
         _keep_b = ranked[_elig_b].sort_values(_rk, ascending=False).index[:int(getattr(backtest_config, "FABLE_BEAR_TOP_N", 5))]
         ranked["qualified"] = False
@@ -616,7 +616,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         _ivb = f"IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}, " if _use_iv_b else ""
         print(f"  Fable Canon: {int(_elig.sum())} eligible bull put(s) ({_ivs}credit >= {backtest_config.FABLE_MIN_CW:g}x width at {_floor_lbl}); "
               f"top {backtest_config.FABLE_TOP_N} by {_rk} qualified; {int(_elig_b.sum())} eligible bear call(s) ({_ivb}"
-              f"credit > {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width); top {getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} by {_rk} qualified"
+              f"credit >= {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width); top {getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} by {_rk} qualified"
               + (f"; quote >= {float(_qg):g}x model required" if _qg is not None else ""), flush=True)
     n_below = int((above_thr & ~ranked["above_min"]).sum())
     if n_below and not _fable:
@@ -640,7 +640,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         _capmsg = (f"pooled top {backtest_config.FABLE_TOP_N} by {_rk}" if getattr(backtest_config, "FABLE_POOLED", False)
                    else f"top {backtest_config.FABLE_TOP_N}/{getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} per side by {_rk}")
         print(f"  qualified: {n_bull_q} bull puts (Fable Canon: credit >= {backtest_config.FABLE_MIN_CW:g}x width) + "
-              f"{n_bear_q} bear calls (credit > {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width, IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}); "
+              f"{n_bear_q} bear calls (credit >= {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width, IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}); "
               f"{_capmsg}; of {len(ranked)}", flush=True)
         return ranked
     print(f"  qualified: {n_bull_q} bull puts (GROUND >= {thr}, {_bull_par}, cap {backtest_config.TOP_N}) + "
@@ -875,7 +875,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             "SELECTION_MODE":   getattr(backtest_config, "SELECTION_MODE", "ground"),
             "SELECTION":        (f"Fable Canon: bull puts every day, credit >= {backtest_config.FABLE_MIN_CW:g}x width "
                                  f"(floor on {getattr(backtest_config, 'FABLE_FLOOR_MULT', 1.0):g}x model credit; rank on {backtest_config.FABLE_FILL_FRAC:g}x quoted mid); "
-                                 f"bear calls every day, credit > {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width; "
+                                 f"bear calls every day, credit >= {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width; "
                                  + (f"pooled top {backtest_config.FABLE_TOP_N} per scan by {getattr(backtest_config, 'FABLE_RANK_KEY', 'GROUND')}" if getattr(backtest_config, "FABLE_POOLED", False)
                                     else f"top {backtest_config.FABLE_TOP_N} per side per scan by {getattr(backtest_config, 'FABLE_RANK_KEY', 'GROUND')}")
                                  + (f"; bulls IV > {backtest_config.FABLE_MIN_IV:g}" if getattr(backtest_config, "FABLE_USE_IV_FILTER", True) else "; bulls no IV filter")
