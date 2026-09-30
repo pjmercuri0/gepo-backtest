@@ -209,7 +209,16 @@ do not fill; Actuals only records fills, so unfillable orders are invisible to t
 mid >= 1.00 x model credit (user cannot fill below model). Six weeks at 1.04 x model booking: 95 picks, 60% win, +$4,032,
 5/6 weeks, worst -$51 (ungated: 100 picks, +$4,450). Bulls 54 / +$2,092; bears 41 / +$1,941.
 
-**Pooled cap (2026-09-30, final).** `config.FABLE_POOLED = True`, `FABLE_TOP_N = 6`: both sides ranked together by quoted
+**FINAL 2026-09-30 (after §0.69): strategy "C + quote gate" is live.** User chose it over the quoted-credit ranking.
+`config.FABLE_RANK_KEY = "GROUND"`, `FABLE_BEAR_EVERY_DAY = False` (bears only below the SPY 100d SMA again), floor model
+credit >= 0.45 x width both sides, bear IV < 0.35, quoted mid >= 1.00 x model, pooled top 6 per scan, booked 1.04 x model,
+History = 15:30 + 15:45 top-up to 6. No GROUND threshold: negative-GROUND spreads can qualify when fewer than 6 clear the
+floor and gate (4 of the 6 on the 09-30 15:30 dry run had GROUND <= 0). Live archive six weeks: 89 picks, 54% win,
++$2,669, 5/6 weeks, worst -$125, yield 33%, $-Sharpe 6.9, daily DD -2.3% (bull-only there: SPY was above its 100d every
+day). Vendor (Air, §0.69, no gate): IS $100.5k / 1.64 / DD -49%, OOT $27.6k / 3.47 / -19%. Open: archive vs vendor disagree
+on the same six weeks (live rule +$4,356 vs -$43); reconciliation needs the mini's archive.
+
+**Pooled cap (2026-09-30).** `config.FABLE_POOLED = True`, `FABLE_TOP_N = 6`: both sides ranked together by quoted
 credit/width, top 6 per scan; History = 15:30 scan, 15:45 tops up to 6 total. Six weeks at 1.04 x model: 114 picks, 61% win,
 +$4,356, 6/6 weeks, worst +$75, yield 40%, $-Sharpe 9.5, max weekly risk $2.2k. (3 per side was +$4,032, 5/6, yield 43%;
 user chose the pooled cap for the no-losing-week record.) Pooling tilts toward bulls (72 / 42).

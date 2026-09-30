@@ -664,7 +664,7 @@ async function refresh() {
       dot.className = marketOpenNow() ? "live-dot" : "live-dot premarket-dot";
       txt.textContent = "GEPO Live Tracker";
       (document.getElementById("top-label")||{}).textContent =
-        `Fable picks · pooled top 6 by credit/width${tickStr ? ` · tick ${tickStr} ET` : ""}`;
+        `Fable picks · pooled top 6 by Γᵢ${tickStr ? ` · tick ${tickStr} ET` : ""}`;
     } else if (!marketOpenNow() && streamIsFresh(data)) {
       // Before the open the newest scan is yesterday's, but the quote stream is
       // live: IB is up, the market just is not open yet. Yellow, not red
@@ -672,13 +672,13 @@ async function refresh() {
       dot.className = "live-dot premarket-dot";
       txt.textContent = "GEPO Live Tracker";
       (document.getElementById("top-label")||{}).textContent =
-        `Fable picks · pooled top 6 by credit/width${tickStr ? ` · last scan ${tickStr} ET` : ""}`;
+        `Fable picks · pooled top 6 by Γᵢ${tickStr ? ` · last scan ${tickStr} ET` : ""}`;
     } else {
       // Tick is stale — IB connection is down or last ranker run > 75 min ago.
       dot.className = "live-dot stale-dot";
       txt.textContent = "GEPO Live Tracker";
       (document.getElementById("top-label")||{}).textContent =
-        `Fable picks · pooled top 6 by credit/width${tickStr ? ` · stale tick ${tickStr} ET` : ""}`;
+        `Fable picks · pooled top 6 by Γᵢ${tickStr ? ` · stale tick ${tickStr} ET` : ""}`;
     }
   } catch (e) {
     document.getElementById("snapshot-meta").textContent = "error: " + e.message;

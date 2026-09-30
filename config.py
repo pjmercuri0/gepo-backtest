@@ -313,3 +313,9 @@ FABLE_QUOTE_GATE = 1.00
 # 61% win, +$4,356, 6/6 weeks, worst +$75, yield 40%, max weekly risk $2.2k.
 FABLE_POOLED = True
 FABLE_TOP_N  = 6
+# 2026-09-30 (user, final): strategy "C + quote gate" -- rank by GROUND; bear calls only below the SPY
+# 100d SMA (regime gate back on for bears); floor model credit >= 0.45 x width both sides, bear IV < 0.35;
+# quoted mid >= 1.00 x model; pooled top 6 per scan; booked 1.04 x model. Live archive six weeks: 89 picks,
+# 54% win, +$2,669, 5/6 weeks, yield 33%, $-Sharpe 6.9. Vendor frame (Air, §0.69, no gate): IS $100.5k / 1.64, OOT 3.47.
+FABLE_RANK_KEY       = "GROUND"
+FABLE_BEAR_EVERY_DAY = False
