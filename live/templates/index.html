@@ -454,6 +454,15 @@ function marketOpenNow() {
   return mins >= 9*60 + 30 && mins <= 16*60;          // 9:30 ≤ now ≤ 16:00 ET
 }
 
+// True if the live quote stream (combo_stream.json, rewritten every few
+// seconds while IB is connected) wrote within the last 10 minutes. Naive
+// local time, parsed the same way as snapshot_ts.
+function streamIsFresh(data) {
+  if (!data || !data.stream_ts) return false;
+  const dt = new Date(data.stream_ts);
+  return !isNaN(dt) && (Date.now() - dt.getTime()) / 60000 < 10;
+}
+
 // True if the snapshot_ts in either the SPY widget or the regime banner is
 // less than 75 minutes old. Threshold matches the hourly parallel cron
 // (60 min) plus the 15-min IBKR delayed data lag, plus small buffer.
@@ -651,6 +660,14 @@ async function refresh() {
       txt.textContent = "GEPO Live Tracker";
       (document.getElementById("top-label")||{}).textContent =
         `Top 5 by GROUND rank${tickStr ? ` · tick ${tickStr} ET` : ""}`;
+    } else if (!marketOpenNow() && streamIsFresh(data)) {
+      // Before the open the newest scan is yesterday's, but the quote stream is
+      // live: IB is up, the market just is not open yet. Yellow, not red
+      // (user 2026-09-30, 9:16 showed red with quotes 9:16:24).
+      dot.className = "live-dot premarket-dot";
+      txt.textContent = "GEPO Live Tracker";
+      (document.getElementById("top-label")||{}).textContent =
+        `Top 5 by GROUND rank${tickStr ? ` · last scan ${tickStr} ET` : ""}`;
     } else {
       // Tick is stale — IB connection is down or last ranker run > 75 min ago.
       dot.className = "live-dot stale-dot";
