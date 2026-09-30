@@ -1693,7 +1693,8 @@ def _overlay_stream(payload: dict) -> None:
                 wa = tg.get("walkaway_credit")
                 if wa is not None:
                     r["above_min"] = math.floor(q["mid"] * 100 + 0.5) / 100 >= wa
-                    r["qualified"] = bool(r.get("GROUND", 0) >= backtest_config.GROUND_THRESHOLD) and r["above_min"]
+                    if getattr(backtest_config, "SELECTION_MODE", "ground") != "fable":
+                        r["qualified"] = bool(r.get("GROUND", 0) >= backtest_config.GROUND_THRESHOLD) and r["above_min"]
                 n += 1
         payload["stream_n"] = n
     except Exception as e:
