@@ -153,6 +153,10 @@ at 1.04 x model, variant B timing: bulls 58 picks, 59% win, +$2,339, 5/6 weeks; 
 5/5 weeks. For the record, the quoted-floor version scored far higher (+$6,685, 6/6) but the user reports its rich quotes
 do not fill; Actuals only records fills, so unfillable orders are invisible to the archive.
 
+**Quote gate (2026-09-30, last change of the day).** `config.FABLE_QUOTE_GATE = 1.00`: a spread qualifies only if its quoted
+mid >= 1.00 x model credit (user cannot fill below model). Six weeks at 1.04 x model booking: 95 picks, 60% win, +$4,032,
+5/6 weeks, worst -$51 (ungated: 100 picks, +$4,450). Bulls 54 / +$2,092; bears 41 / +$1,941.
+
 **History = variant B (commit `f5ad4a9`).** Frozen day = the 15:30 scan, both sides, then the 15:45 scan tops each side up
 to the cap with new names; booked at 0.951 x mid (`credit_basis.entry_credit` for rows carrying `fable: True`); drift skipped
 for fable-frozen days; `live_config.FREEZE_AT = "15:30"`. Mya deployed 2026-09-30 evening (all code + templates).
