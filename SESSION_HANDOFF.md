@@ -133,6 +133,20 @@ while `SELECTION_MODE == "fable"` and `FABLE_BEAR_EVERY_DAY`. Bear evidence cove
 (archive ends 09-16; the +1.3% week of 09-25 is untested) and contradicts the vendor ablation (bears every day: IS -$703,
 OOT 1.76 / -30%). First live bears 15:46: MDT, MRK, IWM, GILD, MSFT.
 
+**Simplified 2026-09-30 evening (user: "credit floor only, 3 per side"; commit follows).** Waterfall on the live archive
+(variant B timing): the credit floor is the only filter that raises P&L per pick ($30 -> $44); the IV split raises win rate
+but lowers total P&L; ranking inside the filter is worth ~nothing (random order +$4,568 vs GROUND +$4,929, because the filter
+leaves a median 3 names/side/scan); the D_ent penalty k=0..8 selects identical picks. Now live: **bull puts credit >= 0.45 x
+width, bear calls credit > 0.50 x width (0.951 x mid), top 3 per side per scan by credit/width. No IV filter, no GROUND, no
+D_ent in selection.** Live archive: 104 picks, 62% win, +$6,685, $64/pick, 72% yield on risk, 6/6 weeks, max weekly risk
+$2.6k. `config.FABLE_USE_IV_FILTER = False`, `FABLE_RANK_KEY = "cw_fill"`, `FABLE_TOP_N = FABLE_BEAR_TOP_N = 3`. History
+(variant B) inherits the 3/side cap. Ranking by credit/width favours the richest quote, which can be a stale or wide book
+(CAT 812.5/815 BC showed 0.81 credit/width on the 15:30 dry run); fills must stay near mid.
+
+**History = variant B (commit `f5ad4a9`).** Frozen day = the 15:30 scan, both sides, then the 15:45 scan tops each side up
+to the cap with new names; booked at 0.951 x mid (`credit_basis.entry_credit` for rows carrying `fable: True`); drift skipped
+for fable-frozen days; `live_config.FREEZE_AT = "15:30"`. Mya deployed 2026-09-30 evening (all code + templates).
+
 **Caveats.** Chosen from ~400 rules on 6 weeks (selection bias); the archive spans four ranking canons; first Fable expiry is
 10-02. User is trading it at 1 contract (BA, TSLA, QCOM, FCX taken 09-30 15:16).
 
