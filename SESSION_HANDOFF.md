@@ -111,6 +111,18 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69b SITE Backtest/OOT tabs = strategy C (2026-09-30 evening, user: "show me the backtest and oot using GROUND rank + bear below")
+
+`research/fable_canon_2026_09_30/build_payloads_C.py` wrote `live/data/backtest_equity.json` and `oot_equity.json`: floor
+model credit >= 0.45 x width (both sides), bear calls only below the prior-session SPY 100d SMA and IV < 0.35, pooled
+top 6/day by GROUND (no threshold, NO quote gate), entries only with >= 252 sessions of the name's closes (start
+2021-01-04), booked 1.04 x model, $10k wallet. IS 5347 trades / qty2 $97,492 / $-Sh 1.71 / DD -26.2% / yield 11.5%;
+OOT 808 / $27,571 / 3.47 / -19.5% / 15.0%. Captions carry "strategy C" and the 2021-01-04 start. Committed (cffa40a)
+and pushed; rsynced to Mya with server-side backups `*.bak_preC_*` (local backups the same name); md5 verified; both
+live pages render the new numbers (checked /backtest and /oot HTML). NOT the §0.67 generator: `report_bear_regime.py`
+still produces the §0.67 canon book; re-running it would put the old book back. The live Fable selection (§0.68 final)
+has the quote gate the site book does not; the vendor frame with that gate was not run for C.
+
 ## 0.69 Fable Canon replayed on the VENDOR frame (2026-09-30 evening, MacBook Air): flat IS; three relaxed variants
 
 **User asked** for the §0.68 Fable Canon on the vendor Backtest/OOT data. Scripts and results in
