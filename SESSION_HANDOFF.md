@@ -104,6 +104,36 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.69 Fable Canon replayed on the VENDOR frame (2026-09-30 evening, MacBook Air): flat IS; three relaxed variants
+
+**User asked** for the §0.68 Fable Canon on the vendor Backtest/OOT data. Scripts and results in
+`research/fable_canon_2026_09_30/` (`attach_quotes.py` joins vendor leg bid/ask/IV onto every featATM8 candidate ->
+`frame_quotes.parquet`, local only; `run_fable.py`, `run_relaxed.py`; `results.csv`, `results_relaxed.csv`). Frame =
+featATM8 through `bear_regime_sweep.prepare` (2020-08 start, earnings/ex-div gates), one 0.55-delta spread per
+name/side/day, booked at 1.04 x model like the site. **Site payloads were NOT rebuilt; live/data untouched.**
+
+**Fable as live** (model floor 0.45 both sides, bear IV < 0.35, quote gate vendor mid >= 1.00 x model, pooled top 6 by
+0.951 x quoted mid / width): IS 5513 trades, qty2 $11,408 from $10k, $-Sharpe 0.04, DD -86%; OOT 791, $23,833, 3.50, -7.9%.
+Bears every day lose $8.9k IS (3665 picks); bulls +$9.6k. Same six weeks as the live archive (08-20..09-24) on vendor:
+-$43, 37% win, vs +$4,356 / 61% in the archive -- the data disagree on the same weeks, not the period. Local archive ends
+08-19, so the reconciliation needs the mini. Mechanism (verified): quoted credit/width IS the market's full-loss odds;
+bull floor-eligible quintiles low->high full-loss 39% -> 50%, $/trade $4.9 -> $1.3. Fable picks run 49% full-loss vs the
+canon's 36%. Wide-quote hypothesis does NOT hold: eligible-pool vendor mid / model median 0.99, short-leg bid-ask 7% of mid.
+
+**The three strategies the user asked to record** (vendor frame, $10k wallet, qty2, 1.04 x model, floor model credit >= 0.45 x width both sides, bear IV < 0.35, NO quote gate, pooled top 6/day):
+
+| strategy | IS trades / final / $-Sh / DD / yield | OOT trades / final / $-Sh / DD | neg yrs |
+|---|---|---|---|---|
+| A. rank by MODEL credit/width, bears every day | 6253 / $46,201 / 1.03 / -67% / 4.7% | 815 / $15,898 / 1.53 / -26% | 2 |
+| B. rank by MODEL credit/width, bears only below SPY 100d SMA | 5795 / $87,199 / 1.34 / -49% / 9.9% | 808 / $21,388 / 1.74 / -32% | 1 |
+| C. rank by GROUND, same floor, bears only below 100d SMA | 5795 / $100,543 / 1.64 / -49% / 11.1% | 808 / $27,571 / 3.47 / -19% | 1 |
+| §0.67 canon (site) | 3272 / $63,720 / 1.67 / -31% / 11.6% | 548 / $24,871 / 3.90 / -4.8% | 0 |
+
+Read: B and C beat the canon on dollars through a fuller book (5.5 picks/day vs 3.1) and the bear regime gate, at a
+drawdown worse in both windows; only C keeps OOT Sharpe near the canon. The gain is the regime gate plus book size,
+not credit ranking (A vs C: same picks pool, GROUND rank +$54k IS / +$11.7k OOT). Also in `results_relaxed.csv`: 3 per
+side, bulls only (OOT DD -108% at qty2), quote gate kept with model rank (IS -0.08).
+
 ## 0.68 FABLE CANON live (2026-09-30 15:16): selection fitted on the LIVE candidate archive
 
 **User decision** ("Do that. Call it Fable Canon"), first live scan 15:16 (commit `6c24c72`). `config.SELECTION_MODE = "fable"`
