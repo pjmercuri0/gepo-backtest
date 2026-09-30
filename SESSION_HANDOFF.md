@@ -104,6 +104,13 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.69a HISTORY REWRITTEN 2026-09-30 evening (user: strip every Co-Authored-By / Claude-Session trailer)
+
+All 237 commits since 2026-08-31 were rewritten with `git filter-branch --msg-filter` (message lines only; every tree
+identical, 362 commits, root unchanged) and main was force-pushed with the user's explicit approval. Pre-rewrite main is
+tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
+before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
+
 ## 0.69 Fable Canon replayed on the VENDOR frame (2026-09-30 evening, MacBook Air): flat IS; three relaxed variants
 
 **User asked** for the §0.68 Fable Canon on the vendor Backtest/OOT data. Scripts and results in
