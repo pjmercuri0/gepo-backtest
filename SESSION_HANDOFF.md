@@ -136,6 +136,21 @@ canon's 36%. Wide-quote hypothesis does NOT hold: eligible-pool vendor mid / mod
 | C. rank by GROUND, same floor, bears only below 100d SMA | 5795 / $100,543 / 1.64 / -49% / 11.1% | 808 / $27,571 / 3.47 / -19% | 1 |
 | §0.67 canon (site) | 3272 / $63,720 / 1.67 / -31% / 11.6% | 548 / $24,871 / 3.90 / -4.8% | 0 |
 
+**252-session gate (user: "refresh the data only with 252 history. start when you have it"; `run_252.py`, `results_252.csv`).**
+The close store starts 2020-01-01, so the 2020-08 book ran P_real on 56-172 sessions (MIN_OBS 1). Requiring >= 252
+sessions of the name's own closes before entry moves the first entry to 2021-01-04 (45,856 -> 42,918 candidates):
+
+| strategy (start 2021-01-04) | IS trades / final / $-Sh / DD qty2 / yield | OOT trades / final / $-Sh / DD | neg yrs |
+|---|---|---|---|---|
+| A. model c/w rank, bears daily | 5788 / $43,117 / 1.01 / -83% / 4.6% | 815 / $15,898 / 1.53 / -26% | 2 |
+| B. model c/w rank, bears below 100d | 5347 / $81,843 / 1.34 / -57% / 9.9% | 808 / $21,388 / 1.74 / -32% | 1 |
+| C. GROUND rank, bears below 100d | 5347 / $97,492 / 1.71 / -26% / 11.5% | 808 / $27,571 / 3.47 / -19% | 1 |
+| §0.67 canon, same gate | 2984 / $61,732 / 1.80 / -23% / 12.2% | 548 / $24,871 / 3.90 / -4.8% | 0 |
+
+C's -49% was the Aug-Oct 2020 bull-put episode on the short-history P_real; with the gate it is -26% IS and the IS
+$-Sharpe is 1.71 vs the canon's 1.80. OOT is unchanged for every variant (2026 names all had 252 sessions). Site payloads
+still on the 2020-08 start; not rebuilt.
+
 Read: B and C beat the canon on dollars through a fuller book (5.5 picks/day vs 3.1) and the bear regime gate, at a
 drawdown worse in both windows; only C keeps OOT Sharpe near the canon. The gain is the regime gate plus book size,
 not credit ranking (A vs C: same picks pool, GROUND rank +$54k IS / +$11.7k OOT). Also in `results_relaxed.csv`: 3 per
