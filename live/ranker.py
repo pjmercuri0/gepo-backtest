@@ -585,11 +585,14 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
             _floor_lbl = f"{_ff:g}x mid"
         _use_iv = bool(getattr(backtest_config, "FABLE_USE_IV_FILTER", True))
         _use_iv_b = bool(getattr(backtest_config, "FABLE_BEAR_USE_IV_FILTER", _use_iv))
+        _qg = getattr(backtest_config, "FABLE_QUOTE_GATE", None)
+        _quote_ok = ((ranked["net_credit"].astype(float) >= float(_qg) * ranked["model_credit"].astype(float))
+                     if _qg is not None else pd.Series(True, index=ranked.index))
         _rk = str(getattr(backtest_config, "FABLE_RANK_KEY", "GROUND"))
         _elig = (ranked["spread_type"].eq("bull_put")
                  & ((ranked["IV"].astype(float) > float(backtest_config.FABLE_MIN_IV)) if _use_iv else True)
                  & (ranked["cw_floor"] >= float(backtest_config.FABLE_MIN_CW))
-                 & feature_ok)
+                 & _quote_ok & feature_ok)
         # 2026-09-30 16:xx (user): both sleeves rank by GROUND (was qedge for bulls; live archive
         # at 15:30: bulls by GROUND +$1,774 6/6 vs qedge +$2,145 6/6 -- aligned for one visible key).
         _keep = ranked[_elig].sort_values(_rk, ascending=False).index[:int(backtest_config.FABLE_TOP_N)]
@@ -598,7 +601,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         _elig_b = (ranked["spread_type"].eq("bear_call")
                    & ((ranked["IV"].astype(float) < float(getattr(backtest_config, "FABLE_BEAR_MAX_IV", 0.35))) if _use_iv_b else True)
                    & (ranked["cw_floor"] > float(getattr(backtest_config, "FABLE_BEAR_MIN_CW", 0.50)))
-                   & feature_ok)
+                   & _quote_ok & feature_ok)
         _keep_b = ranked[_elig_b].sort_values(_rk, ascending=False).index[:int(getattr(backtest_config, "FABLE_BEAR_TOP_N", 5))]
         ranked["qualified"] = False
         ranked.loc[_keep, "qualified"] = True
@@ -609,7 +612,8 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         _ivb = f"IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}, " if _use_iv_b else ""
         print(f"  Fable Canon: {int(_elig.sum())} eligible bull put(s) ({_ivs}credit >= {backtest_config.FABLE_MIN_CW:g}x width at {_floor_lbl}); "
               f"top {backtest_config.FABLE_TOP_N} by {_rk} qualified; {int(_elig_b.sum())} eligible bear call(s) ({_ivb}"
-              f"credit > {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width); top {getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} by {_rk} qualified", flush=True)
+              f"credit > {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width); top {getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} by {_rk} qualified"
+              + (f"; quote >= {float(_qg):g}x model required" if _qg is not None else ""), flush=True)
     n_below = int((above_thr & ~ranked["above_min"]).sum())
     if n_below and not _fable:
         print(f"  execution gate: {n_below} candidate(s) above GROUND {thr} but quoted BELOW fair value (1.00x model) — not qualified", flush=True)
@@ -869,7 +873,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
                                  f"top {backtest_config.FABLE_TOP_N} per side per scan by {getattr(backtest_config, 'FABLE_RANK_KEY', 'GROUND')}"
                                  + (f"; bulls IV > {backtest_config.FABLE_MIN_IV:g}" if getattr(backtest_config, "FABLE_USE_IV_FILTER", True) else "; bulls no IV filter")
                                  + (f"; bears IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}" if getattr(backtest_config, "FABLE_BEAR_USE_IV_FILTER", False) else "; bears no IV filter")
-                                 + "; no GROUND threshold, no parity, no quote gate"
+                                 + (f"; quote >= {float(getattr(backtest_config, 'FABLE_QUOTE_GATE')):g}x model" if getattr(backtest_config, "FABLE_QUOTE_GATE", None) is not None else "; no quote gate")
+                                 + "; no GROUND threshold, no parity"
                                  if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable"
                                  else f"GROUND >= {backtest_config.GROUND_THRESHOLD:g}, top {live_config.TOP_N_DISPLAY}"),
             "BEAR_GROUND_THRESHOLD": getattr(backtest_config, "BEAR_GROUND_THRESHOLD", 0.001),

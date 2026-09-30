@@ -305,3 +305,6 @@ FABLE_BOOK_BASIS = "model"
 # +$2,111, 5/5 weeks, worst +$43. The 0.50 floor left 16 picks and lost money.
 FABLE_BEAR_MIN_CW        = 0.45
 FABLE_BEAR_USE_IV_FILTER = True
+# 2026-09-30 (user): quoted mid must be >= FABLE_QUOTE_GATE x model credit (he cannot fill below
+# model). Live archive at 1.04x model booking: 95 picks, 60% win, +$4,032, 5/6 weeks (vs +$4,450 ungated).
+FABLE_QUOTE_GATE = 1.00
