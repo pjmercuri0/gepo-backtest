@@ -1659,6 +1659,8 @@ def _overlay_stream(payload: dict) -> None:
         if not quotes and not spots:
             return
         payload["stream_ts"] = st.get("ts")
+        # Written by combo_stream each second; absent on files from before 2026-09-30.
+        payload["stream_connected"] = st.get("connected")
         n = 0
         for lst in (payload.get("ticker") or [], payload.get("top_picks") or []):
             for r in lst:

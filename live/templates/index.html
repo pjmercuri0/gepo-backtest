@@ -458,7 +458,9 @@ function marketOpenNow() {
 // seconds while IB is connected) wrote within the last 10 minutes. Naive
 // local time, parsed the same way as snapshot_ts.
 function streamIsFresh(data) {
-  if (!data || !data.stream_ts) return false;
+  // The stream kept writing a fresh ts while its IB socket was down (2026-09-30),
+  // so freshness alone is not proof IB is up: require the connected flag too.
+  if (!data || !data.stream_ts || data.stream_connected !== true) return false;
   const dt = new Date(data.stream_ts);
   return !isNaN(dt) && (Date.now() - dt.getTime()) / 60000 < 10;
 }

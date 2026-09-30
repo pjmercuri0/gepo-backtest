@@ -165,6 +165,12 @@ def main() -> int:
         last_reload = 0.0
         last_pub = 0.0
         while True:
+            # Exit on a dropped IB socket instead of running on disconnected: the
+            # 2026-09-29 overnight Gateway drop left this loop writing a fresh ts with no
+            # quotes for 12h. Exiting frees the lock; the next scan relaunches the stream.
+            if not ib.isConnected():
+                print("[combo_stream] IB disconnected -- exiting so the next scan restarts it", flush=True)
+                break
             now = time.monotonic()
             if now - last_reload >= RELOAD_S:
                 last_reload = now
@@ -298,7 +304,7 @@ def main() -> int:
                 v = t.last if (t.last is not None and t.last == t.last and t.last != 0) else t.close
                 if v is not None and v == v and v != 0:
                     sp[sym] = round(float(v), 4)
-            _atomic(OUT, {"ts": ts, "n": len(quotes), "held": len(subs),
+            _atomic(OUT, {"ts": ts, "connected": bool(ib.isConnected()), "n": len(quotes), "held": len(subs),
                           "quotes": quotes, "spots": sp})
             last_pub = _publish(last_pub)
     except KeyboardInterrupt:
