@@ -124,6 +124,15 @@ Per-scan, live-executable versions: fixed 15:30 scan +$2,145 (17 days, 6/6, wors
 were in the session scratchpad, not the repo; `research/fable_canon_2026_09_30/` does not exist yet -- rebuild from
 `live/ranked/*.json` + `output/ibkr_closes.parquet` if needed.
 
+**Bear sleeve added 15:46 (commit `a79ee2d`, user "Do it now for 3:45").** The archive also holds 7,393 bear-call scan rows
+(08-20..09-16, 1,694 first-sighted spreads): +$18,021 across all of them at 0.951x mid, 55% win, 3/5 weeks. The bull rule does
+NOT transfer (qedge and IV rank backwards on bears). Fitted bear rule: **IV < 0.35, 0.951 x mid > 0.50 x width, top 5 per scan
+by GROUND**; fixed 15:30 scan +$2,698 (13 days, 4/5 weeks, worst -$13), 11:30 +$1,693 (5/5). Both sleeves at 15:30 together:
+97 picks, 64% win, +$4,843, 6/6 weeks, max weekly risk $1,962. `config.FABLE_BEAR_*`; `spreads.py` lifts the bear regime veto
+while `SELECTION_MODE == "fable"` and `FABLE_BEAR_EVERY_DAY`. Bear evidence covers 5 weeks in which SPY never rose > +0.5%
+(archive ends 09-16; the +1.3% week of 09-25 is untested) and contradicts the vendor ablation (bears every day: IS -$703,
+OOT 1.76 / -30%). First live bears 15:46: MDT, MRK, IWM, GILD, MSFT.
+
 **Caveats.** Chosen from ~400 rules on 6 weeks (selection bias); the archive spans four ranking canons; first Fable expiry is
 10-02. User is trading it at 1 contract (BA, TSLA, QCOM, FCX taken 09-30 15:16).
 
