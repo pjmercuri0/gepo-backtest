@@ -554,6 +554,12 @@ def _enrich_pick(pick: dict, tracking_rows: list = None, credit_frac: float = 1.
     if credit_frac != 1.0 and actual_c is not None:
         c0 = round(float(actual_c), 4)
         basis = "ACTUAL"
+    elif credit_frac != 1.0 and (pick.get("fable") or pick.get("cw_fill") is not None) and float(pick.get("net_credit") or 0) > 0:
+        # Fable pick: FABLE_FILL_FRAC x the quoted mid it was selected on (2026-09-30).
+        import config as _cfg
+        _ff = float(getattr(_cfg, "FABLE_FILL_FRAC", 0.951))
+        c0 = round(float(pick.get("net_credit")) * _ff, 4)
+        basis = f"{_ff:.2f}×MID"
     elif model_c is not None and float(model_c) > 0 and credit_frac != 1.0:
         # D_ent canon fill view (History / Actuals): book FILL_MULT x the smile-fit model credit
         # (measured on 19 real fills). The selection view (credit_frac 1.0, live tab) keeps the

@@ -104,6 +104,60 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
     latest_picks = latest.get("top_picks") or []
     latest_hhmm = _latest_hhmm(latest, now)
     existing = _read_json(dst) if dst.exists() else None
+    # Fable Canon (2026-09-30, user): the frozen day IS the 15:30 scan -- both sides, no
+    # 15:01 seed, no top-ups from later scans. Any other 15:xx scan is ignored.
+    import config as backtest_config
+    if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable":
+        want = str(getattr(backtest_config, "FABLE_FREEZE_HHMM", "15:30"))
+        topup = str(getattr(backtest_config, "FABLE_TOPUP_HHMM", "15:45"))
+        cap = int(getattr(backtest_config, "FABLE_TOP_N", 5))
+        ex_at = str((existing or {}).get("frozen_at") or "")
+        if latest_hhmm[:4] == want[:4]:
+            if existing is not None and (existing.get("top_picks") or []) and ex_at.startswith(want):
+                print(f"[freeze] keep existing {dst} ({len(existing.get('top_picks') or [])} picks, {ex_at})", flush=True)
+                return 0
+            payload = dict(latest)
+            payload["frozen_at"] = want
+            payload["mock"] = False
+            _atomic_write(dst, payload)
+            print(f"[freeze] fable: wrote {dst} from the {latest_hhmm} scan ({len(latest_picks)} picks)", flush=True)
+            return 0
+        if latest_hhmm[:4] == topup[:4]:
+            # Variant B: top each side up to `cap` from the 15:45 scan, in its GROUND order,
+            # with spreads the 15:30 freeze did not already hold. Once only.
+            if existing is None or ex_at != want:
+                if existing is None or not (existing.get("top_picks") or []):
+                    payload = dict(latest); payload["frozen_at"] = topup; payload["mock"] = False
+                    payload["freeze_fallback_at"] = topup
+                    _atomic_write(dst, payload)
+                    print(f"[freeze] fable: no {want} freeze; wrote {dst} from the {latest_hhmm} scan ({len(latest_picks)} picks)", flush=True)
+                else:
+                    print(f"[freeze] keep existing {dst} ({ex_at}); top-up already applied or not a {want} freeze", flush=True)
+                return 0
+            existing_picks = existing.get("top_picks") or []
+            seen = {_dedupe_key(p) for p in existing_picks}
+            per_side = {"bull_put": 0, "bear_call": 0}
+            for p in existing_picks:
+                per_side[p.get("spread_type")] = per_side.get(p.get("spread_type"), 0) + 1
+            additions = []
+            for pick in latest_picks:
+                side = pick.get("spread_type")
+                if per_side.get(side, 0) >= cap or _dedupe_key(pick) in seen:
+                    continue
+                additions.append(_with_added_marker(pick, latest_hhmm)); seen.add(_dedupe_key(pick))
+                per_side[side] = per_side.get(side, 0) + 1
+            payload = dict(existing)
+            payload["top_picks"] = existing_picks + additions
+            payload["frozen_at"] = f"{want}+{topup}"
+            payload["freeze_topup_from"] = latest.get("snapshot_file")
+            payload["freeze_topup_at"] = latest_hhmm
+            payload["freeze_topup_original_count"] = len(existing_picks)
+            payload["freeze_topup_added_count"] = len(additions)
+            _atomic_write(dst, payload)
+            print(f"[freeze] fable: topped up {dst} from the {latest_hhmm} scan (+{len(additions)} -> {len(payload['top_picks'])} picks)", flush=True)
+            return 0
+        print(f"[freeze] fable: only the {want} freeze and {topup} top-up write; latest is {latest_hhmm}", flush=True)
+        return 0
     if existing is not None and (existing.get("top_picks") or []):
         existing_picks = existing.get("top_picks") or []
         target = int(getattr(live_config, "TOP_N_DISPLAY", 5))
@@ -249,6 +303,10 @@ def _settle_payload_from_daily_closes(payload: dict) -> bool:
 
 def backfill_short_1501() -> int:
     changed = 0
+    import config as backtest_config
+    if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable":
+        print("[backfill] fable: no top-ups; nothing to do", flush=True)
+        return 0
     frozen_dir = Path(live_config.FROZEN_DIR)
     ranked_dir = Path(live_config.RANKED_DIR)
     for dst in sorted(frozen_dir.glob("*.json")):

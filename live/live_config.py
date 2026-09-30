@@ -271,7 +271,7 @@ FETCH_WINDOW_END   = "16:30"
 # Freeze at 15:01 — moved earlier 2026-05-27 because 15:45 left only ~15 min
 # to place limit orders before close, which proved insufficient for fills on
 # illiquid weekly spreads. 15:01 gives ~57 min execution window.
-FREEZE_AT = "15:01"
+FREEZE_AT = "15:30"   # 2026-09-30 Fable: the 15:30 scan is the frozen day (was 15:01 + top-ups)
 
 # DRIFT_AT was used by cron_drift.sh, which has been removed (2026-05-26).
 # With live data, signal time = market time, so the drift's second-pass

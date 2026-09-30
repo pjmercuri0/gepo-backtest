@@ -51,6 +51,18 @@ def entry_credit(pick: dict) -> float:
         except (TypeError, ValueError):
             pass  # fall through to the quote-derived basis
 
+    # Fable Canon (2026-09-30): a Fable pick books FABLE_FILL_FRAC x the quoted mid it was
+    # selected on -- the basis its evidence was measured at. Rows carry "fable": True
+    # (cw_fill marks the 09-30 afternoon rows written before the flag existed).
+    if pick.get("fable") or pick.get("cw_fill") is not None:
+        try:
+            import config as _cfg
+            _nc = float(pick.get("net_credit") or 0)
+            if _nc > 0:
+                return min(round(_nc * float(getattr(_cfg, "FABLE_FILL_FRAC", 0.951)), 4), round(width, 4))
+        except (TypeError, ValueError):
+            pass
+
     # D_ent canon (2026-09-13): picks scored by the new ranker carry the smile-fit model
     # credit; the measured fill is FILL_MULT x model (19 real fills). Takes precedence over
     # the quote-derived 0.80 x mid, which was calibrated on 5 fills against inflated mids.
