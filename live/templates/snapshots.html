@@ -72,7 +72,7 @@ Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or 
       <thead><tr>
         <th>actual</th>
         <th>ticker</th><th>type</th><th>strikes</th><th>mid credit</th>
-        <th>entry (0.80&times;)</th><th>&Gamma;</th><th>expiry</th>
+        <th>entry ({{ "%.2f"|format(fill_mult) if fill_mult else "canon" }}&times; model)</th><th>&Gamma;</th><th>expiry</th>
         <th>spot</th><th>mark</th>
         <th>expiry px</th><th>outcome</th><th>P&amp;L</th>
       </tr></thead>
