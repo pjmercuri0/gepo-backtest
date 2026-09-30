@@ -291,3 +291,8 @@ FABLE_USE_IV_FILTER = False       # True restores the IV split (bulls > FABLE_MI
 FABLE_RANK_KEY      = "cw_fill"   # "cw_fill" = FABLE_FILL_FRAC x mid / width; "GROUND" restores the score ranking
 FABLE_TOP_N         = 3           # per side per scan (overrides the 5 above)
 FABLE_BEAR_TOP_N    = 3
+# 2026-09-30 (user): the credit FLOOR is tested on 1.0 x the smile-fit model credit (what he fills
+# at); the RANK stays on the quoted mid (0.951 x mid / width). Live archive Sep 10-25 (model credit
+# exists), variant B top 3/side: +$1,553, 51% win; ranking by model credit instead: -$235.
+FABLE_FLOOR_BASIS = "model"   # "model" = FABLE_FLOOR_MULT x model_credit / width; "quoted" = FABLE_FILL_FRAC x mid / width
+FABLE_FLOOR_MULT  = 1.0
