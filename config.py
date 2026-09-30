@@ -257,3 +257,17 @@ ENTRY_DOW = 0   # Monday
 RESULTS_CSV      = "results.csv"
 EQUITY_CURVE_PNG = "equity_curve.png"
 TRADES_CSV       = "all_trades.csv"
+
+
+# ── Fable Canon (2026-09-30, user: "Do that. Call it Fable Canon") ─────────────────────
+# Selection fitted on the LIVE candidate archive (live/ranked/*.json, 2026-08-20 .. 09-25,
+# 2,563 first-sighted bull puts settled at real Friday closes, fills at 0.951x quoted mid):
+# bull puts only, every day; IV > 0.40; fill-adjusted credit >= 0.45x width; each scan
+# qualifies the top 5 by qedge = q_hat - q (market full-loss odds minus the model's).
+# No GROUND threshold, no parity veto, no quote>=model gate. GROUND/D_ent are still
+# computed and shown. Set SELECTION_MODE = "ground" to return to the §0.67 canon.
+SELECTION_MODE  = "fable"
+FABLE_MIN_IV    = 0.40
+FABLE_MIN_CW    = 0.45     # credit / width, measured on FABLE_FILL_FRAC x the quoted mid
+FABLE_FILL_FRAC = 0.951    # user's measured fills vs quoted (Actuals header, 57 fills)
+FABLE_TOP_N     = 5        # per scan

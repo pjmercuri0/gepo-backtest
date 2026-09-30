@@ -566,8 +566,26 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         pos = order[order["qualified"]].groupby("spread_type").cumcount()
         over = pos.index[pos.values >= cap_side[pos.index]]
         ranked.loc[over, "qualified"] = False
+    # Fable Canon (config.SELECTION_MODE == "fable", 2026-09-30): replaces the GROUND
+    # threshold / parity / execution gate above. Bull puts only, IV > FABLE_MIN_IV,
+    # fill-adjusted credit >= FABLE_MIN_CW x width, top FABLE_TOP_N per scan by qedge.
+    _fable = getattr(backtest_config, "SELECTION_MODE", "ground") == "fable"
+    if _fable and not ranked.empty:
+        _ff = float(getattr(backtest_config, "FABLE_FILL_FRAC", 0.951))
+        _w = (ranked["short_strike"].astype(float) - ranked["long_strike"].astype(float)).abs()
+        ranked["qedge"] = ranked["q_hat"].astype(float) - ranked["q"].astype(float)
+        ranked["cw_fill"] = _ff * ranked["net_credit"].astype(float) / _w
+        _elig = (ranked["spread_type"].eq("bull_put")
+                 & (ranked["IV"].astype(float) > float(backtest_config.FABLE_MIN_IV))
+                 & (ranked["cw_fill"] >= float(backtest_config.FABLE_MIN_CW))
+                 & feature_ok & ranked["qedge"].notna())
+        _keep = ranked[_elig].sort_values("qedge", ascending=False).index[:int(backtest_config.FABLE_TOP_N)]
+        ranked["qualified"] = False
+        ranked.loc[_keep, "qualified"] = True
+        print(f"  Fable Canon: {int(_elig.sum())} eligible bull put(s) (IV > {backtest_config.FABLE_MIN_IV:g}, "
+              f"credit >= {backtest_config.FABLE_MIN_CW:g}x width at {_ff:g}x mid); top {backtest_config.FABLE_TOP_N} by qedge qualified", flush=True)
     n_below = int((above_thr & ~ranked["above_min"]).sum())
-    if n_below:
+    if n_below and not _fable:
         print(f"  execution gate: {n_below} candidate(s) above GROUND {thr} but quoted BELOW fair value (1.00x model) — not qualified", flush=True)
     n_parity = int((above_thr & ~parity_ok).sum())
     if n_parity:
@@ -575,12 +593,19 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
               f"bear <= {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%} daily percentile)", flush=True)
 
     # Sort by GROUND descending (qualified first, then below-threshold).
-    ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
+    if _fable and not ranked.empty:
+        ranked = ranked.sort_values(["qualified", "qedge"], ascending=[False, False]).reset_index(drop=True)
+    else:
+        ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
     n_bull_q = int((ranked["qualified"] & ranked["spread_type"].eq("bull_put")).sum()) if not ranked.empty else 0
     n_bear_q = int((ranked["qualified"] & ranked["spread_type"].eq("bear_call")).sum()) if not ranked.empty else 0
     _bull_par = (f"parity > {backtest_config.PARITY_MIN_PCT:.0%}" if getattr(backtest_config, "PARITY_FILTER", True) else "no parity veto")
     _bear_par = (f"bear parity > {getattr(backtest_config, 'BEAR_PARITY_MIN_PCT', 0.25):.0%}"
                  if getattr(backtest_config, "BEAR_PARITY_FILTER", True) else "no parity veto")
+    if _fable:
+        print(f"  qualified: {n_bull_q} bull puts (Fable Canon: IV > {backtest_config.FABLE_MIN_IV:g}, "
+              f"credit >= {backtest_config.FABLE_MIN_CW:g}x width, top {backtest_config.FABLE_TOP_N} by qedge) of {len(ranked)}", flush=True)
+        return ranked
     print(f"  qualified: {n_bull_q} bull puts (GROUND >= {thr}, {_bull_par}, cap {backtest_config.TOP_N}) + "
           f"{n_bear_q} bear calls (GROUND >= {bear_thr}, {_bear_par}, "
           f"cap {getattr(backtest_config, 'BEAR_TOP_N', 5)}) of {len(ranked)}; quote >= fair", flush=True)
@@ -756,6 +781,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             # is latent, but it is a trading gate: it must not fail open.
             "qualified":        _flag(r.get("qualified")),
             "above_min":        (None if r.get("above_min") is None else bool(r.get("above_min"))),
+            "qedge":            _num(r.get("qedge")),
+            "cw_fill":          _num(r.get("cw_fill")),
         }
 
     return {
@@ -805,6 +832,12 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
                 else backtest_config.GROUND_THRESHOLD
             ),
             "TOP_N":            live_config.TOP_N_DISPLAY,
+            "SELECTION_MODE":   getattr(backtest_config, "SELECTION_MODE", "ground"),
+            "SELECTION":        (f"Fable Canon: bull puts every day; IV > {backtest_config.FABLE_MIN_IV:g}; "
+                                 f"credit >= {backtest_config.FABLE_MIN_CW:g}x width at {backtest_config.FABLE_FILL_FRAC:g}x mid; "
+                                 f"top {backtest_config.FABLE_TOP_N} per scan by qedge (q_hat - q); no GROUND threshold, no parity, no quote gate"
+                                 if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable"
+                                 else f"GROUND >= {backtest_config.GROUND_THRESHOLD:g}, top {live_config.TOP_N_DISPLAY}"),
             "BEAR_GROUND_THRESHOLD": getattr(backtest_config, "BEAR_GROUND_THRESHOLD", 0.001),
             "BEAR_TOP_N":       getattr(backtest_config, "BEAR_TOP_N", 5),
             "DKL_K":            getattr(ground, "DKL_K", 1.0),
