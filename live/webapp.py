@@ -1250,6 +1250,7 @@ def snapshots():
     import config as backtest_config
     return render_template("snapshots.html", days=days, agg=agg,
                            thr=backtest_config.GROUND_THRESHOLD,
+                           fill_mult=getattr(__import__("ent_canon"), "FILL_MULT", None),
                            shown_days=len(days), total_days=total_days,
                            day_limit=limit)
 
