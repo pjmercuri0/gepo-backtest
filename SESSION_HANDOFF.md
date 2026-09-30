@@ -111,6 +111,18 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69c SITE tabs = strategy C at k=24 (2026-09-30 night, user: "update backtest and oot on mya to be k=24")
+
+k sweep on the strategy C pool (`research/fable_canon_2026_09_30/k_sweep_C.py`, `k_sweep_C_ext.csv`, chart `k_sweep_C.png`,
+k = 0..64): IS $-Sharpe 1.63 (k=0) -> 1.71 (4) -> 1.87 (24) -> 1.89 (28), plateau 1.75-1.89 to 64; IS DD 30% -> 26% -> 21% -> 19%;
+OOT $-Sh 3.47 (4), dips to 2.78 (12-16), 3.51 (24), 3.72 (28), 3.3-3.6 to 64; OOT DD 19% (4) -> 9% from k=24 on, flat to 64.
+Picks overlap k=4 by 82-100%. At k=24 the key still ranks on EV (rank corr 0.90 vs 0.99 at k=4); picks' mean EV 0.0085 -> 0.0080,
+mean D_ent 0.129 -> 0.120. User chose k=24. `build_payloads_C.py 24` (K is argv[1]; recomputes GROUND = EV*exp(-K D_ent) on the
+prepared frame, captions say k=24) wrote the payloads: IS 5347 / qty2 $105,212 / 1.87 / DD -20.7% / yield 12.3%; OOT 808 /
+$27,169 / 3.51 / -9.3% / 14.4%. Backups `*.bak_prek24_*` local and on Mya. **Only the site book is at k=24**: `ent_canon.K`
+and `ground.DKL_K` are still 4, so the live Fable ranking and the Snapshots tab score at k=4. Changing live k is a separate
+user call.
+
 ## 0.69b SITE Backtest/OOT tabs = strategy C (2026-09-30 evening, user: "show me the backtest and oot using GROUND rank + bear below")
 
 `research/fable_canon_2026_09_30/build_payloads_C.py` wrote `live/data/backtest_equity.json` and `oot_equity.json`: floor
