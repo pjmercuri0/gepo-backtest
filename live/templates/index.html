@@ -47,9 +47,10 @@
         <th>Kelly EV</th>
         <th>exp(k·D_ent)</th>
         <th>Γᵢ</th>
+        <th title="Fable Canon rank key for bull puts: qedge = q̂ − q, the market's full-loss odds minus the model's (%). Bear calls rank by Γᵢ.">qedge</th>
       </tr>
     </thead>
-    <tbody id="ranked-tbody"><tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
+    <tbody id="ranked-tbody"><tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
   </table>
   </div>
 </div>
@@ -284,7 +285,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <th>max-loss ($/sh)</th><th>ratio</th>
           <th title="P_real: realized-move belief at the strikes (used in G)">real: p / r₀ / q</th>
           <th title="Q_bs: market law at the fitted IVs (D_ent reference)">bs: p̂ / r̂₀ / q̂</th>
-          <th>G</th><th>Kelly EV</th><th title="D_ent = ln3 − H(Q_bs)">D_ent</th><th>exp(k·D_ent)</th><th>Γᵢ (risk-adj)</th>
+          <th>G</th><th>Kelly EV</th><th title="D_ent = ln3 − H(Q_bs)">D_ent</th><th>exp(k·D_ent)</th><th>Γᵢ (risk-adj)</th><th title="q̂ − q: Fable rank key for bull puts">qedge</th>
         </tr></thead>
         <tbody><tr>
           <td>${fmtMoney(p.entry_price)}</td>
@@ -303,6 +304,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${fmtNum(p.DKL, 4)}</td>
           <td>${fmtNum(denom(p, kVal), 4)}</td>
           <td class="fw">${groundBar(p.GROUND, maxGround)}${fmtGround(p.GROUND)}</td>
+          <td class="fw">${p.qedge != null ? fmtGround(p.qedge) : "—"}</td>
         </tr></tbody>
       </table></div>
     </div>`;
@@ -313,7 +315,7 @@ function renderTopPicks(picks, maxGround, kVal) {
 function renderRanked(rows, maxGround, kVal) {
   let qualSeen = 0;
   if (!rows || rows.length === 0) {
-    return `<tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
+    return `<tr><td colspan="15" style="color:#888780;text-align:center;padding:24px">no candidates</td></tr>`;
   }
   return rows.map((r, i) => {
     // Bright = qualified (GROUND >= threshold AND IBKR credit >= fair value), at any
@@ -343,6 +345,7 @@ function renderRanked(rows, maxGround, kVal) {
       <td>${fmtKellyEV(r.G)}</td>
       <td>${fmtNum(denom(r, kVal), 4)}</td>
       <td class="fw">${groundBar(r.GROUND, maxGround)}${fmtGround(r.GROUND)}</td>
+      <td class="fw">${r.qedge != null ? fmtGround(r.qedge) : "—"}</td>
     </tr>`;
   }).join("");
 }
@@ -661,7 +664,7 @@ async function refresh() {
       dot.className = marketOpenNow() ? "live-dot" : "live-dot premarket-dot";
       txt.textContent = "GEPO Live Tracker";
       (document.getElementById("top-label")||{}).textContent =
-        `Top 5 by GROUND rank${tickStr ? ` · tick ${tickStr} ET` : ""}`;
+        `Fable picks · bulls by qedge, bears by Γᵢ${tickStr ? ` · tick ${tickStr} ET` : ""}`;
     } else if (!marketOpenNow() && streamIsFresh(data)) {
       // Before the open the newest scan is yesterday's, but the quote stream is
       // live: IB is up, the market just is not open yet. Yellow, not red
@@ -669,13 +672,13 @@ async function refresh() {
       dot.className = "live-dot premarket-dot";
       txt.textContent = "GEPO Live Tracker";
       (document.getElementById("top-label")||{}).textContent =
-        `Top 5 by GROUND rank${tickStr ? ` · last scan ${tickStr} ET` : ""}`;
+        `Fable picks · bulls by qedge, bears by Γᵢ${tickStr ? ` · last scan ${tickStr} ET` : ""}`;
     } else {
       // Tick is stale — IB connection is down or last ranker run > 75 min ago.
       dot.className = "live-dot stale-dot";
       txt.textContent = "GEPO Live Tracker";
       (document.getElementById("top-label")||{}).textContent =
-        `Top 5 by GROUND rank${tickStr ? ` · stale tick ${tickStr} ET` : ""}`;
+        `Fable picks · bulls by qedge, bears by Γᵢ${tickStr ? ` · stale tick ${tickStr} ET` : ""}`;
     }
   } catch (e) {
     document.getElementById("snapshot-meta").textContent = "error: " + e.message;
