@@ -284,3 +284,10 @@ FABLE_BEAR_TOP_N     = 5
 # Live archive at these settings: +$4,929, 6/6 weeks, 5.4 picks/day, max weekly risk $2.5k.
 FABLE_FREEZE_HHMM = "15:30"
 FABLE_TOPUP_HHMM  = "15:45"
+# 2026-09-30 evening (user): "credit floor only, 3 per side". Waterfall on the live archive showed
+# the credit floor does the work; the IV split, GROUND and D_ent add nothing. Rank by credit/width.
+# Variant B timing: 104 picks, 62% win, +$6,685, $64/pick, 72% yield on risk, 6/6 weeks, max weekly risk $2.6k.
+FABLE_USE_IV_FILTER = False       # True restores the IV split (bulls > FABLE_MIN_IV, bears < FABLE_BEAR_MAX_IV)
+FABLE_RANK_KEY      = "cw_fill"   # "cw_fill" = FABLE_FILL_FRAC x mid / width; "GROUND" restores the score ranking
+FABLE_TOP_N         = 3           # per side per scan (overrides the 5 above)
+FABLE_BEAR_TOP_N    = 3
