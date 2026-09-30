@@ -271,3 +271,10 @@ FABLE_MIN_IV    = 0.40
 FABLE_MIN_CW    = 0.45     # credit / width, measured on FABLE_FILL_FRAC x the quoted mid
 FABLE_FILL_FRAC = 0.951    # user's measured fills vs quoted (Actuals header, 57 fills)
 FABLE_TOP_N     = 5        # per scan
+# Fable bear sleeve (2026-09-30 15:40, user): bear calls EVERY day too (regime veto lifted
+# for bears while SELECTION_MODE == "fable"); IV < 0.35, fill-adjusted credit > 0.50x width,
+# top 5 per scan by GROUND. Fitted on the same live archive (bear rows 08-20..09-16).
+FABLE_BEAR_EVERY_DAY = True
+FABLE_BEAR_MAX_IV    = 0.35
+FABLE_BEAR_MIN_CW    = 0.50
+FABLE_BEAR_TOP_N     = 5

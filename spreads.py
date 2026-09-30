@@ -208,7 +208,10 @@ def _build_spread(opts: pd.DataFrame, ticker: str, entry_date,
                         or stale_days <= REGIME_MAX_STALE_CALENDAR_DAYS):
                     regime = regime_series.iloc[idx]
         if REGIME_BULL_ALWAYS:
-            if spread_type == "bear_call" and regime != "bear":
+            # Fable bear sleeve (2026-09-30): bears every day while SELECTION_MODE is "fable".
+            _fable_bears = (getattr(config, "SELECTION_MODE", "ground") == "fable"
+                            and getattr(config, "FABLE_BEAR_EVERY_DAY", False))
+            if spread_type == "bear_call" and regime != "bear" and not _fable_bears:
                 return None
         elif REGIME_BULL_ONLY:
             if regime != "bull" or spread_type != "bull_put":
