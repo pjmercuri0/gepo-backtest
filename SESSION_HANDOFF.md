@@ -143,6 +143,16 @@ $2.6k. `config.FABLE_USE_IV_FILTER = False`, `FABLE_RANK_KEY = "cw_fill"`, `FABL
 (variant B) inherits the 3/side cap. Ranking by credit/width favours the richest quote, which can be a stale or wide book
 (CAT 812.5/815 BC showed 0.81 credit/width on the 15:30 dry run); fills must stay near mid.
 
+**Final 2026-09-30 evening state (commits `06892e0`, `9133c9f`, and the bear-sleeve commit after it).** User decisions after
+the waterfall, in order: (1) credit FLOOR on 1.0 x model credit (he cannot fill rich quotes), RANK on 0.951 x quoted mid /
+width, top 3 per side; (2) picks BOOKED at 1.04 x model (`config.FABLE_BOOK_BASIS = "model"`), same basis as Backtest/OOT/
+Snap; (3) bear sleeve: model floor > 0.45 x width AND IV < 0.35 (`FABLE_BEAR_MIN_CW = 0.45`, `FABLE_BEAR_USE_IV_FILTER`);
+bulls: model floor >= 0.45, no IV filter. Model credit was backfilled on the whole archive by pricing the archived strikes
+off each snapshot's smile fit (`ent_canon.fit_smiles` + `price_spreads`; reproduces stored values exactly). Six-week stats
+at 1.04 x model, variant B timing: bulls 58 picks, 59% win, +$2,339, 5/6 weeks; bears (5 weeks) 42 picks, 62% win, +$2,111,
+5/5 weeks. For the record, the quoted-floor version scored far higher (+$6,685, 6/6) but the user reports its rich quotes
+do not fill; Actuals only records fills, so unfillable orders are invisible to the archive.
+
 **History = variant B (commit `f5ad4a9`).** Frozen day = the 15:30 scan, both sides, then the 15:45 scan tops each side up
 to the cap with new names; booked at 0.951 x mid (`credit_basis.entry_credit` for rows carrying `fable: True`); drift skipped
 for fable-frozen days; `live_config.FREEZE_AT = "15:30"`. Mya deployed 2026-09-30 evening (all code + templates).
