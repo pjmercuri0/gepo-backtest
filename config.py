@@ -278,3 +278,9 @@ FABLE_BEAR_EVERY_DAY = True
 FABLE_BEAR_MAX_IV    = 0.35
 FABLE_BEAR_MIN_CW    = 0.50
 FABLE_BEAR_TOP_N     = 5
+# History (2026-09-30, user, variant "B"): the frozen day = the 15:30 scan, both sides, then the
+# 15:45 scan tops each side up to FABLE_TOP_N with names 15:30 did not have. Booked at
+# FABLE_FILL_FRAC x the quoted mid (the basis the Fable evidence was measured on).
+# Live archive at these settings: +$4,929, 6/6 weeks, 5.4 picks/day, max weekly risk $2.5k.
+FABLE_FREEZE_HHMM = "15:30"
+FABLE_TOPUP_HHMM  = "15:45"

@@ -682,6 +682,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
     snap_time = datetime.now()
     dte_min, dte_max = live_config.live_dte_window(snap_time.date())
 
+    _fable_mode = getattr(backtest_config, "SELECTION_MODE", "ground") == "fable"
     # Ensure qualified column exists (fallback if missing from ranker).
     # Skip on empty ranked: no GROUND column exists either, so the
     # comparison would KeyError. Top-N / ticker slices below are still
@@ -798,6 +799,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             "qualified":        _flag(r.get("qualified")),
             "above_min":        (None if r.get("above_min") is None else bool(r.get("above_min"))),
             "qedge":            _num(r.get("qedge")),
+            "fable":            _fable_mode,
             "cw_fill":          _num(r.get("cw_fill")),
         }
 

@@ -151,6 +151,11 @@ def main() -> int:
     if payload.get("mock"):
         print(f"Frozen file is MOCK; skipping drift.", flush=True)
         return 0
+    import config as backtest_config
+    if (getattr(backtest_config, "SELECTION_MODE", "ground") == "fable"
+            and str(payload.get("frozen_at")).startswith(str(getattr(backtest_config, "FABLE_FREEZE_HHMM", "15:30")))):
+        print("Fable frozen day is booked at its 15:30 quotes; skipping drift.", flush=True)
+        return 0
 
     picks = payload.get("top_picks") or []
     if not picks:
