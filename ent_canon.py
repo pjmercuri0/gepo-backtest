@@ -26,7 +26,7 @@ from math import erf
 
 # ── canon parameters ────────────────────────────────────────────────────────
 DELTA_TARGET, DELTA_MIN, DELTA_MAX = 0.55, 0.50, 0.60
-K            = 4.0        # exp(-K * D_ent). 2026-09-15: k=4 / thr=0.005, middle of the k=3-6 plateau on full-session P_real (handoff §0.43). Was 1.0 / 0.01.
+K           = 24.0   # 2026-09-30 (user): k=24 on strategy C -- vendor k sweep IS DD -20.7% / OOT -9.3% at equal Sharpe; IBKR six-week replay worst week -$117 vs -$308 at k=4. Was 4.0 (§0.43).        # exp(-K * D_ent). 2026-09-15: k=4 / thr=0.005, middle of the k=3-6 plateau on full-session P_real (handoff §0.43). Was 1.0 / 0.01.
 THR          = 0.003      # GROUND threshold. 2026-09-29 (user, handoff §0.66/§0.67): 0.003 with the bull parity and regime
                           # gates OFF; yield-on-risk and drawdown improve monotonically with the floor to 0.003 on IS and OOT.
                           # Was 0.0005 (2026-09-28: 0.0005 with the drift-free P_real; was 0.005 with raw-drift

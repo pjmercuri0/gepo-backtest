@@ -230,6 +230,14 @@ floor and gate (4 of the 6 on the 09-30 15:30 dry run had GROUND <= 0). Live arc
 day). Vendor (Air, §0.69, no gate): IS $100.5k / 1.64 / DD -49%, OOT $27.6k / 3.47 / -19%. Open: archive vs vendor disagree
 on the same six weeks (live rule +$4,356 vs -$43); reconciliation needs the mini's archive.
 
+**k = 24 (2026-09-30, last change).** `ground.DKL_K = ent_canon.K = 24.0` (was 4). Basis: the Air's k sweep on strategy C
+(`k_sweep_C.csv`): IS $105.2k / 1.87 / DD -20.7%, OOT $27.2k / 3.51 / DD -9.3% at k=24 vs $97.5k / 1.71 / -26.2% and
+$27.6k / 3.47 / -19.5% at k=4; 89% of picks shared. IBKR six-week replay (every 15:30/15:45 snapshot re-ranked with the
+current canon, combos off, C + quote gate): k=24 +$910, $-Sh 5.1, worst week -$117, weekly DD -1.1% vs k=4 +$699, 3.2,
+-$308, -2.9%. NOTE the replay also showed C's fair six-week record is ~+$0.7-0.9k, not the +$2,669 quoted from the
+archive's own GROUND/quotes (August rows were the old canon's strikes and scores). Site Backtest/OOT payloads are still
+the Air's k=4 C book; rebuild at k=24 with `build_payloads_C.py` to match.
+
 **Pooled cap (2026-09-30).** `config.FABLE_POOLED = True`, `FABLE_TOP_N = 6`: both sides ranked together by quoted
 credit/width, top 6 per scan; History = 15:30 scan, 15:45 tops up to 6 total. Six weeks at 1.04 x model: 114 picks, 61% win,
 +$4,356, 6/6 weeks, worst +$75, yield 40%, $-Sharpe 9.5, max weekly risk $2.2k. (3 per side was +$4,032, 5/6, yield 43%;
