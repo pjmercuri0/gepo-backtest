@@ -78,7 +78,7 @@
         <thead><tr>
           <th>Actual</th>
           <th>Rank</th><th>Ticker</th>
-          <th>Spot</th><th>Strikes</th><th>Qty</th><th title="quoted mid at the scan; P&amp;L is booked at the low target (1.04 x model)">Credit ($/sh)</th><th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair (fair = smile-fit model credit, else fair(delta, DTE)).">Min / Target ($/sh)</th><th>Max-Loss ($/sh)</th><th>Ratio</th><th>GROUND %</th>
+          <th>Spot</th><th>Strikes</th><th>Qty</th><th title="quoted mid at the scan; P&amp;L is booked at the low target (1.04 x model)">Credit ($/sh)</th><th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair (fair = smile-fit model credit, else fair(delta, DTE)).">Min / Target ($/sh)</th><th>Max-Loss ($/sh)</th><th>Ratio</th><th title="GROUND in basis points (x10,000)">GROUND (bp)</th>
           <th>Δ short</th><th>DTE</th>
           <th>Status</th><th>Mark</th><th style="text-align:right">P&amp;L</th>
         </tr></thead>
@@ -158,7 +158,7 @@
               <td>${{ "%.2f"|format(p.max_loss|rd(2)) }}</td>
               <td>{% if p.max_loss > 0 %}{{ "%.2f"|format((p.net_credit / p.max_loss)|rd(2)) }}{% else %}—{% endif %}</td>
             {% endif %}
-            <td class="fw">{{ "%.2f"|format((p.GROUND * 100)|rd(2)) }}%</td>
+            <td class="fw">{{ "%.1f"|format((p.GROUND * 10000)|rd(1)) }}</td>
             <td>{{ "%.2f"|format(p.short_delta|rd(2)) }}</td>
             <td>{{ p.DTE }}</td>
 
