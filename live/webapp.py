@@ -680,7 +680,7 @@ def _actuals_marks() -> dict:
     return cached
 
 
-def _stream_overlay(pick, last_track, last_marked, outcome_row):
+def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=False):
     """Live spot + mark for ONE open pick, straight off combo_stream.
 
     Extracted 2026-09-21 so History and Actuals cannot diverge again. They
@@ -760,7 +760,22 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row):
             # leg mids +65, combo last +108. BS is the only fallback, for a leg
             # with no book at all.
             _px = _basis = None
-            if _am:
+            # History (user 2026-10-01): show the LIVE quote. When the stream holds this spread on a
+            # credible book (no wider than QUOTE_MAX_BOOK_W x the spread), its mid is the mark and the
+            # quoted credit; Actuals keeps its own-leg method.
+            _live_mid = None
+            if prefer_stream and _q and _q.get("mid") is not None:
+                try:
+                    import config as _cfg
+                    if abs(float(_q["ask"]) - float(_q["bid"])) <= float(getattr(_cfg, "QUOTE_MAX_BOOK_W", 1.0)) * w:
+                        _live_mid = float(_q["mid"])
+                except (TypeError, ValueError, KeyError):
+                    _live_mid = None
+            if _live_mid is not None:
+                _px, _basis = _live_mid, "live quote"
+                live["live_quote"] = round(_live_mid, 4); live["live_quote_ts"] = _q.get("ts")
+                _am = {"ts": _q.get("ts")}
+            elif _am:
                 if _am.get("mark_legs") is not None:
                     _px, _basis = float(_am["mark_legs"]), "own leg mids"
                 elif _am.get("mark_bs") is not None:
@@ -1409,7 +1424,7 @@ def history():
             if (_p.get("pnl") is not None or _tk in _settled
                     or not isinstance(_arr, list) or not _arr):
                 continue
-            _fresh, _ = _stream_overlay(_p, _arr[-1], None, None)
+            _fresh, _ = _stream_overlay(_p, _arr[-1], None, None, prefer_stream=True)
             if isinstance(_fresh, dict) and _fresh is not _arr[-1]:
                 _arr.append(_fresh)
     return render_template("history.html",

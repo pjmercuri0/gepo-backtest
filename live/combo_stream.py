@@ -88,7 +88,11 @@ def _positions(ib) -> list[dict]:
 def _board() -> list[dict]:
     """Ranked rows with leg conIds resolved from the payload's own snapshot."""
     payload = json.loads((Path(live_config.RANKED_DIR) / "latest.json").read_text())
-    rows = (payload.get("ticker") or [])[:MAX_BAGS]   # trimmed again after positions
+    # The scan's PICKS first, then the rest in table order (2026-10-01). The table is GROUND-sorted and
+    # open positions take most of the MAX_BAGS lines, so the picks were falling outside the stream and
+    # the live tab showed their 15-minute-old scan mids as if current (MSFT 517.5/515 at 15:40).
+    _all = payload.get("ticker") or []
+    rows = ([r for r in _all if r.get("qualified")] + [r for r in _all if not r.get("qualified")])[:MAX_BAGS]   # trimmed again after positions
     snap_path = ROOT / str(payload.get("snapshot_file") or "")
     if not snap_path.exists():
         return []
@@ -185,7 +189,11 @@ def main() -> int:
                     pos = []
                     print(f"[combo_stream] positions read failed: {e}", flush=True)
                 seen = {r["_key"] for r in pos}
-                board = pos + [r for r in board if r["_key"] not in seen][:max(0, MAX_BAGS - len(pos))]
+                _new = [r for r in board if r["_key"] not in seen]
+                _picks = [r for r in _new if r.get("qualified")]
+                _rest = [r for r in _new if not r.get("qualified")]
+                _keep_pos = pos[:max(0, MAX_BAGS - len(_picks))]
+                board = _picks + _keep_pos + _rest[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos))]
                 want = {r["_key"]: r for r in board}
                 for k in list(subs):
                     if k not in want:
