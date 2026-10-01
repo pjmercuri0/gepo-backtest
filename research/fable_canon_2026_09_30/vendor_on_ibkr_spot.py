@@ -10,6 +10,8 @@ import ent_canon as ec, config as cfg
 from sma_bull_regime_sweep import GAP_SERIES
 from bear_regime_sweep import add_earnings_gate, add_exdiv_gate
 HERE = Path(__file__).resolve().parent; K = 24.0; W0, W1 = "2026-08-20", "2026-09-24"
+MIN_OI = int(sys.argv[1]) if len(sys.argv) > 1 else 1; FRAME_FILE = {1: "featATM8_oi1.parquet", 0: "featATM8_oi0.parquet", 100: "featATM8.parquet"}[MIN_OI]
+print(f"vendor chain OI >= {MIN_OI} ({FRAME_FILE})")
 I = pd.read_csv(HERE / "ibkr_replay_candidates_1530_1545.csv")
 spot = (I.sort_values(["day", "hm"]).groupby(["day", "ticker"]).entry_price.first().reset_index().rename(columns={"entry_price": "spot_ibkr"}))   # 1530 > 1531 > 1545
 J = pd.read_csv(HERE / "reconcile_vendor_ibkr.csv"); both = sorted(set(J[J._merge.eq("both")].day))
@@ -28,7 +30,7 @@ def score_and_pick(C, label):
         S = ec.score(C, closes, k=K, mu=mu)
     S["G24"] = S.EV * np.exp(-K * S.D_ent); S = S[(S.model_credit / S.width) >= 0.45].dropna(subset=["G24"])
     top = S.sort_values(["day", "G24"], ascending=[True, False]).groupby("day").head(6)
-    S.to_parquet(HERE / f"scored_{label[:1]}.parquet")
+    S.to_parquet(HERE / f"scored_{label[:1]}_oi{MIN_OI}.parquet")
     cr = 1.04 * top.model_credit; part = cr - (top.short_strike - top.expiry_close); part = np.where(part > 0, 0.5 * part, part)
     pnl = np.where(top.expiry_close > top.short_strike, cr, np.where(top.expiry_close <= top.long_strike, -(top.width - cr), part)) * 100
     pv = set(zip(top.day, top.ticker)); ov = pv & pi
@@ -37,7 +39,7 @@ def score_and_pick(C, label):
     return top
 
 # baseline: vendor frame as is (OI>=1), window
-F = pd.read_parquet(ROOT / "research/dkl_2026_09_13/featATM8_oi1.parquet"); F["entry_date"] = pd.to_datetime(F.entry_date).dt.normalize(); F["expiry_date"] = pd.to_datetime(F.expiry_date).dt.normalize()
+F = pd.read_parquet(ROOT / "research/dkl_2026_09_13" / FRAME_FILE); F["entry_date"] = pd.to_datetime(F.entry_date).dt.normalize(); F["expiry_date"] = pd.to_datetime(F.expiry_date).dt.normalize()
 F = F[(F.entry_date >= W0) & (F.entry_date <= W1) & F.spread_type.eq("bull_put")].copy(); F["day"] = F.entry_date.dt.strftime("%Y-%m-%d")
 F = F.merge(spot, on=["day", "ticker"], how="inner")   # only names with an IBKR spot that day
 base = score_and_pick(F.drop(columns=["spot_ibkr"]), "vendor EOD spot, vendor strikes (names with an IBKR spot)")
@@ -58,7 +60,7 @@ for c in COLS[4:]: ch[c] = pd.to_numeric(ch[c], errors="coerce")
 ch["PutCall"] = ch.PutCall.astype(str).str.lower().str.strip(); ch["day"] = ch.DataDate.dt.strftime("%Y-%m-%d")
 ch = ch.merge(spot.rename(columns={"ticker": "Symbol"}), on=["day", "Symbol"], how="inner"); ch["UnderlyingPrice"] = ch.spot_ibkr
 fitsB = ec.fit_smiles(ch)
-q = ch[(ch.BidPrice > 0) & (ch.AskPrice > ch.BidPrice) & (ch.OpenInterest.fillna(0) >= 1) & ch.PutCall.eq("put")].sort_values(["Symbol", "DataDate", "ExpirationDate", "StrikePrice"])
+q = ch[(ch.BidPrice > 0) & (ch.AskPrice > ch.BidPrice) & (ch.OpenInterest.fillna(0) >= MIN_OI) & ch.PutCall.eq("put")].sort_values(["Symbol", "DataDate", "ExpirationDate", "StrikePrice"])
 q["lo"] = q.groupby(["Symbol", "DataDate", "ExpirationDate"]).StrikePrice.shift(1); q = q.dropna(subset=["lo"])
 cand = q.rename(columns={"Symbol": "ticker", "DataDate": "entry_date", "ExpirationDate": "expiry_date", "StrikePrice": "short_strike", "UnderlyingPrice": "entry_price"})
 cand = cand.assign(spread_type="bull_put", long_strike=cand.lo.astype(float))[["ticker", "entry_date", "expiry_date", "DTE", "spread_type", "entry_price", "short_strike", "long_strike"]]
@@ -76,7 +78,7 @@ pi_ng = set(zip(Ii2.day, Ii2.ticker)) & {(d, t) for d, t in zip(Ii2.day, Ii2.tic
 for lab, top in (("A", a), ("B", bp)):
     pv = set(zip(top.day, top.ticker)); print(f"{lab} vs IBKR top-6 WITHOUT quote gate: overlap {len(pv & pi_ng)} ({100 * len(pv & pi_ng) / len(pi_ng):.0f}% of {len(pi_ng)})")
 # B scored vs IBKR scored, same (day,ticker): rank corr of G24, EV, D_ent, model credit ratio
-SB = pd.read_parquet(HERE / "scored_B.parquet"); m = SB.merge(Ii, on=["day", "ticker"], suffixes=("_b", "_i"))
+SB = pd.read_parquet(HERE / f"scored_B_oi{MIN_OI}.parquet"); m = SB.merge(Ii, on=["day", "ticker"], suffixes=("_b", "_i"))
 same = (m.short_strike_b == m.short_strike_i) & (m.long_strike_b == m.long_strike_i); m = m[same]
 rc = lambda a, b: m.groupby("day").apply(lambda g: g[a].rank().corr(g[b].rank()) if len(g) > 4 else np.nan).median()
 print(f"B vs IBKR, identical strikes ({len(m)} pairs): within-day rank corr G24 {rc('G24_b','G24_i'):.2f}, EV {rc('EV_b','EV_i'):.2f}, D_ent {rc('D_ent_b','D_ent_i'):.2f}; "
