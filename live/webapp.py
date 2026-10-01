@@ -11,6 +11,8 @@ Run:
   python -m live.webapp           # http://127.0.0.1:5050
 """
 from __future__ import annotations
+import gzip
+import hashlib
 import json
 import math
 import os
@@ -165,7 +167,10 @@ def _held_cmp(pick: dict) -> str | None:
         kl = round(float(pick["long_strike"]), 2)
     except (TypeError, ValueError, KeyError):
         return None
-    if (tk, st, ks, kl, exp) in (getattr(g, "_held_keys", None) or _held_keys()):
+    keys = getattr(g, "_held_keys", None)
+    if keys is None:                     # was re-reading actuals.json on every row (422x per History render)
+        keys = _held_keys(); g._held_keys = keys
+    if (tk, st, ks, kl, exp) in keys:
         return "same"
     shortmap = getattr(g, "_held_shorts", None)
     if shortmap is None:
@@ -187,6 +192,38 @@ app.jinja_env.filters['strike'] = _strike
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
+
+_GZ_CACHE: dict = {}
+
+
+@app.after_request
+def _gzip_response(resp):
+    """Compress HTML/JSON pages (user 2026-10-01: tabs slow to open). The pages went out
+    uncompressed -- History 545 KB, Backtest 6.9 MB. Compressed bodies are kept by content hash
+    so an unchanged page is not recompressed."""
+    try:
+        if (resp.status_code != 200 or resp.direct_passthrough or resp.headers.get("Content-Encoding")
+                or "gzip" not in (request.headers.get("Accept-Encoding") or "").lower()
+                or not (resp.mimetype or "").startswith(("text/", "application/json"))):
+            return resp
+        body = resp.get_data()
+        if len(body) < 1024:
+            return resp
+        dig = hashlib.md5(body).digest()
+        gz = _GZ_CACHE.get(dig)
+        if gz is None:
+            gz = gzip.compress(body, 5)
+            if len(_GZ_CACHE) >= 32:
+                _GZ_CACHE.clear()
+            _GZ_CACHE[dig] = gz
+        resp.set_data(gz)
+        resp.headers["Content-Encoding"] = "gzip"
+        resp.headers["Content-Length"] = str(len(gz))
+        resp.headers.add("Vary", "Accept-Encoding")
+    except Exception:
+        pass
+    return resp
+
 
 def _read_json(path: Path) -> dict | None:
     if not path.exists():
@@ -1230,14 +1267,31 @@ def _size_view(payload: dict, arm: str) -> dict:
     return payload
 
 
+_SIZED_HTML: dict = {}
+
+
 def _sized_page(template: str, data_file: str, **ctx):
     """Render a Backtest/OOT/Plot page at the chosen sizing and remember the choice."""
-    payload = _read_json(_data_path(data_file))
     arm = _size_choice()
-    if payload:
-        payload["wagering"] = _wagering(payload)
-        payload = _size_view(payload, arm)
-    resp = make_response(render_template(template, data=payload, **ctx))
+    # The page is a pure function of the payload file and the sizing arm, so the rendered HTML is
+    # kept until the file changes (user 2026-10-01: tabs slow to open; Backtest is 6.9 MB).
+    path = _data_path(data_file)
+    try:
+        st = path.stat(); key = (template, data_file, arm, st.st_mtime_ns, st.st_size, repr(sorted(ctx.items())))
+    except OSError:
+        key = None
+    html = _SIZED_HTML.get(key) if key else None
+    if html is None:
+        payload = _read_json(path)
+        if payload:
+            payload["wagering"] = _wagering(payload)
+            payload = _size_view(payload, arm)
+        html = render_template(template, data=payload, **ctx)
+        if key:
+            if len(_SIZED_HTML) >= 16:
+                _SIZED_HTML.clear()
+            _SIZED_HTML[key] = html
+    resp = make_response(html)
     if request.args.get("size"):
         resp.set_cookie("gepo_size", arm, max_age=180 * 24 * 3600, samesite="Lax")
     return resp
