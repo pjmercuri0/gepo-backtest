@@ -165,6 +165,14 @@ Swapping only the smile (credit within +-10%) changes 38% of the replay's OWN pi
 vendor book (16% -> 18%). The selection is a knife edge on every input; the vendor book differs on several at once (gate, spot,
 universe). `ibkr_replay_eod_smile_picks.csv` = variant 2 picks.
 
+**§0.69g addendum: the quote gate cannot be lined up from vendor data.** On 310 identical-strike pairs, every vendor quote
+construct (leg mid, last, natural, bid-side, ask-side) has ~0 correlation with IBKR's quote/model ratio (ratio-corr -0.10..+0.04;
+mid tracks IBKR's mid level at corr 0.76 but not its position vs model). Vendor EOD short-leg bid-ask is 19.5% of mid vs ~7% at
+IBKR 15:30. IBKR's own quote/model is noise around 1: median 0.98, IQR 0.95-1.02, next-day persistence corr 0.14. On IBKR's
+own 15:30 floor-eligible rows the gate does not predict outcomes: pass $1.0/trade (n 276) vs fail $4.0 (n 411), t = -0.4; the
+top-6 difference (+$1,002 with gate vs -$364 without, six weeks) is pick-shuffling. Conclusion: the gate is an execution rule
+(do not fill below model), not a selection signal, and the backtest cannot simulate it except as a random ~40% pass.
+
 ## 0.69d Vendor vs IBKR reconciliation, strategy C, 2026-08-20..09-24 (Air, 2026-09-30 night) + KELLY FIX
 
 **Bug found and fixed (user: "fix that").** `ent_canon.kelly()` returned NaN for every growth-NEGATIVE spread (no interior
