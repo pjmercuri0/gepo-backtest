@@ -46,7 +46,7 @@
         <th title="P_real above (realized-move belief, used in G); Q_bs below (market law, D_ent reference)">real: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">bs below</span></th>
         <th>Kelly EV</th>
         <th>exp(k·D_ent)</th>
-        <th title="GROUND + carry on the capital at risk (CARRY_RATE x DTE/365), display only, order unchanged">Γᵢ + carry (%)</th>
+        <th title="GROUND + carry on the capital at risk (CARRY_RATE x DTE/365), in basis points; display only, order unchanged">Γᵢ + carry (bps)</th>
       </tr>
     </thead>
     <tbody id="ranked-tbody"><tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
@@ -100,16 +100,16 @@ function fmtContract(v, dec=0) {
 // identical for every spread in a scan, so it never changes the order.
 const CARRY_RATE = {{ carry_rate }};
 function carryOf(dte) { const d = Math.max(parseInt(dte ?? 1, 10) || 1, 1); return CARRY_RATE * d / 365; }
-function fmtGround(v, dec=2) {
+function fmtGround(v, dec=0) {
   if (v == null) return "—";
   // Basis points (user 2026-10-01): GROUND x 10,000 -- the x100 percent scale showed +0.00% everywhere.
-  const n = Number(v) * 100;
+  const n = Number(v) * 10000;
   const x = rd(n, dec);
   // Take the sign from the ORIGINAL value. rd() returns -0 for a small
   // negative, and -0 >= 0 is true in JS, so every tiny negative used to render
   // as "+0.00%" -- a negative-edge spread displayed as a positive one.
   // (TSLA -0.0000227 and CL -0.0000316 both showed "+0.00%" on 2026-09-20.)
-  return `${n < 0 ? "-" : "+"}${Math.abs(x).toFixed(dec)}%`;
+  return `${n < 0 ? "-" : "+"}${Math.abs(x).toFixed(dec)}`;
 }
 // Wealth multiplier G = exp(g), where g (per-trade Kelly log-growth at
 // w*) is the value stored in the JSON `G` field. Renders as the
@@ -289,7 +289,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <th>max-loss ($/sh)</th><th>ratio</th>
           <th title="P_real: realized-move belief at the strikes (used in G)">real: p / r₀ / q</th>
           <th title="Q_bs: market law at the fitted IVs (D_ent reference)">bs: p̂ / r̂₀ / q̂</th>
-          <th>G</th><th>Kelly EV</th><th title="D_ent = ln3 − H(Q_bs)">D_ent</th><th>exp(k·D_ent)</th><th title="GROUND + carry on the capital at risk (CARRY_RATE x DTE/365), display only, order unchanged">Γᵢ + carry (%)</th>
+          <th>G</th><th>Kelly EV</th><th title="D_ent = ln3 − H(Q_bs)">D_ent</th><th>exp(k·D_ent)</th><th title="GROUND + carry on the capital at risk (CARRY_RATE x DTE/365), in basis points; display only, order unchanged">Γᵢ + carry (bps)</th>
         </tr></thead>
         <tbody><tr>
           <td>${fmtMoney(p.entry_price)}</td>
