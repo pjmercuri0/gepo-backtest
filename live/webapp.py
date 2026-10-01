@@ -1702,8 +1702,14 @@ def _overlay_stream(payload: dict) -> None:
                     r["above_min"] = math.floor(q["mid"] * 100 + 0.5) / 100 >= wa
                     if getattr(backtest_config, "SELECTION_MODE", "ground") != "fable":
                         r["qualified"] = bool(r.get("GROUND", 0) >= backtest_config.GROUND_THRESHOLD) and r["above_min"]
+                    else:
+                        # Fable (user 2026-10-01): the scan picks the set, but a pick whose LIVE quote has
+                        # fallen below model is no longer fillable -- un-qualify it until the quote recovers.
+                        r["qualified"] = bool(r.get("qualified")) and bool(r["above_min"])
                 n += 1
         payload["stream_n"] = n
+        if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable":
+            payload["top_picks"] = [r for r in (payload.get("top_picks") or []) if r.get("qualified") is not False]
     except Exception as e:
         print(f"[overlay_stream] {e}", flush=True)
         return
