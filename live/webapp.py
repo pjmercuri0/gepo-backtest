@@ -1124,6 +1124,37 @@ def _wagering(payload: dict | None) -> dict | None:
     return out
 
 
+def _qty1_view(payload: dict) -> dict:
+    """Present a Backtest/OOT/Plot payload at ONE contract per pick (user 2026-10-01).
+
+    The builders book the week tables at qty 2 (pnl = 2 x pnl_per_contract, exactly), so the
+    qty-1 view is exact: per-trade pnl / qty, week pnl / credit / risk re-summed, and the running
+    bank rebuilt from the starting bankroll. The shipped JSON is untouched; the summary already
+    carries both arms (qty1_* and strategy_* = qty 2) and the template leads with qty1_*."""
+    if not payload:
+        return payload
+    def _one(t):
+        q = max(int(t.get("qty") or 1), 1)
+        t["pnl"] = round(float(t.get("pnl") or 0.0) / q, 2)
+        t["qty"] = 1
+    for t in payload.get("trades") or []:
+        _one(t)
+    bank = float((payload.get("config") or {}).get("starting_bankroll") or 10000.0)
+    for w in payload.get("weeks") or []:
+        for t in w.get("trades") or []:
+            _one(t)
+        tr = w.get("trades") or []
+        w["pnl"] = round(sum(t["pnl"] for t in tr), 2)
+        w["credit"] = round(sum(float(t.get("credit") or 0) for t in tr) * 100, 2)
+        w["risk"] = round(sum(float(t.get("max_loss") or 0) for t in tr) * 100, 2)
+        w["pre_bank"] = round(bank, 2)
+        bank += w["pnl"]
+        w["post_bank"] = round(bank, 2)
+    if isinstance(payload.get("config"), dict):
+        payload["config"]["sizing"] = "qty=1 per pick"
+    return payload
+
+
 @app.route("/backtest")
 def backtest():
     """Static backtest tab: equity curve vs SPY (G_rv canon 2026-06-09).
@@ -1132,6 +1163,8 @@ def backtest():
     payload = _read_json(_data_path("backtest_equity.json"))
     if payload:
         payload["wagering"] = _wagering(payload)
+        if "qty1_final" in (payload.get("summary") or {}):
+            payload = _qty1_view(payload)
     return render_template("backtest.html", data=payload)
 
 
@@ -1142,6 +1175,7 @@ def oot():
     payload = _read_json(_data_path("oot_equity.json"))
     if payload:
         payload["wagering"] = _wagering(payload)
+        payload = _qty1_view(payload)
     return render_template("oot.html", data=payload)
 
 
@@ -1153,6 +1187,7 @@ def plot():
     payload = _read_json(_data_path("ibkr_replay_equity.json"))
     if payload:
         payload["wagering"] = _wagering(payload)
+        payload = _qty1_view(payload)
     return render_template("oot.html", data=payload, page_title="GEPO IBKR replay",
                            page_heading="GEPO IBKR Fair Replay", page_prefix="IBKR snapshots, current canon",
                            hide_fill_sens=True)

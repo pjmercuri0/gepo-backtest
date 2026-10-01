@@ -40,37 +40,38 @@
       <div class="stat-value">${{ '{:,.0f}'.format(c.starting_bankroll) }}</div>
     </div>
     <div class="stat">
-      <div class="stat-label">final bankroll</div>
-      <div class="stat-value {{ 'pos' if s.strategy_final >= c.starting_bankroll else 'neg' }}">${{ '{:,.0f}'.format(s.strategy_final) }}</div>
+      <div class="stat-label">final bankroll (qty 1)</div>
+      <div class="stat-value {{ 'pos' if (s.qty1_final if s.qty1_final is defined else s.strategy_final) >= c.starting_bankroll else 'neg' }}">${{ '{:,.0f}'.format((s.qty1_final if s.qty1_final is defined else s.strategy_final)) }}</div>
     </div>
     <div class="stat">
       <div class="stat-label">total return</div>
-      <div class="stat-value {{ 'pos' if s.strategy_total_return >= 0 else 'neg' }}">{% if s.strategy_total_return >= 0 %}+{% endif %}{{ s.strategy_total_return }}%</div>
+      <div class="stat-value {{ 'pos' if (s.qty1_total_return if s.qty1_total_return is defined else s.strategy_total_return) >= 0 else 'neg' }}">{% if (s.qty1_total_return if s.qty1_total_return is defined else s.strategy_total_return) >= 0 %}+{% endif %}{{ (s.qty1_total_return if s.qty1_total_return is defined else s.strategy_total_return) }}%</div>
     </div>
     <div class="stat">
       <div class="stat-label">CAGR</div>
-      <div class="stat-value {{ 'pos' if s.strategy_cagr >= 0 else 'neg' }}">{% if s.strategy_cagr >= 0 %}+{% endif %}{{ s.strategy_cagr }}%</div>
+      <div class="stat-value {{ 'pos' if (s.qty1_cagr if s.qty1_cagr is defined else s.strategy_cagr) >= 0 else 'neg' }}">{% if (s.qty1_cagr if s.qty1_cagr is defined else s.strategy_cagr) >= 0 %}+{% endif %}{{ (s.qty1_cagr if s.qty1_cagr is defined else s.strategy_cagr) }}%</div>
     </div>
     <div class="stat">
       <div class="stat-label">yield (P&amp;L / wagered)</div>
-      <div class="stat-value {{ 'pos' if s.strategy_yield >= 0 else 'neg' }}">{% if s.strategy_yield >= 0 %}+{% endif %}{{ s.strategy_yield }}%</div>
+      <div class="stat-value {{ 'pos' if (s.qty1_yield if s.qty1_yield is defined else s.strategy_yield) >= 0 else 'neg' }}">{% if (s.qty1_yield if s.qty1_yield is defined else s.strategy_yield) >= 0 %}+{% endif %}{{ (s.qty1_yield if s.qty1_yield is defined else s.strategy_yield) }}%</div>
     </div>
     <div class="stat">
       <div class="stat-label">$-P&amp;L Sharpe</div>
-      <div class="stat-value">{{ '%+.2f'|format(s.strategy_sharpe_dollar) }}</div>
+      <div class="stat-value">{{ '%+.2f'|format((s.qty1_sharpe_dollar if s.qty1_sharpe_dollar is defined else s.strategy_sharpe_dollar)) }}</div>
       <div class="subtitle">weekly dollar P&amp;L, annualised</div>
     </div>
     <div class="stat">
       <div class="stat-label">max drawdown</div>
-      <div class="stat-value neg">{{ s.strategy_max_dd }}%</div>
+      <div class="stat-value neg">{{ (s.qty1_max_dd if s.qty1_max_dd is defined else s.strategy_max_dd) }}%</div>
     </div>
   </div>
 
   <div class="params-row" style="margin-bottom:10px">
-    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 final</span><span class="chip-v">${{ '{:,.0f}'.format(s.qty1_final) }}</span></span>
-    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 return</span><span class="chip-v {{ 'pos' if s.qty1_total_return >= 0 else 'neg' }}">{% if s.qty1_total_return >= 0 %}+{% endif %}{{ s.qty1_total_return }}%</span></span>
-    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 yield</span><span class="chip-v {{ 'pos' if s.qty1_yield >= 0 else 'neg' }}">{% if s.qty1_yield >= 0 %}+{% endif %}{{ s.qty1_yield }}%</span></span>
-    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.qty1_sharpe_dollar) }}</span></span>
+    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=2 final</span><span class="chip-v">${{ '{:,.0f}'.format(s.strategy_final) }}</span></span>
+    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=2 return</span><span class="chip-v {{ 'pos' if s.strategy_total_return >= 0 else 'neg' }}">{% if s.strategy_total_return >= 0 %}+{% endif %}{{ s.strategy_total_return }}%</span></span>
+    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=2 yield</span><span class="chip-v {{ 'pos' if s.strategy_yield >= 0 else 'neg' }}">{% if s.strategy_yield >= 0 %}+{% endif %}{{ s.strategy_yield }}%</span></span>
+    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=2 $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.strategy_sharpe_dollar) }}</span></span>
+    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=2 max DD</span><span class="chip-v neg">{{ s.strategy_max_dd }}%</span></span>
     <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly final</span><span class="chip-v">${{ '{:,.0f}'.format(s.quarterk_final) }}</span></span>
     <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly yield</span><span class="chip-v {{ 'pos' if s.quarterk_yield >= 0 else 'neg' }}">{% if s.quarterk_yield >= 0 %}+{% endif %}{{ s.quarterk_yield }}%</span></span>
     <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.quarterk_sharpe_dollar) }}</span></span>
@@ -118,8 +119,8 @@
       data: {
         labels: points.map(p => p.date),
         datasets: [
-          { label: 'qty=2 (canonical)', data: points.map(p => p.strategy), borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.2, pointRadius: 0, fill: true,  tension: 0.05 },
-          { label: 'qty=1',             data: points.map(p => p.qty1),     borderColor: '#378ADD', borderWidth: 1.6, pointRadius: 0, fill: false, tension: 0.05 },
+          { label: 'qty=1',             data: points.map(p => p.qty1),     borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.2, pointRadius: 0, fill: true,  tension: 0.05 },
+          { label: 'qty=2',             data: points.map(p => p.strategy), borderColor: '#378ADD', borderWidth: 1.6, pointRadius: 0, fill: false, tension: 0.05 },
           { label: '¼ Kelly (cap=5)',   data: points.map(p => p.quarterk), borderColor: '#EF9F27', borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.05 },
           { label: '½ Kelly (cap=5)',   data: points.map(p => p.halfk),    borderColor: '#9085E9', borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.05 },
           { label: 'SPY',               data: points.map(p => p.spy),      borderColor: '#888780', borderWidth: 1.5, pointRadius: 0, fill: false, borderDash: [4, 3], tension: 0.05 },

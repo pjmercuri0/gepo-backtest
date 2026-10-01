@@ -31,8 +31,8 @@
   <a href="{{ url_for('snapshots') }}" class="{% if request.endpoint == 'snapshots'    %}active{% endif %}">snap</a>
   <a href="{{ url_for('actuals') }}"  class="{% if request.endpoint == 'actuals'      %}active{% endif %}">actuals</a>
   <a href="{{ url_for('plot') }}"     class="{% if request.endpoint == 'plot'         %}active{% endif %}">plot</a>
-  <a href="{{ url_for('backtest') }}" class="{% if request.endpoint == 'backtest'     %}active{% endif %}">backtest</a>
   <a href="{{ url_for('oot') }}"      class="{% if request.endpoint == 'oot'          %}active{% endif %}">oot</a>
+  <a href="{{ url_for('backtest') }}" class="{% if request.endpoint == 'backtest'     %}active{% endif %}">backtest</a>
   <a href="{{ url_for('qr') }}"       class="{% if request.endpoint == 'qr'           %}active{% endif %}">qr</a>
   <a href="{{ url_for('latest_json') }}" class="{% if request.endpoint == 'latest_json' %}active{% endif %}">api</a>
 </div>
@@ -55,8 +55,8 @@
     "{{ url_for('history') }}",
     "{{ url_for('actuals') }}",
     "{{ url_for('plot') }}",
-    "{{ url_for('backtest') }}",
-    "{{ url_for('oot') }}"
+    "{{ url_for('oot') }}",
+    "{{ url_for('backtest') }}"
   ];
   const PULL_THRESHOLD  = 80;
   const AXIS_LOCK_PX    = 12;   // first 12px of movement decides h vs v
