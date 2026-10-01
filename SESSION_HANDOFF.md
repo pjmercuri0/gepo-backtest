@@ -179,6 +179,14 @@ store for P_real; (c) same liquidity rule (live OI off vs vendor OI >= 100 -- ei
 overlap here, or put a liquidity term back live); (d) accept the 15:30-vs-EOD smile/strike noise. Full-frame OI-off rebuild
 (`featATM8_oi0.parquet`, `run_C_on_frame.py`) was started 2026-09-30 night to show the Backtest/OOT at OI off.
 
+**OI gate OFF, full frame (user: "turn off oi gate, show me that").** `research/dkl_2026_09_13/featATM8_oi0.parquet` (build_frame
+--min-oi 0: 134,569 rows vs 92,627), quotes in `frame_quotes_oi0.parquet`, strategy C k=24 via `run_C_on_frame.py` (payloads
+`oi0_k24_*_equity.json` in the research dir, NOT deployed): **IS 5805 trades / qty2 $130,143 / $-Sh 2.12 / DD -23.7% / yield
+13.2%; OOT 816 / $36,232 / 4.13 / -10.9% / 22.2%** vs OI-on site book IS $110,581 / 1.82 / -23.0%, OOT $28,705 / 3.82 / -9.1%.
+Eligible pool 28.4/day vs 18.6. Caveat: every pick is booked at 1.04 x model whether or not the strikes have open interest;
+the OI-off gain comes from strikes the OI >= 100 rule excluded, and nothing in the frame says those fill. Live has the OI
+term off too, so this universe is the closer match to live.
+
 ## 0.69c SITE tabs = strategy C at k=24 (2026-09-30 night, user: "update backtest and oot on mya to be k=24")
 
 k sweep on the strategy C pool (`research/fable_canon_2026_09_30/k_sweep_C.py`, `k_sweep_C_ext.csv`, chart `k_sweep_C.png`,
