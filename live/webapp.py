@@ -475,8 +475,11 @@ def _actuals_rows() -> list[dict]:
         # Actuals tab shows the same second-old spot and mark as the live tab instead of the
         # last scan's. The streamed mid is the book's cost to close; floor it at intrinsic
         # for the same reason the tracker does -- a vertical cannot be closed for less.
+        # prefer_stream (2026-10-01): same mark as History for the same spread -- the live stream
+        # quote when the stream holds it on a credible book, else the last scan's own-leg mark.
+        # The two tabs showed MSFT 517.5/515 at -$5 and -$9 off two different marks.
         last_track, last_marked = _stream_overlay(
-            pick, last_track, last_marked, outcome_row)
+            pick, last_track, last_marked, outcome_row, prefer_stream=True)
 
         # Actuals display basis = the IBKR credit on the pick (combo last > combo mid >
         # leg mids, i.e. quoted_credit/net_credit), NOT the modelled 0.80x mid /
