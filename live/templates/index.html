@@ -96,7 +96,7 @@ function fmtContract(v, dec=0) {
 // return. Reads as "% per-trade expected wealth gain after entropic
 // ambiguity discount." Render as +X.XX% with sign + color matching
 // pos/neg. Selection is argmax(Γᵢ).
-function fmtGround(v, dec=1) {
+function fmtGround(v, dec=2) {
   if (v == null) return "—";
   // Basis points (user 2026-10-01): GROUND x 10,000 -- the x100 percent scale showed +0.00% everywhere.
   const n = Number(v) * 10000;
