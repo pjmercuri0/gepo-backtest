@@ -240,7 +240,9 @@ LIVE_COMBO_EXCHANGE  = "SMART" # 2026-09-16: SMART is the aggregated book and is
 # its midpoint is not a price. 2026-09-01 13:21 DE 670/667.5 quoted -5.60/+1.60
 # — 7.20 wide on a 2.50 spread — and its mid handed the candidate +0.850 of
 # credit it could never collect. MO's book (0.85 wide on a 1.00 spread) passes.
-LIVE_COMBO_MAX_WIDTH = 1.0
+# 2026-10-01 evening (user: "remove for now unless I find it is a huge problem"): rule OFF. A combo
+# mid is used whatever the width of its book; inf = no check. Restore 1.0 to bring the fallback back.
+LIVE_COMBO_MAX_WIDTH = float("inf")
 # Coverage is limited by which spreads have a resting two-sided complex-order
 # book, NOT by how long we wait: batch 25 / wait 12 took 72.9s and returned 56
 # of 130, batch 50 / wait 8 took 24.4s and returned 57. Take the fast one.

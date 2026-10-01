@@ -415,6 +415,11 @@ model at 2dp on any book (ranker, live overlay, History shading). The six-week I
 121 picks, +$909 / +$451. Script: `research/fable_canon_2026_09_30/ibkr_replay_bookfix.py`. The 34 picks the rule removed
 (DE, CAT, AMGN, BLK, ISRG ...) made +$717 booked at 1.04x model; whether they fill at that price on those books is not known.
 On the 2026-10-01 15:30 snapshot the rule changes the six picks from NOW/MSFT/UNH/INTC/AVGO/CRM to PNC/NOW/CAT/BLK/MSFT/DE.
+Same evening the COMBO too-wide fallback is off too (user: "remove for now unless I find it is a huge problem"):
+`live_config.LIVE_COMBO_MAX_WIDTH = inf`, so a combo mid is used whatever its book. On the 27 scans of 2026-10-01: 94 of 710
+listed spreads had a combo book wider than 1x; the quote differs on 34, 8 gain the gate, 3 lose it, picks change in 2 scans
+(10:00, 13:00), none at 15:30/15:45. A combo mid at or beyond the spread width drops the candidate (2 of 94). The archive has
+no combo books, so this rule has no replay evidence either way. Restore 1.0 to bring it back.
 
 
 **User decision** ("Do that. Call it Fable Canon"), first live scan 15:16 (commit `6c24c72`). `config.SELECTION_MODE = "fable"`
