@@ -141,6 +141,14 @@ credit difference between the EOD and 15:30 chains feeding Kelly on near-zero ed
 itself worth 16% -> 25%. P&L on six weeks swings -$1,001 / +$821 / -$811 across variants that share 25% of picks: six weeks of a
 top-6 book is noise. Nothing changed in canon.
 
+**§0.69f addendum: the residual mismatch is the SMILE-FIT CREDIT.** 521 identical-strike, identical-spot pairs (variant B, OI 0):
+vendor P_real without drift matches IBKR's exactly on 79% of pairs (|p diff| < 0.002; corr 0.89; the vendor gap series covers
+74% of rows, drift adds a 0.004 median wobble). Within-day EV rank corr vs IBKR: vendor P + vendor credit 0.55; IBKR P + vendor
+credit 0.67; **vendor P + IBKR credit 0.85**. The EOD vs 15:30 smile fit moves model credit by -5%..+7% (p10-p90), i.e. EV by
+~0.0005, on a pool whose EV median is -0.00035 and within-day IQR 0.0007. Kelly on near-zero edges reorders on that. Order of
+remaining causes once spot/strikes agree: (1) IBKR quote gate, (2) smile-fit credit from a different chain, (3) gap drift coverage.
+No OI effect (OI 0 vs 1 identical: 31/46 overlap, 20 IBKR picks unbuildable at any OI).
+
 ## 0.69d Vendor vs IBKR reconciliation, strategy C, 2026-08-20..09-24 (Air, 2026-09-30 night) + KELLY FIX
 
 **Bug found and fixed (user: "fix that").** `ent_canon.kelly()` returned NaN for every growth-NEGATIVE spread (no interior
