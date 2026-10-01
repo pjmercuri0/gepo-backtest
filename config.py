@@ -91,7 +91,9 @@ DTE_MAX = 8    # maximum days to expiry
 # the actual-b ranker over-rewards).
 # Backtest/OOT gate on open interest; LIVE does not (live_config.LIVE_USE_OPEN_INTEREST).
 USE_OPEN_INTEREST_LIQUIDITY = True
-MIN_OPEN_INTEREST = 100
+# 2026-09-30 (user: "should be OI>=1"): any open interest on both legs. The 100 floor dropped 53 of the 68
+# IBKR fair-replay picks the vendor frame never built (handoff §0.69d); live runs with the OI term off.
+MIN_OPEN_INTEREST = 1
 
 # Credit basis for candidate net_credit (selection pricing).
 #   "last_clamped" — LAST clamped to BBO on each leg (backtest canon 2026-05-30).

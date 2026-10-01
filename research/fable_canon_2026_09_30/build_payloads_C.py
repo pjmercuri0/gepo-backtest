@@ -13,7 +13,7 @@ FLOOR, BEAR_IV, TOP = 0.45, 0.35, 6
 K = float(sys.argv[1]) if len(sys.argv) > 1 else float(ec.K)   # D_ent penalty in the rank key (user 2026-09-30: 24)
 with contextlib.redirect_stdout(io.StringIO()):
     c, spy = prepare(); c = add_regimes(c, spy); c = add_exdiv_gate(c); c = add_earnings_gate(c)
-c = c.merge(pd.read_parquet(HERE / "frame_quotes.parquet")[KEY + ["IV"]], on=KEY, how="left")
+c = c.merge(pd.read_parquet(HERE / "frame_quotes_oi1.parquet")[KEY + ["IV"]], on=KEY, how="left")   # 2026-09-30: OI >= 1 frame
 cl = pd.read_parquet(ROOT / "output/daily_closes.parquet"); cl["date"] = pd.to_datetime(cl.date).dt.normalize()
 cl = cl.dropna(subset=["close"]).sort_values(["ticker", "date"]); cl["n_before"] = cl.groupby("ticker").cumcount()
 c = c.merge(cl[["ticker", "date", "n_before"]].rename(columns={"date": "entry_date"}), on=["ticker", "entry_date"], how="left")

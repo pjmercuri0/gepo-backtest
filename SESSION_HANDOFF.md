@@ -111,6 +111,18 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69e CANON: open interest >= 1 on both legs (2026-09-30 night, user: "okay should be OI>=1"); site rebuilt
+
+`config.MIN_OPEN_INTEREST` 100 -> 1. New canon frame `research/dkl_2026_09_13/featATM8_oi1.parquet` (build_frame --min-oi 1:
+131,570 rows, 93 tickers; the old OI-100 `featATM8.parquet` is untouched) and `sma_bull_regime_sweep.FRAME` now points at it,
+so `bear_regime_sweep.prepare` / `report_bear_regime.py` / every research script that goes through prepare() reads the OI >= 1
+frame. Quotes in `research/fable_canon_2026_09_30/frame_quotes_oi1.parquet`; `build_payloads_C.py` reads them. Site tabs
+(strategy C, k=24, 252-session start, no quote gate, 1.04 x model, $10k): **IS 5804 trades / qty2 $130,092 / $-Sh 2.11 /
+DD -21.4% / yield 13.2%; OOT 816 / $34,263 / 3.92 / -11.8% / 20.3%** (OI-100 book was $110,581 / 1.82 / -23.0% and $28,705 /
+3.82 / -9.1%; OI-0 $130,143 / 2.12 / -23.7% and $36,232 / 4.13 / -10.9%). Backups `*.bak_preoi1_*` local and on Mya.
+Caveat unchanged: picks on thin strikes are booked at 1.04 x model like any other. Live is unaffected (OI term off there).
+`report_ent_canon.py` still hardcodes the OI-100 frame (old generator, not the site's).
+
 ## 0.69d Vendor vs IBKR reconciliation, strategy C, 2026-08-20..09-24 (Air, 2026-09-30 night) + KELLY FIX
 
 **Bug found and fixed (user: "fix that").** `ent_canon.kelly()` returned NaN for every growth-NEGATIVE spread (no interior
