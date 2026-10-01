@@ -699,7 +699,14 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             f"{pick.get('ticker')}|{pick.get('spread_type')}|{float(pick.get('short_strike')):g}"
             f"|{float(pick.get('long_strike')):g}|{str(pick.get('expiry_date'))[:10]}")
         _sp = (_st.get("spots") or {}).get(pick.get("ticker"))
-        if outcome_row is None and (_q or _sp):
+        # Also enter on a mark_actuals mark alone (2026-10-01): a position the stream is not holding
+        # (26-spread cap; picks go first) has no streamed quote or spot, and the row showed "open -- --"
+        # even though mark_actuals had priced its legs at the last scan (GOOGL 340/337.5, MCD 09-30).
+        _am0 = (_actuals_marks() or {}).get(
+            f"{pick.get('ticker')}|{pick.get('spread_type')}"
+            f"|{float(pick.get('short_strike')):g}|{float(pick.get('long_strike')):g}"
+            f"|{str(pick.get('expiry_date'))[:10]}")
+        if outcome_row is None and (_q or _sp or _am0):
             ks, kl = float(pick["short_strike"]), float(pick["long_strike"])
             w = float(pick.get("spread_width") or abs(ks - kl))
             live = dict(last_track or {})
@@ -1641,6 +1648,15 @@ def actuals():
     rows = _actuals_rows()
     risk = _assignment_lookup()
     _stream_spots = (_read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}).get("spots") or {}
+    _scan_spots = {}
+    try:
+        _snapf = sorted((Path(live_config.ROOT_DIR) / "snapshots" / ddate.today().isoformat()).glob("[0-9][0-9][0-9][0-9].parquet"))
+        if _snapf:
+            import pandas as _pd
+            _sdf = _pd.read_parquet(_snapf[-1], columns=["Symbol", "UnderlyingPrice"])
+            _scan_spots = {k: float(v) for k, v in _sdf.groupby("Symbol").UnderlyingPrice.first().items() if v == v and v > 0}
+    except Exception as _e:
+        print(f"[actuals] scan spots unavailable: {_e}", flush=True)
     for r in rows:
         pk = r.get("pick") or {}
         try:
@@ -1670,7 +1686,11 @@ def actuals():
         # seconds old, so Actuals was showing CVX at 204.99 while History and the
         # live tab showed 204.70 off the same underlying -- up to a full scan
         # interval stale, and the two tabs disagreeing with each other.
-        _spot = _stream_spots.get(pk.get("ticker")) or (ar or {}).get("spot")
+        # Fallbacks in order of freshness: streamed spot (seconds), the assignment-risk payload, then
+        # the last scan's spot for that name (<= 15 min) -- a position outside the 26-spread stream
+        # with no assignment-risk row yet had no spot at all and badged a flat "open" (GOOGL 2026-10-01).
+        _spot = (_stream_spots.get(pk.get("ticker")) or (ar or {}).get("spot")
+                 or _scan_spots.get(pk.get("ticker")))
         if _spot and not r.get("outcome_row"):
             lt = r.get("last_track")
             if not isinstance(lt, dict):
