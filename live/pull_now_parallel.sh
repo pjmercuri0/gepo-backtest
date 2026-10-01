@@ -130,6 +130,28 @@ wait "$SPY_WATCH_PID" 2>/dev/null || true
 sed "s/^/  [SPY] /" "$SPY_LOG" 2>/dev/null || true
 rm -f "$SPY_LOG"
 
+# Keep the combo quote stream alive (2026-09-16; moved ahead of the merge 2026-10-01 so the
+# pre-open 09:00/09:15 runs, which exit before the ranker, still relaunch it after the
+# gateway's nightly reconnect). It holds IBKR subscriptions open so
+# the live tab shows quotes a second old instead of a scan old; it exits immediately if
+# another copy holds the lock, so this is a no-op when it is already up. No crontab change.
+"${GEPO_PYTHON:-python3}" -c "
+import os,sys,subprocess
+from pathlib import Path
+lock=Path('live/logs/combo_stream.lock')
+alive=False
+if lock.exists():
+    try: os.kill(int(lock.read_text().strip()),0); alive=True
+    except Exception: lock.unlink(missing_ok=True)
+if not alive:
+    subprocess.Popen([sys.executable,'-m','live.combo_stream'],
+                     stdout=open('live/logs/combo_stream.log','a'),
+                     stderr=subprocess.STDOUT, start_new_session=True)
+    print('  [stream] started combo_stream')
+else:
+    print('  [stream] combo_stream already running')
+"
+
 # Merge all per-group parquets into the canonical HHMM.parquet for the ranker.
 FINAL_OUT="$DATE_DIR/${HHMM}.parquet"
 echo "Merging group parquets into $FINAL_OUT..."
@@ -186,26 +208,6 @@ then
     fi
     exit 0
 fi
-
-# Keep the combo quote stream alive (2026-09-16). It holds IBKR subscriptions open so
-# the live tab shows quotes a second old instead of a scan old; it exits immediately if
-# another copy holds the lock, so this is a no-op when it is already up. No crontab change.
-"${GEPO_PYTHON:-python3}" -c "
-import os,sys,subprocess
-from pathlib import Path
-lock=Path('live/logs/combo_stream.lock')
-alive=False
-if lock.exists():
-    try: os.kill(int(lock.read_text().strip()),0); alive=True
-    except Exception: lock.unlink(missing_ok=True)
-if not alive:
-    subprocess.Popen([sys.executable,'-m','live.combo_stream'],
-                     stdout=open('live/logs/combo_stream.log','a'),
-                     stderr=subprocess.STDOUT, start_new_session=True)
-    print('  [stream] started combo_stream')
-else:
-    print('  [stream] combo_stream already running')
-"
 
 echo "Running ranker..."
 "${GEPO_PYTHON:-python3}" -m live.ranker 2>&1 | sed "s/^/  [Ranker] /"
