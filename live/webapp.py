@@ -19,7 +19,7 @@ import tempfile
 from datetime import datetime, time as dtime, date as ddate
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, abort, request, send_from_directory, g
+from flask import Flask, jsonify, render_template, abort, request, send_from_directory, g, make_response
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -1124,59 +1124,97 @@ def _wagering(payload: dict | None) -> dict | None:
     return out
 
 
-def _qty1_view(payload: dict) -> dict:
-    """Present a Backtest/OOT/Plot payload at ONE contract per pick (user 2026-10-01).
+_SIZE_ARMS = (("q1", "qty 1", "qty1", "#1D9E75"), ("q2", "qty 2", "strategy", "#378ADD"),
+              ("q4", "\u00bc Kelly", "quarterk", "#EF9F27"), ("h2", "\u00bd Kelly", "halfk", "#9085E9"))
+_SIZE_TEXT = {"q1": "qty=1 per pick", "q2": "qty=2 per pick",
+              "q4": "\u00bc Kelly on the carry-adjusted stake, 1-5 contracts per pick",
+              "h2": "\u00bd Kelly on the carry-adjusted stake, 1-5 contracts per pick"}
 
-    The builders book the week tables at qty 2 (pnl = 2 x pnl_per_contract, exactly), so the
-    qty-1 view is exact: per-trade pnl / qty, week pnl / credit / risk re-summed, and the running
-    bank rebuilt from the starting bankroll. The shipped JSON is untouched; the summary already
-    carries both arms (qty1_* and strategy_* = qty 2) and the template leads with qty1_*."""
+
+def _size_choice() -> str:
+    """Sizing arm for Backtest/OOT/Plot: ?size= wins, else the cookie, else qty 1 (user 2026-10-01)."""
+    keys = {a[0] for a in _SIZE_ARMS}
+    v = (request.args.get("size") or request.cookies.get("gepo_size") or "q1").strip().lower()
+    return v if v in keys else "q1"
+
+
+def _size_view(payload: dict, arm: str) -> dict:
+    """Present a Backtest/OOT/Plot payload at one sizing arm (user 2026-10-01).
+
+    The builders book the week tables at qty 2 (pnl = 2 x pnl_per_contract, exactly) and carry the
+    per-trade Kelly contracts (qty_q4 / qty_h2), so every arm is exact: per-trade pnl = contracts x
+    pnl_per_contract, week pnl / credit / risk re-summed, the running bank rebuilt from the starting
+    bankroll. The summary carries all four arms; `head` is the chosen one. The shipped JSON is untouched."""
     if not payload:
         return payload
+    s = payload.get("summary") or {}
+    trades = payload.get("trades") or []
+    have_kelly = bool(trades) and all(("qty_q4" in t and "qty_h2" in t) for t in trades[:50])
+    arms = [a for a in _SIZE_ARMS if f"{a[2]}_final" in s and (a[0] in ("q1", "q2") or have_kelly)]
+    if "qty1_final" not in s or not arms:
+        # Legacy / euro payloads: one arm only, shown as booked.
+        payload["head"] = {k: s.get(f"strategy_{k}") for k in ("final", "total_return", "cagr", "yield", "sharpe_dollar", "max_dd")}
+        payload["arms"] = []; payload["arm"] = None; payload["arm_label"] = None
+        return payload
+    if arm not in {a[0] for a in arms}:
+        arm = "q1"
+    key, label, prefix, _c = next(a for a in arms if a[0] == arm)
+
+    def _q(t):
+        return {"q1": 1, "q2": 2, "q4": int(t.get("qty_q4") or 1), "h2": int(t.get("qty_h2") or 1)}[arm]
+
     def _one(t):
-        q = max(int(t.get("qty") or 1), 1)
-        t["pnl"] = round(float(t.get("pnl") or 0.0) / q, 2)
-        t["qty"] = 1
-    for t in payload.get("trades") or []:
+        base = max(int(t.get("_q0") or t.get("qty") or 1), 1)
+        pc = float(t.get("pnl") or 0.0) / base
+        q = _q(t)
+        t["qty"] = q; t["pnl"] = round(q * pc, 2)
+
+    for t in trades:
         _one(t)
     bank = float((payload.get("config") or {}).get("starting_bankroll") or 10000.0)
     for w in payload.get("weeks") or []:
-        for t in w.get("trades") or []:
-            _one(t)
         tr = w.get("trades") or []
+        for t in tr:
+            _one(t)
         w["pnl"] = round(sum(t["pnl"] for t in tr), 2)
-        w["credit"] = round(sum(float(t.get("credit") or 0) for t in tr) * 100, 2)
-        w["risk"] = round(sum(float(t.get("max_loss") or 0) for t in tr) * 100, 2)
+        w["credit"] = round(sum(float(t.get("credit") or 0) * t["qty"] for t in tr) * 100, 2)
+        w["risk"] = round(sum(float(t.get("max_loss") or 0) * t["qty"] for t in tr) * 100, 2)
         w["pre_bank"] = round(bank, 2)
         bank += w["pnl"]
         w["post_bank"] = round(bank, 2)
     if isinstance(payload.get("config"), dict):
-        payload["config"]["sizing"] = "qty=1 per pick"
+        payload["config"]["sizing"] = _SIZE_TEXT[arm]
+    payload["head"] = {k: s.get(f"{prefix}_{k}") for k in ("final", "total_return", "cagr", "yield", "sharpe_dollar", "max_dd")}
+    payload["arms"] = [{"key": a[0], "label": a[1], "prefix": a[2], "color": a[3], "active": a[0] == arm,
+                        "final": s.get(f"{a[2]}_final"), "yield": s.get(f"{a[2]}_yield"),
+                        "sharpe": s.get(f"{a[2]}_sharpe_dollar"), "max_dd": s.get(f"{a[2]}_max_dd")} for a in arms]
+    payload["arm"] = arm; payload["arm_label"] = label
     return payload
+
+
+def _sized_page(template: str, data_file: str, **ctx):
+    """Render a Backtest/OOT/Plot page at the chosen sizing and remember the choice."""
+    payload = _read_json(_data_path(data_file))
+    arm = _size_choice()
+    if payload:
+        payload["wagering"] = _wagering(payload)
+        payload = _size_view(payload, arm)
+    resp = make_response(render_template(template, data=payload, **ctx))
+    if request.args.get("size"):
+        resp.set_cookie("gepo_size", arm, max_age=180 * 24 * 3600, samesite="Lax")
+    return resp
 
 
 @app.route("/backtest")
 def backtest():
-    """Static backtest tab: equity curve vs SPY (G_rv canon 2026-06-09).
-    Data is precomputed and shipped to live/data/backtest_equity.json by
-    report_three_sizings.py (rich payload: weeks/trades/sizing arms)."""
-    payload = _read_json(_data_path("backtest_equity.json"))
-    if payload:
-        payload["wagering"] = _wagering(payload)
-        if "qty1_final" in (payload.get("summary") or {}):
-            payload = _qty1_view(payload)
-    return render_template("backtest.html", data=payload)
+    """Backtest tab: the vendor 2021-25 book (live/data/backtest_equity.json), at the chosen sizing."""
+    return _sized_page("backtest.html", "backtest_equity.json")
 
 
 @app.route("/oot")
 def oot():
-    """2026 out-of-time results: frozen canon applied to 2026 data.
-    Payload written by report_oot_2026.py to live/data/oot_equity.json."""
-    payload = _read_json(_data_path("oot_equity.json"))
-    if payload:
-        payload["wagering"] = _wagering(payload)
-        payload = _qty1_view(payload)
-    return render_template("oot.html", data=payload)
+    """2026 out-of-time book (live/data/oot_equity.json), at the chosen sizing."""
+    return _sized_page("oot.html", "oot_equity.json")
 
 
 @app.route("/plot")
@@ -1184,13 +1222,9 @@ def plot():
     """IBKR fair replay under the current canon (user 2026-10-01): the archived 15:30/15:45 IBKR
     snapshots re-ranked with today's rule, rendered with the OOT page. Payload written by
     research/fable_canon_2026_09_30/build_payload_ibkr_replay.py to live/data/ibkr_replay_equity.json."""
-    payload = _read_json(_data_path("ibkr_replay_equity.json"))
-    if payload:
-        payload["wagering"] = _wagering(payload)
-        payload = _qty1_view(payload)
-    return render_template("oot.html", data=payload, page_title="GEPO IBKR replay",
-                           page_heading="GEPO IBKR Fair Replay", page_prefix="IBKR snapshots, current canon",
-                           hide_fill_sens=True)
+    return _sized_page("oot.html", "ibkr_replay_equity.json", page_title="GEPO IBKR replay",
+                       page_heading="GEPO IBKR Fair Replay", page_prefix="IBKR snapshots, current canon",
+                       hide_fill_sens=True)
 
 
 @app.route("/qr")

@@ -36,6 +36,8 @@ win = np.where(bp, P.settle >= P.short_strike, P.settle <= P.short_strike); loss
 P["_outcome"] = np.where(win, "WIN", np.where(loss, "LOSS", "PARTIAL")); P["expiry_close"] = P.settle
 b = (P.model_credit / (P.width - P.model_credit)).values
 P["w_star"], P["G"] = ec.kelly(P.p.values, P.q.values, P.ro.values, b)
+import config as cfg
+P["w_star_carry"] = ec.kelly_carry(P.p.values, P.q.values, P.ro.values, b, (cfg.CARRY_RATE * np.clip(P.DTE.astype(float), 1, None) / 365.0).values)
 P["DKL"] = P.D_ent; P["GROUND"] = P.G24
 
 with contextlib.redirect_stdout(io.StringIO()):

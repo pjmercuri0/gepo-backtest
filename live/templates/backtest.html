@@ -34,53 +34,47 @@
 
   {% include "_fill_sensitivity.html" %}
 
+  {% set hd = data.head %}
+  {% include "_size_toggle.html" %}
   <div class="stats">
     <div class="stat">
       <div class="stat-label">starting bankroll</div>
       <div class="stat-value">${{ '{:,.0f}'.format(c.starting_bankroll) }}</div>
     </div>
     <div class="stat">
-      <div class="stat-label">final bankroll (qty 1)</div>
-      <div class="stat-value {{ 'pos' if (s.qty1_final if s.qty1_final is defined else s.strategy_final) >= c.starting_bankroll else 'neg' }}">${{ '{:,.0f}'.format((s.qty1_final if s.qty1_final is defined else s.strategy_final)) }}</div>
+      <div class="stat-label">final bankroll{% if data.arm_label %} ({{ data.arm_label }}){% endif %}</div>
+      <div class="stat-value {{ 'pos' if hd.final >= c.starting_bankroll else 'neg' }}">${{ '{:,.0f}'.format(hd.final) }}</div>
     </div>
     <div class="stat">
       <div class="stat-label">total return</div>
-      <div class="stat-value {{ 'pos' if (s.qty1_total_return if s.qty1_total_return is defined else s.strategy_total_return) >= 0 else 'neg' }}">{% if (s.qty1_total_return if s.qty1_total_return is defined else s.strategy_total_return) >= 0 %}+{% endif %}{{ (s.qty1_total_return if s.qty1_total_return is defined else s.strategy_total_return) }}%</div>
+      <div class="stat-value {{ 'pos' if hd.total_return >= 0 else 'neg' }}">{% if hd.total_return >= 0 %}+{% endif %}{{ hd.total_return }}%</div>
     </div>
     <div class="stat">
       <div class="stat-label">CAGR</div>
-      <div class="stat-value {{ 'pos' if (s.qty1_cagr if s.qty1_cagr is defined else s.strategy_cagr) >= 0 else 'neg' }}">{% if (s.qty1_cagr if s.qty1_cagr is defined else s.strategy_cagr) >= 0 %}+{% endif %}{{ (s.qty1_cagr if s.qty1_cagr is defined else s.strategy_cagr) }}%</div>
+      <div class="stat-value {{ 'pos' if hd.cagr >= 0 else 'neg' }}">{% if hd.cagr >= 0 %}+{% endif %}{{ hd.cagr }}%</div>
     </div>
     <div class="stat">
       <div class="stat-label">yield (P&amp;L / wagered)</div>
-      <div class="stat-value {{ 'pos' if (s.qty1_yield if s.qty1_yield is defined else s.strategy_yield) >= 0 else 'neg' }}">{% if (s.qty1_yield if s.qty1_yield is defined else s.strategy_yield) >= 0 %}+{% endif %}{{ (s.qty1_yield if s.qty1_yield is defined else s.strategy_yield) }}%</div>
+      <div class="stat-value {{ 'pos' if hd.yield >= 0 else 'neg' }}">{% if hd.yield >= 0 %}+{% endif %}{{ hd.yield }}%</div>
     </div>
     <div class="stat">
       <div class="stat-label">$-P&amp;L Sharpe</div>
-      <div class="stat-value">{{ '%+.2f'|format((s.qty1_sharpe_dollar if s.qty1_sharpe_dollar is defined else s.strategy_sharpe_dollar)) }}</div>
+      <div class="stat-value">{{ '%+.2f'|format(hd.sharpe_dollar) }}</div>
       <div class="subtitle">weekly dollar P&amp;L, annualised</div>
     </div>
     <div class="stat">
       <div class="stat-label">max drawdown</div>
-      <div class="stat-value neg">{{ (s.qty1_max_dd if s.qty1_max_dd is defined else s.strategy_max_dd) }}%</div>
+      <div class="stat-value neg">{{ hd.max_dd }}%</div>
     </div>
   </div>
 
+  {% if data.arms %}
   <div class="params-row" style="margin-bottom:10px">
-    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=2 final</span><span class="chip-v">${{ '{:,.0f}'.format(s.strategy_final) }}</span></span>
-    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=2 return</span><span class="chip-v {{ 'pos' if s.strategy_total_return >= 0 else 'neg' }}">{% if s.strategy_total_return >= 0 %}+{% endif %}{{ s.strategy_total_return }}%</span></span>
-    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=2 yield</span><span class="chip-v {{ 'pos' if s.strategy_yield >= 0 else 'neg' }}">{% if s.strategy_yield >= 0 %}+{% endif %}{{ s.strategy_yield }}%</span></span>
-    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=2 $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.strategy_sharpe_dollar) }}</span></span>
-    <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=2 max DD</span><span class="chip-v neg">{{ s.strategy_max_dd }}%</span></span>
-    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly final</span><span class="chip-v">${{ '{:,.0f}'.format(s.quarterk_final) }}</span></span>
-    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly yield</span><span class="chip-v {{ 'pos' if s.quarterk_yield >= 0 else 'neg' }}">{% if s.quarterk_yield >= 0 %}+{% endif %}{{ s.quarterk_yield }}%</span></span>
-    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.quarterk_sharpe_dollar) }}</span></span>
-    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly max DD</span><span class="chip-v neg">{{ s.quarterk_max_dd }}%</span></span>
-    <span class="chip" style="background:rgba(144,133,233,0.10)"><span class="chip-k">½ Kelly final</span><span class="chip-v">${{ '{:,.0f}'.format(s.halfk_final) }}</span></span>
-    <span class="chip" style="background:rgba(144,133,233,0.10)"><span class="chip-k">½ Kelly yield</span><span class="chip-v {{ 'pos' if s.halfk_yield >= 0 else 'neg' }}">{% if s.halfk_yield >= 0 %}+{% endif %}{{ s.halfk_yield }}%</span></span>
-    <span class="chip" style="background:rgba(144,133,233,0.10)"><span class="chip-k">½ Kelly $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.halfk_sharpe_dollar) }}</span></span>
-    <span class="chip" style="background:rgba(144,133,233,0.10)"><span class="chip-k">½ Kelly max DD</span><span class="chip-v neg">{{ s.halfk_max_dd }}%</span></span>
+    {% for a in data.arms %}
+    <span class="chip" style="background:{{ 'rgba(29,158,117,0.16)' if a.active else 'rgba(136,135,128,0.08)' }}"><span class="chip-k">{{ a.label }}</span><span class="chip-v">${{ '{:,.0f}'.format(a.final) }} · {% if a.yield >= 0 %}+{% endif %}{{ a.yield }}% yield · Sharpe {{ '%+.2f'|format(a.sharpe) }} · DD <span class="neg">{{ a.max_dd }}%</span></span></span>
+    {% endfor %}
   </div>
+  {% endif %}
   <div class="params-row" style="margin-bottom:22px">
     <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY final</span><span class="chip-v">${{ '{:,.0f}'.format(s.spy_final) }}</span></span>
     <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY return</span><span class="chip-v {{ 'pos' if s.spy_total_return >= 0 else 'neg' }}">{% if s.spy_total_return >= 0 %}+{% endif %}{{ s.spy_total_return }}%</span></span>
@@ -119,10 +113,11 @@
       data: {
         labels: points.map(p => p.date),
         datasets: [
-          { label: 'qty=1',             data: points.map(p => p.qty1),     borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.2, pointRadius: 0, fill: true,  tension: 0.05 },
-          { label: 'qty=2',             data: points.map(p => p.strategy), borderColor: '#378ADD', borderWidth: 1.6, pointRadius: 0, fill: false, tension: 0.05 },
-          { label: '¼ Kelly (cap=5)',   data: points.map(p => p.quarterk), borderColor: '#EF9F27', borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.05 },
-          { label: '½ Kelly (cap=5)',   data: points.map(p => p.halfk),    borderColor: '#9085E9', borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.05 },
+          {% if data.arms %}{% for a in data.arms %}
+          { label: {{ a.label|tojson }}, data: points.map(p => p[{{ ({'qty1':'qty1','strategy':'strategy','quarterk':'quarterk','halfk':'halfk'}[a.prefix])|tojson }}]), borderColor: {{ a.color|tojson }}, {% if a.active %}backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.4, fill: true,{% else %}borderWidth: 1.3, fill: false,{% endif %} pointRadius: 0, tension: 0.05, order: {{ 0 if a.active else 1 }} },
+          {% endfor %}{% else %}
+          { label: 'strategy', data: points.map(p => p.strategy), borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.2, pointRadius: 0, fill: true, tension: 0.05 },
+          {% endif %}
           { label: 'SPY',               data: points.map(p => p.spy),      borderColor: '#888780', borderWidth: 1.5, pointRadius: 0, fill: false, borderDash: [4, 3], tension: 0.05 },
         ]
       },
@@ -200,6 +195,7 @@
   </script>
 
   {% if data.weeks %}
+  {% include "_size_toggle.html" %}
   <div class="section-label">Week-by-week trades · {{ data.weeks|length }} weeks · {{ data.trades|length }} trades</div>
   {% for w in data.weeks|reverse %}
   <div class="week-card">

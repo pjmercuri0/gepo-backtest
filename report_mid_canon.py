@@ -250,6 +250,10 @@ def build_payload(picks, end_year, label):
             'max_loss': round(float(r['max_loss_adj']), 4),
             'spot':     round(float(r['expiry_close']), 2),
             'qty':      int(r['_q']),
+            # Per-trade contracts under the Kelly arms (user 2026-10-01: the site's sizing toggle
+            # re-renders the week tables at 1/4 and 1/2 Kelly; same rule as simulate_equity).
+            'qty_q4':   int(_kelly_qty(r, 0.25)),
+            'qty_h2':   int(_kelly_qty(r, 0.5)),
             'pnl':      round(float(r['_pnl']), 2),
             'ground':   round(float(r['GROUND']), 6),
             'dkl':      round(float(r['DKL']), 4) if pd.notna(r.get('DKL')) else None,
