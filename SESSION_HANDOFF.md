@@ -187,6 +187,26 @@ median 0.981). It is a level proxy only: which side of model the real IBKR quote
 (R^2 <= 0.06), so any gate `vendor_quote_adj >= model` is false by construction. Nothing in the site book reads a quote;
 selection, booking and payloads are unchanged.
 
+## 0.69i GROUND correlation vendor vs IBKR fair replay (user: "maybe overlap is not the right stat")
+
+Join rebuilt on the OI >= 1 frame (`reconcile_vendor_ibkr.py`, `reconcile_vendor_ibkr.csv`): 20 shared days, vendor 992 and IBKR
+909 (day,ticker), 662 shared, strikes identical on 463 (70%). G24 = EV x exp(-24 D_ent) on each side's own data (vendor EOD spot,
+smile, closes; IBKR 15:30):
+
+| | all 662 shared | 463 identical strikes |
+|---|---|---|
+| G24 Spearman, pooled | 0.46 | 0.48 |
+| G24 Spearman within day, median (p25-p75) | 0.52 (0.27-0.67) | 0.49 (0.22-0.77) |
+| G24 Pearson | 0.02 (tail-dominated) | 0.03 |
+| IBKR bottom-quintile names in vendor bottom half | 83% | 82% |
+| IBKR top-quintile names in vendor top half | 64% | 63% |
+| sign agreement (G24 > 0) | 71% | 72% |
+
+Components on identical strikes: D_ent rank corr 0.98, model credit 0.974, P(win) 0.54 (the 15:30-vs-close spot, §0.69d 3b),
+EV rank 0.41. Read: the two sources agree on what to AVOID (83% of IBKR's worst fifth sits in the vendor's bottom half) better
+than on what to take (64%), and the rank inside the top is where spot and credit noise live. Overlap of a top-6 list is the
+worst possible statistic for this; quintile agreement and the bottom-half exclusion are the honest ones.
+
 ## 0.69d Vendor vs IBKR reconciliation, strategy C, 2026-08-20..09-24 (Air, 2026-09-30 night) + KELLY FIX
 
 **Bug found and fixed (user: "fix that").** `ent_canon.kelly()` returned NaN for every growth-NEGATIVE spread (no interior
