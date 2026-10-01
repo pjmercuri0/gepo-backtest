@@ -740,6 +740,12 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
     # crashed _serialize on exactly the "nothing ranked" path, leaving
     # latest.json unwritten and the live page frozen on the last good scan.
     ticker_rows = ranked
+    # Fable (user 2026-10-01): spreads that fail the model-credit floor are not candidates;
+    # drop them from the table and the candidate count (they stay in the log line).
+    if _fable_mode and not ranked.empty and "cw_floor" in ranked.columns:
+        _bear = ranked["spread_type"].eq("bear_call")
+        _floor = np.where(_bear, float(getattr(backtest_config, "FABLE_BEAR_MIN_CW", 0.50)), float(backtest_config.FABLE_MIN_CW))
+        ticker_rows = ranked[ranked["cw_floor"].astype(float) >= _floor]
 
     def row_to_dict(r):
         # JSON-safe rendering of one ranked spread.
@@ -835,7 +841,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
         "git_sha":       git_sha(),
         "config_hash":   config_hash(),
         "provenance":    provenance or ranked_provenance(snapshot_path, len(ranked), int(ranked.get("qualified", pd.Series(dtype=bool)).sum()) if not ranked.empty else 0),
-        "n_candidates":  int(len(ranked)),
+        "n_candidates":  int(len(ticker_rows)),
         "config": {
             "DTE_MIN":          dte_min,
             "DTE_MAX":          dte_max,
