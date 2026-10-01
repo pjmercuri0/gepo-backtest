@@ -111,6 +111,48 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69k DATA DEFECT: output/daily_closes.parquet is NOT split-adjusted; extreme-GROUND forensic (2026-10-01)
+
+**User asked** why `picks_oi1_k24.parquet` tops out at 1,577 bps GROUND against a 2.9 bps median when the IBKR archive tops out
+at 51.5 bps. Scripts: `split_contamination.py`, `top20_chain_check.csv`, `contamination_flags.csv`. k CONFIRMED: GROUND in that
+file equals EV x exp(-24 x D_ent) on 100% of rows, max |diff| 0 (k=4 matches 0%). Same 6,620 picks as the deployed book; that
+file books at 1.04 x model, the deployed book at 1.00 x.
+
+**Defect 1 - unadjusted corporate actions feeding the DEMEANED P_real.** `output/daily_closes.parquet` carries raw prices:
+14 names have a single session > 50% (GE +696% on 2021-08-03 = 1:8 reverse split; AMZN -95%, GOOGL -95%, NVDA -90%/-75%,
+AVGO -90%, NFLX -90%, NOW -80%, TSLA -77%/-67%, AAPL -74%, NEE -75%, CSX -67%, ISRG -66%, WMT -66%, RUTW). Returns are ratios,
+so a level shift is harmless -- but `P_REAL_DEMEAN = True` (canon since 2026-09-28) subtracts the WINDOW MEAN, and one +696%
+return lifts the mean of a 252-point window by ~5%, which pushes every other return ~5% the other way. Worked example, GE
+2022-04-20 bear call 91/92, spot 91.40: p(WIN) = 0.948 as canon computes it; 0.436 with the split returns dropped; 0.440
+undemeaned. One bad bar moved P(win) by 0.51 and produced EV 0.67 = 199x the pool median. Five of the twenty highest-GROUND
+picks are GE bear calls from this window (522-1,577 bps); their option chains are CLEAN (tight books, OI 173-855, model credit
+0.95-0.98 x the quoted mid, chain IV within 0.01 of the fit). The corruption is entirely in the close store.
+747 picks (11.3%) have such an event inside their 252-session window; they carry 1.8% of P&L, and REMOVING them IMPROVES the
+book: IS $92,880 -> $90,805 and $-Sharpe 1.46 -> 1.60; OOT $29,245 -> $29,500 and 3.11 -> 3.39. The bug adds noise, not profit.
+
+**Defect 2 - smile-fit model credit far above the day's quoted mid on illiquid strikes.** The other 15 of the top 20 are driven
+by credit/width 0.45-0.86, i.e. a Kelly payoff b up to 5.97 (max_loss 0.14 on a $1 width). Chain check: CL 2022-09-01 short leg
+quoted 0.45 x 2.45 (5.4x book) with chain IV 0.86 vs fit 0.72, model 0.857 on width 1.00; CSX 2021-08-09 long leg quoted ABOVE
+the short leg (mid credit -0.05); CSX 2024-07-11 0.25 x 1.35; TJX 2021-04-29 OI 10/1, model 1.77x the mid. 1,079 picks (16.3%)
+have model_credit > 1.25 x the quoted mid or a broken book; they carry 23.2% of P&L. Removing them: IS $74,438 / 1.27 / -34.3%,
+OOT $23,973 / 2.53 / -19.6%. This is the material one.
+
+| site book (qty 2, $10k, 1.00x model) | IS 2021-25 | OOT 2026 |
+|---|---|---|
+| as deployed | 5804 / $92,880 / 1.46 / -27.6% | 816 / $29,245 / 3.11 / -13.9% |
+| drop corporate-action windows | 5158 / $90,805 / 1.60 / -27.8% | 715 / $29,500 / 3.39 / -13.0% |
+| drop model > 1.25x mid / broken book | 4950 / $74,438 / 1.27 / -34.3% | 591 / $23,973 / 2.53 / -19.6% |
+| drop both | 4276 / $69,783 / 1.35 / -38.2% | 477 / $24,545 / 2.89 / -18.3% |
+| drop GROUND > 50 bps (399 picks, 9.8% of P&L) | 5505 / $83,746 / 1.32 / -33.6% | 716 / $28,328 / 3.18 / -14.7% |
+| drop GROUND > 100 bps (180 picks, 3.8%) | 5676 / $89,600 / 1.41 / -28.3% | 764 / $28,647 / 3.15 / -14.4% |
+
+**Caveat on every "drop" row:** deleting picks does NOT re-run selection. The eligible pool is 27.6/day against a cap of 6, so
+a corrected run would backfill those slots and land somewhere between these rows and the deployed book. Ex-dividend is NOT a
+factor (the two near-dates among the top 20 fall outside the entry..expiry+1 gate). NOTHING WAS CHANGED: no canon edit, no
+payload rebuild, no deploy. Open decisions: (i) split-adjust `output/daily_closes.parquet` (build_daily_closes.py) or make
+`ent_canon.p_real` drop |return| > 50% bars as data errors -- the second is a 2-line guard and is right regardless;
+(ii) cap credit/width or require the model credit to stay within ~1.25x the day's quoted mid at selection.
+
 ## 0.69j Carry on GROUND verified rank-neutral; site book sized on carry-adjusted Kelly, 1/4 and 1/2 arms (2026-10-01)
 
 **Carry is rank-neutral, verified.** On the strategy-C eligible pool (30,603 rows, 1,108 days): every day has exactly ONE DTE
