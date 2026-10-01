@@ -45,6 +45,20 @@
     "sixteenk_sharpe_weekly": 2.65,
     "sixteenk_sharpe_dollar": 2.59,
     "sixteenk_max_dd": -2.47,
+    "quarterk_final": 10500.16,
+    "quarterk_total_return": 5.0,
+    "quarterk_cagr": 54.46,
+    "quarterk_sharpe": 1.82,
+    "quarterk_sharpe_weekly": 1.72,
+    "quarterk_sharpe_dollar": 1.64,
+    "quarterk_max_dd": -5.0,
+    "halfk_final": 11054.48,
+    "halfk_total_return": 10.54,
+    "halfk_cagr": 144.26,
+    "halfk_sharpe": 2.7,
+    "halfk_sharpe_weekly": 2.61,
+    "halfk_sharpe_dollar": 2.52,
+    "halfk_max_dd": -5.92,
     "spy_final": 10025.23,
     "spy_total_return": 0.25,
     "spy_cagr": 2.27,
@@ -55,9 +69,13 @@
     "strategy_wagered": 22319.08,
     "qty1_wagered": 11159.54,
     "sixteenk_wagered": 11213.78,
+    "quarterk_wagered": 13175.11,
+    "halfk_wagered": 17218.63,
     "strategy_yield": 4.04,
     "qty1_yield": 4.04,
-    "sixteenk_yield": 4.43
+    "sixteenk_yield": 4.43,
+    "quarterk_yield": 3.8,
+    "halfk_yield": 6.12
   },
   "points": [
     {
@@ -65,6 +83,8 @@
       "strategy": 10000.0,
       "qty1": 10000.0,
       "sixteenk": 10000.0,
+      "quarterk": 10000.0,
+      "halfk": 10000.0,
       "spy": 10000.0
     },
     {
@@ -72,6 +92,8 @@
       "strategy": 10870.64,
       "qty1": 10435.32,
       "sixteenk": 10435.32,
+      "quarterk": 10435.32,
+      "halfk": 10413.63,
       "spy": 10040.91
     },
     {
@@ -79,6 +101,8 @@
       "strategy": 10870.64,
       "qty1": 10435.32,
       "sixteenk": 10435.32,
+      "quarterk": 10435.32,
+      "halfk": 10413.63,
       "spy": 10011.41
     },
     {
@@ -86,6 +110,8 @@
       "strategy": 10870.64,
       "qty1": 10435.32,
       "sixteenk": 10435.32,
+      "quarterk": 10435.32,
+      "halfk": 10413.63,
       "spy": 10043.4
     },
     {
@@ -93,6 +119,8 @@
       "strategy": 10870.64,
       "qty1": 10435.32,
       "sixteenk": 10435.32,
+      "quarterk": 10435.32,
+      "halfk": 10413.63,
       "spy": 10045.63
     },
     {
@@ -100,6 +128,8 @@
       "strategy": 10870.64,
       "qty1": 10435.32,
       "sixteenk": 10435.32,
+      "quarterk": 10435.32,
+      "halfk": 10413.63,
       "spy": 10111.46
     },
     {
@@ -107,6 +137,8 @@
       "strategy": 11061.92,
       "qty1": 10530.96,
       "sixteenk": 10530.96,
+      "quarterk": 10217.91,
+      "halfk": 10255.19,
       "spy": 10088.51
     },
     {
@@ -114,6 +146,8 @@
       "strategy": 11061.92,
       "qty1": 10530.96,
       "sixteenk": 10530.96,
+      "quarterk": 10217.91,
+      "halfk": 10255.19,
       "spy": 10058.35
     },
     {
@@ -121,6 +155,8 @@
       "strategy": 11061.92,
       "qty1": 10530.96,
       "sixteenk": 10530.96,
+      "quarterk": 10217.91,
+      "halfk": 10255.19,
       "spy": 9989.25
     },
     {
@@ -128,6 +164,8 @@
       "strategy": 11061.92,
       "qty1": 10530.96,
       "sixteenk": 10530.96,
+      "quarterk": 10217.91,
+      "halfk": 10255.19,
       "spy": 10033.57
     },
     {
@@ -135,6 +173,8 @@
       "strategy": 11061.92,
       "qty1": 10530.96,
       "sixteenk": 10530.96,
+      "quarterk": 10217.91,
+      "halfk": 10255.19,
       "spy": 10138.6
     },
     {
@@ -142,6 +182,8 @@
       "strategy": 10635.05,
       "qty1": 10317.52,
       "sixteenk": 10317.52,
+      "quarterk": 9913.58,
+      "halfk": 9797.42,
       "spy": 10099.53
     },
     {
@@ -149,6 +191,8 @@
       "strategy": 10635.05,
       "qty1": 10317.52,
       "sixteenk": 10317.52,
+      "quarterk": 9913.58,
+      "halfk": 9797.42,
       "spy": 10044.06
     },
     {
@@ -156,6 +200,8 @@
       "strategy": 10635.05,
       "qty1": 10317.52,
       "sixteenk": 10317.52,
+      "quarterk": 9913.58,
+      "halfk": 9797.42,
       "spy": 9997.38
     },
     {
@@ -163,6 +209,8 @@
       "strategy": 10635.05,
       "qty1": 10317.52,
       "sixteenk": 10317.52,
+      "quarterk": 9913.58,
+      "halfk": 9797.42,
       "spy": 9937.45
     },
     {
@@ -170,6 +218,8 @@
       "strategy": 10540.79,
       "qty1": 10270.4,
       "sixteenk": 10270.4,
+      "quarterk": 9954.3,
+      "halfk": 10331.7,
       "spy": 10022.16
     },
     {
@@ -177,6 +227,8 @@
       "strategy": 10540.79,
       "qty1": 10270.4,
       "sixteenk": 10270.4,
+      "quarterk": 9954.3,
+      "halfk": 10331.7,
       "spy": 9977.44
     },
     {
@@ -184,6 +236,8 @@
       "strategy": 10540.79,
       "qty1": 10270.4,
       "sixteenk": 10270.4,
+      "quarterk": 9954.3,
+      "halfk": 10331.7,
       "spy": 9931.68
     },
     {
@@ -191,6 +245,8 @@
       "strategy": 10540.79,
       "qty1": 10270.4,
       "sixteenk": 10270.4,
+      "quarterk": 9954.3,
+      "halfk": 10331.7,
       "spy": 9887.88
     },
     {
@@ -198,6 +254,8 @@
       "strategy": 10540.79,
       "qty1": 10270.4,
       "sixteenk": 10270.4,
+      "quarterk": 9954.3,
+      "halfk": 10331.7,
       "spy": 10000.0
     },
     {
@@ -205,6 +263,8 @@
       "strategy": 11037.67,
       "qty1": 10518.83,
       "sixteenk": 10518.83,
+      "quarterk": 10580.17,
+      "halfk": 11198.08,
       "spy": 10012.87
     },
     {
@@ -212,6 +272,8 @@
       "strategy": 11037.67,
       "qty1": 10518.83,
       "sixteenk": 10518.83,
+      "quarterk": 10580.17,
+      "halfk": 11198.08,
       "spy": 10168.12
     },
     {
@@ -219,6 +281,8 @@
       "strategy": 11037.67,
       "qty1": 10518.83,
       "sixteenk": 10518.83,
+      "quarterk": 10580.17,
+      "halfk": 11198.08,
       "spy": 10166.54
     },
     {
@@ -226,6 +290,8 @@
       "strategy": 11037.67,
       "qty1": 10518.83,
       "sixteenk": 10518.83,
+      "quarterk": 10580.17,
+      "halfk": 11198.08,
       "spy": 10093.32
     },
     {
@@ -233,6 +299,8 @@
       "strategy": 11037.67,
       "qty1": 10518.83,
       "sixteenk": 10518.83,
+      "quarterk": 10580.17,
+      "halfk": 11198.08,
       "spy": 10085.04
     },
     {
@@ -240,6 +308,8 @@
       "strategy": 10902.37,
       "qty1": 10451.18,
       "sixteenk": 10496.94,
+      "quarterk": 10500.16,
+      "halfk": 11054.48,
       "spy": 10139.86
     },
     {
@@ -247,6 +317,8 @@
       "strategy": 10902.37,
       "qty1": 10451.18,
       "sixteenk": 10496.94,
+      "quarterk": 10500.16,
+      "halfk": 11054.48,
       "spy": 10064.4
     },
     {
@@ -254,6 +326,8 @@
       "strategy": 10902.37,
       "qty1": 10451.18,
       "sixteenk": 10496.94,
+      "quarterk": 10500.16,
+      "halfk": 11054.48,
       "spy": 10045.86
     },
     {
@@ -261,6 +335,8 @@
       "strategy": 10902.37,
       "qty1": 10451.18,
       "sixteenk": 10496.94,
+      "quarterk": 10500.16,
+      "halfk": 11054.48,
       "spy": 10025.23
     }
   ],
