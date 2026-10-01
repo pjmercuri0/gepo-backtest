@@ -2,6 +2,10 @@
 {% block title %}GEPO Live — History{% endblock %}
 
 {% block content %}
+<style>
+  /* Unplaced picks whose quote does not clear the gate: grey, like the live tab's dim rows. */
+  tr.hist-dim td, tr.hist-dim td .pos, tr.hist-dim td .neg { color: #888780 !important; }
+</style>
 <h1>Frozen 15:30 + 15:45 top-up history</h1>
 <div class="subtitle">One snapshot per trading day. Status/P&amp;L update intraday (tracker) and finalize at expiry (settler).</div>
 
@@ -105,7 +109,9 @@
              replaces fired on "expiry day AND short ITM", which lit rows that settled
              cleanly to cash; pin-zone is the only state that delivers shares. #}
           {% set _pin = pin_open(p, (last_track.underlying_price if last_track and last_track.underlying_price else none), outcome_row is not none) %}
-          <tr{% if _pin %} class="assign-watch" title="PIN risk: spot inside {{ p.long_strike }}-{{ p.short_strike }} — short assigned, long expires worthless, shares delivered"{% endif %}>
+          {% set _hcrow = held_cmp(p) %}
+          {% set _dim = (outcome_row is none and _hcrow != 'same' and p.gate_ok is defined and not p.gate_ok) %}
+          <tr{% if _pin %} class="assign-watch{% if _dim %} hist-dim{% endif %}" title="PIN risk: spot inside {{ p.long_strike }}-{{ p.short_strike }} — short assigned, long expires worthless, shares delivered"{% elif _dim %} class="hist-dim" title="quote below model (or no credible book) -- not fillable right now"{% endif %}>
             <td>{% set _hc = held_cmp(p) %}<button class="actuals-add{% if _hc == 'same' %} held-add{% elif _hc == 'better' %} held-better{% elif _hc == 'worse' %} held-worse{% endif %}" data-url="{{ url_for('add_actual_from_frozen', date=day.date, index=loop.index0) }}" title="{% if _hc == 'same' %}already in Actuals — IBKR will refuse a second order on the same option{% elif _hc == 'better' %}same name and side you hold, strike away from the move{% elif _hc == 'worse' %}same name and side you hold, strike has followed the stock{% else %}add this pick to actuals{% endif %}">+</button></td>
             <td>{{ loop.index }}</td>
             <td class="fw">{{ tk }}

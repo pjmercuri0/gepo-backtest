@@ -771,6 +771,17 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                         _live_mid = float(_q["mid"])
                 except (TypeError, ValueError, KeyError):
                     _live_mid = None
+            # Quote gate on the live quote, same rule as the live tab: credible book and quote >= model
+            # at the 2dp shown (a tie clears). Only set when the stream holds this spread.
+            if prefer_stream and _q and _q.get("mid") is not None:
+                try:
+                    _wa = (pick.get("credit_targets") or {}).get("walkaway_credit")
+                    if _wa is None and pick.get("model_credit"):
+                        _wa = math.floor(float(pick["model_credit"]) * 100 + 0.5) / 100
+                    if _wa is not None:
+                        live["gate_ok"] = bool(_live_mid is not None and math.floor(float(_q["mid"]) * 100 + 0.5) / 100 >= float(_wa))
+                except (TypeError, ValueError):
+                    pass
             if _live_mid is not None:
                 _px, _basis = _live_mid, "live quote"
                 live["live_quote"] = round(_live_mid, 4); live["live_quote_ts"] = _q.get("ts")
@@ -1427,6 +1438,12 @@ def history():
             _fresh, _ = _stream_overlay(_p, _arr[-1], None, None, prefer_stream=True)
             if isinstance(_fresh, dict) and _fresh is not _arr[-1]:
                 _arr.append(_fresh)
+            # Row shade (user 2026-10-01): white when the pick clears the quote gate, grey when not --
+            # on the live quote when the stream holds it, else as it stood at the scan.
+            if isinstance(_fresh, dict) and _fresh.get("gate_ok") is not None:
+                _p["gate_ok"] = bool(_fresh["gate_ok"])
+            else:
+                _p["gate_ok"] = bool(_p.get("above_min", True)) and _p.get("quote_ok") is not False
     return render_template("history.html",
                            entries=entries,
                            close_alert=close_alert)
