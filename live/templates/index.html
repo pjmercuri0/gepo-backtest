@@ -307,7 +307,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${fmtKellyEV(p.G)}</td>
           <td>${fmtNum(p.DKL, 4)}</td>
           <td>${fmtNum(denom(p, kVal), 4)}</td>
-          <td class="fw">${groundBar(p.GROUND, maxGround)}${fmtGround(p.GROUND == null ? null : p.GROUND + carryOf(p.DTE))}</td>
+          <td class="fw">${groundBar(p.GROUND == null ? 0 : p.GROUND + carryOf(p.DTE), maxGround)}${fmtGround(p.GROUND == null ? null : p.GROUND + carryOf(p.DTE))}</td>
         </tr></tbody>
       </table></div>
     </div>`;
@@ -350,7 +350,7 @@ function renderRanked(rows, maxGround, kVal) {
           <span style="opacity:0.7;font-size:11px">${r.p_hat != null ? `bs ${fmtNum(r.p_hat,2)} / ${fmtNum(r.ro_hat,2)} / ${fmtNum(r.q_hat,2)}` : "—"}</span></td>
       <td>${fmtKellyEV(r.G)}</td>
       <td>${fmtNum(denom(r, kVal), 4)}</td>
-      <td class="fw">${groundBar(r.GROUND, maxGround)}${fmtGround(r.GROUND == null ? null : r.GROUND + carryOf(r.DTE))}</td>
+      <td class="fw">${groundBar(r.GROUND == null ? 0 : r.GROUND + carryOf(r.DTE), maxGround)}${fmtGround(r.GROUND == null ? null : r.GROUND + carryOf(r.DTE))}</td>
     </tr>`;
   }).join("");
 }
@@ -537,7 +537,9 @@ async function refresh() {
     if (!r.ok) throw new Error("HTTP " + r.status);
     const data = await r.json();
 
-    const maxG = (data.ticker && data.ticker.length) ? data.ticker[0].GROUND : 1.0;
+    // Bars scale on the DISPLAYED value (GROUND + carry), max over the table (user 2026-10-01).
+    const maxG = (data.ticker && data.ticker.length)
+      ? Math.max(...data.ticker.map(r => (r.GROUND == null ? 0 : r.GROUND + carryOf(r.DTE)))) : 1.0;
     document.getElementById("snapshot-meta").textContent =
       `snapshot: ${data.snapshot_ts}  ·  ${data.n_candidates} candidates  ·  source: ${data.snapshot_file}`;
 

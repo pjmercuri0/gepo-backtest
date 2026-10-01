@@ -233,7 +233,7 @@
           <td class="{{ 'pos' if (t.kelly_ev or 0) >= 0 else 'neg' }}" style="text-align:right">{% if t.kelly_ev is not none %}{% if t.kelly_ev >= 0 %}+{% endif %}{{ '%.2f'|format(t.kelly_ev) }}%{% else %}—{% endif %}</td>
           <td style="text-align:right">{% if t.dkl is not none %}{{ '%.4f'|format(t.dkl) }}{% else %}—{% endif %}</td>
           <td class="pos">
-            <span class="ground-bar"><span class="ground-bar-fill" style="width:{{ (100.0 * t.ground / w.max_g)|round(0) if w.max_g > 0 else 0 }}%"></span></span>
+            <span class="ground-bar"><span class="ground-bar-fill" style="width:{{ (100.0 * (t.ground + carry_dow(t.dow)) / (w.max_g + carry_dow(t.dow)))|round(0) if (w.max_g + carry_dow(t.dow)) > 0 else 0 }}%"></span></span>
             {{ '%+.2f'|format(10000.0 * (t.ground + carry_dow(t.dow))) }}
           </td>
           <td>${{ '%.2f'|format(t.spot) }}</td>
