@@ -111,6 +111,47 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69m Close store split-adjusted for P_real + lookback exclusion (2026-10-01). The Sharpe gain did NOT survive backfill.
+
+**User:** "split adjust the close store, exclude any options with a split in the window". Both done.
+
+**1. Split-adjusted copy, raw store untouched.** `research/build_split_adjusted_closes.py` ->
+`output/daily_closes_split_adj.parquet` + `output/split_adjustment_log.csv`. Every Yahoo event is VERIFIED before use: the
+observed session return must match the implied 1/R - 1 within 0.05, searching +-3 sessions around the Yahoo date. **20 applied**
+(AAPL 4:1, AMZN 20:1, AVGO 10:1, CSX 3:1, GE 1:8, GOOGL 20:1, ISRG 3:1, NFLX 10:1, NOW 5:1, NVDA 4:1 and 10:1, TSLA 5:1 and 3:1,
+WMT 3:1, plus small-ratio BDX/HON/IBM/MRK/PFE where the gap was real), **12 skipped** with reasons printed (GE 2023/2024 and T
+2022 spinoff factors the store never gapped on; NEE 4:1 2020-10-27, MMM, RTX, TJX 2018 -- no sessions within 3 days). Verified:
+names with a >50% single session fall from 14 to 2 (NEE, whose store jumps on 2020-11-12 not the Yahoo date, and RUTW, euro lane).
+`ent_canon.backtest_closes_adjusted()` loads it and warns loudly if missing; `bear_regime_sweep.prepare()` uses it for P_real,
+gap drift and sigma. **build_frame still settles from the RAW store** -- its strikes are on the as-of-date scale, so expiry_close
+must stay raw. Changing that would book fake wins/losses; the docstrings say so.
+
+**2. Lookback exclusion.** `bear_regime_sweep.add_split_window_gate(c, mode=...)` marks a spread whose 252-session P_real window
+(measured on the name's own session calendar, plus DTE) contains a corporate action. `mode="unverified"` (DEFAULT, deployed)
+gates only events the adjuster could NOT fix -- a verified event no longer distorts anything, so gating it just discards good
+candidates. `mode="all"` is the belt-and-braces version.
+
+| site book (qty 2, $10k, 1.00x model) | IS 2021-25 | OOT 2026 |
+|---|---|---|
+| before, raw closes (deployed this morning) | 5804 / $92,880 / 1.46 / -27.6% | 816 / $29,245 / 3.11 / -13.9% |
+| **adjusted + gate unverified (DEPLOYED)** | **5804 / $93,485 / 1.46 / -27.9%** | **816 / $29,300 / 2.98 / -15.3%** |
+| adjusted + gate ALL events | 5784 / $99,304 / 1.56 / -26.4% | 816 / $27,160 / 2.62 / -16.3% |
+
+**The 1.60 from §0.69k did not survive.** That number came from DELETING the 747 contaminated picks without re-running
+selection. With the data actually corrected and the slots backfilled from the pool, IS $-Sharpe stays 1.46 and OOT slips
+3.11 -> 2.98. Gating ALL events buys IS 1.56 but costs OOT 2.62, and it does it by excluding NVDA/GOOGL/AMZN/TSLA/ISRG/AAPL
+for a year after each split and removing NFLX (51 picks) and NOW (50) from 2026 entirely -- names whose P_real is now correct.
+That is a performance choice, not a correctness one, so the default stays "unverified".
+
+**What the fix did do:** the GE cluster is gone from the extremes (max GROUND 1,577 -> 1,498 bps, now CL; picks over 100 bps
+180 -> 144). The remaining extremes are all defect 2 from §0.69k -- a smile-fit model credit far above a garbage quoted book
+(CL 2022-09-01 quoted 0.45 x 2.45; CSX 2024-07-11 0.25 x 1.35). That one is still open and is the larger of the two
+(1,079 picks, 23% of P&L).
+
+Deployed to Mya, both pages verified (/backtest $93,485 / +1.46, /oot $29,300 / +2.98); backups `*.bak_presplitadj_*`.
+`output/` is gitignored: a machine that rebuilds payloads must run `fetch_yahoo_split_history.py` then
+`build_split_adjusted_closes.py` first, or P_real silently falls back to the raw store (it prints a warning).
+
 ## 0.69l THIRD EXCLUSION: corporate actions (split / reverse split / spinoff), 2026-10-01
 
 **User:** "1. ex-div, 2. earnings, 3. corporate action stock/reverse splits". New `research/fetch_yahoo_split_history.py`

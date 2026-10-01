@@ -7,13 +7,13 @@ from pathlib import Path
 import numpy as np, pandas as pd
 ROOT = Path(__file__).resolve().parents[2]; sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "research"))
 import ent_canon as ec, config as cfg, report_mid_canon as rmc, report_bear_regime as rbr
-from bear_regime_sweep import add_earnings_gate, add_exdiv_gate, add_regimes, add_split_gate, prepare, realize
+from bear_regime_sweep import add_earnings_gate, add_exdiv_gate, add_regimes, add_split_gate, add_split_window_gate, prepare, realize
 HERE = Path(__file__).resolve().parent; KEY = ["ticker", "entry_date", "expiry_date", "spread_type", "short_strike", "long_strike"]
 FLOOR, BEAR_IV, TOP = 0.45, 0.35, 6
 K = float(sys.argv[1]) if len(sys.argv) > 1 else float(ec.K)   # D_ent penalty in the rank key (user 2026-09-30: 24)
 FILL = float(sys.argv[2]) if len(sys.argv) > 2 else float(ec.FILL_MULT)   # 2026-09-30 (user): site book at 1.00 x model; live booking keeps ec.FILL_MULT
 with contextlib.redirect_stdout(io.StringIO()):
-    c, spy = prepare(); c = add_regimes(c, spy); c = add_exdiv_gate(c); c = add_earnings_gate(c); c = add_split_gate(c)
+    c, spy = prepare(); c = add_regimes(c, spy); c = add_exdiv_gate(c); c = add_earnings_gate(c); c = add_split_gate(c); c = add_split_window_gate(c)
 c = c.merge(pd.read_parquet(HERE / "frame_quotes_oi1.parquet")[KEY + ["IV"]], on=KEY, how="left")   # 2026-09-30: OI >= 1 frame
 cl = pd.read_parquet(ROOT / "output/daily_closes.parquet"); cl["date"] = pd.to_datetime(cl.date).dt.normalize()
 cl = cl.dropna(subset=["close"]).sort_values(["ticker", "date"]); cl["n_before"] = cl.groupby("ticker").cumcount()
@@ -21,7 +21,7 @@ c = c.merge(cl[["ticker", "date", "n_before"]].rename(columns={"date": "entry_da
 c = c[c.n_before >= ec.WINDOW].copy()
 c["GROUND"] = c.EV * np.exp(-K * c.D_ent)   # rank key at this K (prepare() scored at ec.K)
 # 2026-10-01 (user): third exclusion beside earnings and ex-dividend -- corporate actions (split / reverse split / spinoff)
-g = ~c.exdiv_hit & ~c.earnings_hit & ~c.split_hit
+g = ~c.exdiv_hit & ~c.earnings_hit & ~c.split_hit & ~c.split_window_hit
 cw = c.model_credit / c.width
 elig = (c.spread_type.eq("bull_put") & g & (cw >= FLOOR)) | (c.spread_type.eq("bear_call") & g & (cw >= FLOOR) & (c.IV < BEAR_IV) & c.below_100)
 sel = c[elig].sort_values(["entry_date", "GROUND"], ascending=[True, False]).groupby("entry_date", sort=False).head(TOP)

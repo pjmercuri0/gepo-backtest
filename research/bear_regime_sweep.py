@@ -62,7 +62,9 @@ def prepare() -> tuple[pd.DataFrame, pd.DataFrame]:
     if len(c) < n0:
         print(f"  frame start {FRAME_START.date()}: dropped {n0-len(c):,} pre-window candidates", flush=True)
     c["expiry_date"] = pd.to_datetime(c.expiry_date).dt.normalize()
-    closes = ec.backtest_closes()
+    # 2026-10-01 (user): returns are measured on the SPLIT-ADJUSTED store; settlement stays raw
+    # (build_frame bakes expiry_close from the raw store against as-of-date strikes).
+    closes = ec.backtest_closes_adjusted()
     mu = ec.gap_drift(c, closes, pd.read_parquet(GAP_SERIES))
     p = ec.p_real(c, closes, mu=mu)
     c["p"], c["q"], c["ro"] = p[:, 0], p[:, 1], p[:, 2]
@@ -221,6 +223,55 @@ def add_split_gate(c: pd.DataFrame) -> pd.DataFrame:
         hit[i] = left < len(dates) and dates[left] <= end
     out = c.copy()
     out["split_hit"] = hit
+    return out
+
+
+def add_split_window_gate(c: pd.DataFrame, window: int = 252, mode: str = "unverified") -> pd.DataFrame:
+    """Mark any spread whose P_real LOOKBACK window contains a corporate action (user 2026-10-01).
+
+    Belt and braces beside the split-adjusted close store. P_real counts `window` sessions of
+    DTE-day moves ending the session before entry and subtracts the window mean; a residual
+    corporate action inside it (one the adjuster could not verify -- NEE 2020-11-12, the GE/T/MMM
+    spinoff factors) still shifts every demeaned return. The window is measured on the name's OWN
+    session calendar, so it is exact rather than a calendar-day approximation.
+    """
+    if not SPLITS.exists():
+        raise FileNotFoundError(f"{SPLITS} missing; run research/fetch_yahoo_split_history.py")
+    d = pd.read_csv(SPLITS, parse_dates=["SplitDate"])
+    if mode == "unverified":
+        # Events the adjuster verified and removed from the return series carry no distortion any
+        # more, so gating on them only throws away good candidates (NFLX and NOW are the whole 2026
+        # story). Gate on what could NOT be fixed. mode="all" restores the belt-and-braces version.
+        log_path = SPLITS.parent / "split_adjustment_log.csv"
+        if not log_path.exists():
+            raise FileNotFoundError(f"{log_path} missing; run research/build_split_adjusted_closes.py")
+        log = pd.read_csv(log_path, parse_dates=["SplitDate"])
+        keep = {(r.Symbol, pd.Timestamp(r.SplitDate).normalize()) for r in log[~log.applied.astype(bool)].itertuples()}
+        d = d[[(r.Symbol, pd.Timestamp(r.SplitDate).normalize()) in keep for r in d.itertuples()]]
+    elif mode != "all":
+        raise ValueError(f"mode must be 'unverified' or 'all', got {mode!r}")
+    by_symbol = {s: g.SplitDate.to_numpy("datetime64[ns]") for s, g in d.groupby("Symbol")}
+    cl = ec.backtest_closes().dropna().drop_duplicates(["ticker", "date"]).sort_values(["ticker", "date"])
+    cal = {tk: pd.to_datetime(g.date).to_numpy("datetime64[ns]") for tk, g in cl.groupby("ticker")}
+    hit = np.zeros(len(c), dtype=bool)
+    for i, row in enumerate(c.itertuples(index=False)):
+        if row.ticker == "MMC":
+            hit[i] = True
+            continue
+        ev = by_symbol.get(row.ticker)
+        if ev is None:
+            continue
+        dates = cal.get(row.ticker)
+        if dates is None or len(dates) == 0:
+            hit[i] = True          # no calendar to measure the window on: fail closed
+            continue
+        entry = np.datetime64(pd.Timestamp(row.entry_date))
+        pos = int(np.searchsorted(dates, entry))
+        lo = max(pos - window - int(row.DTE) - 1, 0)
+        start = dates[lo]
+        hit[i] = bool(((ev >= start) & (ev <= entry)).any())
+    out = c.copy()
+    out["split_window_hit"] = hit
     return out
 
 

@@ -416,6 +416,25 @@ def p_real(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW, mu=N
     return out
 
 
+SPLIT_ADJ_STORE = 'output/daily_closes_split_adj.parquet'
+
+
+def backtest_closes_adjusted(spy_csv: str = 'data/spy_us_d.csv') -> pd.DataFrame:
+    """Split-adjusted closes for P_real / gap drift / sigma (user 2026-10-01).
+
+    Built by research/build_split_adjusted_closes.py from the raw store plus the verified Yahoo
+    split list. Use this wherever RETURNS are measured. Do NOT use it to settle trades: build_frame
+    takes expiry_close from the RAW store and the frame's strikes are on the as-of-date scale, so a
+    settled P&L must stay raw. Falls back to the raw store with a loud warning if the file is absent.
+    """
+    import os
+    if not os.path.exists(SPLIT_ADJ_STORE):
+        print(f"  WARNING: {SPLIT_ADJ_STORE} missing -- P_real falling back to the RAW close store; "
+              "splits will corrupt the demeaned window (handoff §0.69k). Run research/build_split_adjusted_closes.py", flush=True)
+        return backtest_closes(spy_csv=spy_csv)
+    return backtest_closes(store=SPLIT_ADJ_STORE, spy_csv=spy_csv)
+
+
 def backtest_closes(store: str = 'output/daily_closes.parquet', spy_csv: str = 'data/spy_us_d.csv') -> pd.DataFrame:
     """The backtest's P_real close series: the vendor-seeded store restricted to SPY sessions.
     The store carries ~9 vendor holiday republishes a year (stale duplicate closes); dropping
