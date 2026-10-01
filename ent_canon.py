@@ -503,7 +503,13 @@ def kelly(p, q, ro, b):
         r1 = (-B - s) / (2 * A); r2 = (-B + s) / (2 * A)
     ok1 = (r1 > 0) & (r1 < 1); ok2 = (r2 > 0) & (r2 < 1); quad = ~lin & (disc >= 0)
     w[quad & ok1] = r1[quad & ok1]; w[quad & ~ok1 & ok2] = r2[quad & ~ok1 & ok2]
-    valid = np.isfinite(w) & (p > 0) & (q > 0) & (p + q <= 1.0)
+    # 2026-09-30 (user: "fix that"): a growth-NEGATIVE spread -- no interior optimum, w* <= 0 --
+    # used to come back NaN and be DROPPED by every backtest (38-59% of bull candidates per year,
+    # found reconciling vendor vs IBKR §0.69d), while live/ranker._score_growth_negative kept the
+    # same rows with their growth at the floor stake. Evaluate them at the floor here, so the
+    # vendor book and the live ranker see the same universe. NaN only when P_real itself is unusable.
+    w = np.where(np.isfinite(w), w, 0.01)
+    valid = (p > 0) & (q > 0) & (p + q <= 1.0) & np.isfinite(b)
     w = np.clip(w, 0.01, 0.99)
     with np.errstate(invalid='ignore', divide='ignore'):
         ell = (p * np.log(np.clip(1 + w * b, 1e-10, None)) + ro * np.log(np.clip(1 + w * a * b, 1e-10, None))

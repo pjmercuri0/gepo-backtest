@@ -111,6 +111,43 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69d Vendor vs IBKR reconciliation, strategy C, 2026-08-20..09-24 (Air, 2026-09-30 night) + KELLY FIX
+
+**Bug found and fixed (user: "fix that").** `ent_canon.kelly()` returned NaN for every growth-NEGATIVE spread (no interior
+w*), and `bear_regime_sweep.prepare()` then DROPPED those rows (`dropna(subset=["EV"])`): 38-59% of bull candidates every
+year (2020 39%, 2021 55%, 2022 44%, 2023 59%, 2024 49%, 2025 40%, 2026 38%). Live kept the same rows with growth at the
+floor stake (`live/ranker._score_growth_negative`), and 40% of the IBKR replay's top-6 picks are such rows (no GROUND
+threshold in C). Fix in `ent_canon.kelly`: w = 0.01 where the solver has no interior optimum, growth evaluated there
+(identical to the live fill; the live function is now a no-op whose `clipped` branch still sets `growth_negative`).
+`test_canon_direction_overlay.py`, `test_gap_drift.py` pass. Site book rebuilt and deployed (backups `*.bak_prekellyfix_*`
+local and on Mya, md5 verified, both pages checked): **IS 5710 trades / qty2 $110,581 / $-Sh 1.82 / DD -23.0% / yield 12.2%;
+OOT 815 / $28,705 / 3.82 / -9.1% / 15.7%** (was 5347 / $105,212 / 1.87 / -20.7%; 808 / $27,169 / 3.51 / -9.3%). The §0.67
+GROUND-threshold book is unaffected in selection (negative GROUND never clears a threshold) but its candidate counts change.
+
+**Reconciliation** (`reconcile_vendor_ibkr.py`; `reconcile_vendor_ibkr.csv` = every (day,ticker) pair outer-joined,
+`vendor_candidates_aug20_sep24.csv` = the vendor table). Vendor = featATM8 + leg quotes through prepare/gates/252 gate, bull
+puts; IBKR = the mini's 15:30 (1531 fallback) rows. 20 joined days (IBKR also has Fridays 09-04/11/18; vendor has none).
+
+| | |
+|---|---|
+| universe | vendor 664 (day,ticker), IBKR 909, joined 413; vendor-only 251, IBKR-only 490 |
+| IBKR-only, why not in vendor | 339 no liquid vendor put with delta 0.50-0.60 at EOD; 96 had one but the adjacent-strike pair failed OI/width/fit; 55 no OI>=100 row |
+| a. same strikes | 310/413 = 75% (same width 97%) |
+| b. vendor/IBKR ratios, median (p10-p90) | model credit 0.99 (0.87-1.12); IV 1.00 (0.92-1.26); quote 1.02 (0.81-1.32); EV diff 0.000 (-0.001..+0.002); D_ent 1.00 |
+| c. agreement | floor 83% (vendor pass 74%, IBKR 78%); **quote gate 54%** (vendor pass 51%, IBKR 38%); eligible 67% |
+| d. within-day rank corr of G24 | median 0.62 (EV 0.46, D_ent 0.93) |
+| e. one-sided drops | gate: IBKR fails/vendor passes 122, vendor fails/IBKR passes 68; floor: 43 / 26; hist/earnings 10 |
+
+**Picks.** Joined days: vendor 104, IBKR 120, overlap 22 (18% of IBKR). Of the 120 IBKR picks, 68 are not in the vendor
+frame at all (universe), 21 fail the vendor quote gate, 2 the floor, 8 are eligible but ranked out, 22 match. Hybrids on
+the joined universe, overlap with the IBKR rule: vendor rule 37%; swap in IBKR's G24 only 41%; swap in IBKR's quote gate only
+(vendor floor + vendor G24) **83%**; swap in IBKR's full eligibility 90%. **The quote gate on a different quote source is the
+driver**, then the candidate universe (EOD strike grid vs 15:30 chain); model credit, IV, D_ent and the G24 ranking agree.
+P&L at 1.04 x model, qty 1: vendor picks **+$1,124** (104), IBKR picks **+$910** (121; $791 on joined days). The -$824 vendor
+figure in the task could not be located in the handoff or reproduced; on this frame the vendor C book is positive on
+these weeks. So the disagreement is a quote-source/universe effect on WHICH names, not a sign disagreement. No canon
+change beyond the kelly fix above.
+
 ## 0.69c SITE tabs = strategy C at k=24 (2026-09-30 night, user: "update backtest and oot on mya to be k=24")
 
 k sweep on the strategy C pool (`research/fable_canon_2026_09_30/k_sweep_C.py`, `k_sweep_C_ext.csv`, chart `k_sweep_C.png`,
