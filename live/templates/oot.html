@@ -214,7 +214,7 @@
         <th style="text-align:right">qty</th>
         <th style="text-align:right">Kelly EV</th>
         <th style="text-align:right">DKL</th>
-        <th>Γᵢ</th>
+        <th title="GROUND in basis points (x10,000)">Γᵢ (bp)</th>
         <th>spot@exp</th>
         <th>result</th>
         <th style="text-align:right">P&amp;L</th>
@@ -234,7 +234,7 @@
           <td style="text-align:right">{% if t.dkl is not none %}{{ '%.4f'|format(t.dkl) }}{% else %}—{% endif %}</td>
           <td class="pos">
             <span class="ground-bar"><span class="ground-bar-fill" style="width:{{ (100.0 * t.ground / w.max_g)|round(0) if w.max_g > 0 else 0 }}%"></span></span>
-            +{{ '%.2f'|format(100.0 * t.ground) }}%
+            {{ '%+.1f'|format(10000.0 * t.ground) }} bp
           </td>
           <td>${{ '%.2f'|format(t.spot) }}</td>
           <td><span class="badge badge-{{ t.outcome }}">{{ t.outcome }}</span></td>
