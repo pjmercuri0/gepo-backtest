@@ -108,7 +108,46 @@ def load_closes() -> pd.DataFrame:
     allc = pd.concat([ib.assign(_src=0), snap.assign(_src=1)], ignore_index=True)
     allc = allc.sort_values(['ticker', 'date', '_src']).drop_duplicates(['ticker', 'date'], keep='first')
     allc = allc[['ticker', 'date', 'close']].reset_index(drop=True)
-    return fill_gaps(allc, session_calendar(ib) if len(ib) else None)
+    out = fill_gaps(allc, session_calendar(ib) if len(ib) else None)
+    return _split_adjust(out)
+
+
+def _split_adjust(closes: pd.DataFrame) -> pd.DataFrame:
+    """Back-adjust the IBKR close history for splits before P_real measures returns (2026-10-01).
+
+    Same verified adjuster the backtest uses (ent_canon.apply_split_adjustment): an event is applied
+    only when the store actually shows the implied gap. A raw split prints as one huge return, and
+    P_real demeans its 252-session window, so a single unadjusted bar shifts every other return for
+    about a year (handoff §0.69k/m). Adjusts IN MEMORY: output/ibkr_closes.parquet is never rewritten.
+
+    Fails OPEN with a warning if the split file is missing -- the alternative is a scan with no
+    candidates -- so a machine without output/yahoo_split_history.csv keeps trading on raw closes.
+    Refresh it with: python3 research/fetch_yahoo_split_history.py
+    """
+    import live_config
+    if not getattr(live_config, 'LIVE_SPLIT_ADJUST_CLOSES', True):
+        return closes
+    try:
+        import sys
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        import ent_canon as ec
+        path = ROOT / ec.SPLIT_HISTORY
+        if not path.exists():
+            print(f"  WARNING: {path.name} missing -- IBKR closes NOT split-adjusted; P_real will be "
+                  "wrong for ~1y after any split. Run research/fetch_yahoo_split_history.py", flush=True)
+            return closes
+        adj, log = ec.apply_split_adjustment(closes, str(path))
+        n_ok = int(log.applied.sum()) if len(log) else 0
+        changed = int((closes.merge(adj, on=['ticker', 'date'], suffixes=('_r', '_a')).close_r
+                       != closes.merge(adj, on=['ticker', 'date'], suffixes=('_r', '_a')).close_a).sum())
+        if n_ok:
+            print(f"  closes: split-adjusted {n_ok} event(s), {changed:,} bars changed "
+                  f"({int((~log.applied).sum())} unverified, left raw)", flush=True)
+        return adj
+    except Exception as e:
+        print(f"  split adjust: ERR {type(e).__name__}: {e} -- using raw closes", flush=True)
+        return closes
 
 
 def closes_status() -> dict:

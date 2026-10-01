@@ -111,6 +111,37 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69n Splits are CANON FOR LIVE too; 1/2 Kelly off the chart (2026-10-01)
+
+**User:** "make canon for live too. need to make sure live checks ibkr close store to see if splits need adjusting too.
+then also remove kelly 1/2 from the chart in all tabs."
+
+**One shared adjuster.** `ent_canon.apply_split_adjustment(closes, splits_csv)` now holds the verified back-adjustment
+(observed session return must match the implied 1/R - 1 within 0.05, +-3 sessions; unverified events are left raw and logged).
+`research/build_split_adjusted_closes.py` delegates to it and still reproduces 20 applied / 12 skipped, 14 names over 50%
+down to 2. So the backtest and the live ranker measure returns on the same basis.
+
+**Live now does three things.**
+1. `live/closes.py::load_closes` -> `_split_adjust`: back-adjusts the IBKR close history IN MEMORY before P_real sees it.
+   `output/ibkr_closes.parquet` is never rewritten. Logs "closes: split-adjusted N event(s), M bars changed".
+2. `live/ranker.py`: corporate-action gate beside earnings and ex-dividend -- drops any candidate held across a split /
+   reverse split / spinoff, window entry..expiry+1, same rule as `bear_regime_sweep.add_split_gate`.
+3. `live/live_config.py`: `LIVE_SPLIT_GATE = True`, `LIVE_SPLIT_ADJUST_CLOSES = True`.
+Both FAIL OPEN with a printed warning when `output/yahoo_split_history.csv` is absent, matching how the earnings and ex-div
+gates behave; the alternative is a scan that qualifies nothing.
+
+**MINI TO DO (blocking for correctness, not for trading).** `output/` is gitignored, so the split file does NOT arrive with a
+pull. On the mini: `git pull` then `python3 research/fetch_yahoo_split_history.py`. Until that runs, the mini keeps trading on
+RAW closes and without the split gate, and prints a warning on every scan. NOT VERIFIED FROM THE AIR: no IB gateway and no
+`output/ibkr_closes.parquet` here, so the live paths were syntax-checked and the shared adjuster was exercised on the vendor
+store (20 applied / 12 unverified), but `_split_adjust` has never run against the real IBKR store.
+
+**1/2 Kelly dropped from the display.** The mini had refactored the chart into a sizing-arm selector (`live/webapp.py`
+`_SIZE_ARMS`, `?size=` plus cookie). Removing the `h2` tuple takes it out of the chart, the chips and the selector on every
+tab at once; `_size_choice` already falls back to q1 for an unknown cookie. The payload still carries every `halfk_*` field
+and the `halfk` series, so restoring it is one tuple. Deployed to Mya (`webapp.py`, backup `*.bak_prearmdrop_*`, gunicorn
+1640172 HUP'd); both tabs verified to offer q1 / q2 / 1/4 Kelly only.
+
 ## 0.69m Close store split-adjusted for P_real + lookback exclusion (2026-10-01). The Sharpe gain did NOT survive backfill.
 
 **User:** "split adjust the close store, exclude any options with a split in the window". Both done.

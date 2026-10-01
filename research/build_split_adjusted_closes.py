@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 import numpy as np, pandas as pd
 ROOT = Path(__file__).resolve().parents[1]; sys.path.insert(0, str(ROOT))
+import ent_canon as ec
 RAW = ROOT / "output/daily_closes.parquet"
 SPLITS = ROOT / "output/yahoo_split_history.csv"
 OUT = ROOT / "output/daily_closes_split_adj.parquet"
@@ -29,40 +30,16 @@ def main() -> None:
     cl = pd.read_parquet(RAW); cl["date"] = pd.to_datetime(cl.date).dt.normalize()
     cl = cl.dropna(subset=["close"]).drop_duplicates(["ticker", "date"]).sort_values(["ticker", "date"]).reset_index(drop=True)
     sp = pd.read_csv(SPLITS, parse_dates=["SplitDate"])
-    out = cl.copy(); applied = []; skipped = []
-    for tk, g in cl.groupby("ticker"):
-        ev = sp[sp.Symbol == tk]
-        if ev.empty:
-            continue
-        idx = g.index.to_numpy(); c = g.close.to_numpy(float); d = g.date.to_numpy("datetime64[ns]")
-        r = np.concatenate([[np.nan], c[1:] / c[:-1] - 1.0])
-        factor = np.ones(len(c))
-        for e in ev.itertuples():
-            R = float(e.Ratio) if e.Ratio else np.nan
-            if not np.isfinite(R) or R <= 0:
-                skipped.append((tk, e.SplitDate.date(), R, None, "bad ratio")); continue
-            implied = 1.0 / R - 1.0
-            near = np.where(np.abs((d - np.datetime64(e.SplitDate)).astype("timedelta64[D]").astype(int)) <= SEARCH)[0]
-            near = near[near > 0]
-            if len(near) == 0:
-                skipped.append((tk, e.SplitDate.date(), R, None, "no sessions near the date")); continue
-            j = near[np.nanargmin(np.abs(r[near] - implied))]
-            if not np.isfinite(r[j]) or abs(r[j] - implied) > TOL:
-                skipped.append((tk, e.SplitDate.date(), R, r[j], "store shows no matching gap")); continue
-            factor[:j] *= 1.0 / R
-            applied.append((tk, e.SplitDate.date(), pd.Timestamp(d[j]).date(), R, implied, r[j], j))
-        if (factor != 1.0).any():
-            out.loc[idx, "close"] = c * factor
+    out, log = ec.apply_split_adjustment(cl, str(SPLITS), tol=TOL, search=SEARCH)
+    applied = [(r.Symbol, r.SplitDate.date(), r.ratio, r.why) for r in log[log.applied].itertuples()]
+    skipped = [(r.Symbol, r.SplitDate.date(), r.ratio, r.why) for r in log[~log.applied].itertuples()]
+    log.to_csv(ROOT / "output/split_adjustment_log.csv", index=False)
     OUT.parent.mkdir(parents=True, exist_ok=True); out.to_parquet(OUT)
     print(f"applied {len(applied)} splits, skipped {len(skipped)}")
-    A = pd.DataFrame(applied, columns=["ticker", "yahoo_date", "store_date", "ratio", "implied_ret", "observed_ret", "idx"])
-    print("\nAPPLIED (back-adjusted: every close before store_date multiplied by 1/ratio)")
-    print(A[["ticker", "yahoo_date", "store_date", "ratio", "implied_ret", "observed_ret"]].to_string(index=False, float_format=lambda x: f"{x:.4g}"))
-    S = pd.DataFrame(skipped, columns=["ticker", "yahoo_date", "ratio", "observed_ret", "why"])
-    log = pd.concat([A.assign(applied=True, why="verified against the store")[["ticker", "yahoo_date", "ratio", "applied", "why"]],
-                     S.assign(applied=False)[["ticker", "yahoo_date", "ratio", "applied", "why"]]], ignore_index=True)
-    log.rename(columns={"ticker": "Symbol", "yahoo_date": "SplitDate"}).sort_values(["Symbol", "SplitDate"]).to_csv(ROOT / "output/split_adjustment_log.csv", index=False)
-    print("\nSKIPPED (left untouched)"); print(S.to_string(index=False, float_format=lambda x: f"{x:.4g}"))
+    A = pd.DataFrame(applied, columns=["ticker", "yahoo_date", "ratio", "why"])
+    print("\nAPPLIED (back-adjusted: every close before the gap multiplied by 1/ratio)"); print(A.to_string(index=False))
+    S = pd.DataFrame(skipped, columns=["ticker", "yahoo_date", "ratio", "why"])
+    print("\nSKIPPED (left untouched)"); print(S.to_string(index=False))
     # verification: biggest single-session move per ticker, before vs after
     def worst(df):
         rows = []

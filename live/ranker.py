@@ -406,6 +406,40 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
                           f"(LIVE_EXDIV_GATE_PUTS off — kept)", flush=True)
     except Exception as e:
         print(f"  ex-div gate: ERR {type(e).__name__}: {e}", flush=True)
+
+    # Corporate-action gate (2026-10-01, user: the third exclusion beside earnings and ex-dividend).
+    # Drop any spread held across a split, reverse split or spinoff: the OCC re-denominates the
+    # contract mid-flight, and the adjusted deliverable is illiquid and wide to close. Window is
+    # entry through expiry+1, matching the backtest (bear_regime_sweep.add_split_gate).
+    # Fails OPEN with a printed error, like the two gates above.
+    try:
+        if getattr(live_config, "LIVE_SPLIT_GATE", True) and not candidates.empty:
+            from pathlib import Path as _P
+            import ent_canon as _ec
+            sp_path = _P(_ec.SPLIT_HISTORY)
+            if not sp_path.exists():
+                print(f"  split gate: {sp_path.name} missing -- NOT gating; run "
+                      "research/fetch_yahoo_split_history.py", flush=True)
+            else:
+                sp = pd.read_csv(sp_path)
+                sp["SplitDate"] = pd.to_datetime(sp["SplitDate"]).dt.date
+                sp_by_sym = sp.groupby("Symbol")["SplitDate"].apply(set).to_dict()
+                def _split_in_window(row):
+                    dates = sp_by_sym.get(row["ticker"], set())
+                    if not dates:
+                        return False
+                    start = pd.Timestamp(row["entry_date"]).date()
+                    end = (pd.Timestamp(row["expiry_date"]) + pd.Timedelta(days=1)).date()
+                    return any(start <= d <= end for d in dates)
+                before = len(candidates)
+                mask_split = candidates.apply(_split_in_window, axis=1)
+                candidates = candidates[~mask_split].copy()
+                if before - len(candidates):
+                    print(f"  split gate: dropped {before - len(candidates)} candidate(s) held across a "
+                          "split / reverse split / spinoff", flush=True)
+    except Exception as e:
+        print(f"  split gate: ERR {type(e).__name__}: {e}", flush=True)
+
     if candidates.empty:
         return pd.DataFrame()
 

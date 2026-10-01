@@ -100,6 +100,14 @@ IB_CONNECT_RETRY_DELAY  = 3
 #
 # XSP printed 775.38 against SPX 7,754.08 — exactly 1/10th, confirming it is
 # the same index at a size that fits a small account.
+# --- Corporate actions (2026-10-01, user: "make canon for live too") ---
+# LIVE_SPLIT_GATE: drop candidates held across a split / reverse split / spinoff (entry..expiry+1).
+# LIVE_SPLIT_ADJUST_CLOSES: back-adjust the IBKR close history before P_real measures returns.
+# Both read output/yahoo_split_history.csv (research/fetch_yahoo_split_history.py; output/ is
+# gitignored, so each machine refreshes its own). Both fail OPEN with a warning if it is missing.
+LIVE_SPLIT_GATE          = True
+LIVE_SPLIT_ADJUST_CLOSES = True
+
 LIVE_INDEX_ROOTS = {
     "SPXW": {"underlying": "SPX",  "exchange": "CBOE",    "trading_class": "SPXW"},
     "XSP":  {"underlying": "XSP",  "exchange": "CBOE",    "trading_class": "XSP"},

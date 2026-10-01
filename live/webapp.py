@@ -1202,11 +1202,12 @@ def _wagering(payload: dict | None) -> dict | None:
     return out
 
 
+# 2026-10-01 (user): 1/2 Kelly dropped from the chart and the selector -- too many lines. The payload
+# still carries every halfk_* field and the halfk series, so restoring it is this one tuple.
 _SIZE_ARMS = (("q1", "qty 1", "qty1", "#1D9E75"), ("q2", "qty 2", "strategy", "#378ADD"),
-              ("q4", "\u00bc Kelly", "quarterk", "#EF9F27"), ("h2", "\u00bd Kelly", "halfk", "#9085E9"))
+              ("q4", "\u00bc Kelly", "quarterk", "#EF9F27"))
 _SIZE_TEXT = {"q1": "qty=1 per pick", "q2": "qty=2 per pick",
-              "q4": "\u00bc Kelly on the carry-adjusted stake, 1-5 contracts per pick",
-              "h2": "\u00bd Kelly on the carry-adjusted stake, 1-5 contracts per pick"}
+              "q4": "\u00bc Kelly on the carry-adjusted stake, 1-5 contracts per pick"}
 
 
 def _size_choice() -> str:

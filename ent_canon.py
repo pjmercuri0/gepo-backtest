@@ -416,6 +416,57 @@ def p_real(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW, mu=N
     return out
 
 
+SPLIT_HISTORY = 'output/yahoo_split_history.csv'
+SPLIT_TOL = 0.05        # |observed session return - implied (1/R - 1)| must be within this to adjust
+SPLIT_SEARCH = 3        # sessions either side of the vendor's split date to look for the gap
+
+
+def apply_split_adjustment(closes: pd.DataFrame, splits_csv: str = SPLIT_HISTORY,
+                           tol: float = SPLIT_TOL, search: int = SPLIT_SEARCH):
+    """Back-adjust a (ticker, date, close) frame for stock splits. Returns (adjusted, log).
+
+    Every event is VERIFIED before anything changes: the observed session return must match the
+    split's implied 1/R - 1 within `tol`, searching `search` sessions either side of the recorded
+    date. Verified events have every close BEFORE the gap multiplied by 1/R; unverified events are
+    left alone and reported in the log with `applied=False` -- applying a factor to a series that
+    never gapped would INVENT a jump instead of removing one (spinoff factors do this).
+
+    Shared by the backtest (research/build_split_adjusted_closes.py, vendor store) and the live
+    ranker (live/closes.py, IBKR store) so both measure returns on the same basis. 2026-10-01.
+    """
+    import os
+    if not os.path.exists(splits_csv):
+        return closes.copy(), pd.DataFrame(columns=['Symbol', 'SplitDate', 'ratio', 'applied', 'why'])
+    sp = pd.read_csv(splits_csv, parse_dates=['SplitDate'])
+    cl = closes.copy(); cl['date'] = pd.to_datetime(cl['date']).dt.normalize()
+    cl = cl.dropna(subset=['close']).drop_duplicates(['ticker', 'date']).sort_values(['ticker', 'date']).reset_index(drop=True)
+    out = cl.copy(); rows = []
+    for tk, g in cl.groupby('ticker'):
+        ev = sp[sp.Symbol == tk]
+        if ev.empty:
+            continue
+        idx = g.index.to_numpy(); c = g.close.to_numpy(float); d = g.date.to_numpy('datetime64[ns]')
+        r = np.concatenate([[np.nan], c[1:] / c[:-1] - 1.0]); factor = np.ones(len(c))
+        for e in ev.itertuples():
+            R = float(e.Ratio) if e.Ratio else np.nan
+            if not np.isfinite(R) or R <= 0:
+                rows.append((tk, e.SplitDate, R, False, 'bad ratio')); continue
+            implied = 1.0 / R - 1.0
+            near = np.where(np.abs((d - np.datetime64(e.SplitDate)).astype('timedelta64[D]').astype(int)) <= search)[0]
+            near = near[near > 0]
+            if len(near) == 0:
+                rows.append((tk, e.SplitDate, R, False, 'no sessions near the date')); continue
+            j = near[np.nanargmin(np.abs(r[near] - implied))]
+            if not np.isfinite(r[j]) or abs(r[j] - implied) > tol:
+                rows.append((tk, e.SplitDate, R, False, 'store shows no matching gap')); continue
+            factor[:j] *= 1.0 / R
+            rows.append((tk, e.SplitDate, R, True, f'verified at {pd.Timestamp(d[j]).date()} (observed {r[j]:+.4f} vs implied {implied:+.4f})'))
+        if (factor != 1.0).any():
+            out.loc[idx, 'close'] = c * factor
+    log = pd.DataFrame(rows, columns=['Symbol', 'SplitDate', 'ratio', 'applied', 'why'])
+    return out, log
+
+
 SPLIT_ADJ_STORE = 'output/daily_closes_split_adj.parquet'
 
 
