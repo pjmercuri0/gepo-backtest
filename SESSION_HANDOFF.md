@@ -207,6 +207,13 @@ EV rank 0.41. Read: the two sources agree on what to AVOID (83% of IBKR's worst 
 than on what to take (64%), and the rank inside the top is where spot and credit noise live. Overlap of a top-6 list is the
 worst possible statistic for this; quintile agreement and the bottom-half exclusion are the honest ones.
 
+**§0.69i addendum: AUROC.** Shared 662 rows, within-day G24 percentile as score: vendor G24 -> IBKR top-6 pick 0.67, -> IBKR top
+quintile 0.64, -> IBKR bottom quintile 0.81, IBKR G24 -> vendor pick 0.65. Against realized outcomes on those six weeks both sides
+are ~0.50. Full eligible pool (strategy C, OI >= 1, 1.00 x model): GROUND pct -> P&L > 0: IS 0.511 (n 25,803), OOT 0.529 (n 4,800);
+-> not full loss 0.509 / 0.534; by year 0.50-0.53; -D_ent alone -> not full loss 0.554 / 0.563. Per-trade discrimination is tiny;
+the top-6 book's edge over random (1.46 vs 0.94 $-Sharpe) comes from the extremes and the credit size, not from a per-trade
+classifier. Overlap and AUROC on the shared window are therefore the wrong yardsticks for live vs backtest; months of P&L is the one.
+
 ## 0.69d Vendor vs IBKR reconciliation, strategy C, 2026-08-20..09-24 (Air, 2026-09-30 night) + KELLY FIX
 
 **Bug found and fixed (user: "fix that").** `ent_canon.kelly()` returned NaN for every growth-NEGATIVE spread (no interior
