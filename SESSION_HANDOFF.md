@@ -214,6 +214,12 @@ are ~0.50. Full eligible pool (strategy C, OI >= 1, 1.00 x model): GROUND pct ->
 the top-6 book's edge over random (1.46 vs 0.94 $-Sharpe) comes from the extremes and the credit size, not from a per-trade
 classifier. Overlap and AUROC on the shared window are therefore the wrong yardsticks for live vs backtest; months of P&L is the one.
 
+**§0.69i addendum 2: pairwise concordance (continuous-target AUROC, user's ask).** P(higher score -> higher $ P&L) over all
+within-day pairs, strategy C pool at 1.00 x model: GROUND IS 0.523 (n 25,803) / OOT 0.535 / Aug-Sep 0.505; EV 0.514 / 0.529;
+-D_ent 0.478 / 0.496; model credit/width 0.586 / 0.597 (mechanical: for a given settle a richer credit always books more).
+Pooled-pair GROUND 0.517 / 0.527. Vendor G24 vs IBKR G24 order agreement on the 662 shared rows: within-day concordance 0.692,
+pooled 0.683, identical strikes 0.703 (0.5 = unrelated).
+
 ## 0.69d Vendor vs IBKR reconciliation, strategy C, 2026-08-20..09-24 (Air, 2026-09-30 night) + KELLY FIX
 
 **Bug found and fixed (user: "fix that").** `ent_canon.kelly()` returned NaN for every growth-NEGATIVE spread (no interior
