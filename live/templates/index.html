@@ -321,8 +321,11 @@ function renderRanked(rows, maxGround, kVal) {
     // position 6 because two unqualified names (gate ✗) ranked above it, while the
     // Snapshots tab correctly listed it as a qualified pick.
     // Cap at five: the first five QUALIFIED rows in GROUND order are the picks.
+    // Fable (user 2026-10-01): the table is in GROUND order; bright = clears the quote gate
+    // on the LIVE quote (above_min). The scan's picks are the cards above; a pick whose
+    // quote has slipped below model dims like any other row.
     if (r.qualified === true) qualSeen += 1;
-    const isPrimary = (r.qualified === true) && (qualSeen <= 5);
+    const isPrimary = (r.above_min === true) || (r.qualified === true && r.above_min == null);
     // Blue only when it is a pick you already hold (user 2026-09-15). A held name that is
     // not currently qualified stays grey like any other unqualified row.
     // Held = the + is painted blue (user 2026-09-15); row text stays white / grey.

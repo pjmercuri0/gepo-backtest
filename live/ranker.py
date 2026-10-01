@@ -631,7 +631,9 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
 
     # Sort by GROUND descending (qualified first, then below-threshold).
     if _fable and not ranked.empty:
-        ranked = ranked.sort_values(["qualified", "fable_rank"], ascending=[False, False]).reset_index(drop=True)
+        # Table order (user 2026-10-01): always by GROUND; the picks are the top 6 among those that
+        # also clear the quote gate, so they can sit below an ungated higher-GROUND row.
+        ranked = ranked.sort_values("fable_rank", ascending=False).reset_index(drop=True)
     else:
         ranked = ranked.sort_values("GROUND", ascending=False).reset_index(drop=True)
     n_bull_q = int((ranked["qualified"] & ranked["spread_type"].eq("bull_put")).sum()) if not ranked.empty else 0
