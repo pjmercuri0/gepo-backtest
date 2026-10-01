@@ -12,7 +12,7 @@ K = 24.0; W0, W1 = "2026-08-20", "2026-09-24"
 # ---- vendor side: same pipeline as build_payloads_C (prepare, gates, quotes, 252 gate), window, bull puts
 with contextlib.redirect_stdout(io.StringIO()):
     c, spy = prepare(); c = add_regimes(c, spy); c = add_exdiv_gate(c); c = add_earnings_gate(c)
-c = c.merge(pd.read_parquet(HERE / "frame_quotes.parquet")[KEY + ["vendor_mid", "IV", "s_bid", "s_ask", "l_bid", "l_ask"]], on=KEY, how="left")
+c = c.merge(pd.read_parquet(HERE / "frame_quotes_oi1.parquet")[KEY + ["vendor_mid", "IV", "s_bid", "s_ask", "l_bid", "l_ask"]], on=KEY, how="left")
 cl = pd.read_parquet(ROOT / "output/daily_closes.parquet"); cl["date"] = pd.to_datetime(cl.date).dt.normalize()
 cl = cl.dropna(subset=["close"]).sort_values(["ticker", "date"]); cl["n_before"] = cl.groupby("ticker").cumcount()
 c = c.merge(cl[["ticker", "date", "n_before"]].rename(columns={"date": "entry_date"}), on=["ticker", "entry_date"], how="left")
