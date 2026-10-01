@@ -8,36 +8,58 @@
   {% endfor %}
 </div>
 {% endif %}
-{# Keep the scroll spot across the re-render (user 2026-10-01): remember which toggle was tapped and
-   where it sat in the viewport, then put the same toggle back at the same height after the reload.
-   Anchoring on the toggle (not on scrollY) survives any change in page height above it. #}
+{# In-place switch (user 2026-10-01): tapping a sizing fetches the page at that sizing and swaps the
+   content of #page-content without a navigation -- no white flash, no jump to the top. The scroller
+   (#page-content) keeps its scrollTop; the tapped toggle row is then re-anchored to the same height
+   in case anything above it changed size. Falls back to a normal link on any failure. #}
 {% if data.arms %}
 <script>
 (function () {
   if (window.__gepoSizeToggle) return; window.__gepoSizeToggle = true;
-  const KEY = "gepo_size_scroll";
-  function restore() {
-    let st = null;
-    try { st = JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) {}
-    if (!st || st.path !== location.pathname) return;
-    const el = document.querySelectorAll(".size-toggle")[st.idx];
-    if (!el) return;
-    // The page scrolls inside #page-content (position:absolute; overflow-y:auto), NOT the window --
-    // window.scrollTo did nothing and the page stayed at the top (2026-10-01).
-    const delta = el.getBoundingClientRect().top - st.top;
-    const sc = document.getElementById("page-content");
-    if (sc && sc.scrollHeight > sc.clientHeight) sc.scrollTop += delta; else window.scrollBy(0, delta);
+  let busy = false;
+  function runScripts(root) {
+    // innerHTML does not execute scripts. Re-run the inline ones inside a block so their top-level
+    // const/let (points, weeks, chart contexts) do not collide with the previous render's.
+    root.querySelectorAll("script").forEach(function (old) {
+      if (old.src) return;                       // chart.js is already loaded
+      const s = document.createElement("script");
+      s.textContent = "{\n" + old.textContent + "\n}";
+      old.replaceWith(s);
+    });
   }
   document.addEventListener("click", function (e) {
     const a = e.target.closest(".size-toggle a");
-    if (!a) return;
+    if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+    e.preventDefault();
+    if (busy) return;
+    busy = true;
+    const sc = document.getElementById("page-content");
     const box = a.closest(".size-toggle");
     const idx = Array.prototype.indexOf.call(document.querySelectorAll(".size-toggle"), box);
-    try { sessionStorage.setItem(KEY, JSON.stringify({ path: location.pathname, idx: idx, top: box.getBoundingClientRect().top })); } catch (e) {}
+    const top = box.getBoundingClientRect().top;
+    const url = a.href;
+    document.querySelectorAll(".size-toggle").forEach(function (b) { b.style.opacity = "0.55"; });
+    fetch(url, { credentials: "same-origin" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (html) {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const fresh = doc.getElementById("page-content");
+        if (!fresh || !sc) throw new Error("no content");
+        const keep = sc.scrollTop;
+        if (window.Chart) {
+          document.querySelectorAll("#page-content canvas").forEach(function (cv) { const ch = Chart.getChart(cv); if (ch) ch.destroy(); });
+          Chart.defaults.animation = false;      // redraw without the grow-in animation
+        }
+        sc.innerHTML = fresh.innerHTML;
+        runScripts(sc);
+        sc.scrollTop = keep;
+        const el = document.querySelectorAll(".size-toggle")[idx];
+        if (el) sc.scrollTop += el.getBoundingClientRect().top - top;
+        try { history.replaceState(null, "", url); } catch (err) {}
+        busy = false;
+      })
+      .catch(function () { window.location.href = url; });
   });
-  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
-  document.addEventListener("DOMContentLoaded", restore);
-  window.addEventListener("load", function () { restore(); try { sessionStorage.removeItem(KEY); } catch (e) {} });
 })();
 </script>
 {% endif %}
