@@ -111,6 +111,34 @@ def _board() -> list[dict]:
     return out
 
 
+def _frozen_today() -> list[dict]:
+    """Today's frozen History picks, streamed as picks (2026-10-01): once the next scan replaces the
+    board, the frozen 15:30 picks dropped out of the stream and History fell back to their scan-time
+    quotes. conIds come from the snapshot(s) of the scans that froze / topped up the day."""
+    fp = Path(live_config.FROZEN_DIR) / f"{datetime.now():%Y-%m-%d}.json"
+    if not fp.exists():
+        return []
+    payload = json.loads(fp.read_text())
+    idx = {}
+    for sf in {str(payload.get("snapshot_file") or ""), str(payload.get("freeze_topup_from") or "")}:
+        sp = ROOT / sf
+        if not sf or not sp.exists():
+            continue
+        snap = pd.read_parquet(sp, columns=["Symbol", "ExpirationDate", "StrikePrice", "PutCall", "conId"])
+        snap["exp"] = pd.to_datetime(snap.ExpirationDate).dt.strftime("%Y-%m-%d")
+        for r in snap.itertuples():
+            idx[(r.Symbol, r.exp, float(r.StrikePrice), str(r.PutCall).lower())] = int(r.conId)
+    out = []
+    for r in payload.get("top_picks") or []:
+        exp = str(r.get("expiry_date"))[:10]
+        pc = "put" if r.get("spread_type") == "bull_put" else "call"
+        s_ = idx.get((r.get("ticker"), exp, float(r.get("short_strike")), pc))
+        l_ = idx.get((r.get("ticker"), exp, float(r.get("long_strike")), pc))
+        if s_ and l_:
+            out.append({**r, "qualified": True, "short_conid": s_, "long_conid": l_, "_key": _key(r)})
+    return out
+
+
 def _atomic(path: Path, payload: dict) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload))
@@ -188,7 +216,14 @@ def main() -> int:
                 except Exception as e:
                     pos = []
                     print(f"[combo_stream] positions read failed: {e}", flush=True)
+                try:
+                    frozen = _frozen_today()
+                except Exception as e:
+                    frozen = []
+                    print(f"[combo_stream] frozen read failed: {e}", flush=True)
                 seen = {r["_key"] for r in pos}
+                _bk = {r["_key"] for r in board}
+                board = board + [r for r in frozen if r["_key"] not in _bk]     # frozen picks ride as picks
                 _new = [r for r in board if r["_key"] not in seen]
                 _picks = [r for r in _new if r.get("qualified")]
                 _rest = [r for r in _new if not r.get("qualified")]
