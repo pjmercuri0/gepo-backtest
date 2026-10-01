@@ -123,6 +123,24 @@ DD -21.4% / yield 13.2%; OOT 816 / $34,263 / 3.92 / -11.8% / 20.3%** (OI-100 boo
 Caveat unchanged: picks on thin strikes are booked at 1.04 x model like any other. Live is unaffected (OI term off there).
 `report_ent_canon.py` still hardcodes the OI-100 frame (old generator, not the site's).
 
+## 0.69f Vendor picks on the IBKR 15:30 spot, 2026-08-20..09-24 (user: "use the 3:30/3:45 IBKR spots for the vendor picks")
+
+`research/fable_canon_2026_09_30/vendor_on_ibkr_spot.py` (OI >= 1 chain, strategy C k=24, no gate, names with an IBKR 15:30 spot
+that day, 20 shared days, 120 picks each side; IBKR = fair replay with its quote gate):
+
+| vendor variant | overlap with IBKR picks | vs IBKR top-6 WITHOUT its gate | P&L qty1 | win |
+|---|---|---|---|---|
+| vendor EOD spot, vendor strikes | 30 (25%) | | -$1,001 | 34% |
+| A. IBKR spot, vendor strikes re-priced | 30 (25%) | 28 (23%) | +$821 | 40% |
+| B. IBKR spot, strikes rebuilt on it | 31 (26%) | **45 (38%)** | -$811 | 34% |
+
+B's strikes equal IBKR's on 99% of the names both built, and on 501 identical-strike pairs p corr is 0.87, D_ent rank corr 0.98,
+model credit within 0.95-1.07 -- yet G24 rank corr is only 0.56 and the IBKR gate passes 43% of them. So once spot and strikes
+agree, what is left is (1) the quote gate (overlap 26% -> 38% when IBKR's gate is removed) and (2) EV noise from the +-5-7% smile-fit
+credit difference between the EOD and 15:30 chains feeding Kelly on near-zero edges. Restricting to names IBKR built that day is
+itself worth 16% -> 25%. P&L on six weeks swings -$1,001 / +$821 / -$811 across variants that share 25% of picks: six weeks of a
+top-6 book is noise. Nothing changed in canon.
+
 ## 0.69d Vendor vs IBKR reconciliation, strategy C, 2026-08-20..09-24 (Air, 2026-09-30 night) + KELLY FIX
 
 **Bug found and fixed (user: "fix that").** `ent_canon.kelly()` returned NaN for every growth-NEGATIVE spread (no interior
