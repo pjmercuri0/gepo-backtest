@@ -46,7 +46,7 @@
         <th title="P_real above (realized-move belief, used in G); Q_bs below (market law, D_ent reference)">real: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">bs below</span></th>
         <th>Kelly EV</th>
         <th>exp(k·D_ent)</th>
-        <th title="GROUND in basis points (x10,000)">Γᵢ (bp)</th>
+        <th title="GROUND in basis points (x10,000)">Γᵢ (bps)</th>
       </tr>
     </thead>
     <tbody id="ranked-tbody"><tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
@@ -105,7 +105,7 @@ function fmtGround(v, dec=1) {
   // negative, and -0 >= 0 is true in JS, so every tiny negative used to render
   // as "+0.00%" -- a negative-edge spread displayed as a positive one.
   // (TSLA -0.0000227 and CL -0.0000316 both showed "+0.00%" on 2026-09-20.)
-  return `${n < 0 ? "-" : "+"}${Math.abs(x).toFixed(dec)} bp`;
+  return `${n < 0 ? "-" : "+"}${Math.abs(x).toFixed(dec)}`;
 }
 // Wealth multiplier G = exp(g), where g (per-trade Kelly log-growth at
 // w*) is the value stored in the JSON `G` field. Renders as the
@@ -285,7 +285,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <th>max-loss ($/sh)</th><th>ratio</th>
           <th title="P_real: realized-move belief at the strikes (used in G)">real: p / r₀ / q</th>
           <th title="Q_bs: market law at the fitted IVs (D_ent reference)">bs: p̂ / r̂₀ / q̂</th>
-          <th>G</th><th>Kelly EV</th><th title="D_ent = ln3 − H(Q_bs)">D_ent</th><th>exp(k·D_ent)</th><th title="GROUND in basis points (x10,000)">Γᵢ (bp)</th>
+          <th>G</th><th>Kelly EV</th><th title="D_ent = ln3 − H(Q_bs)">D_ent</th><th>exp(k·D_ent)</th><th title="GROUND in basis points (x10,000)">Γᵢ (bps)</th>
         </tr></thead>
         <tbody><tr>
           <td>${fmtMoney(p.entry_price)}</td>
