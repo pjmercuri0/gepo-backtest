@@ -10,8 +10,8 @@ import numpy as np, pandas as pd
 ROOT = Path(__file__).resolve().parents[2]; sys.path.insert(0, str(ROOT))
 import ent_canon as ec
 
-FRAME = ROOT / "research/dkl_2026_09_13/featATM8.parquet"
-OUT = ROOT / "research/fable_canon_2026_09_30/frame_quotes.parquet"
+FRAME = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "research/dkl_2026_09_13/featATM8.parquet"
+OUT = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "research/fable_canon_2026_09_30/frame_quotes.parquet"
 KEY = ["ticker", "entry_date", "expiry_date", "spread_type", "short_strike", "long_strike"]
 COLS = ["Symbol", "DataDate", "ExpirationDate", "PutCall", "StrikePrice", "BidPrice", "AskPrice", "ImpliedVolatility"]
 

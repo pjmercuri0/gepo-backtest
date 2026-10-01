@@ -148,6 +148,37 @@ figure in the task could not be located in the handoff or reproduced; on this fr
 these weeks. So the disagreement is a quote-source/universe effect on WHICH names, not a sign disagreement. No canon
 change beyond the kelly fix above.
 
+**§0.69d deeper dig (user: "I'd prefer them to match more so I can be more confident in the simulations").** Scripts
+`missing68.py`, `missing68_oi_off.py` and the inline checks below, all on the 20 shared days, bull puts.
+
+1. **Universe is the open-interest gate.** The vendor builder needs OI >= 100 on BOTH legs at the EOD chain; live has the OI term
+   OFF (`LIVE_USE_OPEN_INTEREST = False`). Of the 68 IBKR picks absent from the vendor frame, 53 have a leg under 100 OI at
+   IBKR's own strikes (short-leg median 62): 8 no liquid put at all, 25 no adjacent liquid pair <= 2.5 wide, 35 the 0.50-0.60
+   delta strikes are the illiquid ones. Spot drift 15:30 -> close is 0.3% median, never > 1%, so it is not timing. Rebuilding
+   the window with OI off builds 49 of the 68 but picks only 5: the new illiquid names (CL, MO, PM, DHR, PNC, LOW ...) carry
+   high G24, enter the vendor top 6 and push out the names that DID match (INTC, PYPL, NOW, TSLA); IBKR either never built
+   those displacers or they fail its quote gate. Overlap 15% -> 12%. The reverse direction (251 vendor names IBKR did not
+   build that day) is day-specific: 250 of 251 tickers ARE built by IBKR on other days (SPY, QQQ, IWM, GOOGL, WMT lead); the
+   15:30 snapshots are on the mini only, so why a given name failed live that day is unverified from the Air.
+2. **The quote gate is a coin flip across sources.** quote/model medians 1.00 (vendor) and 0.98 (IBKR); 30% / 40% of pairs sit
+   within 3% of the 1.00 line, and the two sources' quote/model ratios are UNCORRELATED (corr -0.01, same strikes -0.03;
+   vendor/IBKR quote ratio on identical strikes p10-p90 0.85-1.29). Eligibility agreement with the gate on both sides 67%,
+   at 0.95 68%, at 0.90 73%, no gate 81%. Identical rules on each side's own data, joined universe: pick overlap 37% with the
+   gate, **58% without it** (63% on same-strike pairs). The gate throws away the most agreement per unit of rule.
+3. **P_real disagrees on IDENTICAL spreads.** Same ticker/day/strikes, 310 pairs: p (P_WIN) corr only 0.51, |p_v - p_i| median
+   0.024, 23% differ by > 0.05 (= 12+ of 252 window outcomes); q corr 0.91, ro 0.98. Not the gap drift: vendor P_real with
+   drift removed matches IBKR no better (0.53). Live P_real runs on `output/ibkr_closes.parquet` (mini only, absent on the
+   Air) plus snapshot prints; vendor on `output/daily_closes.parquet`. Swapping IBKR's P into the vendor EV lifts within-day EV
+   rank corr 0.38 -> 0.62; swapping IBKR's model credit instead 0.38 -> 0.45. **P_real is the main ranking driver, model
+   credit second** (smile-fit credit differs +-10% p10-p90 on identical strikes, EOD vs 15:30 chain). To close this, the Air
+   needs the mini's `output/ibkr_closes.parquet` to recompute P_real on the same closes.
+4. Strikes differ on 25% of pairs (delta band on a moved spot / different fit); D_ent agrees (rank corr 0.93).
+
+**What would make them match more, in order:** (a) drop the quote gate on both or move it off the median; (b) same close
+store for P_real; (c) same liquidity rule (live OI off vs vendor OI >= 100 -- either turn vendor's off, which did NOT help
+overlap here, or put a liquidity term back live); (d) accept the 15:30-vs-EOD smile/strike noise. Full-frame OI-off rebuild
+(`featATM8_oi0.parquet`, `run_C_on_frame.py`) was started 2026-09-30 night to show the Backtest/OOT at OI off.
+
 ## 0.69c SITE tabs = strategy C at k=24 (2026-09-30 night, user: "update backtest and oot on mya to be k=24")
 
 k sweep on the strategy C pool (`research/fable_canon_2026_09_30/k_sweep_C.py`, `k_sweep_C_ext.csv`, chart `k_sweep_C.png`,
