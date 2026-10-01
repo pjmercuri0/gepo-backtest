@@ -17,6 +17,7 @@ from bear_regime_sweep import (
     add_earnings_gate,
     add_exdiv_gate,
     add_regimes,
+    add_split_gate,
     prepare,
     realize,
 )
@@ -96,14 +97,15 @@ def main() -> None:
     c = add_regimes(c, spy)
     c = add_exdiv_gate(c)
     c = add_earnings_gate(c)
+    c = add_split_gate(c)
 
-    bull_mask = c.spread_type.eq("bull_put") & ~c.exdiv_hit & ~c.earnings_hit & (c.GROUND >= ec.THR)
+    bull_mask = c.spread_type.eq("bull_put") & ~c.exdiv_hit & ~c.earnings_hit & ~c.split_hit & (c.GROUND >= ec.THR)
     if ec.BULL_REGIME_GATE:      # OFF since 2026-09-29 (§0.66/§0.67): bull puts every day
         bull_mask &= prior_spy_bull(c.entry_date, spy, 100)
     if ec.BULL_PARITY_GATE:      # OFF since 2026-09-29
         bull_mask &= c.parity_pct > ec.PARITY_MIN_PCT
     bull_pool = c[bull_mask]
-    bear_mask = c.spread_type.eq("bear_call") & ~c.exdiv_hit & ~c.earnings_hit & c[REGIME] & (c.GROUND >= GROUND)
+    bear_mask = c.spread_type.eq("bear_call") & ~c.exdiv_hit & ~c.earnings_hit & ~c.split_hit & c[REGIME] & (c.GROUND >= GROUND)
     if PARITY_GATE:              # OFF since 2026-09-29
         bear_mask &= c.bear_parity_pct > PARITY
     bear_pool = c[bear_mask]

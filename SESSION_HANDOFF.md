@@ -111,6 +111,41 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69l THIRD EXCLUSION: corporate actions (split / reverse split / spinoff), 2026-10-01
+
+**User:** "1. ex-div, 2. earnings, 3. corporate action stock/reverse splits". New `research/fetch_yahoo_split_history.py`
+(same Yahoo chart endpoint as the dividend fetcher, `events=split`) -> `output/yahoo_split_history.csv`: 32 events, 23 symbols,
+28 of them in the 2019-06..2026 window. New `bear_regime_sweep.add_split_gate()` mirrors `add_exdiv_gate`: any event from
+entry through expiry+1 marks the spread, MMC failed closed (Yahoo 404s it, same as dividends). Wired into
+`build_payloads_C.py` and `research/report_bear_regime.py`; captions updated.
+
+**Validation.** Every >50% single-session move in `output/daily_closes.parquet` maps to a Yahoo split date (AAPL 4:1,
+AMZN 20:1, AVGO 10:1, CSX 3:1, GE 1:8, GOOGL 20:1, ISRG 3:1, NFLX 10:1, NOW 5:1, NVDA 4:1 and 10:1, TSLA 5:1 and 3:1, WMT 3:1).
+The file ALSO carries Yahoo's small-ratio adjustments for spinoffs (GE 2023-01-04 ratio 1.281 HealthCare, GE 2024-04-02 1.253
+Vernova, T 2022-04-11 1.324 Warner, MMM 2024-04-01 1.196 Solventum, DHR 2023-10-02 1.128 Veralto, RTX 2020-04-03 1.589,
+BDX, HON, IBM, MRK, PFE) -- those gap the price 10-19% overnight, enough to cross a 1-point spread at 1-4 DTE, so the gate
+catches them too. Two unexplained store jumps have NO split on file and are real market moves (INTC -26% 2024-08-02,
+ORCL +36% 2025-09-10, NFLX -35% 2022-04-20, IBM -25% 2026-07-14, ZTS -29% 2026-05-07, several 2020 COVID days). ONE anomaly:
+NEE jumps -75% on 2020-11-12 but Yahoo dates its 4:1 split 2020-10-27 -- unexplained, pre-window for the book's entries but
+inside the 252-session lookback for early-2021 entries.
+
+**Effect on the book.** 39 of 114,712 frame candidates hit the gate (0.03%), none already caught by earnings or ex-dividend.
+Three picks left the book and three backfilled: MRK 2021-06-01 (Organon spinoff 06-03, was -$22.85), NVDA 2021-07-20 (the 4:1
+split date itself, was a +$35.11 "win" on pre-split strikes), HON 2025-10-28 (Solstice spinoff 10-30, was -$123.66). Site book
+(qty 2, 1.00x model): **IS $92,880 -> $93,697, $-Sharpe 1.46 -> 1.47, DD -27.6% -> -27.5%; OOT unchanged** ($29,245 / 3.11 / -13.9%;
+no 2026 pick spanned an event). Deployed to Mya with backups `*.bak_presplitgate_*`.
+
+**STILL OPEN - the larger half of §0.69k.** This gate is forward-looking only: it stops a spread being HELD across an event.
+It does NOT fix the LOOKBACK corruption, where an unadjusted split sits inside the 252-session P_real window and the demeaning
+shifts every return (GE 2022-04-20: p 0.948 vs 0.436 clean). That still affects 747 picks (11.3%) and costs Sharpe
+(removing them: IS 1.46 -> 1.60, OOT 3.11 -> 3.39). Fix is one of: split-adjust `output/daily_closes.parquet`, or have
+`ent_canon.p_real` ignore |return| > 50% bars. Not done; user's call.
+
+**MINI TO DO.** `output/` is gitignored, so `yahoo_split_history.csv` does not travel with a pull. Any machine that runs
+`report_bear_regime.py` or `build_payloads_C.py` must run `python3 research/fetch_yahoo_split_history.py` first or the gate
+raises FileNotFoundError (same contract as the dividend and earnings gates). The LIVE ranker has earnings and ex-dividend
+gates only (`live/ranker.py` ~355 and ~372, forward calendars); adding a forward split calendar there is a separate change.
+
 ## 0.69k DATA DEFECT: output/daily_closes.parquet is NOT split-adjusted; extreme-GROUND forensic (2026-10-01)
 
 **User asked** why `picks_oi1_k24.parquet` tops out at 1,577 bps GROUND against a 2.9 bps median when the IBKR archive tops out

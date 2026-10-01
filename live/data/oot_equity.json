@@ -12,7 +12,7 @@
     "sizing": "qty=2 per pick",
     "starting_bankroll": 10000.0,
     "parity": "no bull parity veto; no bear parity veto",
-    "bear_gates": "bear calls: IV < 0.35, same credit floor, share the pooled top-6. Earnings and ex-dividend gates (ex-date through expiry+1) apply to both sleeves.",
+    "bear_gates": "bear calls: IV < 0.35, same credit floor, share the pooled top-6. Earnings, ex-dividend and corporate-action (split / reverse split / spinoff) gates, entry through expiry+1, apply to both sleeves.",
     "window": "252 full sessions of realized DTE-matched moves vs the exact strikes (P_real, every trading day), drift-free: each name's window-mean return removed before counting",
     "dkl": "D_ent = D(Q_bs\u2016U\u2083) = ln3 \u2212 H(Q_bs), Q_bs = N(d2) at the smile-fit IVs (Mercurio\u2013Wu\u2013Xie 2020 eq. 19)",
     "gap": "P_real drift = 1 \u00d7 \u03b2_year \u03c3 \u00d7 z(the stock's OWN opening gap, ATR units) \u00d7 \u221aDTE; no market average",

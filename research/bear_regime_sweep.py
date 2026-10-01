@@ -33,6 +33,7 @@ from sma_bull_regime_sweep import (
 OUT = ROOT / "output/bear_regime_sweep.csv"
 DIVIDENDS = ROOT / "output/yahoo_dividend_history.csv"
 EARNINGS = ROOT / "output/nasdaq_earnings_history.csv"
+SPLITS = ROOT / "output/yahoo_split_history.csv"
 START = 20_000.0
 # P_real needs history before it means anything; featATM6 began 2020-07-14 for that reason
 # and build_frame.py now produces candidates from 2020-01-01.  Keeping the original start
@@ -182,6 +183,44 @@ def add_exdiv_gate(c: pd.DataFrame) -> pd.DataFrame:
         hit[i] = left < len(dates) and dates[left] <= end
     out = c.copy()
     out["exdiv_hit"] = hit
+    return out
+
+
+def add_split_gate(c: pd.DataFrame) -> pd.DataFrame:
+    """Mark ANY spread exposed to a corporate action from entry through expiry+1.
+
+    2026-10-01 (user): the third exclusion beside earnings and ex-dividend. A split, reverse
+    split or spinoff re-denominates the underlying overnight. The option contract itself is
+    adjusted by the OCC so a real position keeps its value, but the BACKTEST holds strikes from
+    the entry-day chain and settles against the expiry close, which is on the post-event scale --
+    the trade then books a fake full win or full loss purely from the units change.
+
+    The file (research/fetch_yahoo_split_history.py) carries whole splits (AAPL 4:1, GE 1:8,
+    NVDA 10:1 ...) and the small-ratio adjustments Yahoo records for spinoffs (GE 2023-01-04
+    ratio 1.281 = HealthCare, T 2022-04-11 ratio 1.324 = Warner), which still gap the price
+    10-19% overnight -- enough to cross a 1-point-wide spread at 1-4 DTE.
+
+    MMC is failed closed: Yahoo returns 404 for that ticker, exactly as in the dividend gate.
+    """
+    if not SPLITS.exists():
+        raise FileNotFoundError(f"{SPLITS} missing; run research/fetch_yahoo_split_history.py")
+    d = pd.read_csv(SPLITS, parse_dates=["SplitDate"])
+    by_symbol = {symbol: dates.to_numpy(dtype="datetime64[D]")
+                 for symbol, dates in d.groupby("Symbol").SplitDate}
+    hit = np.zeros(len(c), dtype=bool)
+    for i, row in enumerate(c.itertuples(index=False)):
+        if row.ticker == "MMC":
+            hit[i] = True
+            continue
+        dates = by_symbol.get(row.ticker)
+        if dates is None:
+            continue
+        start = np.datetime64(pd.Timestamp(row.entry_date).date(), "D")
+        end = np.datetime64((pd.Timestamp(row.expiry_date) + pd.Timedelta(days=1)).date(), "D")
+        left = np.searchsorted(dates, start, side="left")
+        hit[i] = left < len(dates) and dates[left] <= end
+    out = c.copy()
+    out["split_hit"] = hit
     return out
 
 
