@@ -325,3 +325,7 @@ FABLE_BEAR_EVERY_DAY = False
 # behind the site's strategy-C book carries both sides of every name; the regime gate and the
 # GROUND ranking decide. Set True to restore the old behaviour.
 FABLE_PER_TICKER_DEDUPE = False
+# Display only (user 2026-10-01): GROUND is shown with carry on the capital at risk added,
+# CARRY_RATE x max(DTE,1)/365 -- the interest the credit earns while held. Same constant for every
+# spread in a scan, so the ranking is untouched; selection still uses raw GROUND.
+CARRY_RATE = 0.04

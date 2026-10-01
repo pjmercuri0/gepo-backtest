@@ -117,6 +117,27 @@ def _pin_open(pick, spot, settled=False) -> bool:
 
 
 app.jinja_env.filters['rd'] = _round_half_up
+
+
+def _carry(dte, rate=None):
+    """Display-only carry on the capital at risk: rate x max(DTE,1)/365 (user 2026-10-01)."""
+    import config as _cfg
+    r = float(getattr(_cfg, "CARRY_RATE", 0.04)) if rate is None else float(rate)
+    try:
+        d = max(int(float(dte)), 1) if dte is not None else 1
+    except (TypeError, ValueError):
+        d = 1
+    return r * d / 365.0
+
+
+def _carry_from_dow(dow):
+    """Vendor trades carry a weekday, not a DTE; Friday expiry -> Mon 4, Tue 3, Wed 2, Thu 1."""
+    return _carry({"Mon": 4, "Tue": 3, "Wed": 2, "Thu": 1, "Fri": 1}.get(str(dow)[:3], 1))
+
+
+app.jinja_env.globals['carry'] = _carry
+app.jinja_env.globals['carry_dow'] = _carry_from_dow
+app.jinja_env.globals['carry_rate'] = float(getattr(__import__('config'), 'CARRY_RATE', 0.04))
 app.jinja_env.globals['pin_open'] = _pin_open
 
 

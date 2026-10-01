@@ -26,7 +26,7 @@
         <th>Date</th><th>Time</th><th>Ticker</th>
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th>
         <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">Min / Target ($/sh)</th>
-        <th>Max-Loss ($/sh)</th><th>Ratio</th><th title="GROUND in basis points (x10,000)">GROUND (bps)</th>
+        <th>Max-Loss ($/sh)</th><th>Ratio</th><th title="GROUND + carry on the capital at risk (display only)">GROUND + carry (bps)</th>
         <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>
       </tr></thead>
       <tbody>
@@ -148,7 +148,7 @@
               <span class="actual-shown" style="color:#7ec99a">({{ "%.2f"|format(ar) }})</span>
             {%- endif %}
           </td>
-          <td class="fw">{% if p.GROUND is not none %}{{ "%.2f"|format((p.GROUND * 10000)|rd(2)) }}{% else %}—{% endif %}</td>
+          <td class="fw">{% if p.GROUND is not none %}{{ "%.2f"|format(((p.GROUND + carry(p.DTE)) * 10000)|rd(2)) }}{% else %}—{% endif %}</td>
           <td>{% if p.short_delta is defined and p.short_delta is not none %}{{ "%.2f"|format(p.short_delta|rd(2)) }}{% else %}—{% endif %}</td>
           <td>{{ p.DTE if p.DTE is not none else '—' }}</td>
           {% if outcome_row and outcome_row.result %}
