@@ -149,6 +149,22 @@ credit 0.67; **vendor P + IBKR credit 0.85**. The EOD vs 15:30 smile fit moves m
 remaining causes once spot/strikes agree: (1) IBKR quote gate, (2) smile-fit credit from a different chain, (3) gap drift coverage.
 No OI effect (OI 0 vs 1 identical: 31/46 overlap, 20 IBKR picks unbuildable at any OI).
 
+## 0.69g IBKR fair replay re-scored with the vendor EOD smile (user: "redo the ibkr fair replay based on eod smile fit")
+
+`ibkr_replay_eod_smile.py`: IBKR candidates, 15:30/15:45 spot, quoted mid and P_real unchanged; model credit + fitted deltas + D_ent
+re-priced on the vendor EOD chain's smile for the same strikes (available for 100% of rows; EOD/IBKR credit median 0.99, p10-p90
+0.86-1.08). Replay rule unchanged (floor 0.45, quote >= model, pooled top 6 by G24, 15:30 + 15:45 top-up, 1.04 x model).
+
+| replay variant | picks | P&L qty1 | win | weeks + | overlap with original replay | overlap with vendor site book |
+|---|---|---|---|---|---|---|
+| as built (IBKR 15:30 smile) | 121 | +$910 | 43% | 5/6 | 100% | 19/120 (16%) |
+| vendor EOD smile @ IBKR spot | 120 | +$1,183 | 42% | 4/6 | **74/120 (62%)** | 21/120 (18%) |
+| vendor EOD smile @ EOD spot | 115 | -$476 | 37% | 3/6 | 56/120 (47%) | 13/120 (11%) |
+
+Swapping only the smile (credit within +-10%) changes 38% of the replay's OWN picks; it does not bring the replay closer to the
+vendor book (16% -> 18%). The selection is a knife edge on every input; the vendor book differs on several at once (gate, spot,
+universe). `ibkr_replay_eod_smile_picks.csv` = variant 2 picks.
+
 ## 0.69d Vendor vs IBKR reconciliation, strategy C, 2026-08-20..09-24 (Air, 2026-09-30 night) + KELLY FIX
 
 **Bug found and fixed (user: "fix that").** `ent_canon.kelly()` returned NaN for every growth-NEGATIVE spread (no interior
