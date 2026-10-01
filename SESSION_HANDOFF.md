@@ -111,6 +111,13 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69h SITE tabs booked at 1.00 x model (2026-09-30 night, user: "change backtest and oot to be 1xmodel fills")
+
+`build_payloads_C.py 24 1.0` (fill is argv[2], default `ec.FILL_MULT`; `ec.FILL_MULT` itself is still 1.04, so live booking is
+unchanged). Strategy C, k=24, OI >= 1, 252 start, no gate, $10k: **IS 5804 / qty2 $92,880 / $-Sh 1.46 / DD -27.6% / yield 8.8%;
+OOT 816 / $29,245 / 3.11 / -13.9% / 15.4%** (at 1.04 x model: $130,092 / 2.11 / -21.4% and $34,263 / 3.92 / -11.8%). The 4% fill
+haircut is worth 0.65 of IS Sharpe on this book. Captions say "1.00x smile-fit model credit". Backups `*.bak_prefill100_*`.
+
 ## 0.69e CANON: open interest >= 1 on both legs (2026-09-30 night, user: "okay should be OI>=1"); site rebuilt
 
 `config.MIN_OPEN_INTEREST` 100 -> 1. New canon frame `research/dkl_2026_09_13/featATM8_oi1.parquet` (build_frame --min-oi 1:

@@ -11,6 +11,7 @@ from bear_regime_sweep import add_earnings_gate, add_exdiv_gate, add_regimes, pr
 HERE = Path(__file__).resolve().parent; KEY = ["ticker", "entry_date", "expiry_date", "spread_type", "short_strike", "long_strike"]
 FLOOR, BEAR_IV, TOP = 0.45, 0.35, 6
 K = float(sys.argv[1]) if len(sys.argv) > 1 else float(ec.K)   # D_ent penalty in the rank key (user 2026-09-30: 24)
+FILL = float(sys.argv[2]) if len(sys.argv) > 2 else float(ec.FILL_MULT)   # 2026-09-30 (user): site book at 1.00 x model; live booking keeps ec.FILL_MULT
 with contextlib.redirect_stdout(io.StringIO()):
     c, spy = prepare(); c = add_regimes(c, spy); c = add_exdiv_gate(c); c = add_earnings_gate(c)
 c = c.merge(pd.read_parquet(HERE / "frame_quotes_oi1.parquet")[KEY + ["IV"]], on=KEY, how="left")   # 2026-09-30: OI >= 1 frame
@@ -22,7 +23,7 @@ c["GROUND"] = c.EV * np.exp(-K * c.D_ent)   # rank key at this K (prepare() scor
 g = ~c.exdiv_hit & ~c.earnings_hit; cw = c.model_credit / c.width
 elig = (c.spread_type.eq("bull_put") & g & (cw >= FLOOR)) | (c.spread_type.eq("bear_call") & g & (cw >= FLOOR) & (c.IV < BEAR_IV) & c.below_100)
 sel = c[elig].sort_values(["entry_date", "GROUND"], ascending=[True, False]).groupby("entry_date", sort=False).head(TOP)
-picks = rbr.enrich(realize(sel, 10**6))
+picks = rbr.enrich(realize(sel, 10**6, fill=FILL))
 picks.to_parquet(HERE / f"picks_C_252_k{K:g}.parquet")
 
 def captions(payload):
@@ -33,6 +34,7 @@ def captions(payload):
     k["bear_gates"] = (f"bear calls: IV < {BEAR_IV:.2f}, same credit floor, share the pooled top-{TOP}. Earnings and ex-dividend gates "
                        "(ex-date through expiry+1) apply to both sleeves.")
     k["parity"] = "no bull parity veto; no bear parity veto"
+    k["fill_basis"] = f"{FILL:.2f}\u00d7 smile-fit model credit; partial-WIN at 50% intrinsic; no commission"
     k["scoring"] = f"G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G\u22121)\u00b7e^(\u2212k\u00b7D_ent), k = {K:g}"
     return payload
 for lab, m, yr, path in (("IS", picks.entry_date.dt.year <= 2025, 2025, "backtest_equity.json"),
