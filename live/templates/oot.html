@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}GEPO OOT 2026{% endblock %}
+{% block title %}{{ page_title or "GEPO OOT 2026" }}{% endblock %}
 {% block content %}
 
 {% if data %}
   {% set s = data.summary %}
   {% set c = data.config %}
 
-  <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">GEPO 2026 Out-of-Time</h1>
-  <div class="subtitle">2026 · D_ent canon · {{ c.delta }} · {{ c.selection }} · {{ c.regime }} · {{ c.parity }} · {{ c.fill_basis }} · {{ c.sizing }}</div>
+  <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">{{ page_heading or "GEPO 2026 Out-of-Time" }}</h1>
+  <div class="subtitle">{{ page_prefix or "2026" }} · D_ent canon · {{ c.delta }} · {{ c.selection }} · {{ c.regime }} · {{ c.parity }} · {{ c.fill_basis }} · {{ c.sizing }}</div>
 
   <details class="params-fold">
     <summary><span class="chip-k">params</span><span class="chip-v">canon settings</span></summary>
@@ -32,7 +32,7 @@
     </div>
   </details>
 
-  {% include "_fill_sensitivity.html" %}
+  {% if not hide_fill_sens %}{% include "_fill_sensitivity.html" %}{% endif %}
 
   <div class="stats">
     <div class="stat">

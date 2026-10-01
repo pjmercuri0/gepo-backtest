@@ -30,6 +30,7 @@
   <a href="{{ url_for('history') }}"  class="{% if request.endpoint == 'history'      %}active{% endif %}">history</a>
   <a href="{{ url_for('snapshots') }}" class="{% if request.endpoint == 'snapshots'    %}active{% endif %}">snap</a>
   <a href="{{ url_for('actuals') }}"  class="{% if request.endpoint == 'actuals'      %}active{% endif %}">actuals</a>
+  <a href="{{ url_for('plot') }}"     class="{% if request.endpoint == 'plot'         %}active{% endif %}">plot</a>
   <a href="{{ url_for('backtest') }}" class="{% if request.endpoint == 'backtest'     %}active{% endif %}">backtest</a>
   <a href="{{ url_for('oot') }}"      class="{% if request.endpoint == 'oot'          %}active{% endif %}">oot</a>
   <a href="{{ url_for('qr') }}"       class="{% if request.endpoint == 'qr'           %}active{% endif %}">qr</a>
@@ -53,6 +54,7 @@
     "{{ url_for('index') }}",
     "{{ url_for('history') }}",
     "{{ url_for('actuals') }}",
+    "{{ url_for('plot') }}",
     "{{ url_for('backtest') }}",
     "{{ url_for('oot') }}"
   ];

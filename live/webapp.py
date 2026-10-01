@@ -1145,6 +1145,19 @@ def oot():
     return render_template("oot.html", data=payload)
 
 
+@app.route("/plot")
+def plot():
+    """IBKR fair replay under the current canon (user 2026-10-01): the archived 15:30/15:45 IBKR
+    snapshots re-ranked with today's rule, rendered with the OOT page. Payload written by
+    research/fable_canon_2026_09_30/build_payload_ibkr_replay.py to live/data/ibkr_replay_equity.json."""
+    payload = _read_json(_data_path("ibkr_replay_equity.json"))
+    if payload:
+        payload["wagering"] = _wagering(payload)
+    return render_template("oot.html", data=payload, page_title="GEPO IBKR replay",
+                           page_heading="GEPO IBKR Fair Replay", page_prefix="IBKR snapshots, current canon",
+                           hide_fill_sens=True)
+
+
 @app.route("/qr")
 def qr():
     default_site = ("https://gepo-euro-backtest.peter.cloudmallinc.com/"

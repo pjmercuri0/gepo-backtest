@@ -201,6 +201,7 @@ UPLOAD_FILES=(
   "live/actuals.json"               # user-selected actual trades (Actuals tab)
   "live/data/backtest_equity.json"  # precomputed equity curve (Backtest tab)
   "live/data/oot_equity.json"       # 2026 out-of-time equity curve (OOT tab)
+  "live/data/ibkr_replay_equity.json"  # IBKR fair replay under the current canon (Plot tab)
 )
 
 # TODAY's snapshot parquet. The webapp prices every OPEN position's mark from it
