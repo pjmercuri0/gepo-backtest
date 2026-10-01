@@ -8,3 +8,31 @@
   {% endfor %}
 </div>
 {% endif %}
+{# Keep the scroll spot across the re-render (user 2026-10-01): remember which toggle was tapped and
+   where it sat in the viewport, then put the same toggle back at the same height after the reload.
+   Anchoring on the toggle (not on scrollY) survives any change in page height above it. #}
+{% if data.arms %}
+<script>
+(function () {
+  if (window.__gepoSizeToggle) return; window.__gepoSizeToggle = true;
+  const KEY = "gepo_size_scroll";
+  function restore() {
+    let st = null;
+    try { st = JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) {}
+    if (!st || st.path !== location.pathname) return;
+    const el = document.querySelectorAll(".size-toggle")[st.idx];
+    if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - st.top);
+  }
+  document.addEventListener("click", function (e) {
+    const a = e.target.closest(".size-toggle a");
+    if (!a) return;
+    const box = a.closest(".size-toggle");
+    const idx = Array.prototype.indexOf.call(document.querySelectorAll(".size-toggle"), box);
+    try { sessionStorage.setItem(KEY, JSON.stringify({ path: location.pathname, idx: idx, top: box.getBoundingClientRect().top })); } catch (e) {}
+  });
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  document.addEventListener("DOMContentLoaded", restore);
+  window.addEventListener("load", function () { restore(); try { sessionStorage.removeItem(KEY); } catch (e) {} });
+})();
+</script>
+{% endif %}
