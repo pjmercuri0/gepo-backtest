@@ -100,7 +100,7 @@ function fmtContract(v, dec=0) {
 // identical for every spread in a scan, so it never changes the order.
 const CARRY_RATE = {{ carry_rate }};
 function carryOf(dte) { const d = Math.max(parseInt(dte ?? 1, 10) || 1, 1); return CARRY_RATE * d / 365; }
-function fmtGround(v, dec=0) {
+function fmtGround(v, dec=2) {
   if (v == null) return "—";
   // Basis points (user 2026-10-01): GROUND x 10,000 -- the x100 percent scale showed +0.00% everywhere.
   const n = Number(v) * 10000;

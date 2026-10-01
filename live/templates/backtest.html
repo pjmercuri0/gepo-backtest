@@ -234,7 +234,7 @@
           <td style="text-align:right">{% if t.dkl is not none %}{{ '%.4f'|format(t.dkl) }}{% else %}—{% endif %}</td>
           <td class="pos">
             <span class="ground-bar"><span class="ground-bar-fill" style="width:{{ (100.0 * t.ground / w.max_g)|round(0) if w.max_g > 0 else 0 }}%"></span></span>
-            {{ '%+.0f'|format(10000.0 * (t.ground + carry_dow(t.dow))) }}
+            {{ '%+.2f'|format(10000.0 * (t.ground + carry_dow(t.dow))) }}
           </td>
           <td>${{ '%.2f'|format(t.spot) }}</td>
           <td><span class="badge badge-{{ t.outcome }}">{{ t.outcome }}</span></td>
