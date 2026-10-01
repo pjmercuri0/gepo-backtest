@@ -810,11 +810,16 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             # History (user 2026-10-01): show the LIVE quote. When the stream holds this spread on a
             # credible book (no wider than QUOTE_MAX_BOOK_W x the spread), its mid is the mark and the
             # quoted credit; Actuals keeps its own-leg method.
-            _live_mid = None
+            _live_mid = None; _gate_book_ok = False
             if prefer_stream and _q and _q.get("mid") is not None:
                 try:
                     import config as _cfg
-                    if abs(float(_q["ask"]) - float(_q["bid"])) <= float(getattr(_cfg, "QUOTE_MAX_BOOK_W", 1.0)) * w:
+                    # The MARK still needs a book no wider than the spread; the quote GATE below follows
+                    # config.QUOTE_MAX_BOOK_W (None = no book check, user 2026-10-01).
+                    _mbw = getattr(_cfg, "QUOTE_MAX_BOOK_W", None)
+                    _bw = abs(float(_q["ask"]) - float(_q["bid"]))
+                    _gate_book_ok = _mbw is None or _bw <= float(_mbw) * w
+                    if _bw <= 1.0 * w:
                         _live_mid = float(_q["mid"])
                 except (TypeError, ValueError, KeyError):
                     _live_mid = None
@@ -826,7 +831,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                     if _wa is None and pick.get("model_credit"):
                         _wa = math.floor(float(pick["model_credit"]) * 100 + 0.5) / 100
                     if _wa is not None:
-                        live["gate_ok"] = bool(_live_mid is not None and math.floor(float(_q["mid"]) * 100 + 0.5) / 100 >= float(_wa))
+                        live["gate_ok"] = bool(_gate_book_ok and math.floor(float(_q["mid"]) * 100 + 0.5) / 100 >= float(_wa))
                 except (TypeError, ValueError):
                     pass
             if _live_mid is not None:
@@ -1927,7 +1932,8 @@ def _overlay_stream(payload: dict) -> None:
                     # QUOTE_MAX_BOOK_W x the spread width is not a price.
                     try:
                         _bw = abs(float(q["ask"]) - float(q["bid"]))
-                        if w and _bw > float(getattr(backtest_config, "QUOTE_MAX_BOOK_W", 1.0)) * float(w):
+                        _mbw = getattr(backtest_config, "QUOTE_MAX_BOOK_W", None)   # None = rule off
+                        if _mbw is not None and w and _bw > float(_mbw) * float(w):
                             r["above_min"] = False; r["quote_ok"] = False
                         else:
                             r["quote_ok"] = True

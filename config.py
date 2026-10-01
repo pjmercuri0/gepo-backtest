@@ -335,3 +335,7 @@ CARRY_RATE = 0.04
 # not a price (TMO 15:00: short 3.90/10.00, long 1.20/9.20 -> "mid" 1.75 on a 2.50 spread cleared the
 # gate while tight books a cent under model failed). Same rule the combo book already used.
 QUOTE_MAX_BOOK_W = 1.0
+# 2026-10-01 evening (user: "take off wide book for both replay and live"): the rule is OFF. The
+# six-week IBKR replay with it on fell from +$909 to +$159 at 1.04x model (research/fable_canon_2026_09_30/
+# ibkr_replay_bookfix.py). None = no book check; the gate is quote >= model at 2dp on any book.
+QUOTE_MAX_BOOK_W = None

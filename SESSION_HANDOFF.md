@@ -409,6 +409,14 @@ side, bulls only (OOT DD -108% at qty2), quote gate kept with model rank (IS -0.
 
 ## 0.68 FABLE CANON live (2026-09-30 15:16): selection fitted on the LIVE candidate archive
 
+**2026-10-01 evening — wide-book quote rule OFF (user).** `config.QUOTE_MAX_BOOK_W = None`: the quote gate is quoted mid >=
+model at 2dp on any book (ranker, live overlay, History shading). The six-week IBKR fair replay with the rule on:
+111 picks, +$159 at 1.04x model / -$232 at 1.00x; with it off (the original replay, and what the Plot tab shows):
+121 picks, +$909 / +$451. Script: `research/fable_canon_2026_09_30/ibkr_replay_bookfix.py`. The 34 picks the rule removed
+(DE, CAT, AMGN, BLK, ISRG ...) made +$717 booked at 1.04x model; whether they fill at that price on those books is not known.
+On the 2026-10-01 15:30 snapshot the rule changes the six picks from NOW/MSFT/UNH/INTC/AVGO/CRM to PNC/NOW/CAT/BLK/MSFT/DE.
+
+
 **User decision** ("Do that. Call it Fable Canon"), first live scan 15:16 (commit `6c24c72`). `config.SELECTION_MODE = "fable"`
 replaces the §0.67 GROUND selection in `live/ranker.py`: **bull puts only, every day; IV > 0.40; 0.951 x quoted mid >= 0.45 x
 width; each scan qualifies the top 5 by qedge = q_hat - q** (market full-loss odds minus the model's). No GROUND threshold, no

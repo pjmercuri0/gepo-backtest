@@ -549,7 +549,8 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # Credible-book check (2026-10-01): a quote built from leg mids counts only when the legs' combined
     # book is no wider than QUOTE_MAX_BOOK_W x the spread width and both legs are bid. Combo-sourced
     # quotes already went through the same too-wide test in _reprice_on_combos.
-    if not ranked.empty:
+    _mbw = getattr(backtest_config, "QUOTE_MAX_BOOK_W", None)      # None = rule off (user 2026-10-01)
+    if not ranked.empty and _mbw is not None:
         _sw = (ranked["short_strike"].astype(float) - ranked["long_strike"].astype(float)).abs()
         _bk = ((ranked["short_ask"].astype(float) - ranked["short_bid"].astype(float))
                + (ranked["long_ask"].astype(float) - ranked["long_bid"].astype(float)))
@@ -557,11 +558,11 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         _legsrc = ~_src.str.startswith("combo")
         _bid_ok = (ranked["short_bid"].astype(float) > 0) & (ranked["long_bid"].astype(float) > 0)
         ranked["quote_book_w"] = (_bk / _sw).round(3)
-        ranked["quote_ok"] = ~_legsrc | (_bid_ok & (_bk <= float(getattr(backtest_config, "QUOTE_MAX_BOOK_W", 1.0)) * _sw))
+        ranked["quote_ok"] = ~_legsrc | (_bid_ok & (_bk <= float(_mbw) * _sw))
         _nbad = int((ranked["above_min"] & ~ranked["quote_ok"]).sum())
         if _nbad:
             print(f"  quote gate: {_nbad} spread(s) at/above model only on a leg book wider than "
-                  f"{getattr(backtest_config, 'QUOTE_MAX_BOOK_W', 1.0):g}x the spread width -- not counted", flush=True)
+                  f"{float(_mbw):g}x the spread width -- not counted", flush=True)
         ranked["above_min"] = ranked["above_min"] & ranked["quote_ok"]
     # 2026-09-29 canon (§0.66/§0.67): the bull parity veto is OFF (config.PARITY_FILTER False); bears keep theirs.
     bull_gate_on = bool(getattr(backtest_config, "PARITY_FILTER", True))
