@@ -172,6 +172,12 @@ change beyond the kelly fix above.
    rank corr 0.38 -> 0.62; swapping IBKR's model credit instead 0.38 -> 0.45. **P_real is the main ranking driver, model
    credit second** (smile-fit credit differs +-10% p10-p90 on identical strikes, EOD vs 15:30 chain). To close this, the Air
    needs the mini's `output/ibkr_closes.parquet` to recompute P_real on the same closes.
+3b. **RESOLVED: the P_real gap is the SPOT, not the close store.** Recomputing the vendor P_real on the same 310 identical-strike
+   pairs with IBKR's 15:30 entry_price instead of the vendor EOD UnderlyingPrice: corr p 0.53 -> 0.90, |p - p_i| median
+   0.024 -> 0.000, > 0.05 share 21% -> 3% (q 0.99, ro 1.00). Spots differ only 0.14% median, but P_real at an ATM strike is a
+   knife edge: +0.3% spot moves p by +0.043 median, +0.079 p90 (11-20 of 252 window outcomes). Same closes, same code; live
+   enters at 15:30, the vendor frame at the close. Options: a 15:30 vendor snapshot (not available) or a spot-band-averaged
+   P_real (model change, user's call); the same sensitivity makes 15:30 vs 15:45 live scans flip picks on noise.
 4. Strikes differ on 25% of pairs (delta band on a moved spot / different fit); D_ent agrees (rank corr 0.93).
 
 **What would make them match more, in order:** (a) drop the quote gate on both or move it off the median; (b) same close
