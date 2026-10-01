@@ -13,9 +13,11 @@ import ent_canon as ec
 FRAME = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "research/dkl_2026_09_13/featATM8.parquet"
 OUT = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "research/fable_canon_2026_09_30/frame_quotes.parquet"
 KEY = ["ticker", "entry_date", "expiry_date", "spread_type", "short_strike", "long_strike"]
+QUOTE_LEVEL = 0.987   # median IBKR 15:30 quoted credit / vendor EOD model credit, identical strikes, 2026-08-20..09-24
 COLS = ["Symbol", "DataDate", "ExpirationDate", "PutCall", "StrikePrice", "BidPrice", "AskPrice", "ImpliedVolatility"]
 
-f = pd.read_parquet(FRAME, columns=KEY)
+f = pd.read_parquet(FRAME, columns=KEY + ["model_credit"])
+f_model = f[KEY + ["model_credit"]].copy(); f = f[KEY]
 f["entry_date"] = pd.to_datetime(f.entry_date).dt.normalize(); f["expiry_date"] = pd.to_datetime(f.expiry_date).dt.normalize()
 parts = []
 for y in range(2020, 2027):
@@ -35,6 +37,12 @@ for y in range(2020, 2027):
                 on=["ticker", "entry_date", "expiry_date", "PutCall", "long_strike"], how="left")
     m["vendor_mid"] = ((m.s_bid + m.s_ask) / 2 - (m.l_bid + m.l_ask) / 2).round(4)
     m["vendor_nat"] = (m.s_bid - m.l_ask).round(4)     # natural (sell short at bid, buy long at ask)
+    # 2026-09-30 (user: "fix the level"): the vendor EOD leg mid explains 47% of IBKR's 15:30 quoted credit, the vendor
+    # smile-fit model explains 93% (310 identical-strike pairs, handoff §0.69g). IBKR quote / vendor model median = 0.987.
+    # vendor_quote_adj is the level-matched proxy for an IBKR quote; it carries NO information about which side of model
+    # the real quote lands on (R^2 0.001-0.06), so a quote gate on it is meaningless by construction.
+    m = m.merge(f_model, on=KEY, how="left")
+    m["vendor_quote_adj"] = (QUOTE_LEVEL * m.model_credit).round(4)
     dup = m.duplicated(KEY).sum()
     print(f"{y}: {len(fy):,} cands, matched mid {m.vendor_mid.notna().mean():.3%}, IV {m.IV.notna().mean():.3%}, dup keys {dup} [{time.time()-t0:.0f}s]", flush=True)
     parts.append(m.drop_duplicates(KEY))

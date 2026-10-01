@@ -173,6 +173,13 @@ own 15:30 floor-eligible rows the gate does not predict outcomes: pass $1.0/trad
 top-6 difference (+$1,002 with gate vs -$364 without, six weeks) is pick-shuffling. Conclusion: the gate is an execution rule
 (do not fill below model), not a selection signal, and the backtest cannot simulate it except as a random ~40% pass.
 
+**Vendor quote LEVEL fixed (user: "fix the level").** `attach_quotes.py` now writes `vendor_quote_adj = 0.987 x model_credit`
+(QUOTE_LEVEL = median IBKR 15:30 quoted credit / vendor EOD model on 310 identical-strike pairs; the vendor leg mid explains
+47% of IBKR's quoted credit, the vendor model 93%). `frame_quotes_oi1.parquet` regenerated with the column (adj / vendor mid
+median 0.981). It is a level proxy only: which side of model the real IBKR quote lands on is unpredictable from vendor data
+(R^2 <= 0.06), so any gate `vendor_quote_adj >= model` is false by construction. Nothing in the site book reads a quote;
+selection, booking and payloads are unchanged.
+
 ## 0.69d Vendor vs IBKR reconciliation, strategy C, 2026-08-20..09-24 (Air, 2026-09-30 night) + KELLY FIX
 
 **Bug found and fixed (user: "fix that").** `ent_canon.kelly()` returned NaN for every growth-NEGATIVE spread (no interior
