@@ -86,13 +86,27 @@ def select_picks(cache_path):
     return sel.sort_values('entry_date_dt').reset_index(drop=True)
 
 
+def _w_size(row):
+    """Kelly stake used for sizing: the carry-adjusted w* when the book carries one (user 2026-10-01).
+
+    A NaN w_star_carry means the carry-adjusted Kelly has no positive-growth stake -- do not bet --
+    and must size at the floor (qty 1). Do NOT fall back to w_star there: ent_canon.kelly() clips those
+    same rows to 0.01, which on a small max_loss sizes ABOVE qty 1 and resurrects trades Kelly rejected
+    (+$422 on the 1/2 Kelly arm, IS, before this fix). The fallback applies only to books built before
+    the carry column existed.
+    """
+    if hasattr(row, 'index') and 'w_star_carry' in row.index:
+        return row.get('w_star_carry')
+    return row.get('w_star')
+
+
 def simulate_equity(picks, sizing):
     bankroll = START_BANKROLL
     daily_pnl = {}
     for _, row in picks.iterrows():
         if isinstance(sizing, str) and sizing.startswith('kelly_'):
             frac = float(sizing.split('_')[1])
-            ws = row.get('w_star'); ml_dollar = row['max_loss_dollar']
+            ws = _w_size(row); ml_dollar = row['max_loss_dollar']
             if ws is None or pd.isna(ws) or ws <= 0 or ml_dollar <= 0:
                 qty = 1
             else:
@@ -122,9 +136,15 @@ def build_payload(picks, end_year, label):
     pnl_qty2 = simulate_equity(picks, '2')      # canonical arm: qty=2 per pick (user 2026-09-19, reverted from risk-sizing)
     pnl_qty1 = simulate_equity(picks, '1')
     pnl_sixt = simulate_equity(picks, 'kelly_0.0625')
+    # 2026-10-01 (user): the site book also carries 1/4 and 1/2 Kelly at cap 5, sized on the
+    # carry-adjusted stake. 1/16 was effectively flat qty 1 (avg 1.34) and the weakest arm OOT.
+    pnl_q4 = simulate_equity(picks, 'kelly_0.25')
+    pnl_h2 = simulate_equity(picks, 'kelly_0.5')
     eq_qty2 = START_BANKROLL + pnl_qty2.reindex(td, fill_value=0.0).cumsum()
     eq_qty1 = START_BANKROLL + pnl_qty1.reindex(td, fill_value=0.0).cumsum()
     eq_sixt = START_BANKROLL + pnl_sixt.reindex(td, fill_value=0.0).cumsum()
+    eq_q4   = START_BANKROLL + pnl_q4.reindex(td, fill_value=0.0).cumsum()
+    eq_h2   = START_BANKROLL + pnl_h2.reindex(td, fill_value=0.0).cumsum()
     spy_eq  = START_BANKROLL * (spy['Close'].values / spy['Close'].iloc[0])
 
     n_years = (td[-1] - td[0]).days / 365.25
@@ -171,26 +191,36 @@ def build_payload(picks, end_year, label):
     summary.update(summary_for(eq_qty2, 'strategy'))
     summary.update(summary_for(eq_qty1, 'qty1'))
     summary.update(summary_for(eq_sixt, 'sixteenk'))
+    summary.update(summary_for(eq_q4, 'quarterk'))
+    summary.update(summary_for(eq_h2, 'halfk'))
     summary.update(summary_for(pd.Series(spy_eq, index=td), 'spy'))
 
     ml_col = picks['max_loss_dollar']
     def _kelly_qty(r, frac=0.0625):
-        ws = r.get('w_star'); mld = r['max_loss_dollar']
+        ws = _w_size(r); mld = r['max_loss_dollar']
         if ws is None or pd.isna(ws) or ws <= 0 or mld <= 0: return 1
         return max(1, min(5, int(frac*float(ws)*START_BANKROLL/mld)))
     wag2 = float((ml_col*2).sum()); wag1 = float(ml_col.sum())
     wagk = float((picks.apply(_kelly_qty, axis=1)*ml_col).sum())
+    wagq4 = float((picks.apply(_kelly_qty, axis=1, frac=0.25)*ml_col).sum())
+    wagh2 = float((picks.apply(_kelly_qty, axis=1, frac=0.5)*ml_col).sum())
     summary['strategy_wagered'] = round(wag2, 2)
     summary['qty1_wagered']     = round(wag1, 2)
     summary['sixteenk_wagered'] = round(wagk, 2)
+    summary['quarterk_wagered'] = round(wagq4, 2)
+    summary['halfk_wagered']    = round(wagh2, 2)
     summary['strategy_yield'] = round(100*(summary['strategy_final']-START_BANKROLL)/wag2, 2) if wag2 > 0 else 0
     summary['qty1_yield']     = round(100*(summary['qty1_final']-START_BANKROLL)/wag1, 2) if wag1 > 0 else 0
     summary['sixteenk_yield'] = round(100*(summary['sixteenk_final']-START_BANKROLL)/wagk, 2) if wagk > 0 else 0
+    summary['quarterk_yield'] = round(100*(summary['quarterk_final']-START_BANKROLL)/wagq4, 2) if wagq4 > 0 else 0
+    summary['halfk_yield']    = round(100*(summary['halfk_final']-START_BANKROLL)/wagh2, 2) if wagh2 > 0 else 0
 
     points = [{'date': d.strftime('%Y-%m-%d'),
                'strategy': round(float(eq_qty2.iloc[i]), 2),
                'qty1':     round(float(eq_qty1.iloc[i]), 2),
                'sixteenk': round(float(eq_sixt.iloc[i]), 2),
+               'quarterk': round(float(eq_q4.iloc[i]), 2),
+               'halfk':    round(float(eq_h2.iloc[i]), 2),
                'spy':      round(float(spy_eq[i]), 2)} for i, d in enumerate(td)]
 
     sp = picks.sort_values(['entry_date_dt','GROUND'], ascending=[True,False]).copy()

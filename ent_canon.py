@@ -518,6 +518,29 @@ def kelly(p, q, ro, b):
     return w, ell
 
 
+
+def kelly_carry(p, q, ro, b, carry):
+    """Kelly stake when the capital at risk also earns `carry` over the hold (user 2026-10-01).
+
+    Win pays b + carry, partial pays a*b + carry, a full loss costs (1 - carry) of the stake;
+    a is the same partial-payoff convention as kelly(). Solved on a 400-point grid in (0, 0.99]
+    -- the closed form in kelly() does not survive the shifted loss leg. At carry = 0 this matches
+    kelly()'s w* to within the grid step on growth-POSITIVE rows (median |diff| 0.0006, 6,099 picks);
+    growth-negative rows come back NaN here instead of kelly()'s floor-clipped 0.01. Both route to
+    the minimum size downstream (report_mid_canon._kelly_qty floors at qty 1), so sizing is unchanged.
+    """
+    p, q, ro, b, c = (np.asarray(x, dtype=float) for x in (p, q, ro, b, carry))
+    a = np.where(b >= 1.0, 0.0, (b - 1.0) / (2.0 * np.where(b == 0, 1, b)))
+    W = np.linspace(0.001, 0.99, 400)[None, :]
+    with np.errstate(invalid='ignore', divide='ignore'):
+        ell = (p[:, None] * np.log(np.clip(1 + W * (b + c)[:, None], 1e-12, None))
+               + ro[:, None] * np.log(np.clip(1 + W * (a * b + c)[:, None], 1e-12, None))
+               + q[:, None] * np.log(np.clip(1 - W * (1.0 - c)[:, None], 1e-12, None)))
+    fin = np.where(np.isfinite(ell), ell, -np.inf)
+    w = W[0][np.argmax(fin, axis=1)]
+    bad = ~(np.isfinite(b) & (p > 0) & (q > 0) & (p + q <= 1.0)) | (fin.max(axis=1) <= 0)
+    return np.where(bad, np.nan, w)
+
 # ── 5. score ────────────────────────────────────────────────────────────────
 def score(C: pd.DataFrame, closes: pd.DataFrame, k: float = K, thr: float = THR, credit_col: str = 'model_credit', mu=None) -> pd.DataFrame:
     """C must already carry model_credit + D_ent (price_spreads). Adds p,q,ro,w_star,G,EV,DKL,GROUND,qualified.

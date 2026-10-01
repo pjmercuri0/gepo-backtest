@@ -71,10 +71,14 @@
     <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 return</span><span class="chip-v {{ 'pos' if s.qty1_total_return >= 0 else 'neg' }}">{% if s.qty1_total_return >= 0 %}+{% endif %}{{ s.qty1_total_return }}%</span></span>
     <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 yield</span><span class="chip-v {{ 'pos' if s.qty1_yield >= 0 else 'neg' }}">{% if s.qty1_yield >= 0 %}+{% endif %}{{ s.qty1_yield }}%</span></span>
     <span class="chip" style="background:rgba(55,138,221,0.08)"><span class="chip-k">qty=1 $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.qty1_sharpe_dollar) }}</span></span>
-    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly final</span><span class="chip-v">${{ '{:,.0f}'.format(s.sixteenk_final) }}</span></span>
-    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly return</span><span class="chip-v {{ 'pos' if s.sixteenk_total_return >= 0 else 'neg' }}">{% if s.sixteenk_total_return >= 0 %}+{% endif %}{{ s.sixteenk_total_return }}%</span></span>
-    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly yield</span><span class="chip-v {{ 'pos' if s.sixteenk_yield >= 0 else 'neg' }}">{% if s.sixteenk_yield >= 0 %}+{% endif %}{{ s.sixteenk_yield }}%</span></span>
-    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¹⁄₁₆ Kelly $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.sixteenk_sharpe_dollar) }}</span></span>
+    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly final</span><span class="chip-v">${{ '{:,.0f}'.format(s.quarterk_final) }}</span></span>
+    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly yield</span><span class="chip-v {{ 'pos' if s.quarterk_yield >= 0 else 'neg' }}">{% if s.quarterk_yield >= 0 %}+{% endif %}{{ s.quarterk_yield }}%</span></span>
+    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.quarterk_sharpe_dollar) }}</span></span>
+    <span class="chip" style="background:rgba(245,159,39,0.08)"><span class="chip-k">¼ Kelly max DD</span><span class="chip-v neg">{{ s.quarterk_max_dd }}%</span></span>
+    <span class="chip" style="background:rgba(144,133,233,0.10)"><span class="chip-k">½ Kelly final</span><span class="chip-v">${{ '{:,.0f}'.format(s.halfk_final) }}</span></span>
+    <span class="chip" style="background:rgba(144,133,233,0.10)"><span class="chip-k">½ Kelly yield</span><span class="chip-v {{ 'pos' if s.halfk_yield >= 0 else 'neg' }}">{% if s.halfk_yield >= 0 %}+{% endif %}{{ s.halfk_yield }}%</span></span>
+    <span class="chip" style="background:rgba(144,133,233,0.10)"><span class="chip-k">½ Kelly $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.halfk_sharpe_dollar) }}</span></span>
+    <span class="chip" style="background:rgba(144,133,233,0.10)"><span class="chip-k">½ Kelly max DD</span><span class="chip-v neg">{{ s.halfk_max_dd }}%</span></span>
   </div>
   <div class="params-row" style="margin-bottom:22px">
     <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY final</span><span class="chip-v">${{ '{:,.0f}'.format(s.spy_final) }}</span></span>
@@ -116,7 +120,8 @@
         datasets: [
           { label: 'qty=2 (canonical)', data: points.map(p => p.strategy), borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.2, pointRadius: 0, fill: true,  tension: 0.05 },
           { label: 'qty=1',             data: points.map(p => p.qty1),     borderColor: '#378ADD', borderWidth: 1.6, pointRadius: 0, fill: false, tension: 0.05 },
-          { label: '¹⁄₁₆ Kelly (cap=5)',data: points.map(p => p.sixteenk), borderColor: '#EF9F27', borderWidth: 1.6, pointRadius: 0, fill: false, tension: 0.05 },
+          { label: '¼ Kelly (cap=5)',   data: points.map(p => p.quarterk), borderColor: '#EF9F27', borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.05 },
+          { label: '½ Kelly (cap=5)',   data: points.map(p => p.halfk),    borderColor: '#9085E9', borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.05 },
           { label: 'SPY',               data: points.map(p => p.spy),      borderColor: '#888780', borderWidth: 1.5, pointRadius: 0, fill: false, borderDash: [4, 3], tension: 0.05 },
         ]
       },

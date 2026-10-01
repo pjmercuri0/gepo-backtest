@@ -111,6 +111,42 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69j Carry on GROUND verified rank-neutral; site book sized on carry-adjusted Kelly, 1/4 and 1/2 arms (2026-10-01)
+
+**Carry is rank-neutral, verified.** On the strategy-C eligible pool (30,603 rows, 1,108 days): every day has exactly ONE DTE
+(Mon-Thu all expire the same Friday), so `CARRY_RATE x DTE/365` is a per-day constant. Adding it changes 0 of 30,603 within-day
+ranks and leaves all 6,620 picks identical. Selection still reads raw GROUND (`build_payloads_C.py` has no carry term). NOTE for
+reading the column: carry is 3.29 bps at the median against |GROUND| 0.23 bps, i.e. ~14x, so the displayed "Γ + carry" is mostly
+carry and ACROSS days it mostly tracks DTE (Mon 4.4 bps -> Thu 1.1 bps). Within a day it ranks exactly as raw GROUND.
+
+**Kelly sizing redone (user: "1/2 Kelly cap 5 and 1/4 cap 5 both on backtest").** New `ent_canon.kelly_carry(p,q,ro,b,carry)`:
+win pays b+carry, partial a*b+carry, a full loss costs (1-carry) of the stake; 400-point grid (the closed form in `kelly()` does
+not survive the shifted loss leg). At carry=0 it matches `kelly()` to the grid step on growth-positive rows; growth-negative rows
+return NaN instead of kelly()'s floor-clipped 0.01. `build_payloads_C.py` attaches `w_star_carry` (median 0.098 vs raw 0.089, finite 92%);
+`report_mid_canon._w_size()` sizes on it, and `build_payload` now emits `quarterk` (1/4) and `halfk` (1/2) arms alongside the
+existing `sixteenk`. Templates: Backtest AND OOT chips + equity chart show both arms (1/16 dropped from the display, still in the payload).
+
+| arm ($10k, cap 5, carry-adjusted stake) | IS 2021-25 | OOT 2026 |
+|---|---|---|
+| qty 1 | $51,440 / 1.46 / -23.0% | $19,623 / 3.11 / -9.6% |
+| qty 2 (headline) | $92,880 / 1.46 / -27.6% | $29,245 / 3.11 / -13.9% |
+| 1/16 Kelly (old arm) | $64,026 / 1.69 / -18.9% | $21,319 / 2.56 / -11.0% |
+| **1/4 Kelly** | **$115,241 / 1.67 / -26.3%** | **$37,415 / 3.21 / -13.7%** |
+| **1/2 Kelly** | **$159,183 / 1.62 / -43.6%** | **$50,199 / 3.25 / -18.4%** |
+
+Carry barely moves the STAKE (books within 1% of raw-Kelly sizing) even though it dominates the displayed score: carry 0.0002
+against a payoff b of ~1.0. Full 1x Kelly is not meaningful at cap 5 (avg qty 4.26 of 5 = "qty 5"); uncapped/compounding variants
+are in `kelly_sizing_sweep.csv` (1/2 Kelly cap 20: IS $283,663 / 1.78 / -33.8%, OOT $78,266 / 2.79 / -19.6%).
+
+**Bug fixed while wiring this.** `_w_size` first fell back to `w_star` when `w_star_carry` was NaN. Those are exactly the rows
+carry-Kelly rejects, and `kelly()` clips them to 0.01, which on a small max_loss sizes ABOVE qty 1 -- resurrecting trades Kelly
+said not to take (+$422 on the IS 1/2 Kelly arm). NaN now sizes at qty 1; the fallback applies only to books with no carry column.
+
+**Deploy.** Payloads + `live/templates/backtest.html` + `oot.html` rsynced to Mya, gunicorn master 1554088 HUP'd, both pages
+verified live (¼ $115,241 / +1.67, ½ $159,183 / +1.62 on /backtest; ¼ $37,415 / +3.21, ½ $50,199 / +3.25 on /oot). Backups
+`*.bak_prekellyarms_*` local and on Mya. `ent_canon.py` and `report_mid_canon.py` were NOT pushed to Mya (build-side only; Mya
+serves the JSON). Chart: `research/fable_canon_2026_09_30/plot_kelly_arms.py` -> `kelly_arms_equity.png`.
+
 ## 0.69h SITE tabs booked at 1.00 x model (2026-09-30 night, user: "change backtest and oot to be 1xmodel fills")
 
 `build_payloads_C.py 24 1.0` (fill is argv[2], default `ec.FILL_MULT`; `ec.FILL_MULT` itself is still 1.04, so live booking is

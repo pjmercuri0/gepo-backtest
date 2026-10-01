@@ -24,6 +24,12 @@ g = ~c.exdiv_hit & ~c.earnings_hit; cw = c.model_credit / c.width
 elig = (c.spread_type.eq("bull_put") & g & (cw >= FLOOR)) | (c.spread_type.eq("bear_call") & g & (cw >= FLOOR) & (c.IV < BEAR_IV) & c.below_100)
 sel = c[elig].sort_values(["entry_date", "GROUND"], ascending=[True, False]).groupby("entry_date", sort=False).head(TOP)
 picks = rbr.enrich(realize(sel, 10**6, fill=FILL))
+# 2026-10-01 (user): size the Kelly arms on GROUND+carry -- the stake that earns CARRY_RATE x DTE/365
+# on the capital at risk while held. Display GROUND already carries it; selection stays on raw GROUND.
+_carry = float(cfg.CARRY_RATE) * np.clip(picks.DTE.astype(float), 1, None) / 365.0
+_b = picks.model_credit / (picks.width - picks.model_credit)
+picks["w_star_carry"] = ec.kelly_carry(picks.p.values, picks.q.values, picks.ro.values, _b.values, _carry.values)
+print(f"carry-adjusted Kelly stake: median {np.nanmedian(picks.w_star_carry):.3f} vs raw {np.nanmedian(picks.w_star):.3f}; finite {100 * np.isfinite(picks.w_star_carry).mean():.0f}%")
 picks.to_parquet(HERE / f"picks_C_252_k{K:g}.parquet")
 
 def captions(payload):
