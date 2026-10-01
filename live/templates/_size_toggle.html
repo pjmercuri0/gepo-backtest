@@ -4,7 +4,7 @@
 <div class="size-toggle" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 14px">
   <span style="color:#888780;font-size:12px;margin-right:2px">sizing</span>
   {% for a in data.arms %}
-  <a href="?size={{ a.key }}" style="padding:5px 12px;border-radius:999px;font-size:13px;text-decoration:none;border:1px solid {{ '#1D9E75' if a.active else '#3a3a3a' }};background:{{ 'rgba(29,158,117,0.18)' if a.active else 'transparent' }};color:{{ '#e0e0d8' if a.active else '#888780' }};font-weight:{{ '600' if a.active else '400' }}">{{ a.label }}</a>
+  <a href="?size={{ a.key }}" style="padding:5px 12px;border-radius:999px;font-size:13px;text-decoration:none;border:1px solid {{ a.color if a.active else '#3a3a3a' }};background:{{ a.fill if a.active else 'transparent' }};color:{{ '#e0e0d8' if a.active else '#888780' }};font-weight:{{ '600' if a.active else '400' }}">{{ a.label }}</a>
   {% endfor %}
 </div>
 {% endif %}

@@ -1185,7 +1185,9 @@ def _size_view(payload: dict, arm: str) -> dict:
     if isinstance(payload.get("config"), dict):
         payload["config"]["sizing"] = _SIZE_TEXT[arm]
     payload["head"] = {k: s.get(f"{prefix}_{k}") for k in ("final", "total_return", "cagr", "yield", "sharpe_dollar", "max_dd")}
-    payload["arms"] = [{"key": a[0], "label": a[1], "prefix": a[2], "color": a[3], "active": a[0] == arm,
+    def _fill(hx):   # the arm's own colour at low alpha, so the shaded area matches its line
+        return "rgba(%d,%d,%d,0.10)" % tuple(int(hx[i:i + 2], 16) for i in (1, 3, 5))
+    payload["arms"] = [{"key": a[0], "label": a[1], "prefix": a[2], "color": a[3], "fill": _fill(a[3]), "active": a[0] == arm,
                         "final": s.get(f"{a[2]}_final"), "yield": s.get(f"{a[2]}_yield"),
                         "sharpe": s.get(f"{a[2]}_sharpe_dollar"), "max_dd": s.get(f"{a[2]}_max_dd")} for a in arms]
     payload["arm"] = arm; payload["arm_label"] = label

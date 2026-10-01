@@ -71,7 +71,7 @@
   {% if data.arms %}
   <div class="params-row" style="margin-bottom:10px">
     {% for a in data.arms %}
-    <span class="chip" style="background:{{ 'rgba(29,158,117,0.16)' if a.active else 'rgba(136,135,128,0.08)' }}"><span class="chip-k">{{ a.label }}</span><span class="chip-v">${{ '{:,.0f}'.format(a.final) }} · {% if a.yield >= 0 %}+{% endif %}{{ a.yield }}% yield · Sharpe {{ '%+.2f'|format(a.sharpe) }} · DD <span class="neg">{{ a.max_dd }}%</span></span></span>
+    <span class="chip" style="background:{{ a.fill if a.active else 'rgba(136,135,128,0.08)' }}"><span class="chip-k" style="color:{{ a.color }}">{{ a.label }}</span><span class="chip-v">${{ '{:,.0f}'.format(a.final) }} · {% if a.yield >= 0 %}+{% endif %}{{ a.yield }}% yield · Sharpe {{ '%+.2f'|format(a.sharpe) }} · DD <span class="neg">{{ a.max_dd }}%</span></span></span>
     {% endfor %}
   </div>
   {% endif %}
@@ -114,7 +114,7 @@
         labels: points.map(p => p.date),
         datasets: [
           {% if data.arms %}{% for a in data.arms %}
-          { label: {{ a.label|tojson }}, data: points.map(p => p[{{ ({'qty1':'qty1','strategy':'strategy','quarterk':'quarterk','halfk':'halfk'}[a.prefix])|tojson }}]), borderColor: {{ a.color|tojson }}, {% if a.active %}backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.4, fill: true,{% else %}borderWidth: 1.3, fill: false,{% endif %} pointRadius: 0, tension: 0.05, order: {{ 0 if a.active else 1 }} },
+          { label: {{ a.label|tojson }}, data: points.map(p => p[{{ ({'qty1':'qty1','strategy':'strategy','quarterk':'quarterk','halfk':'halfk'}[a.prefix])|tojson }}]), borderColor: {{ a.color|tojson }}, {% if a.active %}backgroundColor: {{ a.fill|tojson }}, borderWidth: 2.4, fill: true,{% else %}borderWidth: 1.3, fill: false,{% endif %} pointRadius: 0, tension: 0.05, order: {{ 0 if a.active else 1 }} },
           {% endfor %}{% else %}
           { label: 'strategy', data: points.map(p => p.strategy), borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.2, pointRadius: 0, fill: true, tension: 0.05 },
           {% endif %}
