@@ -22,7 +22,6 @@ import ent_canon as ec
 RAW = ROOT / "output/daily_closes.parquet"
 SPLITS = ROOT / "output/yahoo_split_history.csv"
 OUT = ROOT / "output/daily_closes_split_adj.parquet"
-TOL = 0.05          # absolute return units between observed and implied
 SEARCH = 3          # sessions either side of the Yahoo date
 
 
@@ -30,7 +29,7 @@ def main() -> None:
     cl = pd.read_parquet(RAW); cl["date"] = pd.to_datetime(cl.date).dt.normalize()
     cl = cl.dropna(subset=["close"]).drop_duplicates(["ticker", "date"]).sort_values(["ticker", "date"]).reset_index(drop=True)
     sp = pd.read_csv(SPLITS, parse_dates=["SplitDate"])
-    out, log = ec.apply_split_adjustment(cl, str(SPLITS), tol=TOL, search=SEARCH)
+    out, log = ec.apply_split_adjustment(cl, str(SPLITS), search=SEARCH)   # tolerance/floor live in ent_canon
     applied = [(r.Symbol, r.SplitDate.date(), r.ratio, r.why) for r in log[log.applied].itertuples()]
     skipped = [(r.Symbol, r.SplitDate.date(), r.ratio, r.why) for r in log[~log.applied].itertuples()]
     log.to_csv(ROOT / "output/split_adjustment_log.csv", index=False)

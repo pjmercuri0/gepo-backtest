@@ -111,6 +111,40 @@ identical, 362 commits, root unchanged) and main was force-pushed with the user'
 tag `backup/pre-trailer-strip-20260930` (0e418ad). **MAC MINI: `git fetch origin && git reset --hard origin/main`**
 before its next pull (a fast-forward pull will fail). Never add the trailers again; the user's 2026-05-13 rule stands.
 
+## 0.69o Split-match tolerance was wrong (mini caught it); tightened, both stores re-run (2026-10-01)
+
+**The mini's finding, confirmed and it is the Air's bug.** `apply_split_adjustment` tested the match with an ABSOLUTE
+tolerance of 0.05 in return units -- wider than the event itself for a small-ratio spinoff factor. On the IBKR store it
+"verified" HON 2026-06-29 (implied +4.88%) against an ordinary +3.66% day and scaled every earlier HON close up 4.9%;
+HON's real bar that day is -6.4%. The damage from a false match is worse than a miss: scaling a prefix changes exactly ONE
+return, the one spanning the boundary, so a false match INSERTS a spurious jump rather than removing one. Mini measured
+HON's GROUND moving 2.78 -> 2.06 bps on the 15:30 snapshot, picks unchanged.
+
+**Fix (ent_canon, shared by both stores).** `SPLIT_TOL_REL = 0.10` -- the observed return must land within 10% OF THE
+IMPLIED MOVE -- plus `SPLIT_MIN_IMPLIED = 0.15`: an event implying less than a 15% move is never adjusted at all, because
+it cannot be told from an ordinary session. Calibration: every genuine split matches within 3% (worst TSLA 2020-08-31 at
+3.1%). An intermediate 0.25 was tried and rejected -- it let T's 2022 Warner spinoff through at 22% off (observed -19.0%
+vs implied -24.5%), which would have inserted a ~6% error.
+
+**Vendor store: 20 applied / 12 skipped -> 14 applied / 18 skipped.** Now applied: AAPL, AMZN, AVGO, CSX, GE 1:8, GOOGL,
+ISRG, NFLX, NOW, NVDA (both), TSLA (both), WMT -- every unambiguous split, none within 3% of a false match. Now skipped and
+therefore LOOKBACK-GATED instead: BDX, DHR, GE spinoff factors, HON (all three), IBM, MMM, MRK, NEE, PFE, RTX, T, TJX.
+The five the Air had wrongly applied (BDX 1.025, HON 1.061, IBM 1.046, MRK 1.048, PFE 1.054) are exactly the class the mini
+flagged on its own store.
+
+| site book (qty 2, $10k, 1.00x model) | IS 2021-25 | OOT 2026 |
+|---|---|---|
+| loose tolerance (deployed earlier today) | 5804 / $93,485 / 1.46 / -27.9% | 816 / $29,300 / 2.98 / -15.3% |
+| **tightened (DEPLOYED)** | **5803 / $93,682 / 1.45 / -27.8%** | **816 / $27,975 / 2.74 / -15.9%** |
+
+Correctness costs 0.24 of OOT $-Sharpe: HON (10 picks) leaves the 2026 book via the lookback gate, and BDX/IBM/MRK/PFE
+lose their false adjustments. That is the honest number -- the earlier 2.98 was partly built on five events we had not
+actually verified. Deployed to Mya, both pages checked; backups `*.bak_pretol_*`.
+
+**MINI: pull, then re-run `python3 research/fetch_yahoo_split_history.py` is NOT needed (the CSV is unchanged) but the
+adjuster is -- nothing to rebuild on your side, `live/closes.py` adjusts in memory on every scan, so the next scan picks the
+new rule up automatically. Expect HON to stop being adjusted and its GROUND to return to ~2.78 bps.**
+
 ## 0.69n Splits are CANON FOR LIVE too; 1/2 Kelly off the chart (2026-10-01)
 
 **User:** "make canon for live too. need to make sure live checks ibkr close store to see if splits need adjusting too.

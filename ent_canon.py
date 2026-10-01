@@ -417,19 +417,30 @@ def p_real(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW, mu=N
 
 
 SPLIT_HISTORY = 'output/yahoo_split_history.csv'
-SPLIT_TOL = 0.05        # |observed session return - implied (1/R - 1)| must be within this to adjust
-SPLIT_SEARCH = 3        # sessions either side of the vendor's split date to look for the gap
+# 2026-10-01 (mini caught this): the match tolerance was an ABSOLUTE 0.05 in return units, which is
+# wider than the move itself for a small-ratio spinoff factor -- on the IBKR store HON 2026-06-29
+# (implied +4.9%) "verified" against an ordinary +3.7% day. Tolerance is now a FRACTION of the implied
+# move, and an event smaller than SPLIT_MIN_IMPLIED is never adjusted at all: a false match INSERTS a
+# spurious jump (scaling a prefix changes exactly one return, the one spanning the boundary), which is
+# worse than leaving the event alone. Small events are handled by the lookback exclusion instead.
+SPLIT_TOL_REL = 0.10     # |observed - implied| must be within this fraction of |implied|. Every genuine
+                         # split matches within 3% (worst: TSLA 2020 at 3.1%); 0.25 let T's 2022 Warner
+                         # spinoff through at 22% off (observed -19.0% vs implied -24.5%), which would have
+                         # inserted a ~6% error at that bar.
+SPLIT_MIN_IMPLIED = 0.15 # never adjust an event whose implied move is smaller than this
+SPLIT_SEARCH = 3         # sessions either side of the recorded date to look for the gap
 
 
 def apply_split_adjustment(closes: pd.DataFrame, splits_csv: str = SPLIT_HISTORY,
-                           tol: float = SPLIT_TOL, search: int = SPLIT_SEARCH):
+                           tol_rel: float = SPLIT_TOL_REL, search: int = SPLIT_SEARCH,
+                           min_implied: float = SPLIT_MIN_IMPLIED):
     """Back-adjust a (ticker, date, close) frame for stock splits. Returns (adjusted, log).
 
-    Every event is VERIFIED before anything changes: the observed session return must match the
-    split's implied 1/R - 1 within `tol`, searching `search` sessions either side of the recorded
-    date. Verified events have every close BEFORE the gap multiplied by 1/R; unverified events are
-    left alone and reported in the log with `applied=False` -- applying a factor to a series that
-    never gapped would INVENT a jump instead of removing one (spinoff factors do this).
+    Every event is VERIFIED before anything changes: its implied move 1/R - 1 must be at least
+    `min_implied`, and the observed session return must match it within `tol_rel` x |implied|,
+    searching `search` sessions either side of the recorded date. Verified events have every close
+    BEFORE the gap multiplied by 1/R; everything else is left alone and reported with applied=False --
+    applying a factor to a series that never gapped INVENTS a jump instead of removing one.
 
     Shared by the backtest (research/build_split_adjusted_closes.py, vendor store) and the live
     ranker (live/closes.py, IBKR store) so both measure returns on the same basis. 2026-10-01.
@@ -452,13 +463,17 @@ def apply_split_adjustment(closes: pd.DataFrame, splits_csv: str = SPLIT_HISTORY
             if not np.isfinite(R) or R <= 0:
                 rows.append((tk, e.SplitDate, R, False, 'bad ratio')); continue
             implied = 1.0 / R - 1.0
+            if abs(implied) < min_implied:
+                rows.append((tk, e.SplitDate, R, False,
+                             f'implied {implied:+.4f} below the {min_implied:g} floor -- too small to verify, left raw')); continue
             near = np.where(np.abs((d - np.datetime64(e.SplitDate)).astype('timedelta64[D]').astype(int)) <= search)[0]
             near = near[near > 0]
             if len(near) == 0:
                 rows.append((tk, e.SplitDate, R, False, 'no sessions near the date')); continue
             j = near[np.nanargmin(np.abs(r[near] - implied))]
-            if not np.isfinite(r[j]) or abs(r[j] - implied) > tol:
-                rows.append((tk, e.SplitDate, R, False, 'store shows no matching gap')); continue
+            if not np.isfinite(r[j]) or abs(r[j] - implied) > tol_rel * abs(implied):
+                rows.append((tk, e.SplitDate, R, False,
+                             f'no matching gap (best {r[j]:+.4f} vs implied {implied:+.4f})')); continue
             factor[:j] *= 1.0 / R
             rows.append((tk, e.SplitDate, R, True, f'verified at {pd.Timestamp(d[j]).date()} (observed {r[j]:+.4f} vs implied {implied:+.4f})'))
         if (factor != 1.0).any():
