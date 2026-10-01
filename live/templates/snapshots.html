@@ -3,10 +3,10 @@
 
 {% block content %}
 <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">Intraday Snapshot Picks</h1>
-<div class="subtitle">Every scan's threshold-qualified top-N, settled at expiry
+<div class="subtitle">Every scan's Fable picks (pooled top 6 by GROUND among spreads clearing the model-credit floor and the quote gate), settled at expiry
 (partial-WIN at 50% intrinsic — same P&amp;L model as the backtest). Scans are bucketed to
 their cron slot (:00/:15/:30/:45); out-of-hours runs are not shown.
-Question under test: does thr={{ '%g' % thr }} pick well at any time of day, or only near the close?</div>
+{% if stats_start %}{% if show_archive %}Showing the full archive (stats and cards include days before {{ stats_start }}). <a href="/snapshots">Back to stats since {{ stats_start }}</a>.{% else %}Stats, counts and cards start {{ stats_start }} (current canon){% if archived_days %} · {{ archived_days }} earlier day{{ 's' if archived_days != 1 else '' }} in the <a href="/snapshots?archive=1&days=all">archive</a>{% endif %}.{% endif %}{% endif %}</div>
 
 <style>
   /* .section-label is 11px uppercase grey -- fine for a caption, invisible as a

@@ -1200,8 +1200,16 @@ def snapshots():
         except ValueError:
             limit = SNAPSHOT_DAYS_DEFAULT
 
+    # Stats start (user 2026-10-01): everything before SNAPSHOT_STATS_START is archive --
+    # out of the aggregate, the counts and the day cards unless ?archive=1.
+    stats_start = str(getattr(live_config, "SNAPSHOT_STATS_START", "") or "")
+    show_archive = (request.args.get("archive") or "").strip() in ("1", "true", "yes")
+    archived_days = 0
     all_days = []
     for fp in sorted(picks_dir.glob("*.json"), reverse=True):
+        if stats_start and fp.stem < stats_start and not show_archive:
+            archived_days += 1
+            continue
         d = _read_json(fp)
         if d:
             # Drop out-of-hours scans (00:19, 16:00, 16:30, 20:11 are all in the
@@ -1259,7 +1267,8 @@ def snapshots():
                            thr=backtest_config.GROUND_THRESHOLD,
                            fill_mult=getattr(__import__("ent_canon"), "FILL_MULT", None),
                            shown_days=len(days), total_days=total_days,
-                           day_limit=limit)
+                           day_limit=limit, stats_start=stats_start,
+                           show_archive=show_archive, archived_days=archived_days)
 
 
 @app.route("/history")

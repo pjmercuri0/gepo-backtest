@@ -354,3 +354,7 @@ TOP_N_DISPLAY = 10                # 2026-09-16 canon: top-10 qualified bull puts
 # also what the backtest/OOT canon was validated on (§0.39). The broker quote is used ONCE,
 # as the execution gate below, not as a ranking input.
 LIVE_SELECTION_CREDIT = "model"
+
+# Snapshots tab (user 2026-10-01): settled stats, day cards and counts start from the first day of
+# the current canon; earlier days stay on disk and are reachable with ?archive=1.
+SNAPSHOT_STATS_START = "2026-10-01"
