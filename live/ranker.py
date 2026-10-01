@@ -546,6 +546,23 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # screen and failed underneath. A tie at 2dp qualifies.
     _r2 = lambda x: np.floor(x * 100 + 0.5) / 100
     ranked["above_min"] = _r2(ranked["net_credit"].astype(float)) >= ranked["tgt_walkaway_credit"].astype(float)
+    # Credible-book check (2026-10-01): a quote built from leg mids counts only when the legs' combined
+    # book is no wider than QUOTE_MAX_BOOK_W x the spread width and both legs are bid. Combo-sourced
+    # quotes already went through the same too-wide test in _reprice_on_combos.
+    if not ranked.empty:
+        _sw = (ranked["short_strike"].astype(float) - ranked["long_strike"].astype(float)).abs()
+        _bk = ((ranked["short_ask"].astype(float) - ranked["short_bid"].astype(float))
+               + (ranked["long_ask"].astype(float) - ranked["long_bid"].astype(float)))
+        _src = ranked["credit_source"].astype(str) if "credit_source" in ranked.columns else pd.Series("leg_mid", index=ranked.index)
+        _legsrc = ~_src.str.startswith("combo")
+        _bid_ok = (ranked["short_bid"].astype(float) > 0) & (ranked["long_bid"].astype(float) > 0)
+        ranked["quote_book_w"] = (_bk / _sw).round(3)
+        ranked["quote_ok"] = ~_legsrc | (_bid_ok & (_bk <= float(getattr(backtest_config, "QUOTE_MAX_BOOK_W", 1.0)) * _sw))
+        _nbad = int((ranked["above_min"] & ~ranked["quote_ok"]).sum())
+        if _nbad:
+            print(f"  quote gate: {_nbad} spread(s) at/above model only on a leg book wider than "
+                  f"{getattr(backtest_config, 'QUOTE_MAX_BOOK_W', 1.0):g}x the spread width -- not counted", flush=True)
+        ranked["above_min"] = ranked["above_min"] & ranked["quote_ok"]
     # 2026-09-29 canon (§0.66/§0.67): the bull parity veto is OFF (config.PARITY_FILTER False); bears keep theirs.
     bull_gate_on = bool(getattr(backtest_config, "PARITY_FILTER", True))
     bull_parity_ok = (ranked["parity_pct"] > getattr(backtest_config, "PARITY_MIN_PCT", 0.12)) if bull_gate_on \
@@ -589,8 +606,9 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         _use_iv = bool(getattr(backtest_config, "FABLE_USE_IV_FILTER", True))
         _use_iv_b = bool(getattr(backtest_config, "FABLE_BEAR_USE_IV_FILTER", _use_iv))
         _qg = getattr(backtest_config, "FABLE_QUOTE_GATE", None)
-        _quote_ok = ((ranked["net_credit"].astype(float) >= float(_qg) * ranked["model_credit"].astype(float))
-                     if _qg is not None else pd.Series(True, index=ranked.index))
+        # The gate IS above_min: quote >= model at the 2dp the page shows (a tie qualifies) on a credible
+        # book -- so the check mark on the live tab and the pick set can never disagree (2026-10-01).
+        _quote_ok = (ranked["above_min"].astype(bool) if _qg is not None else pd.Series(True, index=ranked.index))
         _rk = str(getattr(backtest_config, "FABLE_RANK_KEY", "GROUND"))
         _elig = (ranked["spread_type"].eq("bull_put")
                  & ((ranked["IV"].astype(float) > float(backtest_config.FABLE_MIN_IV)) if _use_iv else True)
@@ -834,6 +852,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             "fable":            _fable_mode,
             "cw_fill":          _num(r.get("cw_fill")),
             "cw_floor":         _num(r.get("cw_floor")),
+            "quote_ok":         (None if r.get("quote_ok") is None else bool(r.get("quote_ok"))),
+            "quote_book_w":     _num(r.get("quote_book_w")),
         }
 
     return {

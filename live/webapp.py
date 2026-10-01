@@ -1814,6 +1814,16 @@ def _overlay_stream(payload: dict) -> None:
                 wa = tg.get("walkaway_credit")
                 if wa is not None:
                     r["above_min"] = math.floor(q["mid"] * 100 + 0.5) / 100 >= wa
+                    # Same credible-book rule as the scan (2026-10-01): a streamed book wider than
+                    # QUOTE_MAX_BOOK_W x the spread width is not a price.
+                    try:
+                        _bw = abs(float(q["ask"]) - float(q["bid"]))
+                        if w and _bw > float(getattr(backtest_config, "QUOTE_MAX_BOOK_W", 1.0)) * float(w):
+                            r["above_min"] = False; r["quote_ok"] = False
+                        else:
+                            r["quote_ok"] = True
+                    except (TypeError, ValueError, KeyError):
+                        pass
                     if getattr(backtest_config, "SELECTION_MODE", "ground") != "fable":
                         r["qualified"] = bool(r.get("GROUND", 0) >= backtest_config.GROUND_THRESHOLD) and r["above_min"]
                     else:

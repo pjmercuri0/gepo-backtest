@@ -329,3 +329,9 @@ FABLE_PER_TICKER_DEDUPE = False
 # CARRY_RATE x max(DTE,1)/365 -- the interest the credit earns while held. Same constant for every
 # spread in a scan, so the ranking is untouched; selection still uses raw GROUND.
 CARRY_RATE = 0.04
+# 2026-10-01 (user: "snapshots are wrong ... not clearing the quote gate"): a quote only counts for
+# the gate when its book is credible. A leg-derived quote's book is [short_bid - long_ask,
+# short_ask - long_bid]; if that is wider than QUOTE_MAX_BOOK_W x the spread width the midpoint is
+# not a price (TMO 15:00: short 3.90/10.00, long 1.20/9.20 -> "mid" 1.75 on a 2.50 spread cleared the
+# gate while tight books a cent under model failed). Same rule the combo book already used.
+QUOTE_MAX_BOOK_W = 1.0
