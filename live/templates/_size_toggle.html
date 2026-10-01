@@ -21,7 +21,12 @@
     try { st = JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) {}
     if (!st || st.path !== location.pathname) return;
     const el = document.querySelectorAll(".size-toggle")[st.idx];
-    if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - st.top);
+    if (!el) return;
+    // The page scrolls inside #page-content (position:absolute; overflow-y:auto), NOT the window --
+    // window.scrollTo did nothing and the page stayed at the top (2026-10-01).
+    const delta = el.getBoundingClientRect().top - st.top;
+    const sc = document.getElementById("page-content");
+    if (sc && sc.scrollHeight > sc.clientHeight) sc.scrollTop += delta; else window.scrollBy(0, delta);
   }
   document.addEventListener("click", function (e) {
     const a = e.target.closest(".size-toggle a");
