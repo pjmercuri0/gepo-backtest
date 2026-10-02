@@ -124,7 +124,7 @@ def _split_adjust(closes: pd.DataFrame) -> pd.DataFrame:
     candidates -- so a machine without output/yahoo_split_history.csv keeps trading on raw closes.
     Refresh it with: python3 research/fetch_yahoo_split_history.py
     """
-    import live_config
+    from live import live_config   # was a bare `import live_config`: ModuleNotFoundError under `python -m live.ranker` (2026-10-02 09:30 scan)
     if not getattr(live_config, 'LIVE_SPLIT_ADJUST_CLOSES', True):
         return closes
     try:
