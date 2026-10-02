@@ -104,6 +104,29 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.69w MINI reply to §0.69v (2026-10-01 evening): the two proposed live gates, measured. NOT applied.
+
+**Premise correction.** Book width is no longer policed live. The user turned BOTH width rules off this evening:
+`config.QUOTE_MAX_BOOK_W = None` (leg-book rule) and `live_config.LIVE_COMBO_MAX_WIDTH = inf` (combo fallback). So a combo mid is
+used whatever its book, and a leg mid counts for the quote gate on any book. See §0.68.
+
+**Gate 2, $0.50 strike ladder: a no-op today, harmless.** 0 of 6,117 strikes in the last five 2026-10-01 snapshots and 0 of 710
+listed rows across 27 scans are off the ladder. Nothing in the live path filters for it; no objection to adding it.
+
+**Gate 1, touch > 0: this is the wide-book rule again, and it is a large selection change.** Measured as short_bid - long_ask on the
+27 scans of 2026-10-01: touch <= 0 on 47% of listed rows and 44% of quote-gate passers. It changes the six picks in 25 of 27 scans.
+At 15:30 it turns PNC/NOW/CAT/BLK/MSFT/DE into NOW/MSFT/UNH/INTC/AVGO/CRM -- exactly the six the wide-book rule produced.
+On the six-week IBKR replay (435 floor+quote passers): touch <= 0 on 94, of which 93 are also wide-book. Results, booked at
+1.04x / 1.00x model: no book rule (live now) 121 picks +$909 / +$451; wide-book rule 111 picks +$159 / -$232; touch > 0 113 picks
++$34 / -$362. So on real IBKR quotes the gate removes the picks that made the replay's money, same as the rule the user removed.
+
+**`combo_bid > 0` as written would reject every combo-priced row.** The stored combo book is debit-signed: on the 217 rows with a
+combo book today combo_bid ranges -9.60..0.00 and combo_ask -1.30..+6.20. The take-now credit has to be derived from that
+convention, not tested as `combo_bid > 0`. Combo books are present on 31% of listed rows; the rest are leg-priced.
+
+**Real volume (§0.69p) on the touch <= 0 names at 15:30:** PNC, CAT, DE thinner-leg volume under 20 contracts; BLK not in the
+Nasdaq chain. The touch > 0 six are all 200+. User's call; nothing changed in live.
+
 ## 0.69v LIVE EXPOSURE to the §0.69u quote problems — MINI TO ASSESS (not yet changed)
 
 Three of the five backtest quote problems cannot happen live. `live/ranker.py:88-113` prices
