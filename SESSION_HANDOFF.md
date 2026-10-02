@@ -104,6 +104,58 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.69q CALENDAR STALENESS 2026-10-01 (MacBook): earnings/ex-div gates may be blind — MINI MUST CHECK
+
+**MINI TO DO (live-affecting, this week).** Run on the mini and report:
+
+```
+ls -la data/earnings_calendar.csv data/dividend_calendar.csv
+tail -5 live/logs/calendar_refresh.log
+crontab -l | grep calendar_refresh
+```
+
+If `cron_calendar_refresh.sh` is not in the mini crontab, or the log's last entry is old,
+the live earnings and ex-dividend gates have been passing everything. Fix:
+`python3 fetch_earnings.py --start $(date '+%Y-%m-%d') --end $(date -v+90d '+%Y-%m-%d')`
+then `python3 fetch_dividends.py`. Both MERGE, they do not wipe.
+
+**What was found on the MacBook (its own copies, NOT proof of the mini's state).**
+`data/earnings_calendar.csv` and `data/dividend_calendar.csv` were both last written
+Jun 12 17:01. The earnings calendar ended 2026-07-30; the dividend calendar held 7 rows
+ending 2026-08-21 with ZERO forward events. Both have now been refreshed on the MacBook
+(earnings 386 rows through 2026-11-25, 89 forward events: ACN 10-01, PEP 10-08,
+BLK/GS/JNJ/JPM/UNH all 10-13). `data/` is gitignored, so none of that travels — the mini
+must refresh its own.
+
+**Research earnings history was also short and is now fixed.**
+`output/nasdaq_earnings_history.csv` ended 2026-08-26, leaving 96 OOT trades (12%, -$2,956)
+with no earnings gate. Refreshed to 2,574 rows through 2026-11-25. The four added September
+events (MDT 09-01, AVGO 09-02, ORCL 09-10, COST 09-24) gate ZERO OOT trades, so IS/OOT are
+unchanged at $93,476 / $-Sh 1.44 and $28,857 / $-Sh 2.88. The hole was exposure, not a
+realized error. `output/` is gitignored: the mini must run
+`python3 research/fetch_nasdaq_earnings_history.py` before it next rebuilds payloads.
+
+**Refresh cadence, as it stands.** Earnings + ex-div: weekly `live/cron_calendar_refresh.sh`
+(merge-only). Splits: NO job — `research/fetch_yahoo_split_history.py` is manual and must be
+run on any machine that rebuilds payloads.
+
+**Other EDA findings 2026-10-01, not yet actioned.** (a) DE carries only 3 earnings dates in
+the whole history file, all 2026 — its 135 IS trades ran with no earnings gate (-$3,275);
+ORCL is missing its Dec-2022 report. (b) The close store is 8.7% empty, and 9 traded names
+sit under 90% session coverage (SYK 34%, ZTS 42%, WM 61%, NEE 63%, ITW 63%, BDX 64%,
+TMO 74%, DHR 82%, CME 84%) = 253 trades, $5,261. This matters more than the share suggests:
+`ec.p_real` builds moves POSITIONALLY (`cl[d:]/cl[:-d]`), so for a name missing two sessions
+in three, a "1-day move" is really a week's move. (c) SPY/QQQ/IWM are in the traded universe
+(551 IS trades, +$7,674 = 9.2% of IS profit); user is not concerned.
+
+**What the same EDA pass cleared.** Splits: 12 names adjusted, 0 trades held across a known
+split, 0 selected trades with an unapplied corporate action inside the 252-session lookback
+(NEE 4:1, GE/T/MMM spinoffs all gated). Vendor holiday republishes (5,386 rows, 97%
+zero-return) are stripped by `backtest_closes()`'s SPY-session filter and never reach P_real;
+0 picks on holidays. Settlement: expiry_close matches the close store 131,570/131,570, every
+expiry a Friday, DTE exact. Chains: no republished days, no |delta| > 1, 12k duplicate keys
+touch 0 picks. 2026 universe stable at 85-86 names.
+
 ## 0.69p MINI evening findings 2026-10-01: vendor/IBKR overlap, fills vs model, snapshot Volume is unreliable
 
 **Vendor OOT vs IBKR fair replay, same weeks (entries 2026-08-20..09-24), matched on name + week + direction.** OOT 120 trades /
