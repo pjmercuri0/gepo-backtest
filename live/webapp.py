@@ -635,6 +635,19 @@ def _enrich_pick(pick: dict, tracking_rows: list = None, credit_frac: float = 1.
     # Belt-and-suspenders: clamp credit basis to spread width regardless of path.
     c0 = min(c0, round(spread_w, 4))
 
+    # The BOOKED basis, ignoring any typed fill (user 2026-10-02: on History the white max-loss and
+    # ratio equalled the green ones, because a recorded fill replaced the booked credit above).
+    # White = what the canon books (FILL_MULT x model); green = the real fill. P&L is unchanged.
+    c_book = None
+    if credit_frac != 1.0 and actual_c is not None:
+        if model_c is not None and float(model_c) > 0:
+            c_book = round(float(model_c) * credit_basis.MODEL_FILL_MULT, 4)
+        elif base_mid > 0:
+            c_book = round(base_mid * credit_frac, 4)
+        if c_book is not None:
+            c_book = min(c_book, round(spread_w, 4))
+            pick["book_target"] = {"credit": c_book, "max_loss": round(spread_w - c_book, 4)}
+
     # Canonical display sizing 2026-06-05: qty=1 per pick (per-contract display).
     # Live trading qty stays at user's discretion; the displayed credit/risk/P&L
     # numbers are per-contract for clean reading.
