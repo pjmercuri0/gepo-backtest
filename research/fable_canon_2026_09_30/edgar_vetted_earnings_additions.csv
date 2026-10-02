@@ -1,0 +1,27 @@
+Symbol,EarningsDate,verdict,why
+DE,2020-02-21,added,NASDAQ has no date within 45 days
+DE,2020-05-22,added,NASDAQ has no date within 45 days
+DE,2020-08-21,added,NASDAQ has no date within 45 days
+DE,2020-11-25,added,NASDAQ has no date within 45 days
+DE,2021-02-19,added,NASDAQ has no date within 45 days
+DE,2021-05-21,added,NASDAQ has no date within 45 days
+DE,2021-08-20,added,NASDAQ has no date within 45 days
+DE,2021-11-24,added,NASDAQ has no date within 45 days
+DE,2022-02-18,added,NASDAQ has no date within 45 days
+DE,2022-05-20,added,NASDAQ has no date within 45 days
+DE,2022-08-19,added,NASDAQ has no date within 45 days
+DE,2022-11-23,added,NASDAQ has no date within 45 days
+ORCL,2022-12-12,added,NASDAQ has no date within 45 days
+DE,2023-02-17,added,NASDAQ has no date within 45 days
+DE,2023-05-19,added,NASDAQ has no date within 45 days
+DE,2023-08-18,added,NASDAQ has no date within 45 days
+DE,2023-11-22,added,NASDAQ has no date within 45 days
+DE,2024-02-15,added,NASDAQ has no date within 45 days
+DE,2024-05-16,added,NASDAQ has no date within 45 days
+DE,2024-08-15,added,NASDAQ has no date within 45 days
+DE,2024-11-21,added,NASDAQ has no date within 45 days
+DE,2025-02-13,added,NASDAQ has no date within 45 days
+DE,2025-05-15,added,NASDAQ has no date within 45 days
+DE,2025-08-14,added,NASDAQ has no date within 45 days
+DE,2025-11-26,added,NASDAQ has no date within 45 days
+DE,2026-02-19,added,replaces NASDAQ 2026-02-12 (no 8-K within 3 days of it)

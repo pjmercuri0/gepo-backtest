@@ -104,6 +104,28 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.69s MINI reply to §0.69r (2026-10-01): EDGAR dates vetted, nine names pulled from IBKR; payload rebuild is the Air's
+
+**The mini cannot rebuild payloads.** `research/dkl_2026_09_13/featATM8_oi1.parquet`, `output/name_gaps_backtest.parquet`,
+`output/yahoo_dividend_history.csv` and the 2021-25 vendor chains are not on this machine; its `output/daily_closes.parquet` covers
+2025-09-02..2026-09-11 only and was NOT touched. Steps that need `build_payloads_C.py` are left for the Air.
+
+**Item 2 — vetted.** `research/fable_canon_2026_09_30/vet_edgar_earnings.py` -> `edgar_vetted_earnings_additions.csv` (tracked) and
+`output/earnings_history_merged.csv` (2,599 rows = NASDAQ 2,574 + 26 added - 1 removed). Of 188 EDGAR Item 2.02 dates with no NASDAQ
+date within 3 days: **26 added** (DE 25 -- its whole quarterly history plus 2026-02-19; ORCL 2022-12-12), **162 dropped**.
+159 of the dropped are a second 2.02 filing in a quarter whose NASDAQ date has its own 8-K: TSLA 27 (quarterly delivery reports,
+2nd of Jan/Apr/Jul/Oct), ABBV 18 (IPR&D expense pre-announcements), REGN 14, DHR 9, ISRG 8, HON 6, EOG 6 ... Three were read on
+EDGAR and are not earnings: HON 2023-12-11 (business realignment), GE 2020-04-09 (Q1 pre-announcement) and 2020-04-13 (financing
+actions; GE's real Q1 release on 04-29 was filed under Item 9.01 only, so NASDAQ is right). One NASDAQ date is removed: DE 2026-02-12
+(the 8-K for fiscal Q1 is dated 02-19). After the merge every name-year 2020-25 has exactly 4 dates. To use it: run
+`fetch_edgar_earnings_history.py`, then `vet_edgar_earnings.py`, then point `bear_regime_sweep.py:EARNINGS` at
+`output/earnings_history_merged.csv`. Step 5 of §0.69r cannot be done from EDGAR: it holds past filings only, no forward dates.
+
+**Item 3 — data pulled, merge is the Air's.** `research/fable_canon_2026_09_30/ibkr_closes_backfill_9names.parquet`: IBKR daily
+TRADES closes 2019-10-04..2026-10-01, 1,757 sessions each for SYK, ZTS, WM, NEE, ITW, BDX, TMO, DHR, CME. **These bars are
+split-ADJUSTED** (NEE prints ~75 before its 2020-10-27 4:1), the vendor store is raw: un-adjust before appending to
+`output/daily_closes.parquet`, or the merge inserts a jump. Only bar over 20% in the file: ZTS 2026-05-07 -21.5% (real).
+
 ## 0.69r MINI WORK ORDER 2026-10-01: finish EDA items 2 (earnings source) and 3 (close coverage)
 
 ### Item 2 — replace the earnings gate's source with SEC EDGAR
