@@ -104,6 +104,32 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.69v LIVE EXPOSURE to the §0.69u quote problems — MINI TO ASSESS (not yet changed)
+
+Three of the five backtest quote problems cannot happen live. `live/ranker.py:88-113` prices
+every spread from the REAL combo book (combo mid when the book is tighter than
+`LIVE_COMBO_MAX_WIDTH` x width, else a fresh combo last that sits INSIDE the book, else leg
+mids), so there is no smile fit to exceed the market: credit above the best quote is
+impossible, a combo quote cannot cross itself, and the inverted-mid case was a single-leg
+artifact. Book width is already policed by `quote_ok` (ranker.py:589-595).
+
+**Two DO apply live and are NOT gated.**
+
+1. **touch <= 0 is not checked.** The keep-rule is `net_credit > 0` (ranker.py:124-126) on the
+   MID. A combo book of 0.00 x 1.00 mids to 0.50 and passes — exactly the 14,768-candidate
+   defect just gated out of the backtest. Proposed: require `combo_bid > 0` (and consider
+   `combo_bid >= some fraction of the model credit`) wherever the credit comes from a combo
+   book, and for the leg-mid fallback require `short_bid - long_ask > 0`.
+2. **No strike-ladder filter** exists in `ranker.py` or `fetcher.py`. IBKR serves
+   split-adjusted orphan series (the CSX 32.17 / NVDA 196.88 shape); nothing stops a pick
+   landing there. Proposed: both strikes must be a multiple of $0.50. Real ladder gaps on a
+   normal grid (EOG 76/74) must stay.
+
+Neither change is made — it alters live selection, so it needs the user's call and a mini
+pull before the next scan. MINI: say whether you agree with the two gates as specified,
+whether `combo_bid > 0` is the right form given how often IBKR shows a 0 bid on a 1-4 DTE
+combo, and whether anything in the live path already covers either case that the Air missed.
+
 ## 0.69u QUOTE-REALITY GATES 2026-10-01 (user): candidates must be fillable, credit capped at the book
 
 Second EDA pass on the vendor data and the two books found five quote problems in the
