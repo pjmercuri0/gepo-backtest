@@ -104,6 +104,61 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.69r MINI WORK ORDER 2026-10-01: finish EDA items 2 (earnings source) and 3 (close coverage)
+
+### Item 2 — replace the earnings gate's source with SEC EDGAR
+
+Why: NASDAQ's historical calendar is missing 188 reports for the universe. DE carried 3
+dates for the whole 2020-2026 sample, so its 135 backtest trades (-$3,275) ran ungated.
+Where NASDAQ does have a date it can be wrong: DE's Jan-2026 quarter is 2026-02-12 in
+NASDAQ, 2026-02-19 in Deere's own 8-K.
+
+1. `python3 research/fetch_edgar_earnings_history.py` (output/ is gitignored, so the mini
+   must run it). Writes `output/edgar_earnings_history.csv`, ~3,019 dates, 93 names,
+   2019-01-02 onward. MMC has no CIK in SEC's ticker map and is not traded anyway.
+2. VET THE EXTRAS BEFORE USING IT. Some issuers furnish non-earnings releases under Item
+   2.02 — TSLA has 27 dates with no NASDAQ counterpart within 3 days, DE 25, ABBV 18,
+   REGN 14. Print the per-(name, year) counts; any name/year above 4 needs a look at what
+   those filings are before the date is allowed to gate a trade. Do NOT merge blind: a
+   false earnings date silently deletes good candidates.
+3. Merge the vetted EDGAR dates with the NASDAQ file (union, dedupe on Symbol+EarningsDate),
+   point `research/bear_regime_sweep.py:EARNINGS` at the merged file, then
+   `python3 research/fable_canon_2026_09_30/build_payloads_C.py 24 1.00`.
+4. Report: trade count and P&L before/after, DE's trade count before/after, and how many
+   trades the new dates removed per name. Baseline to beat: IS 5,803 trades $93,476
+   $-Sh 1.44; OOT 816 $28,857 $-Sh 2.88.
+5. Seed the forward dates into the LIVE gate as well (`data/earnings_calendar.csv`), since
+   that is what `live/ranker.py` reads.
+
+Caveat to carry: EDGAR gives the FILING date. An issuer that releases after the close
+normally files the same day, but a next-morning filing shifts the date one session.
+
+### Item 3 — close-store coverage holes corrupt P_real for sparse names
+
+Why: `output/daily_closes.parquet` is 8.7% empty across (name, session). Nine TRADED names
+sit under 90% coverage — SYK 34%, ZTS 42%, WM 61%, NEE 63%, ITW 63%, BDX 64%, TMO 74%,
+DHR 82%, CME 84% — covering 253 trades and $5,261. This is worse than the share suggests:
+`ent_canon.p_real` builds its moves POSITIONALLY (`R = cl[d:] / cl[:-d] - 1`), so for a name
+missing two sessions in three a "1-day move" is really a week's move, and the window that
+decides P(win) is measuring the wrong horizon.
+
+Root cause is known: `build_daily_closes.py` seeds the store from the vendor chain files'
+`UnderlyingPrice`, so a name absent from the vendor chain on a day has no close at all.
+
+1. Confirm the holes are vendor-side, not store-side: for SYK and ZTS, count distinct
+   DataDates in `output/20??_sp500_last.parquet` versus sessions in the store.
+2. Backfill from an INDEPENDENT daily source — the mini has IB Gateway, so
+   `live/fetch_ibkr_closes.py` is the natural one; Yahoo is the fallback. Append, never
+   overwrite: `live.closes.append_closes` is merge-only and keeps existing rows.
+3. Rebuild the split-adjusted store (`python3 research/build_split_adjusted_closes.py`) —
+   the adjuster works off the raw store, and NEE's 4:1 is currently unverifiable precisely
+   because the store has no sessions near 2020-10-27.
+4. Rebuild payloads and report the delta, plus the new coverage table.
+5. If backfill is not possible for some names, the alternative is a COVERAGE GATE: no
+   candidate unless the name has at least (say) 90% of the trailing 252 sessions present.
+   Measure both before choosing; a gate that drops the nine names costs 253 trades/$5,261
+   at most, which is the ceiling on what this is worth.
+
 ## 0.69q CALENDAR STALENESS 2026-10-01 (MacBook): earnings/ex-div gates may be blind — MINI MUST CHECK
 
 **MINI TO DO (live-affecting, this week).** Run on the mini and report:
