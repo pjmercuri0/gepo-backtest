@@ -104,6 +104,46 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.69u QUOTE-REALITY GATES 2026-10-01 (user): candidates must be fillable, credit capped at the book
+
+Second EDA pass on the vendor data and the two books found five quote problems in the
+selected trades. All five are now gated at CANDIDATE level in `build_payloads_C.py`, so the
+daily top-6 backfills instead of thinning. Definitions: touch = short bid - long ask (the
+price you can take now); best = short ask - long bid (the most the quoted book could pay).
+
+| gate | candidates dropped |
+| --- | --- |
+| touch <= 0 (book cannot pay anything) | 14,768 |
+| inverted mid (nearer strike worth less than the farther) | 625 |
+| off-ladder strikes, not a multiple of $0.50 | 499 |
+| crossed quotes, short ask < long bid | 28 |
+
+plus `model_credit = min(model_credit, best quoted credit)` BEFORE the delta cap, so both
+ceilings apply and GROUND is scored on the capped credit. The best-quote cap bites on 2.3%
+of survivors (median haircut $0.014). Candidates/day 99 -> 84; no day fell below 6.
+
+**Verified on the rebuilt book** (6,593 picks joined to `frame_quotes_oi1.parquet`): touch<=0
+0, crossed 0, inverted 0, credit above best quote 0, off-ladder strikes 0, odd widths 0.
+
+**Cost.** IS 5,828 trades $86,115 $-Sh 1.43 DD -26.0% -> **5,779 trades $73,391 $-Sh 1.26
+DD -30.3%**. OOT 816 $18,857 $-Sh 2.88 -> **814 $18,198 $-Sh 2.86**. IS gives up 15% of its
+profit and 0.17 Sharpe; OOT is unchanged inside noise.
+
+**Why the split gates did not already catch the odd ladders.** The corporate-action gate
+covers entry-through-expiry and the lookback gate covers the 252-session window, but a
+split-adjusted series (CSX 32.17/32.00, NVDA 196.88/196.25, ISRG 1.67 ladders) keeps trading
+for YEARS after the event, long past both. It needed its own ladder rule. Ladder gaps on a
+normal grid (EOG 76/74, FCX 43/41.50) are real listings and are kept.
+
+**Also measured, not acted on.** GROUND still does not rank profit: Spearman(GROUND, P&L)
+0.003 IS and -0.016 OOT, while loss rate falls monotonically by decile (40.2% -> 26.9% IS,
+34.1% -> 20.7% OOT) -- the §0.66 finding, now on this book. 762 IS trades (13.1%) carried
+GROUND <= 0 and still earned +$18,430; strategy C has no threshold, so they fill the daily
+six. The net is a thin residual of large flows: WIN +$467,696, LOSS -$361,519,
+PARTIAL -$20,062, a 10% margin on $829k gross. The six daily picks behave like 3.34
+independent bets (average pairwise correlation 0.16, 89% bull puts) and daily P&L correlates
+0.18 with the NEXT day's SPY return, ~0 with the same day's.
+
 ## 0.69t AIR 2026-10-01: EDA items 2 and 3 applied — earnings source merged, nine names backfilled
 
 **Item 2 applied.** `research/bear_regime_sweep.py:EARNINGS` now points at

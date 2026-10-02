@@ -13,8 +13,30 @@ FLOOR, BEAR_IV, TOP = 0.45, 0.35, 6
 K = float(sys.argv[1]) if len(sys.argv) > 1 else float(ec.K)   # D_ent penalty in the rank key (user 2026-09-30: 24)
 FILL = float(sys.argv[2]) if len(sys.argv) > 2 else float(ec.FILL_MULT)   # 2026-09-30 (user): site book at 1.00 x model; live booking keeps ec.FILL_MULT
 with contextlib.redirect_stdout(io.StringIO()):
-    c, spy = prepare(); c = rbr.apply_delta_cap(c); c = add_regimes(c, spy); c = add_exdiv_gate(c); c = add_earnings_gate(c); c = add_split_gate(c); c = add_split_window_gate(c)
-c = c.merge(pd.read_parquet(HERE / "frame_quotes_oi1.parquet")[KEY + ["IV"]], on=KEY, how="left")   # 2026-09-30: OI >= 1 frame
+    c, spy = prepare(); c = add_regimes(c, spy); c = add_exdiv_gate(c); c = add_earnings_gate(c); c = add_split_gate(c); c = add_split_window_gate(c)
+QCOLS = ["IV", "s_bid", "s_ask", "l_bid", "l_ask"]
+c = c.merge(pd.read_parquet(HERE / "frame_quotes_oi1.parquet")[KEY + QCOLS], on=KEY, how="left")   # 2026-09-30: OI >= 1 frame
+
+# 2026-10-01 (user): quote-reality gates at CANDIDATE level, so the daily top-N backfills.
+#   touch = sell the short at its bid, buy the long at its ask -- the price you can take now.
+#   best  = sell at the ask, buy at the bid -- the most the quoted book could ever pay.
+# Dropped: a book that cannot pay anything (touch <= 0), quotes that cross across strikes
+# (short ask below long bid), an inverted mid (the nearer strike worth less than the farther),
+# and split-adjusted odd ladders (CSX 32.17/32.00, NVDA 196.88/196.25) which are thin orphan
+# series. Ladder gaps on a normal $0.50 grid (EOG 76/74) are real and kept.
+_touch = c.s_bid - c.l_ask
+_best = c.s_ask - c.l_bid
+_smid, _lmid = (c.s_bid + c.s_ask) / 2, (c.l_bid + c.l_ask) / 2
+_half = lambda x: (np.round(x.to_numpy(float) * 100).astype(int) % 50) == 0
+_keep = (c[QCOLS[1:]].notna().all(axis=1) & (_touch > 0) & (c.s_ask >= c.l_bid) & (_smid >= _lmid)
+         & _half(c.short_strike) & _half(c.long_strike))
+print(f"quote gates: dropped {int((~_keep).sum()):,} of {len(c):,} candidates "
+      f"(touch<=0 {int((_touch <= 0).sum()):,}, crossed {int((c.s_ask < c.l_bid).sum()):,}, "
+      f"inverted mid {int((_smid < _lmid).sum()):,}, off-ladder {int((~(_half(c.short_strike) & _half(c.long_strike))).sum()):,})")
+c = c[_keep].copy()
+# Credit can never exceed the best quote the book showed; the delta ceiling applies on top.
+c["model_credit"] = np.minimum(c.model_credit.to_numpy(float), (c.s_ask - c.l_bid).to_numpy(float)).round(4)
+c = rbr.apply_delta_cap(c)   # min(credit, |delta| x width) + EV/GROUND recomputed on the capped credit
 cl = pd.read_parquet(ROOT / "output/daily_closes.parquet"); cl["date"] = pd.to_datetime(cl.date).dt.normalize()
 cl = cl.dropna(subset=["close"]).sort_values(["ticker", "date"]); cl["n_before"] = cl.groupby("ticker").cumcount()
 c = c.merge(cl[["ticker", "date", "n_before"]].rename(columns={"date": "entry_date"}), on=["ticker", "entry_date"], how="left")
@@ -42,7 +64,7 @@ def captions(payload):
     k["bear_gates"] = (f"bear calls: IV < {BEAR_IV:.2f}, same credit floor, share the pooled top-{TOP}. Earnings, ex-dividend and "
                        "corporate-action (split / reverse split / spinoff) gates, entry through expiry+1, apply to both sleeves.")
     k["parity"] = "no bull parity veto; no bear parity veto"
-    k["fill_basis"] = f"{FILL:.2f}\u00d7 min(smile-fit model credit, {float(os.environ.get(chr(68)+chr(69)+chr(76)+chr(84)+chr(65)+chr(95)+chr(67)+chr(65)+chr(80)+chr(95)+chr(70)+chr(82)+chr(65)+chr(67), 1.0)):g} \u00d7 |short delta| \u00d7 width); partial-WIN at 50% intrinsic; no commission"
+    k["fill_basis"] = f"{FILL:.2f}\u00d7 min(smile-fit model credit, |short delta| \u00d7 width, best quoted credit); quote gates: touch > 0, no crossed or inverted quotes, $0.50 strike ladder; partial-WIN at 50% intrinsic; no commission"
     k["scoring"] = f"G = Kelly log-growth on P_real at the delta-capped model credit; GROUND = (e^G\u22121)\u00b7e^(\u2212k\u00b7D_ent), k = {K:g}"
     return payload
 for lab, m, yr, path in (("IS", picks.entry_date.dt.year <= 2025, 2025, "backtest_equity.json"),
