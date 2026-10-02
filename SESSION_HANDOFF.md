@@ -104,6 +104,26 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.69p MINI evening findings 2026-10-01: vendor/IBKR overlap, fills vs model, snapshot Volume is unreliable
+
+**Vendor OOT vs IBKR fair replay, same weeks (entries 2026-08-20..09-24), matched on name + week + direction.** OOT 120 trades /
+100 name-weeks, replay 121 / 92, shared 30 (30% of OOT, 33% of replay). Per contract at 1.00x model: shared name-weeks OOT -$1,744
+(41 trades) and replay -$553 (36); unshared OOT +$300 (79), replay +$1,004 (85). Totals OOT -$1,444, replay +$451. Worst shared
+names: AXP -$606 combined, EOG -$456, ADI -$380. Only 14 of the 41 shared OOT trades have the same strikes and entry day.
+Per-trade t-stats (1.00x): vendor IS 6.3, OOT Jan-Aug19 4.9, OOT Aug20-Sep24 -1.5, replay 0.4.
+
+**User fills vs model credit (server live/actuals.json, 52 trades with a typed fill):** median fill/model 1.037, 47 at or above
+1.00x, 29 at or above 1.03x; expiry 10-02 median 1.013. The 1.00x model fill assumption is supported by real fills.
+
+**Snapshot Volume column is NOT reliable.** live/snapshots/*.parquet Volume showed 0 on legs the user traded that morning (ADP 265 and
+262.5 puts, NOW 138, CME 265/267.5) and fell 2 -> 0 between the 10:30 and 10:45 scans. OpenInterest is 0 on every row. Nasdaq
+end-of-day for the same legs: MSFT 515 put 12,019 (snapshot 0), NOW 138 336 (0), ADP 265 31 (0), ADP 262.5 104 (0), CME 265 27 (0).
+Do not use the snapshot Volume/OI for liquidity work. `research/fable_canon_2026_09_30/nasdaq_volume_check.py` pulls real volume
+for a ranked scan (same evening only; Nasdaq serves the current chain) -> `nasdaq_volume_2026-10-01_1530.csv`: of 22 floor-passing
+candidates at 15:30, thinner-leg volume is 200+ on 12, 20-199 on 1, under 20 on 9 (DE, ISRG, PNC, EOG, CAT, TMO, ADI, TJX, CSX).
+The six picks with the wide-book rule ON (NOW, MSFT, UNH, INTC, AVGO, CRM) are all 200+; with it OFF, as live now
+(PNC, NOW, CAT, BLK, MSFT, DE), two are 200+, three under 20, BLK not in the Nasdaq chain. One scan, one day.
+
 ## 0.69a HISTORY REWRITTEN 2026-09-30 evening (user: strip every Co-Authored-By / Claude-Session trailer)
 
 All 237 commits since 2026-08-31 were rewritten with `git filter-branch --msg-filter` (message lines only; every tree
