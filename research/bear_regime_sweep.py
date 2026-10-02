@@ -32,7 +32,7 @@ from sma_bull_regime_sweep import (
 
 OUT = ROOT / "output/bear_regime_sweep.csv"
 DIVIDENDS = ROOT / "output/yahoo_dividend_history.csv"
-EARNINGS = ROOT / "output/nasdaq_earnings_history.csv"
+EARNINGS = ROOT / "output/earnings_history_merged.csv"   # 2026-10-01: NASDAQ + vetted EDGAR 8-K Item 2.02 (handoff §0.69s); DE had 3 dates in NASDAQ
 SPLITS = ROOT / "output/yahoo_split_history.csv"
 START = 20_000.0
 # P_real needs history before it means anything; featATM6 began 2020-07-14 for that reason

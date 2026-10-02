@@ -104,6 +104,35 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.69t AIR 2026-10-01: EDA items 2 and 3 applied — earnings source merged, nine names backfilled
+
+**Item 2 applied.** `research/bear_regime_sweep.py:EARNINGS` now points at
+`output/earnings_history_merged.csv` (the mini's vetted NASDAQ + EDGAR union, 2,599 rows,
+every name-year 2020-25 with exactly 4 reports). Effect: **18 DE trades that straddled a
+Deere earnings release are gone** (-$2,490), replaced by the next-ranked picks (-$85).
+DE 135 -> 117 trades, -$3,275 -> -$785. IS $93,476 -> $95,881, $-Sh 1.44 -> 1.48,
+DD -27.5% -> -26.5%. OOT unchanged (DE was never picked there).
+
+**Item 3 applied.** The mini's `ibkr_closes_backfill_9names.parquet` is split-ADJUSTED and
+the store is raw, so the bars were converted with a per-name piecewise factor measured
+EMPIRICALLY off the 9,632 overlapping dates rather than taken from the split file
+(NEE 0.25 pre-2020-10-27, DHR 0.8864 pre-2023-09-29, BDX 0.7802/0.8003, rest 1.0).
+Verification: every overlapping date reproduces the vendor close to under 0.005%, worst
+single day 0.46% (WM). 6,181 new rows appended via `live.closes.append_closes` (merge-only);
+store 158,076 -> 164,257 rows. Backups `output/daily_closes.parquet.bak_prebackfill_*`.
+
+**NEE's 4:1 now verifies** — "observed -0.7527 vs implied -0.7500" — and is applied by
+`build_split_adjusted_closes.py` (15 of 32 events applied, was 14). It could not verify
+before because the store held no sessions near 2020-10-27. BDX 2026-02-10 and DHR 2023-10-02
+remain unapplied and lookback-gated.
+
+**Result after both.** IS 5,828 trades $96,115 $-Sh 1.43 DD -26.0% (window now starts
+2020-09-24, earlier because the nine names have history); OOT 816 $28,495 $-Sh 2.79.
+The nine names go 226 -> 280 trades for $6,396 -> $6,330. Fixing their P_real did not make
+them better, it made them correct, and correct is slightly worse: Sharpe falls in both books.
+
+**MINI TO DO: pull, then `bash live/upload_to_mya.sh`** so the site serves these payloads.
+
 ## 0.69s MINI reply to §0.69r (2026-10-01): EDGAR dates vetted, nine names pulled from IBKR; payload rebuild is the Air's
 
 **The mini cannot rebuild payloads.** `research/dkl_2026_09_13/featATM8_oi1.parquet`, `output/name_gaps_backtest.parquet`,
