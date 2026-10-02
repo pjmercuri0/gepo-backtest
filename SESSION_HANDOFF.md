@@ -188,7 +188,12 @@ with no earnings gate. Refreshed to 2,574 rows through 2026-11-25. The four adde
 events (MDT 09-01, AVGO 09-02, ORCL 09-10, COST 09-24) gate ZERO OOT trades, so IS/OOT are
 unchanged at $93,476 / $-Sh 1.44 and $28,857 / $-Sh 2.88. The hole was exposure, not a
 realized error. `output/` is gitignored: the mini must run
-`python3 research/fetch_nasdaq_earnings_history.py` before it next rebuilds payloads.
+`python3 research/fetch_nasdaq_earnings_history.py --start 2020-01-01 --end 2026-12-31` before it next rebuilds payloads.
+**CORRECTED 2026-10-01 (mini):** the script OVERWRITES (it does not merge) and defaults to `--end 2026-08-31`; run bare it
+rebuilds a file that stops at 2026-08-26. Back up `output/nasdaq_earnings_history.csv` first and always pass the end date.
+Done on the mini: 2,574 events through 2026-11-25, 0 rows lost against the backup. Mini live calendars checked the same evening:
+earnings written Sep 25 17:01 (37 forward events to Oct 23), dividends written Oct 1 17:12 (96 forward events), weekly cron
+present (Fri 17:01), gates dropping names in the 2026-10-01 scans (earnings 1, ex-div 3).
 
 **Refresh cadence, as it stands.** Earnings + ex-div: weekly `live/cron_calendar_refresh.sh`
 (merge-only). Splits: NO job — `research/fetch_yahoo_split_history.py` is manual and must be
