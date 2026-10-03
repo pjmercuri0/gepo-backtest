@@ -18,7 +18,10 @@ FILL = float(sys.argv[1]) if len(sys.argv) > 1 else 1.00; K = 24.0; FLOOR = 0.45
 R = pd.read_csv(HERE / "ibkr_replay_candidates_1530_1545.csv", dtype={"hm": str})
 R = R[R.settle.notna() & (R.model_credit > 0) & R.net_credit.notna() & R.p.notna()].copy()
 R["slot"] = R.hm.map(lambda h: "15:30" if h in ("1530", "1531") else "15:45")
-E = R[(R.model_cw >= FLOOR) & (R.quote_over_model >= 1.0)].copy()
+# Quote gate = the ranker's above_min (2026-10-02): live's 2dp tie rule, not the raw ratio >= 1.00 used before,
+# which dropped 90 candidates live accepts (NOW 0.49 vs model 0.4939). Not `qualified`: that also needs the
+# own-gap store, which starts 2026-09-17, so it would empty every earlier day.
+E = R[(R.model_cw >= FLOOR) & R.above_min.astype(bool) & R.spread_type.eq("bull_put")].copy()
 E["r"] = E.groupby(["day", "hm"]).G24.rank(ascending=False, method="first"); T = E[E.r <= TOP]
 key = ["day", "ticker", "short_strike", "long_strike", "exp"]; out = []
 for day, g in T.groupby("day"):

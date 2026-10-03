@@ -40,7 +40,8 @@ R["quote_over_model"] = R.net_credit / R.model_credit
 R["G24"] = R.EV * np.exp(-24.0 * R.D_ent)
 R["settle"] = [px.get((t, e), np.nan) for t, e in zip(R.ticker, R.exp)]
 cols = ["day", "hm", "ticker", "spread_type", "short_strike", "long_strike", "width", "exp", "DTE", "entry_price",
-        "net_credit", "model_credit", "model_cw", "quote_over_model", "IV", "p", "q", "ro", "G", "EV", "D_ent", "GROUND", "G24", "settle"]
+        "net_credit", "model_credit", "model_cw", "quote_over_model", "IV", "p", "q", "ro", "G", "EV", "D_ent", "GROUND", "G24", "settle",
+        "above_min", "qualified"]
 R = R[cols]
 print(f"{len(R)} rows, {R.day.nunique()} days, {R.settle.isna().sum()} unsettled (dropped), exp max {R.exp.max()}")
 R[R.settle.notna()].to_csv(OUT, index=False)
