@@ -707,10 +707,8 @@ def _basket_totals(picks: list) -> dict:
             sum_actual_c += float(actual_c) * 100 * qty
             sum_actual_ml += float(actual_ml) * 100 * qty
             any_actual = True
-        else:
-            if tgts:
-                sum_actual_c  += float(tgts[0]["credit"]) * 100 * qty
-                sum_actual_ml += float(tgts[0]["max_loss"]) * 100 * qty
+        # Green line = the user's fills only (user 2026-10-03). Picks with no fill used to
+        # add their model target here, so the green total read like a second model line.
     out = {
         "day_sum_credit":   round(sum_c, 2) if sum_c else None,
         "day_sum_max_loss": round(sum_ml, 2) if sum_ml else None,
