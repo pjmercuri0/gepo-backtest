@@ -423,6 +423,13 @@ def _actuals_rows() -> list[dict]:
                 idx = int(idx)
             except (TypeError, ValueError):
                 idx = -1
+            # A restated day can reorder its picks (2026-10-01 re-run on the current canon,
+            # user 2026-10-03), so when the stored position no longer holds this spread,
+            # find the same spread elsewhere in the day.
+            _day_picks = (day or {}).get("top_picks") or []
+            if not (0 <= idx < len(_day_picks) and _pick_identity(_day_picks[idx]) == _pick_identity(pick)):
+                idx = next((j for j, p in enumerate(_day_picks)
+                            if _pick_identity(p) == _pick_identity(pick)), -1)
             if day and 0 <= idx < len(day.get("top_picks") or []):
                 fresh = day["top_picks"][idx]
                 if _pick_identity(fresh) == _pick_identity(pick):
