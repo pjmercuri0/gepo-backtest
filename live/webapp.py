@@ -445,6 +445,16 @@ def _actuals_rows() -> list[dict]:
                         if tr.get("current_mark") is not None:
                             last_marked = tr
                             break
+            # The restated day no longer holds this spread at all (2026-10-01: AVGO 347.5/345
+            # and INTC 121/120 were dropped, and both sat here as open after expiry). The
+            # trade then carries its own settlement, written by snapshot_picks.settle.
+            if outcome_row is None and idx < 0 and pick.get("pnl") is not None:
+                outcome_row = {
+                    "result": pick.get("outcome"),
+                    "pnl_per_contract": pick.get("pnl"),
+                    "underlying_price": pick.get("expiry_close"),
+                }
+                _mk_actual_settled(outcome_row, pick)
 
         elif source.get("kind") == "snapshot":
             payload, scan = _find_snapshot_scan(str(source.get("date")), str(source.get("hhmm")))
@@ -1912,11 +1922,14 @@ def _overlay_stream(payload: dict) -> None:
         st = _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
         quotes = st.get("quotes") or {}
         spots = st.get("spots") or {}
-        if not quotes and not spots:
-            return
+        # Before the empty-stream return: with an empty board and no open positions the
+        # stream holds nothing, yet it is still the proof IB is up (2026-10-05, Monday
+        # pre-open showed red with the stream connected).
         payload["stream_ts"] = st.get("ts")
         # Written by combo_stream each second; absent on files from before 2026-09-30.
         payload["stream_connected"] = st.get("connected")
+        if not quotes and not spots:
+            return
         n = 0
         for lst in (payload.get("ticker") or [], payload.get("top_picks") or []):
             for r in lst:

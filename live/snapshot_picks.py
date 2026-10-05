@@ -239,6 +239,23 @@ def _settle_files(today, ib, ib_close_cache) -> None:
     _settle_live_actuals(today, ib, ib_close_cache)
 
 
+def _orphaned_frozen(src: dict, p: dict) -> bool:
+    """True when the History day this trade was added from no longer holds its spread."""
+    def _ident(x):
+        try:
+            return (x.get("ticker"), x.get("spread_type"), str(x.get("expiry_date"))[:10],
+                    float(x.get("short_strike")), float(x.get("long_strike")))
+        except (TypeError, ValueError):
+            return None
+    fp = Path(live_config.ROOT_DIR) / "frozen" / f"{src.get('date')}.json"
+    try:
+        day = json.loads(fp.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    me = _ident(p)
+    return me is not None and all(_ident(x) != me for x in (day.get("top_picks") or []))
+
+
 def _settle_live_actuals(today, ib, ib_close_cache) -> None:
     """Same settlement for Actuals rows added from the live tab (kind "live"): they
     are ranked rows, not snapshot-record entries, so _settle_files never sees them.
@@ -253,9 +270,13 @@ def _settle_live_actuals(today, ib, ib_close_cache) -> None:
         return
     changed = 0
     for t in store.get("trades") or []:
-        if (t.get("source") or {}).get("kind") != "live":
-            continue
+        src = t.get("source") or {}
         p = t.get("pick") or {}
+        # A History-sourced trade settles off its day file -- unless a restatement dropped
+        # the spread from that day (2026-10-01 restated 2026-10-03: AVGO 347.5/345 and INTC
+        # 121/120 left the picks and sat on Actuals as open). Then it settles here.
+        if src.get("kind") != "live" and not (src.get("kind") == "frozen" and _orphaned_frozen(src, p)):
+            continue
         if p.get("outcome") is not None:
             continue
         expiry = (p.get("expiry_date") or "")[:10]
@@ -285,7 +306,7 @@ def _settle_live_actuals(today, ib, ib_close_cache) -> None:
         changed += 1
     if changed:
         tmp = fp.with_suffix(".tmp"); tmp.write_text(json.dumps(store, indent=1)); tmp.replace(fp)
-        print(f"[snapshot_picks] settled {changed} live-added actuals row(s)")
+        print(f"[snapshot_picks] settled {changed} actuals row(s) off their own expiry close")
 
 
 if __name__ == "__main__":
