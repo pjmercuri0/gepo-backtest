@@ -104,6 +104,87 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.70 PAPER 4 written on FCM Canon (2026-10-05): `paper/gepo_fcm_2026.tex` + the limitations it does NOT print
+
+**Naming.** "Fable Canon" is retired. The configuration is **FCM = fair credit model** (user 2026-10-05).
+It is the fourth paper of the series; `paper/gepo_ground_2026.tex` (Jun 12) was an unpublished working
+paper and **must never be cited or mentioned** (user). Title:
+*Relative-Entropy Risk Discounting in Growth-Optimal Selection: Weekly Vertical Credit Spreads on the S&P 100*.
+26 pages, compiles clean with pdflatex.
+
+**What the paper is.** Γ = (e^G − 1)·e^(−k·D_ent), k=24, D_ent = ln3 − H(Q_bs). NOT the cross-measure
+D(P‖Q) — the user cut every mention of that alternative. Additive form: ranks on g + k·H(Q_bs).
+Two new theory results, both proved and both verified numerically in this session:
+- D_ent is strictly decreasing in the market's partial-zone mass for m < π_s/2 (true on 98.2% of the pool);
+  **Spearman(D_ent, q_part) = −0.999** and **Spearman(D_ent, σ√T·S/width) = +0.999** on 25,228 eligible.
+  So D_ent = "is this a real 3-state wager or a disguised binary one", measured off quotes alone.
+- D_ent = (3/2)·Σ(Q_i − 1/3)² + O(δ³), i.e. 1/2 χ²(Q, U₃) to second order.
+Γ is explicitly NOT Hansen–Sargent multiplier preferences (the penalty is a state of the market, not a
+charge on the agent's beliefs) — the paper says so rather than claiming the equivalence.
+
+**All numbers recomputed this session and tied to the deployed payload**
+(`pool_elig.parquet` rebuild reproduces IS 5,779/$73,391/1.26/−30.32% and OOT 814/$18,198/2.86/−15.23%
+exactly, and the §0.69u quote-gate drop counts to the row: touch≤0 14,768 / inverted 625 / off-ladder 499 / crossed 28).
+New ablations that are in the paper and were not in the handoff before:
+
+| ranker (same pool, top 6, 1.00× model) | IS $ | IS $-Sh | IS DD | OOT $ | OOT $-Sh |
+|---|---|---|---|---|---|
+| Γ = EV·e^(−24 D_ent) (FCM) | 73,391 | 1.26 | −30.3% | 18,198 | 2.86 |
+| EV alone (= Kelly selection, k=0) | 69,401 | 1.13 | −50.1% | 16,464 | 2.73 |
+| −D_ent alone | 51,569 | 0.90 | −72.4% | 9,669 | 1.44 |
+| model credit/width | 67,035 | 1.06 | −54.9% | 8,668 | 1.31 |
+| random | 48,973 | 0.77 | −122.9% | 917 | 0.14 |
+| Γ ascending (worst 6) | 8,105 | 0.13 | −149.5% | −8,362 | −1.05 |
+
+Γ's gain over EV alone is only +6% IS / +11% OOT in **dollars**; what it buys is DD −50% → −30%.
+Eligible pool if ALL 25,228 taken: +$80,396 qty1 = $3.19/trade vs the book's $6.94/trade.
+**Break-even fill (bisection): 0.9197× model IS, 0.8612× OOT, 0.9123× pooled.** Real fills median 1.037×.
+Within-day pairwise concordance: Γ 0.5225 IS / 0.5348 OOT on $; −D_ent 0.5596 on not-a-loss but **0.4801 on $**;
+credit/width 0.5821 on $ but **0.4509 on not-a-loss**. Γ is the only score above chance on BOTH targets.
+Diversification: pooled within-day pairwise corr 0.161 → **3.30 effective independent bets** at a cap of 5.93.
+corr(settlement-day P&L, same-day SPY) = **+0.444**; corr(entry-day P&L, entry-day SPY) = −0.011.
+
+### LIMITATIONS — user 2026-10-05: "i dont want limitations section in this paper. just keep it in the handoff doc"
+
+The paper carries no Limitations section. These eight are the list that was removed; they are live and
+must not be lost. Re-read before quoting any headline number to anyone.
+
+1. **OOT 2026 is NOT a clean holdout.** Nine months, consulted while the config was being settled.
+   Extended sample, not untouched. (Standing rule: `feedback_holdout_vs_extended`.)
+2. **k=24 is on the plateau, not at the peak.** k=28 is better on BOTH windows on the current pool
+   (IS 1.30/−29.8%, OOT 2.96). 24 was fixed on an earlier sweep, before the quote gates and the
+   earnings-source fix. Not moved, deliberately — chasing the peak of the latest rebuild is how a
+   config becomes fitted.
+3. **Several components were chosen on in-sample evidence**: the cap of 6, the 0.45 floor, and the bear
+   IV<0.35 cut. The IV cut DISAGREES between windows — removing it costs $8,076 IS but gains $4,514 OOT.
+   Unresolved.
+4. **The corporate-action gates reduce measured performance** — decomposed properly this session:
+   - hold gate (`split_hit`, 22 candidates) is FREE: removing it loses $701. No tension.
+   - lookback gate (`split_window_hit`, 1,749 candidates) is the whole cost: removing it is
+     **+$2,314 / +0.05 IS and +$1,738 / +0.27 OOT**. It excludes 169 picks worth +$2,476 whose backfill
+     earns only +$801. Names: GE 44, DHR 31, IBM 24, MRK 24, PFE 13, BDX 11, HON 10, MMM 10 — exactly
+     the unverifiable small-ratio spinoffs of §0.69o.
+   - Kept anyway: those candidates' P_real counts crossings over a window holding an unadjusted 10–19%
+     overnight gap, and with demeaning on one bad bar shifts every other return (GE 2022-04-20: p=0.948
+     as computed vs 0.436 clean). In sample the gate does buy DD (−30.3% vs −33.7%).
+5. **The live IBKR replay is 6 weeks / 146 trades.** $-Sharpe 3.54 is a sign of computability, not level.
+   It cannot distinguish 3.5 from 1.0. Bull-only (SPY above its 100d throughout the window).
+6. **Per-trade discrimination is tiny.** Concordance 0.52 = right on 52 of every 100 pairs. The book's
+   edge over random comes from the extremes and the credit floor, not a per-trade classifier.
+7. **The book is long beta at expiry** (+0.444) and behaves like 3.3 independent bets/day, not 6.
+   88.6% of picks are bull puts.
+8. **2022 is negative** (−$749 on 1,172 trades) and is the only sustained bear market in the sample.
+   It is also the only year the bear sleeve was large (397 of 1,172).
+
+**Plus the one the paper DOES print, because it is the central result, not a caveat:** Γ ranks the
+probability of LOSING, not dollars. Spearman(Γ, P&L) = +0.013 IS / −0.008 OOT; Spearman(Γ, loss) = −0.079 / −0.070;
+loss rate by decile 39.6%→29.9% IS, low-40s→23.2% OOT. The partial-zone cushion Γ rewards is bought with
+the credit that pays, so the two effects nearly cancel in dollars. **There is still no dollar ranker** —
+the paper names finding one (or proving none exists for verticals) as the open problem.
+
+**Scratch scripts** (session scratchpad, NOT in the repo — rebuild from `build_payloads_C.py` if needed):
+pool rebuild, ranker/k/fill/cap ablations, gate ablation, concordance + decile stats, CA-gate decomposition.
+
 ## 0.69w MINI reply to §0.69v (2026-10-01 evening): the two proposed live gates, measured. NOT applied.
 
 **Premise correction.** Book width is no longer policed live. The user turned BOTH width rules off this evening:
