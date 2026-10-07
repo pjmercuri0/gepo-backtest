@@ -748,6 +748,19 @@ def _actuals_marks() -> dict:
     return cached
 
 
+def _stream_state() -> dict:
+    """combo_stream.json, read once per request: every row of a page is then priced off the same
+    stream tick (Snap overlays ~300 rows), and the file is not re-read per row."""
+    try:
+        cached = getattr(g, "_stream_state", None)
+        if cached is None:
+            cached = _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
+            g._stream_state = cached
+        return cached
+    except RuntimeError:          # outside a request
+        return _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
+
+
 def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=False):
     """Live spot + mark for ONE open pick, straight off combo_stream.
 
@@ -762,7 +775,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
     """
     _out_track, _out_marked = last_track, last_marked
     try:
-        _st = _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
+        _st = _stream_state()
         _q = (_st.get("quotes") or {}).get(
             f"{pick.get('ticker')}|{pick.get('spread_type')}|{float(pick.get('short_strike')):g}"
             f"|{float(pick.get('long_strike')):g}|{str(pick.get('expiry_date'))[:10]}")
@@ -1512,6 +1525,14 @@ def snapshots():
     for d in days:
         for scan in d.get("scans", []):
             for pk in scan.get("picks") or []:
+                # Open rows go through the SAME overlay as History and Actuals (user 2026-10-07), so a
+                # spread shows one spot, one mark, one badge and one P&L on every tab. Snap used to
+                # render whatever the last scan stored: on 2026-10-06 all 73 rows it shared with
+                # Actuals showed a different spot, and GS 902.5/900 read L at a 15-minute-old mark.
+                if pk.get("pnl") is None and not pk.get("outcome") and pk.get("expiry_close") is None:
+                    _lt, _ = _stream_overlay(pk, pk.get("live"), None, None, prefer_stream=True)
+                    if isinstance(_lt, dict):
+                        pk["live"] = _lt
                 lv = pk.get("live")
                 if lv:
                     lv.setdefault("live_status", _live_status(
