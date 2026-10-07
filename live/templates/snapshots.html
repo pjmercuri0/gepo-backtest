@@ -71,7 +71,8 @@ their cron slot (:00/:15/:30/:45); out-of-hours runs are not shown.
     <table>
       <thead><tr>
         <th>actual</th>
-        <th>ticker</th><th>type</th><th>strikes</th><th>mid credit</th>
+        <th>ticker</th><th>type</th><th>strikes</th><th>credit ($/sh)</th>
+        <th>min / target ($/sh)</th>
         <th>entry ({{ "%.2f"|format(fill_mult) if fill_mult else "canon" }}&times; model)</th><th title="GROUND + carry on the capital at risk (display only)">&Gamma; + carry (bps)</th><th>expiry</th>
         <th>spot</th><th>mark</th>
         <th>expiry px</th><th>outcome</th><th>P&amp;L</th>
@@ -84,7 +85,12 @@ their cron slot (:00/:15/:30/:45); out-of-hours runs are not shown.
           <td class="fw"><span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}">{{ '▲' if p.spread_type == 'bull_put' else '▼' }}</span> {{ p.ticker }}</td>
           <td>{{ 'bull put' if p.spread_type == 'bull_put' else 'bear call' }}</td>
           <td>${{ '%.2f' % p.short_strike }} / ${{ '%.2f' % p.long_strike }}</td>
-          <td>${{ '%.2f' % p.net_credit }}</td>
+          {# Credit and min / target: the same cells as History (user 2026-10-07) -- the live quote with
+             its dot when the stream holds the spread on a credible book, else the quoted mid at the scan. #}
+          {% set _open = p.pnl is none and not p.outcome and p.expiry_close is none %}
+          {% if _open and p.live and p.live.live_quote is defined and p.live.live_quote is not none %}<td title="LIVE quote ({{ p.live.live_quote_ts }}); scan quote ${{ '%.2f' % p.net_credit }}; booked at ${{ '%.2f' % p.entry_credit }}">${{ "%.2f"|format(p.live.live_quote|rd(2)) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span></td>{% else %}<td title="quoted mid at the scan (no live quote); booked at ${{ '%.2f' % p.entry_credit }}">${{ "%.2f"|format(p.net_credit|rd(2)) }}</td>{% endif %}
+          {% set tg = p.credit_targets %}
+          {% if tg and tg.min_credit is defined %}<td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }})"><span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span></td>{% else %}<td>—</td>{% endif %}
           <td>${{ '%.2f' % p.entry_credit }}</td>
           <td>{{ '%.2f' % ((p.GROUND + carry(p.DTE)) * 10000) if p.GROUND is not none else '—' }}</td>
           <td>{{ (p.expiry_date or '')[:10] }}</td>
