@@ -196,6 +196,14 @@ def main() -> int:
         print(f"[combo_stream] connected, client {CLIENT_ID}, max {MAX_BAGS} bags", flush=True)
         last_reload = 0.0
         last_pub = 0.0
+        # Last IN-SESSION quote per spread (user 2026-10-06). After the bell the quotes stop and the
+        # page fell to a model floored at intrinsic: TMO 662.5/660, spot 659.00, read 2.50 (max loss)
+        # at 19:56 against a last live mid of 2.05 at 15:57. Carried in the stream file itself so it
+        # reaches Mya with the same push, and reloaded here so a restart does not lose the close.
+        try:
+            last_q = dict((json.loads(OUT.read_text()).get("last") or {}))
+        except (OSError, ValueError, AttributeError):
+            last_q = {}
         while True:
             # Exit on a dropped IB socket instead of running on disconnected: the
             # 2026-09-29 overnight Gateway drop left this loop writing a fresh ts with no
@@ -223,7 +231,13 @@ def main() -> int:
                     print(f"[combo_stream] frozen read failed: {e}", flush=True)
                 seen = {r["_key"] for r in pos}
                 _bk = {r["_key"] for r in board}
-                board = board + [r for r in frozen if r["_key"] not in _bk]     # frozen picks ride as picks
+                # A frozen pick keeps its pick priority even when the CURRENT board lists the same
+                # spread as unqualified. DHR 217.5/215 (frozen 15:15) was on the 15:45 board below the
+                # gate on 2026-10-06, so its frozen copy was skipped as a duplicate, the board copy
+                # fell into the trimmed remainder, and History showed its scan quote with no live one.
+                _fk = {r["_key"] for r in frozen}
+                board = [({**r, "qualified": True} if r["_key"] in _fk else r) for r in board] \
+                        + [r for r in frozen if r["_key"] not in _bk]     # frozen picks ride as picks
                 _new = [r for r in board if r["_key"] not in seen]
                 _picks = [r for r in _new if r.get("qualified")]
                 _rest = [r for r in _new if not r.get("qualified")]
@@ -307,7 +321,13 @@ def main() -> int:
                     _cb, _ca = -float(bid), -float(ask)          # cost to close
                     _lo, _hi = (0.0, _w + 1e-9) if _w else (0.0, float("inf"))
                     _sides = [v for v in (_cb, _ca) if _lo <= v <= _hi]
-                    _m = (sum(_sides) / len(_sides)) if _sides else -1.0
+                    # BOTH sides must survive. One survivor is not a mid: FCX 74/73
+                    # on 2026-10-06 streamed bid -1.01 / ask -0.39 on a 1.00-wide
+                    # spread, the bid was dropped a cent over the width, and the ask
+                    # alone was published as "mid" 0.39 -- a LOSING spread (spot
+                    # 72.28) showed +$11 against own-leg mids of 0.725. Fall through
+                    # to the leg mids instead.
+                    _m = (sum(_sides) / 2.0) if len(_sides) == 2 else -1.0
                     if _m > 0 and (_w is None or _m <= _w + 1e-9):
                         quotes[k] = {"bid": float(bid), "ask": float(ask), "mid": round(_m, 4),
                                      "last": (float(last) if ok(last) else None),
@@ -347,8 +367,16 @@ def main() -> int:
                 v = t.last if (t.last is not None and t.last == t.last and t.last != 0) else t.close
                 if v is not None and v == v and v != 0:
                     sp[sym] = round(float(v), 4)
+            _now = datetime.now()
+            if _now.weekday() < 5 and "09:30" <= _now.strftime("%H:%M") < "16:00":
+                for k, q in quotes.items():
+                    last_q[k] = {"mid": q["mid"], "bid": q["bid"], "ask": q["ask"], "src": q["src"],
+                                 "ts": q["ts"], "spot": sp.get(k.split("|")[0])}
+            _today = _now.date().isoformat()
+            for k in [k for k in last_q if k.rsplit("|", 1)[-1] < _today]:      # expired spreads
+                del last_q[k]
             _atomic(OUT, {"ts": ts, "connected": bool(ib.isConnected()), "n": len(quotes), "held": len(subs),
-                          "quotes": quotes, "spots": sp})
+                          "quotes": quotes, "spots": sp, "last": last_q})
             last_pub = _publish(last_pub)
     except KeyboardInterrupt:
         pass

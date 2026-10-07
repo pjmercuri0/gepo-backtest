@@ -44,6 +44,7 @@ def current_regime() -> dict:
           "window":             100,
           "allowed_direction":  "bull_put" | None,
           "stale_days":         int,
+          "stale_sessions":     int,    # trading sessions missed since as_of
           "source":             "Yahoo daily (prior session)",
         }
     """
@@ -71,6 +72,12 @@ def current_regime() -> dict:
     as_of = latest["Date"].date()
     regime = "bull" if latest["Close"] > latest["SMA"] else "bear"
     stale_days = (today.date() - as_of).days
+    # Sessions missed between as_of and today: 0 when as_of IS the prior session. The page
+    # flags on this, not calendar days -- Friday's close read "stale 3d" every Monday
+    # (user 2026-10-05). The fail-closed cash rule below stays on calendar days.
+    _hol = set(spreads.NYSE_HOLIDAYS)
+    stale_sessions = sum(1 for d in pd.date_range(as_of, today.date(), inclusive="neither")
+                         if d.weekday() < 5 and d not in _hol)
 
     max_stale = getattr(backtest_config, "REGIME_MAX_STALE_CALENDAR_DAYS", None)
     if max_stale is not None and stale_days > max_stale:
@@ -82,6 +89,7 @@ def current_regime() -> dict:
             "window": int(backtest_config.REGIME_WINDOW),
             "allowed_direction": None,
             "stale_days": int(stale_days),
+            "stale_sessions": int(stale_sessions),
             "source": "Yahoo daily (stale; cash)",
         }
 
@@ -96,6 +104,7 @@ def current_regime() -> dict:
                               if getattr(backtest_config, "REGIME_BULL_ALWAYS", False)
                               else ("bull_put" if regime == "bull" else "bear_call")),
         "stale_days":        int(stale_days),
+        "stale_sessions":    int(stale_sessions),
         "source":            "Yahoo daily (prior session)",
     }
 
@@ -109,6 +118,7 @@ def _empty() -> dict:
         "window":            int(backtest_config.REGIME_WINDOW),
         "allowed_direction": None,
         "stale_days":        None,
+        "stale_sessions":    None,
         "source":            None,
     }
 

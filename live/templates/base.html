@@ -28,7 +28,8 @@
 <div class="nav">
   <a href="{{ url_for('index') }}"    class="{% if request.endpoint == 'index'        %}active{% endif %}">live</a>
   <a href="{{ url_for('history') }}"  class="{% if request.endpoint == 'history'      %}active{% endif %}">history</a>
-  <a href="{{ url_for('snapshots') }}" class="{% if request.endpoint == 'snapshots'    %}active{% endif %}">snap</a>
+  {# snap tab hidden (user 2026-10-06): the page is not useful right now. Scans keep writing
+     live/intraday_picks/ and /snapshots still renders by URL. #}
   <a href="{{ url_for('actuals') }}"  class="{% if request.endpoint == 'actuals'      %}active{% endif %}">actuals</a>
   <a href="{{ url_for('plot') }}"     class="{% if request.endpoint == 'plot'         %}active{% endif %}">plot</a>
   <a href="{{ url_for('oot') }}"      class="{% if request.endpoint == 'oot'          %}active{% endif %}">oot</a>

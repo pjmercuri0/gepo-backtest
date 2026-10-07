@@ -281,7 +281,11 @@ FETCH_WINDOW_END   = "16:30"
 # Freeze at 15:01 — moved earlier 2026-05-27 because 15:45 left only ~15 min
 # to place limit orders before close, which proved insufficient for fills on
 # illiquid weekly spreads. 15:01 gives ~57 min execution window.
-FREEZE_AT = "15:30"   # 2026-09-30 Fable: the 15:30 scan is the frozen day (was 15:01 + top-ups)
+# Live tab (user 2026-10-05): the board stops at the 15:45 scan. The 16:00 scan still runs for
+# marks and settlement, but it ranks a closing market (48 -> 3 candidates that day) and the page
+# dropped every ticker; the site keeps showing the last scan at or before this time instead.
+LIVE_BOARD_FREEZE_AT = "15:45"
+FREEZE_AT = "15:15"   # 2026-10-05 (user): the 15:15 scan is the frozen day, topped up at 15:30 and 15:45 (was 15:30 + 15:45)
 
 # DRIFT_AT was used by cron_drift.sh, which has been removed (2026-05-26).
 # With live data, signal time = market time, so the drift's second-pass

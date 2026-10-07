@@ -1,4 +1,6 @@
-"""Write the daily frozen snapshot, with a 15:31 top-up for short 15:01s.
+"""Write the daily frozen snapshot. Fable mode: the 15:15 scan, topped up at 15:30 and 15:45.
+
+Legacy (non-fable) policy, a 15:31 top-up for short 15:01s:
 
 Policy:
   - First 15:xx scan writes live/frozen/YYYY-MM-DD.json if missing.
@@ -48,6 +50,39 @@ def _dedupe_key(pick: dict):
     """
     tk = pick.get("ticker")
     return tk.strip().upper() if isinstance(tk, str) else tk
+
+
+def _held_today(day: str) -> list[dict] | None:
+    """Trades the user added to Actuals today, as [{ticker, id}]. None when Actuals cannot be read.
+
+    He clicks + on the site, so Mya's actuals.json is the live copy; the mini's is only as
+    fresh as the last scan's upload (a + clicked since then is missing from it). Read Mya's
+    first, fall back to the local file."""
+    import subprocess
+    store = None
+    host = os.environ.get("MYA_SSH_HOST")
+    if host:
+        base = os.environ.get("MYA_REMOTE_BASE", "/opt/vito/gepo-backtest/live")
+        key = os.environ.get("MYA_SSH_KEY", "")
+        cmd = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=8"]
+        if key:
+            cmd += ["-i", key]
+        try:
+            out = subprocess.check_output(cmd + [host, f"cat '{base}/actuals.json'"],
+                                          stderr=subprocess.DEVNULL, timeout=15).decode()
+            store = json.loads(out)
+        except Exception as exc:
+            print(f"[freeze] Mya actuals unreadable ({type(exc).__name__}); using the local copy", flush=True)
+    if store is None:
+        store = _read_json(Path(live_config.ROOT_DIR) / "actuals.json")
+    if store is None:
+        return None
+    held = []
+    for t in store.get("trades") or []:
+        src = t.get("source") or {}
+        if src.get("date") == day or str(t.get("added_at") or "")[:10] == day:
+            held.append({"ticker": (t.get("pick") or {}).get("ticker"), "id": t.get("id")})
+    return held
 
 
 def _with_added_marker(pick: dict, hhmm: str) -> dict:
@@ -104,12 +139,15 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
     latest_picks = latest.get("top_picks") or []
     latest_hhmm = _latest_hhmm(latest, now)
     existing = _read_json(dst) if dst.exists() else None
-    # Fable Canon (2026-09-30, user): the frozen day IS the 15:30 scan -- both sides, no
-    # 15:01 seed, no top-ups from later scans. Any other 15:xx scan is ignored.
+    # Fable Canon: the frozen day IS the FABLE_FREEZE_HHMM scan (15:15 since 2026-10-05, user;
+    # was 15:30), topped up once from each FABLE_TOPUP_HHMM scan in order (15:30, then 15:45).
+    # Any other 15:xx scan is ignored.
     import config as backtest_config
     if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable":
         want = str(getattr(backtest_config, "FABLE_FREEZE_HHMM", "15:30"))
-        topup = str(getattr(backtest_config, "FABLE_TOPUP_HHMM", "15:45"))
+        _tu = getattr(backtest_config, "FABLE_TOPUP_HHMM", "15:45")
+        topups = [str(_tu)] if isinstance(_tu, str) else [str(x) for x in _tu]
+        topup = next((t for t in topups if latest_hhmm[:4] == t[:4]), None)
         cap = int(getattr(backtest_config, "FABLE_TOP_N", 5))
         ex_at = str((existing or {}).get("frozen_at") or "")
         if latest_hhmm[:4] == want[:4]:
@@ -122,17 +160,20 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
             _atomic_write(dst, payload)
             print(f"[freeze] fable: wrote {dst} from the {latest_hhmm} scan ({len(latest_picks)} picks)", flush=True)
             return 0
-        if latest_hhmm[:4] == topup[:4]:
-            # Variant B: top each side up to `cap` from the 15:45 scan, in its GROUND order,
-            # with spreads the 15:30 freeze did not already hold. Once only.
-            if existing is None or ex_at != want:
-                if existing is None or not (existing.get("top_picks") or []):
-                    payload = dict(latest); payload["frozen_at"] = topup; payload["mock"] = False
-                    payload["freeze_fallback_at"] = topup
-                    _atomic_write(dst, payload)
-                    print(f"[freeze] fable: no {want} freeze; wrote {dst} from the {latest_hhmm} scan ({len(latest_picks)} picks)", flush=True)
-                else:
-                    print(f"[freeze] keep existing {dst} ({ex_at}); top-up already applied or not a {want} freeze", flush=True)
+        if topup is not None:
+            # Top the day up to `cap` from this scan, in its GROUND order, with names the day
+            # does not already hold. Each top-up scan applies once; a day with no picks yet
+            # (no freeze, or a blank one) is written from this scan instead.
+            _known = [want] + topups
+            _parts = ex_at.split("+") if ex_at else []
+            if existing is None or not (existing.get("top_picks") or []):
+                payload = dict(latest); payload["frozen_at"] = topup; payload["mock"] = False
+                payload["freeze_fallback_at"] = topup
+                _atomic_write(dst, payload)
+                print(f"[freeze] fable: no {want} picks; wrote {dst} from the {latest_hhmm} scan ({len(latest_picks)} picks)", flush=True)
+                return 0
+            if topup in _parts or not _parts or any(p not in _known for p in _parts):
+                print(f"[freeze] keep existing {dst} ({ex_at}); {topup} top-up already applied or not a fable freeze", flush=True)
                 return 0
             existing_picks = existing.get("top_picks") or []
             seen = {_dedupe_key(p) for p in existing_picks}
@@ -141,10 +182,22 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
                 per_side[p.get("spread_type")] = per_side.get(p.get("spread_type"), 0) + 1
             additions = []
             pooled = bool(getattr(backtest_config, "FABLE_POOLED", False))
+            # Fill to `cap` by what the user HOLDS (2026-10-05, user): cap minus today's Actuals
+            # trades, not cap minus the day's picks. Unplaced picks stay on the day. If Actuals
+            # cannot be read at all, fall back to counting the day's picks.
+            base_count = len(existing_picks)
+            held = None
+            if pooled and bool(getattr(backtest_config, "FABLE_TOPUP_BY_ACTUALS", False)):
+                held = _held_today(f"{now:%Y-%m-%d}")
+                if held is not None:
+                    base_count = len(held)
+                    seen |= {_dedupe_key(h) for h in held}
+                    print(f"[freeze] fable: {len(held)} trade(s) in Actuals today "
+                          f"({', '.join(str(h['ticker']) for h in held) or 'none'}); room for {max(0, cap - len(held))}", flush=True)
             for pick in latest_picks:
                 side = pick.get("spread_type")
                 if pooled:
-                    if len(existing_picks) + len(additions) >= cap or _dedupe_key(pick) in seen:
+                    if base_count + len(additions) >= cap or _dedupe_key(pick) in seen:
                         continue
                 elif per_side.get(side, 0) >= cap or _dedupe_key(pick) in seen:
                     continue
@@ -152,15 +205,20 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
                 per_side[side] = per_side.get(side, 0) + 1
             payload = dict(existing)
             payload["top_picks"] = existing_picks + additions
-            payload["frozen_at"] = f"{want}+{topup}"
-            payload["freeze_topup_from"] = latest.get("snapshot_file")
-            payload["freeze_topup_at"] = latest_hhmm
-            payload["freeze_topup_original_count"] = len(existing_picks)
-            payload["freeze_topup_added_count"] = len(additions)
+            payload["frozen_at"] = f"{ex_at}+{topup}"
+            # Counts span every top-up of the day; the per-pick freeze_added_at says which scan.
+            _prev_added = int(existing.get("freeze_topup_added_count") or 0)
+            if additions or not _prev_added:
+                payload["freeze_topup_from"] = latest.get("snapshot_file")
+                payload["freeze_topup_at"] = latest_hhmm
+            payload["freeze_topup_original_count"] = int(existing.get("freeze_topup_original_count") or len(existing_picks))
+            payload["freeze_topup_added_count"] = _prev_added + len(additions)
+            if held is not None:
+                payload.setdefault("freeze_topup_held", {})[topup] = len(held)
             _atomic_write(dst, payload)
             print(f"[freeze] fable: topped up {dst} from the {latest_hhmm} scan (+{len(additions)} -> {len(payload['top_picks'])} picks)", flush=True)
             return 0
-        print(f"[freeze] fable: only the {want} freeze and {topup} top-up write; latest is {latest_hhmm}", flush=True)
+        print(f"[freeze] fable: only the {want} freeze and {'/'.join(topups)} top-ups write; latest is {latest_hhmm}", flush=True)
         return 0
     if existing is not None and (existing.get("top_picks") or []):
         existing_picks = existing.get("top_picks") or []

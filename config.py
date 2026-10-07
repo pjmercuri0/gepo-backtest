@@ -284,8 +284,15 @@ FABLE_BEAR_TOP_N     = 5
 # 15:45 scan tops each side up to FABLE_TOP_N with names 15:30 did not have. Booked at
 # FABLE_FILL_FRAC x the quoted mid (the basis the Fable evidence was measured on).
 # Live archive at these settings: +$4,929, 6/6 weeks, 5.4 picks/day, max weekly risk $2.5k.
-FABLE_FREEZE_HHMM = "15:30"
-FABLE_TOPUP_HHMM  = "15:45"
+# 2026-10-05 (user): freeze at 15:15, then top up from 15:30 and from 15:45, in that order.
+# IBKR replay on the 22 days with both scans (09-02..10-02, qty 1, 1.00x model): 15:15 +$1,801
+# vs 15:30 +$923; this rule +$1,776 on 107 trades vs +$779 on 104 for 15:30 + 15:45.
+FABLE_FREEZE_HHMM = "15:15"
+FABLE_TOPUP_HHMM  = ("15:30", "15:45")
+# 2026-10-05 (user): a top-up fills to FABLE_TOP_N by what he HOLDS, not by what was snapshotted --
+# 6 minus the trades added to Actuals today, from names the day and Actuals do not already have.
+# Picks he has not placed stay on the day. False = count the day's own picks (the old rule).
+FABLE_TOPUP_BY_ACTUALS = True
 # 2026-09-30 evening (user): "credit floor only, 3 per side". Waterfall on the live archive showed
 # the credit floor does the work; the IV split, GROUND and D_ent add nothing. Rank by credit/width.
 # Variant B timing: 104 picks, 62% win, +$6,685, $64/pick, 72% yield on risk, 6/6 weeks, max weekly risk $2.6k.

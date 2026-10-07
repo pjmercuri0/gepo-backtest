@@ -442,23 +442,36 @@ async function refreshSpyLive() {
 }
 
 // ── Market-hours + tick-freshness helpers (status-dot logic) ────────
-// Returns true if it's currently a weekday between 9:30 and 16:00 ET.
-// Browser computes from local clock translated to ET via Intl API.
+// SERVER clock, not the device's (user 2026-10-05: a Mac stuck on Sunday 9pm drove the
+// dot and the stale banner off its own wrong time). /api/latest.json sends server_now as
+// ET wall time; between polls it advances on performance.now(), which is monotonic and
+// ignores the device's date. Every timestamp here is naive ET, so all are read as the
+// same fake-UTC instant and the device's timezone drops out too.
+let _srvNow = null;   // { ms: server_now as fake-UTC ms, at: performance.now() at receipt }
+function etMs(ts) {
+  if (!ts) return NaN;
+  const t = String(ts);
+  return Date.parse((t.length <= 10 ? t + "T00:00:00" : t.slice(0, 19)) + "Z");
+}
+function noteServerNow(data) {
+  const ms = etMs(data && data.server_now);
+  if (!isNaN(ms)) _srvNow = { ms, at: performance.now() };
+}
+function serverNowMs() {
+  return _srvNow ? _srvNow.ms + (performance.now() - _srvNow.at) : NaN;
+}
+function ageMinutes(ts) {
+  return (serverNowMs() - etMs(ts)) / 60000;   // NaN until the server clock arrives
+}
+
+// Returns true if it's currently a weekday between 9:30 and 16:00 ET, by the server clock.
 function marketOpenNow() {
-  const now = new Date();
-  // Render the current time in America/New_York then parse back the parts.
-  // hour12: false so we get "13" at 1pm, not "01" (which would parse to 1
-  // and mis-classify the afternoon as outside market hours).
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
-  });
-  const parts = Object.fromEntries(fmt.formatToParts(now).map(p => [p.type, p.value]));
-  const dow = parts.weekday;                          // Mon, Tue, ... Sun
-  if (dow === "Sat" || dow === "Sun") return false;
-  const h = parseInt(parts.hour, 10);
-  const m = parseInt(parts.minute, 10);
-  const mins = h * 60 + m;
+  const ms = serverNowMs();
+  if (isNaN(ms)) return false;
+  const now = new Date(ms);                           // fake-UTC: getUTC* reads ET wall time
+  const dow = now.getUTCDay();                        // 0 = Sun ... 6 = Sat
+  if (dow === 0 || dow === 6) return false;
+  const mins = now.getUTCHours() * 60 + now.getUTCMinutes();
   return mins >= 9*60 + 30 && mins <= 16*60;          // 9:30 ≤ now ≤ 16:00 ET
 }
 
@@ -469,8 +482,8 @@ function streamIsFresh(data) {
   // The stream kept writing a fresh ts while its IB socket was down (2026-09-30),
   // so freshness alone is not proof IB is up: require the connected flag too.
   if (!data || !data.stream_ts || data.stream_connected !== true) return false;
-  const dt = new Date(data.stream_ts);
-  return !isNaN(dt) && (Date.now() - dt.getTime()) / 60000 < 10;
+  const age = ageMinutes(data.stream_ts);
+  return !isNaN(age) && age < 10;
 }
 
 // True if the snapshot_ts in either the SPY widget or the regime banner is
@@ -482,11 +495,8 @@ function tickIsFresh(data) {
   if (data && data.regime && data.regime.as_of) candidates.push(data.regime.as_of);
   if (data && data.snapshot_ts) candidates.push(data.snapshot_ts);
   for (const ts of candidates) {
-    const dt = new Date(ts);
-    if (!isNaN(dt)) {
-      const ageMin = (Date.now() - dt.getTime()) / 60000;
-      if (ageMin < 75) return true;
-    }
+    const ageMin = ageMinutes(ts);
+    if (!isNaN(ageMin) && ageMin < 75) return true;
   }
   return false;
 }
@@ -504,8 +514,11 @@ function renderRegime(r) {
   const dir = r.regime === "bull" ? "BULL regime · bull puts enabled" : "BEAR regime · cash";
   badge.innerHTML = `<span class="badge ${cls === 'dir-bull' ? 'badge-WIN' : 'badge-LOSS'}" `
                   + `style="vertical-align:middle;margin-left:8px;font-size:12px">${dir}</span>`;
-  const stale = (r.stale_days ?? 0) > 1
-    ? ` · <span class="neg">stale ${r.stale_days}d</span>` : "";
+  // Trading sessions missed, not calendar days: Friday's close is current on a Monday.
+  const staleN = r.stale_sessions != null ? r.stale_sessions
+    : ((r.stale_days ?? 0) > 1 ? r.stale_days : 0);
+  const stale = staleN > 0
+    ? ` · <span class="neg">stale ${staleN}d</span>` : "";
   // as_of is an ISO timestamp ("2026-05-11T14:47:04") when sourced from the
   // live IBKR tick, or a date-only string ("2026-05-11") when from the daily
   // Yahoo CSV. Render the time only for live (12-hour format), full date for daily.
@@ -536,6 +549,7 @@ async function refresh() {
     const r = await fetch("{{ url_for('latest_json') }}?_=" + Date.now());
     if (!r.ok) throw new Error("HTTP " + r.status);
     const data = await r.json();
+    noteServerNow(data);
 
     // Bars scale on the DISPLAYED value (GROUND + carry), max over the table (user 2026-10-01).
     const maxG = (data.ticker && data.ticker.length)
@@ -566,9 +580,9 @@ async function refresh() {
 
     const staleEl = document.getElementById("stale-banner");
     if (staleEl) {
-      const todayET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+      const todayET = data.server_now ? String(data.server_now).slice(0, 10) : null;   // server's ET date
       const snapDay = (data.snapshot_ts && data.snapshot_ts.length >= 10) ? data.snapshot_ts.slice(0, 10) : null;
-      if (snapDay && snapDay !== todayET) {
+      if (snapDay && todayET && snapDay !== todayET) {
         staleEl.innerHTML = `<div class="week-card" style="background:#3a2a15;border:1px solid #6b5227;padding:14px;margin-bottom:18px">
           <div style="color:#ffce8a;font-weight:600">&#9888; stale ranking &mdash; last fresh scan was ${snapDay}</div>
           <div class="week-sub" style="margin-top:4px">No option data has been captured yet today; the picks below are from ${snapDay}, not live.</div></div>`;
@@ -631,7 +645,7 @@ async function refresh() {
 
     // ── Status dot ────────────────────────────────────────────────
     // Green pulse  : market is open AND tick fresh (live trading hours).
-    // Solid blue   : post-15:45 frozen state (official picks of the day).
+    // Solid blue   : the board is frozen at the 15:45 scan (a later scan has run).
     // Solid yellow : IB Gateway alive (tick fresh) but market not yet open
     //               (e.g. 9:01 ranker run, weekend with recent intraday data).
     // Solid red    : tick stale → IB connection is down or last ranker run > 75 min.
@@ -665,7 +679,7 @@ async function refresh() {
       txt.innerHTML =
         `GEPO Live Tracker <span class="badge badge-FROZEN" style="vertical-align:middle">FROZEN ${data.frozen_at || ""}</span>`;
       (document.getElementById("top-label")||{}).textContent =
-        `Frozen 15:01 picks for today${tickStr ? ` · tick ${tickStr} ET` : ""}`;
+        `Fable picks · board frozen at the ${data.frozen_at || ""} scan${tickStr ? ` · tick ${tickStr} ET` : ""}`;
     } else if (tickIsFresh(data)) {
       // IB feed is healthy. Differentiate based on whether market is open.
       dot.className = marketOpenNow() ? "live-dot" : "live-dot premarket-dot";

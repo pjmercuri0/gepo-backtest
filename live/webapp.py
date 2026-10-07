@@ -774,7 +774,11 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             f"{pick.get('ticker')}|{pick.get('spread_type')}"
             f"|{float(pick.get('short_strike')):g}|{float(pick.get('long_strike')):g}"
             f"|{str(pick.get('expiry_date'))[:10]}")
-        if outcome_row is None and (_q or _sp or _am0):
+        # Last in-session stream quote for this spread (combo_stream "last"); see the hold below.
+        _lq = (_st.get("last") or {}).get(
+            f"{pick.get('ticker')}|{pick.get('spread_type')}|{float(pick.get('short_strike')):g}"
+            f"|{float(pick.get('long_strike')):g}|{str(pick.get('expiry_date'))[:10]}")
+        if outcome_row is None and (_q or _sp or _am0 or _lq):
             ks, kl = float(pick["short_strike"]), float(pick["long_strike"])
             w = float(pick.get("spread_width") or abs(ks - kl))
             live = dict(last_track or {})
@@ -835,20 +839,23 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             # leg mids +65, combo last +108. BS is the only fallback, for a leg
             # with no book at all.
             _px = _basis = None
-            # History (user 2026-10-01): show the LIVE quote. When the stream holds this spread on a
-            # credible book (no wider than QUOTE_MAX_BOOK_W x the spread), its mid is the mark and the
-            # quoted credit; Actuals keeps its own-leg method.
+            # History and Actuals (user 2026-10-01): show the LIVE quote. When the stream holds this
+            # spread, its mid is the mark and the quoted credit; otherwise the last scan's own-leg mark.
             _live_mid = None; _gate_book_ok = False
             if prefer_stream and _q and _q.get("mid") is not None:
                 try:
                     import config as _cfg
-                    # The MARK still needs a book no wider than the spread; the quote GATE below follows
-                    # config.QUOTE_MAX_BOOK_W (None = no book check, user 2026-10-01).
+                    # The quote GATE below follows config.QUOTE_MAX_BOOK_W (None = no book check,
+                    # user 2026-10-01).
                     _mbw = getattr(_cfg, "QUOTE_MAX_BOOK_W", None)
                     _bw = abs(float(_q["ask"]) - float(_q["bid"]))
                     _gate_book_ok = _mbw is None or _bw <= float(_mbw) * w
-                    if _bw <= 1.0 * w:
-                        _live_mid = float(_q["mid"])
+                    # ONE quote per row (user 2026-10-06): when the stream holds the spread its mid is
+                    # the credit shown, the mark, the P&L basis and the number the gate judges -- on any
+                    # book width. The mark used to need a book no wider than the spread and otherwise
+                    # fell back to the last scan, so a wide-book row was shown, marked and shaded off
+                    # different numbers (GS 902.5/900: cell 1.43 from 15:15, shade off a live 1.35).
+                    _live_mid = float(_q["mid"])
                 except (TypeError, ValueError, KeyError):
                     _live_mid = None
             # Quote gate on the live quote, same rule as the live tab: credible book and quote >= model
@@ -871,6 +878,16 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                     _px, _basis = float(_am["mark_legs"]), "own leg mids"
                 elif _am.get("mark_bs") is not None:
                     _px, _basis = float(_am["mark_bs"]), "BS at own-leg IV (no book)"
+            # HOLD the last live quote (user 2026-10-06) when nothing is quoting the spread now and the
+            # last scan priced neither leg -- after the close, mostly. It used to fall to a model
+            # floored at intrinsic, which is the full width once spot is under both strikes: TMO
+            # 662.5/660 showed 2.50 / -$103 on a Tuesday night with three days to run.
+            if _px is None and prefer_stream and _lq and _lq.get("mid") is not None:
+                try:
+                    _px, _basis = float(_lq["mid"]), f"last live quote {str(_lq.get('ts'))[11:16]} (held)"
+                    _am = {"ts": _lq.get("ts")}
+                except (TypeError, ValueError):
+                    _px = None
             if _px is not None:
                 live["current_mark"] = round(min(max(_px, 0.0), w), 4)
                 live["mark_basis"] = _basis
@@ -1305,23 +1322,43 @@ def _size_view(payload: dict, arm: str) -> dict:
 _SIZED_HTML: dict = {}
 
 
+WEEK_CARDS_DEFAULT = 12   # week cards rendered by default on Backtest/OOT/Plot; charts are unaffected
+
+
 def _sized_page(template: str, data_file: str, **ctx):
     """Render a Backtest/OOT/Plot page at the chosen sizing and remember the choice."""
     arm = _size_choice()
+    # Week cards are capped (user 2026-10-06: make the pages load faster). Backtest rendered all 264
+    # weeks -- 6,054 table rows, 6.9 MB -- on every open. The charts and the summary still cover
+    # every week; only the week-by-week cards are limited.  ?weeks=N / ?weeks=all
+    raw_weeks = (request.args.get("weeks") or "").strip().lower()
+    if raw_weeks in ("all", "0"):
+        week_limit = None
+    else:
+        try:
+            week_limit = max(int(raw_weeks), 1)
+        except ValueError:
+            week_limit = WEEK_CARDS_DEFAULT
     # The page is a pure function of the payload file and the sizing arm, so the rendered HTML is
     # kept until the file changes (user 2026-10-01: tabs slow to open; Backtest is 6.9 MB).
     path = _data_path(data_file)
     try:
-        st = path.stat(); key = (template, data_file, arm, st.st_mtime_ns, st.st_size, repr(sorted(ctx.items())))
+        st = path.stat(); key = (template, data_file, arm, week_limit, st.st_mtime_ns, st.st_size, repr(sorted(ctx.items())))
     except OSError:
         key = None
     html = _SIZED_HTML.get(key) if key else None
     if html is None:
         payload = _read_json(path)
+        weeks_chart = []
         if payload:
             payload["wagering"] = _wagering(payload)
             payload = _size_view(payload, arm)
-        html = render_template(template, data=payload, **ctx)
+            # The charts read five fields per week; shipping whole weeks put every trade in the
+            # page a second time as JSON (2 MB of inline script on Backtest).
+            weeks_chart = [{k: w.get(k) for k in ("start", "pnl", "direction", "n_bull_put", "n_bear_call")}
+                           for w in (payload.get("weeks") or [])]
+        html = render_template(template, data=payload, week_limit=week_limit,
+                               weeks_chart=weeks_chart, **ctx)
         if key:
             if len(_SIZED_HTML) >= 16:
                 _SIZED_HTML.clear()
@@ -2019,6 +2056,32 @@ def _mark_held(payload: dict) -> None:
                     r["held_cmp"] = None
 
 
+def _live_board() -> dict | None:
+    """The payload the live tab shows: latest.json, except that once a scan LATER than the
+    kept end-of-day board (live_frozen.json, the 15:45 scan) has replaced it on the same day,
+    the kept board is served instead, flagged frozen (user 2026-10-05: the 16:00 scan ranks a
+    closing market and dropped every ticker). A new day's first scan takes over again. The +
+    on the live tab reads through here too, so its row index is the row on screen."""
+    payload = _read_json(Path(live_config.RANKED_DIR) / "latest.json")
+    if payload is None:
+        return None
+    payload["frozen"] = False
+    keep = _read_json(Path(live_config.RANKED_DIR) / "live_frozen.json")
+    ts, kts = str(payload.get("snapshot_ts") or ""), str((keep or {}).get("snapshot_ts") or "")
+    if keep and kts and ts[:10] == kts[:10] and ts > kts:
+        keep["frozen"] = True
+        keep["frozen_at"] = str(getattr(live_config, "LIVE_BOARD_FREEZE_AT", "15:45"))
+        return keep
+    return payload
+
+
+def _server_now_et() -> str:
+    """Server wall clock in ET, naive like snapshot_ts. The live tab times its status dot
+    and stale banner off this, never the device clock (user 2026-10-05)."""
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("America/New_York")).replace(tzinfo=None).isoformat(timespec="seconds")
+
+
 @app.route("/api/latest.json")
 def latest_json():
     """Return the latest ranked snapshot.
@@ -2040,10 +2103,10 @@ def latest_json():
             _enrich_payload(frozen)
             _overlay_stream(frozen)
             _mark_held(frozen)
+            frozen["server_now"] = _server_now_et()
             return jsonify(frozen)
 
-    latest_path = Path(live_config.RANKED_DIR) / "latest.json"
-    payload = _read_json(latest_path)
+    payload = _live_board()
     if payload is None:
         return jsonify({
             "snapshot_ts": None,
@@ -2054,15 +2117,16 @@ def latest_json():
             "ticker": [],
             "regime": current_regime(),
             "week_notice": trading_calendar.week_notice(),
+            "server_now": _server_now_et(),
             "error": "no ranked snapshot found yet — run the fetcher + ranker",
         })
-    payload["frozen"] = False
     # Always re-evaluate regime against the freshest data on disk, so the
     # subheader matches the SPY chip even if `latest.json` was baked earlier.
     payload["regime"] = current_regime()
     _enrich_payload(payload)
     _overlay_stream(payload)
     _mark_held(payload)
+    payload["server_now"] = _server_now_et()
     return jsonify(payload)
 
 
@@ -2151,7 +2215,7 @@ def add_actual_from_live(index: int):
     saved as kind "live" with the full ranked row -- displays and takes a typed
     fill, but nothing tracks or settles it. ?dry=1 returns the resolved source
     without saving."""
-    payload = _read_json(Path(live_config.RANKED_DIR) / "latest.json")
+    payload = _live_board()
     # Overlay the live stream exactly as /api/latest.json does before picking the
     # row. Without it the + saved the SCAN's credit while the page displayed the
     # streamed one: EOG 143/142 on 2026-09-23 showed 0.53 (stream_mid) and was

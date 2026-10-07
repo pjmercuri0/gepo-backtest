@@ -6,7 +6,7 @@
   /* Unplaced picks whose quote does not clear the gate: grey, like the live tab's dim rows. */
   tr.hist-dim td, tr.hist-dim td .pos, tr.hist-dim td .neg { color: #888780 !important; }
 </style>
-<h1>Frozen 15:30 + 15:45 top-up history</h1>
+<h1>Frozen 15:15 + 15:30 / 15:45 top-up history</h1>
 <div class="subtitle">One snapshot per trading day. Status/P&amp;L update intraday (tracker) and finalize at expiry (settler).</div>
 
 {% if entries %}
@@ -187,7 +187,7 @@
             {% if outcome_row %}
               <td>—</td>
             {% elif last_marked %}
-              <td>${{ "%.2f"|format(last_marked.current_mark|rd(2)) }}</td>
+              <td>${{ "%.2f"|format(last_marked.current_mark|rd(2)) }}{% if last_marked.mark_basis and '(held)' in last_marked.mark_basis and last_marked.ts %}<span style="color:#888780;font-size:10px" title="{{ last_marked.mark_basis }}"> {{ (last_marked.ts|string)[11:16] }}</span>{% endif %}</td>
             {% else %}
               <td>—</td>
             {% endif %}

@@ -163,7 +163,7 @@
           {% if outcome_row %}
             <td>—</td>
           {% elif last_marked %}
-            <td>${{ "%.2f"|format(last_marked.current_mark|rd(2)) }}</td>
+            <td>${{ "%.2f"|format(last_marked.current_mark|rd(2)) }}{% if last_marked.mark_basis and '(held)' in last_marked.mark_basis and last_marked.ts %}<span style="color:#888780;font-size:10px" title="{{ last_marked.mark_basis }}"> {{ (last_marked.ts|string)[11:16] }}</span>{% endif %}</td>
           {% else %}
             <td>—</td>
           {% endif %}

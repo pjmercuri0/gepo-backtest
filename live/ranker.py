@@ -1083,6 +1083,14 @@ def main() -> int:
     _atomic_write_json(archive_path, payload)
     print(f"wrote {latest_path}", flush=True)
     print(f"wrote {archive_path}", flush=True)
+    # The live tab's end-of-day board: the last 15:xx scan at or before LIVE_BOARD_FREEZE_AT that
+    # ranked anything. The site serves it once a later scan has replaced latest.json.
+    _stem = snap_path.stem
+    _cut = str(getattr(live_config, "LIVE_BOARD_FREEZE_AT", "15:45")).replace(":", "")
+    if len(_stem) == 4 and _stem.isdigit() and "1500" <= _stem <= _cut and (payload.get("ticker") or []):
+        keep_path = Path(live_config.RANKED_DIR) / "live_frozen.json"
+        _atomic_write_json(keep_path, payload)
+        print(f"wrote {keep_path}", flush=True)
     return 0
 
 

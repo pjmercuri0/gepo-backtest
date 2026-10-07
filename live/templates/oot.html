@@ -104,7 +104,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
     const points  = {{ data.points | tojson }};
-    const weeks   = {{ data.weeks  | tojson }};
+    const weeks   = {{ weeks_chart | tojson }};
 
     // ── Equity curve ────────────────────────────────────────
     const eqCtx = document.getElementById('equity-chart').getContext('2d');
@@ -197,7 +197,8 @@
   {% if data.weeks %}
   {% include "_size_toggle.html" %}
   <div class="section-label">Week-by-week trades · {{ data.weeks|length }} weeks · {{ data.trades|length }} trades</div>
-  {% for w in data.weeks|reverse %}
+  {% set _wk = data.weeks|reverse|list %}
+  {% for w in (_wk[:week_limit] if week_limit else _wk) %}
   <div class="week-card">
     <div class="week-head">
       <div>
@@ -252,6 +253,15 @@
     </div>
   </div>
   {% endfor %}
+  {% if week_limit and data.weeks|length > week_limit %}
+  <div class="week-card">
+    <div class="week-sub" style="padding:10px 0">
+      Showing the {{ week_limit }} most recent of {{ data.weeks|length }} weeks.
+      <a href="{{ url_for(request.endpoint, weeks=week_limit + 12) }}" style="margin-left:10px">show 12 more</a>
+      <a href="{{ url_for(request.endpoint, weeks='all') }}" style="margin-left:14px">show all ({{ data.weeks|length }})</a>
+    </div>
+  </div>
+  {% endif %}
   {% endif %}
 
 {% else %}
