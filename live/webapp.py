@@ -748,6 +748,47 @@ def _actuals_marks() -> dict:
     return cached
 
 
+def _intrinsic_mark(spread_type, spot, short_strike, long_strike, width=None):
+    """PURE INTRINSIC value of the spread at `spot` -- the only open-row mark (user 2026-10-07:
+    "i want it to be just pure intrinsic pricing for the p&l from now on").
+
+    bull put:  clamp(short - spot, 0, width)      bear call: clamp(spot - short, 0, width)
+
+    So a row above its short strike (W) marks 0 and shows the full credit, a row through its long
+    strike (L) marks the width and shows max loss, and a row between the strikes (P) is linear.
+    The badge and the P&L are the same statement about spot and can never disagree. No quote,
+    model or held mark feeds the P&L any more; the credit cell still shows the quote.
+    """
+    try:
+        spot = _round_half_up(float(spot), 2); ks = float(short_strike); kl = float(long_strike)
+    except (TypeError, ValueError):
+        return None
+    w = float(width) if width else abs(ks - kl)
+    raw = (ks - spot) if spread_type == "bull_put" else (spot - ks)
+    return round(min(max(raw, 0.0), w), 4)
+
+
+def _apply_intrinsic(live: dict, pick: dict) -> None:
+    """Set live's mark and unrealized P&L from the spot the row shows. In place."""
+    if not isinstance(live, dict) or not live.get("underlying_price"):
+        return
+    try:
+        ks, kl = float(pick["short_strike"]), float(pick["long_strike"])
+    except (KeyError, TypeError, ValueError):
+        return
+    w = float(pick.get("spread_width") or abs(ks - kl))
+    m = _intrinsic_mark(pick.get("spread_type"), live["underlying_price"], ks, kl, w)
+    if m is None:
+        return
+    live["current_mark"] = m
+    live["mark_basis"] = "intrinsic at spot"
+    live["live_status"] = _live_status(pick.get("spread_type"), live["underlying_price"], ks, kl) or live.get("live_status")
+    _ac = pick.get("actual_credit")
+    _basis_credit = float(_ac) if _ac is not None else credit_basis.entry_credit(pick)
+    if _basis_credit is not None:
+        live["unrealized_pnl_per_contract"] = round((float(_basis_credit) - m) * 100, 2)
+
+
 def _stream_state() -> dict:
     """combo_stream.json, read once per request: every row of a page is then priced off the same
     stream tick (Snap overlays ~300 rows), and the file is not re-read per row."""
@@ -1027,9 +1068,16 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             if live.get("current_mark") is not None and _basis_credit is not None:
                 live["unrealized_pnl_per_contract"] = round(
                     (float(_basis_credit) - live["current_mark"]) * 100, 2)
+            # PURE INTRINSIC (user 2026-10-07) overrides the mark chosen above and its P&L.
+            _apply_intrinsic(live, pick)
             _out_track = live
             if live.get("current_mark") is not None:
                 _out_marked = live
+        elif outcome_row is None and isinstance(last_track, dict) and last_track.get("underlying_price"):
+            # Nothing live for this spread: still intrinsic, at the last spot the tracker stored.
+            live = dict(last_track)
+            _apply_intrinsic(live, pick)
+            _out_track = _out_marked = live
     except (TypeError, ValueError, KeyError):
         pass
     return _out_track, _out_marked
@@ -1185,12 +1233,8 @@ def _frozen_history(limit: int = 60) -> list[dict]:
             # 0.526, which is what made History and Actuals disagree.
             long_itm_by = (ls - spot) if stype == "bull_put" else (spot - ls)
             deep_long = long_itm_by > 0.01 * spot if spot else False
-            close_debit = target_row.get("current_mark")
-            if close_debit is None:
-                close_debit = intrinsic
-            else:
-                close_debit = max(float(close_debit), intrinsic) if deep_long else float(close_debit)
-            close_debit = min(max(close_debit, 0.0), spread_w)
+            # PURE INTRINSIC (user 2026-10-07): the tracker's stored mark no longer feeds the P&L.
+            close_debit = min(max(intrinsic, 0.0), spread_w)
 
             pps_per_share = entry_credit - close_debit
             target_row["unrealized_pnl_per_contract"] = round(pps_per_share * 100, 2)
@@ -1655,6 +1699,20 @@ def history():
                 _p["gate_ok"] = bool(_fresh["gate_ok"])
             else:
                 _p["gate_ok"] = bool(_p.get("above_min", True)) and _p.get("quote_ok") is not False
+        # The day total is the sum of the rows AS RENDERED. It was summed in _frozen_history, before
+        # the overlay above moved the open rows, so an unsettled day's header and its rows were two
+        # different moments (2026-10-07 08:37: header +$46 over rows summing to +$23).
+        if _settled or _e.get("mock"):
+            continue
+        _tot = None
+        for _p in (_e.get("top_picks") or []):
+            _rows = _tracking.get(_p.get("ticker")) or []
+            _v = next((r.get("unrealized_pnl_per_contract") for r in reversed(_rows)
+                       if isinstance(r, dict) and r.get("unrealized_pnl_per_contract") is not None), None)
+            if _v is not None:
+                _tot = (_tot or 0.0) + float(_v) * max(1, int(_p.get("suggested_qty") or 1))
+        if _tot is not None:
+            _e["day_total_pnl_per_contract"] = round(_tot, 2)
     return render_template("history.html",
                            entries=entries,
                            close_alert=close_alert)
@@ -1899,8 +1957,7 @@ def actuals():
         # _stream_overlay; a later spot beside it would badge the row off a different moment than
         # its P&L, and Actuals would disagree with History, which has no override here.
         _lt0 = r.get("last_track")
-        _held = (isinstance(_lt0, dict) and "(held)" in str(_lt0.get("mark_basis") or "")
-                 and bool(_lt0.get("underlying_price")))
+        _held = False     # intrinsic pricing (2026-10-07): the mark follows whatever spot the row shows
         if _spot and not r.get("outcome_row") and not _held:
             lt = r.get("last_track")
             if not isinstance(lt, dict):
@@ -1934,6 +1991,14 @@ def actuals():
                     lt["assignment_risk"] = bool(
                         exp_d == today_d and today_d.weekday() == 4
                         and short_itm and long_otm)
+        # PURE INTRINSIC (user 2026-10-07), re-applied at the spot this row ends up showing, and the
+        # row P&L re-read so the card header still sums exactly what the rows display.
+        _lt1 = r.get("last_track")
+        if isinstance(_lt1, dict) and not r.get("outcome_row"):
+            _apply_intrinsic(_lt1, r.get("pick") or {})
+            if _lt1.get("current_mark") is not None:
+                r["last_marked"] = _lt1
+            r["row_pnl"], r["row_pnl_realized"] = _actuals_row_pnl(r)
     fill_stats = _fill_stats(rows)
     ctx = dict(fill_stats=fill_stats, rows=rows, weeks=_actuals_weeks(rows),
                assign_ts=risk.get("_ts"),
