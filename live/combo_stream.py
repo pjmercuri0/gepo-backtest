@@ -370,6 +370,9 @@ def main() -> int:
             _now = datetime.now()
             if _now.weekday() < 5 and "09:30" <= _now.strftime("%H:%M") < "16:00":
                 for k, q in quotes.items():
+                    _w = widths.get(k)
+                    if _w and abs(q["ask"] - q["bid"]) > _w + 1e-9:     # wider than the spread: not a price
+                        continue
                     last_q[k] = {"mid": q["mid"], "bid": q["bid"], "ask": q["ask"], "src": q["src"],
                                  "ts": q["ts"], "spot": sp.get(k.split("|")[0])}
             _today = _now.date().isoformat()

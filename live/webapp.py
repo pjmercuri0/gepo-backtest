@@ -854,7 +854,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             _px = _basis = None
             # History and Actuals (user 2026-10-01): show the LIVE quote. When the stream holds this
             # spread, its mid is the mark and the quoted credit; otherwise the last scan's own-leg mark.
-            _live_mid = None; _gate_book_ok = False
+            _live_mid = None; _gate_book_ok = False; _wide = False
             if prefer_stream and _q and _q.get("mid") is not None:
                 try:
                     import config as _cfg
@@ -863,17 +863,21 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                     _mbw = getattr(_cfg, "QUOTE_MAX_BOOK_W", None)
                     _bw = abs(float(_q["ask"]) - float(_q["bid"]))
                     _gate_book_ok = _mbw is None or _bw <= float(_mbw) * w
-                    # ONE quote per row (user 2026-10-06): when the stream holds the spread its mid is
-                    # the credit shown, the mark, the P&L basis and the number the gate judges -- on any
-                    # book width. The mark used to need a book no wider than the spread and otherwise
-                    # fell back to the last scan, so a wide-book row was shown, marked and shaded off
-                    # different numbers (GS 902.5/900: cell 1.43 from 15:15, shade off a live 1.35).
-                    _live_mid = float(_q["mid"])
+                    # ONE quote per row, and only a CREDIBLE one (2026-10-07). A book wider than the
+                    # spread itself has no meaningful midpoint, so it prices NOTHING on the row: not
+                    # the credit cell, not the mark, not the shade. On 2026-10-06 the mark was let
+                    # through on any width, and FCX 74/73 (spot 71.28, 1.72 under the long strike,
+                    # leg book -2.79/+1.93 on a 1.00 spread) marked 0.43 and showed +$7 on an L badge.
+                    # A wide-book row shows its scan quote, shades on the scan's gate (GS 902.5/900:
+                    # cell 1.43, floor 1.41, lit) and is marked by the model at the live spot.
+                    _wide = _bw > 1.0 * w + 1e-9
+                    if not _wide:
+                        _live_mid = float(_q["mid"])
                 except (TypeError, ValueError, KeyError):
                     _live_mid = None
             # Quote gate on the live quote, same rule as the live tab: credible book and quote >= model
-            # at the 2dp shown (a tie clears). Only set when the stream holds this spread.
-            if prefer_stream and _q and _q.get("mid") is not None:
+            # at the 2dp shown (a tie clears). Only set when the stream holds this spread credibly.
+            if _live_mid is not None:
                 try:
                     _wa = (pick.get("credit_targets") or {}).get("walkaway_credit")
                     if _wa is None and pick.get("model_credit"):
@@ -887,15 +891,44 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                 live["live_quote"] = round(_live_mid, 4); live["live_quote_ts"] = _q.get("ts")
                 _am = {"ts": _q.get("ts")}
             elif _am:
-                if _am.get("mark_legs") is not None:
-                    _px, _basis = float(_am["mark_legs"]), "own leg mids"
-                elif _am.get("mark_bs") is not None:
-                    _px, _basis = float(_am["mark_bs"]), "BS at own-leg IV (no book)"
+                # Wide book: the scan's own-leg mid came off the same wide legs, so the model goes
+                # first -- repriced at the LIVE spot from the scan's own-leg IVs, so the mark and
+                # the badge beside it are the same moment.
+                if _wide and _sp and _am.get("iv_short"):
+                    try:
+                        from live.bs_pricing import bs_spread_debit
+                        _px = float(bs_spread_debit(
+                            spot=_sp, short_strike=ks, long_strike=kl,
+                            short_iv=float(_am["iv_short"]),
+                            long_iv=float(_am.get("iv_long") or _am["iv_short"]),
+                            dte_days=(int(_am["dte"]) if _am.get("dte") is not None else max(
+                                (ddate.fromisoformat(str(pick["expiry_date"])[:10]) - ddate.today()).days, 0)),
+                            spread_type=pick["spread_type"]))
+                        _basis = "model at own-leg IV, live spot (book wider than the spread)"
+                    except Exception:
+                        _px = None
+                if _px is None:
+                    for _k, _b in ((("mark_bs", "BS at own-leg IV (wide book)"), ("mark_legs", "own leg mids"))
+                                   if _wide else
+                                   (("mark_legs", "own leg mids"), ("mark_bs", "BS at own-leg IV (no book)"))):
+                        if _am.get(_k) is not None:
+                            _px, _basis = float(_am[_k]), _b
+                            break
             # HOLD the last live quote (user 2026-10-06) when nothing is quoting the spread now and the
             # last scan priced neither leg -- after the close, mostly. It used to fall to a model
             # floored at intrinsic, which is the full width once spot is under both strikes: TMO
             # 662.5/660 showed 2.50 / -$103 on a Tuesday night with three days to run.
-            if _px is None and prefer_stream and _lq and _lq.get("mid") is not None:
+            try:        # a held quote must have come off a credible book too (seeded rows carry none)
+                _lq_ok = bool(_lq) and (_lq.get("bid") is None or _lq.get("ask") is None
+                                        or abs(float(_lq["ask"]) - float(_lq["bid"])) <= 1.0 * w + 1e-9)
+            except (TypeError, ValueError):
+                _lq_ok = False
+            # ...and only while it is the NEWEST thing known about the spread. Once a later scan has
+            # tracked it, that wins: GS 902.5/900 sat on the 15:59 hold (spot 897.81, +$29) at 10:01
+            # the next morning with the stock at 870.65.
+            _lt_ts = str((last_track or {}).get("ts") or "")
+            _lq_new = bool(_lq) and str(_lq.get("ts") or "") >= _lt_ts
+            if _px is None and prefer_stream and _lq_ok and _lq_new and not _q and _lq.get("mid") is not None:
                 try:
                     _px, _basis = float(_lq["mid"]), f"last live quote {str(_lq.get('ts'))[11:16]} (held)"
                     _am = {"ts": _lq.get("ts")}
