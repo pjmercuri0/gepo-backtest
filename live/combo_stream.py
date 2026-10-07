@@ -111,6 +111,46 @@ def _board() -> list[dict]:
     return out
 
 
+_CONID_CACHE: dict[tuple, int] = {}
+
+
+def _frozen_earlier(ib) -> list[dict]:
+    """Open History picks from EARLIER days (user 2026-10-07). The stream followed positions,
+    today's board and today's frozen day only, so a pick frozen yesterday that he does not hold
+    lost its live quote overnight: DHR 217.5/215, GS 902.5/900 and AVGO 380/377.5 sat on their
+    15-minute scan numbers all morning. conIds are qualified from IBKR, as for positions, and
+    cached -- an earlier day's strikes can be outside every snapshot of today."""
+    today = datetime.now().date().isoformat()
+    out = []
+    files = sorted(Path(live_config.FROZEN_DIR).glob("*.json"), reverse=True)
+    for fp in [f for f in files if f.stem < today][:10]:
+        try:
+            payload = json.loads(fp.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        settled = set(((payload.get("outcome") or {}).get("results") or {}).keys())
+        for r in payload.get("top_picks") or []:
+            exp = str(r.get("expiry_date") or "")[:10]
+            if not exp or exp < today or r.get("pnl") is not None or r.get("ticker") in settled:
+                continue
+            right = "P" if r.get("spread_type") == "bull_put" else "C"
+            legs = []
+            for k in ("short_strike", "long_strike"):
+                try:
+                    ck = (r["ticker"], exp, float(r[k]), right)
+                except (KeyError, TypeError, ValueError):
+                    legs = []; break
+                if ck not in _CONID_CACHE:
+                    o = Option(ck[0], exp.replace("-", ""), ck[2], right, "SMART", currency="USD")
+                    if not ib.qualifyContracts(o) or not o.conId:
+                        legs = []; break
+                    _CONID_CACHE[ck] = o.conId
+                legs.append(_CONID_CACHE[ck])
+            if len(legs) == 2:
+                out.append({**r, "short_conid": legs[0], "long_conid": legs[1], "_key": _key(r)})
+    return out
+
+
 def _frozen_today() -> list[dict]:
     """Today's frozen History picks, streamed as picks (2026-10-01): once the next scan replaces the
     board, the frozen 15:30 picks dropped out of the stream and History fell back to their scan-time
@@ -242,7 +282,17 @@ def main() -> int:
                 _picks = [r for r in _new if r.get("qualified")]
                 _rest = [r for r in _new if not r.get("qualified")]
                 _keep_pos = pos[:max(0, MAX_BAGS - len(_picks))]
-                board = _picks + _keep_pos + _rest[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos))]
+                # Earlier days' open History picks go ahead of the non-pick board rows.
+                try:
+                    _have = {r["_key"] for r in _picks} | {r["_key"] for r in _keep_pos}
+                    _earlier = [r for r in _frozen_earlier(ib) if r["_key"] not in _have]
+                except Exception as e:
+                    _earlier = []
+                    print(f"[combo_stream] earlier frozen read failed: {e}", flush=True)
+                _earlier = _earlier[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos))]
+                _ek = {r["_key"] for r in _earlier}
+                _rest = [r for r in _rest if r["_key"] not in _ek]
+                board = _picks + _keep_pos + _earlier + _rest[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos) - len(_earlier))]
                 want = {r["_key"]: r for r in board}
                 for k in list(subs):
                     if k not in want:
