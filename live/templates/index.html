@@ -476,14 +476,15 @@ function marketOpenNow() {
 }
 
 // True if the live quote stream (combo_stream.json, rewritten every few
-// seconds while IB is connected) wrote within the last 10 minutes. Naive
-// local time, parsed the same way as snapshot_ts.
+// seconds while IB is connected) wrote within the last 2 minutes (was 10; the file
+// is rewritten every second, so 2 covers a restart without leaving the dot wrong
+// for long). Naive local time, parsed the same way as snapshot_ts.
 function streamIsFresh(data) {
   // The stream kept writing a fresh ts while its IB socket was down (2026-09-30),
   // so freshness alone is not proof IB is up: require the connected flag too.
   if (!data || !data.stream_ts || data.stream_connected !== true) return false;
   const age = ageMinutes(data.stream_ts);
-  return !isNaN(age) && age < 10;
+  return !isNaN(age) && age < 2;
 }
 
 // True if the snapshot_ts in either the SPY widget or the regime banner is
@@ -675,14 +676,19 @@ async function refresh() {
       `All ranked candidates${tickStr ? ` · scan ${tickStr}` : ""}` +
       (qStr ? ` · quotes ${qStr} ET (live)` : "");
     if (data.frozen) {
-      dot.className = "live-dot frozen-dot";
+      // Stream off = flashing red, frozen board or not (user 2026-10-07). The frozen check ran
+      // first, so from the 15:45 freeze until the next morning's first scan the dot stayed blue
+      // while the stream was down (2026-10-06 23:44 to 2026-10-07 09:00).
+      dot.className = streamIsFresh(data) ? "live-dot frozen-dot" : "live-dot stale-dot";
       txt.innerHTML =
         `GEPO Live Tracker <span class="badge badge-FROZEN" style="vertical-align:middle">FROZEN ${data.frozen_at || ""}</span>`;
       (document.getElementById("top-label")||{}).textContent =
         `Fable picks · board frozen at the ${data.frozen_at || ""} scan${tickStr ? ` · tick ${tickStr} ET` : ""}`;
     } else if (tickIsFresh(data)) {
-      // IB feed is healthy. Differentiate based on whether market is open.
-      dot.className = marketOpenNow() ? "live-dot" : "live-dot premarket-dot";
+      // Scan is fresh. Green in the session, yellow outside it -- and red whenever the quote
+      // stream is off, since the prices on the page are then only as new as the scan.
+      dot.className = !streamIsFresh(data) ? "live-dot stale-dot"
+                    : (marketOpenNow() ? "live-dot" : "live-dot premarket-dot");
       txt.textContent = "GEPO Live Tracker";
       (document.getElementById("top-label")||{}).textContent =
         `Fable picks · pooled top 6 by Γᵢ${tickStr ? ` · tick ${tickStr} ET` : ""}`;

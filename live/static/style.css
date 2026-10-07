@@ -179,7 +179,7 @@ tr.assignment-risk td:first-child::before {
 }
 .frozen-dot    { background: #378ADD; animation: none; }
 .premarket-dot { background: #E5B947; animation: none; } /* solid yellow — IB alive but market not yet open */
-.stale-dot     { background: #E24B4A; animation: none; } /* solid red — bad IB connection / stale data */
+.stale-dot     { background: #E24B4A; animation: pulse 0.7s ease-in-out infinite; } /* flashing red — quote stream off / stale data */
 .ticker-strip { background: #141414; border: 0.5px solid rgba(255,255,255,0.06);
                 border-radius: 8px; padding: 10px 16px; margin-bottom: 24px;
                 font-size: 12px; color: #888780;
