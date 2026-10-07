@@ -406,8 +406,14 @@ def main() -> int:
                 # money) is always worth more than the long. Anything else is not a quote,
                 # so publish nothing and let the caller fall back to BS.
                 wid = widths.get(k)
-                if not (s_mid > l_mid and mid > 0 and (wid is None or mid <= wid + 1e-9)):
+                # A leg mid ABOVE the width is still published, clamped to the width (user
+                # 2026-10-07: "just publish it for GS too"). GS 902.5/900 with the stock at 871 had
+                # leg mids 30.475 and 27.55 -- a 2.925 "spread" on a 2.50 width -- and was the one
+                # open History row with no live quote. Zero or negative is still not a quote.
+                if not (s_mid > l_mid and mid > 0):
                     continue
+                if wid is not None and mid > wid:
+                    mid = wid
                 quotes[k] = {"bid": round(-(float(st_.ask) - float(lt_.bid)), 4),
                              "ask": round(-(float(st_.bid) - float(lt_.ask)), 4),
                              "mid": round(mid, 4),
