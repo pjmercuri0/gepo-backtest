@@ -679,7 +679,12 @@ async function refresh() {
       // Stream off = flashing red, frozen board or not (user 2026-10-07). The frozen check ran
       // first, so from the 15:45 freeze until the next morning's first scan the dot stayed blue
       // while the stream was down (2026-10-06 23:44 to 2026-10-07 09:00).
-      dot.className = streamIsFresh(data) ? "live-dot frozen-dot" : "live-dot stale-dot";
+      // ...and stream on with the market not open yet is YELLOW (user 2026-10-07): the frozen
+      // board on screen is a previous session's, so blue would read as today's 15:45 freeze.
+      const _today = data.server_now ? String(data.server_now).slice(0, 10) : null;
+      const _preOpen = !marketOpenNow() && _today && data.data_date && _today > String(data.data_date);
+      dot.className = !streamIsFresh(data) ? "live-dot stale-dot"
+                    : (_preOpen ? "live-dot premarket-dot" : "live-dot frozen-dot");
       txt.innerHTML =
         `GEPO Live Tracker <span class="badge badge-FROZEN" style="vertical-align:middle">FROZEN ${data.frozen_at || ""}</span>`;
       (document.getElementById("top-label")||{}).textContent =
