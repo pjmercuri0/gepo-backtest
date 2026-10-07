@@ -2,6 +2,10 @@
 {% block title %}GEPO Snapshots — every scan's qualified picks{% endblock %}
 
 {% block content %}
+<style>
+  /* Open picks whose quote is below the model floor: grey, the same shade rule as History. */
+  tr.hist-dim td, tr.hist-dim td .pos, tr.hist-dim td .neg { color: #888780 !important; }
+</style>
 <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">Intraday Snapshot Picks</h1>
 <div class="subtitle">Every scan's Fable picks (pooled top 6 by GROUND among spreads clearing the model-credit floor and the quote gate), settled at expiry
 (partial-WIN at 50% intrinsic — same P&amp;L model as the backtest). Scans are bucketed to
@@ -80,7 +84,10 @@ their cron slot (:00/:15/:30/:45); out-of-hours runs are not shown.
       <tbody>
       {% for p in scan.picks %}
         {% set _pin = pin_open(p, (p.live.underlying_price if p.live and p.live.underlying_price else none), (p.outcome or p.expiry_close is not none)) %}
-        <tr{% if _pin %} class="assign-watch" title="PIN risk: spot inside the strikes — short assigned, long expires worthless, shares delivered"{% endif %}>
+        {# Shade (user 2026-10-07), History's rule: an open pick he does not hold is grey when its quote is
+           below the model floor and white when it clears. gate_ok is set in the route. #}
+        {% set _dim = (p.pnl is none and not p.outcome and p.expiry_close is none and held_cmp(p) != 'same' and p.gate_ok is defined and not p.gate_ok) %}
+        <tr{% if _pin %} class="assign-watch{% if _dim %} hist-dim{% endif %}" title="PIN risk: spot inside the strikes — short assigned, long expires worthless, shares delivered"{% elif _dim %} class="hist-dim" title="quote below model -- not fillable right now"{% endif %}>
           <td>{% set _hc = held_cmp(p) %}<button class="actuals-add{% if _hc == 'same' %} held-add{% elif _hc == 'better' %} held-better{% elif _hc == 'worse' %} held-worse{% endif %}" data-url="{{ url_for('add_actual_from_snapshot', date=d.date, hhmm=scan.hhmm, index=loop.index0) }}" title="{% if _hc == 'same' %}already in Actuals — IBKR will refuse a second order on the same option{% elif _hc == 'better' %}same name and side you hold, strike away from the move{% elif _hc == 'worse' %}same name and side you hold, strike has followed the stock{% else %}add this pick to actuals{% endif %}">+</button></td>
           <td class="fw"><span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}">{{ '▲' if p.spread_type == 'bull_put' else '▼' }}</span> {{ p.ticker }}</td>
           <td>{{ 'bull put' if p.spread_type == 'bull_put' else 'bear call' }}</td>

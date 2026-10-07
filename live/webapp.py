@@ -1620,6 +1620,18 @@ def snapshots():
                     _lt, _ = _stream_overlay(pk, pk.get("live"), None, None, prefer_stream=True)
                     if isinstance(_lt, dict):
                         pk["live"] = _lt
+                    # Row shade, History's rule: the live quote against the model floor when the stream
+                    # holds the spread, else the scan quote against it (2dp as shown, a tie clears).
+                    _g = (_lt or {}).get("gate_ok") if isinstance(_lt, dict) else None
+                    if _g is None:
+                        try:
+                            _wa = (pk.get("credit_targets") or {}).get("walkaway_credit")
+                            if _wa is not None and pk.get("net_credit") is not None:
+                                _g = math.floor(float(pk["net_credit"]) * 100 + 0.5) / 100 >= float(_wa)
+                        except (TypeError, ValueError):
+                            _g = None
+                    if _g is not None:
+                        pk["gate_ok"] = bool(_g)
                 lv = pk.get("live")
                 if lv:
                     lv.setdefault("live_status", _live_status(
