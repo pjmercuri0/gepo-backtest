@@ -886,6 +886,13 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                 try:
                     _px, _basis = float(_lq["mid"]), f"last live quote {str(_lq.get('ts'))[11:16]} (held)"
                     _am = {"ts": _lq.get("ts")}
+                    # A held mark keeps the spot it was quoted at. The spot feed runs on after the
+                    # bell, so a held mark beside a later spot is two moments on one row: AVGO
+                    # 380/377.5 on 2026-10-07 pre-open badged L off 375.91 (after-hours) next to a
+                    # +$15 P&L off a 15:46 mark taken at 378.12.
+                    if _lq.get("spot"):
+                        live["underlying_price"] = float(_lq["spot"])
+                        live["live_status"] = _live_status(pick.get("spread_type"), float(_lq["spot"]), ks, kl)
                 except (TypeError, ValueError):
                     _px = None
             if _px is not None:
@@ -899,6 +906,10 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                 live["current_mark"] = last_track["current_mark"]
                 live["mark_basis"] = f"{last_track.get('mark_basis') or 'mark'} (held)"
                 live["ts"] = last_track.get("ts")
+                # Same rule as the held live quote above: the mark's own spot, not a later one.
+                if last_track.get("underlying_price"):
+                    live["underlying_price"] = last_track["underlying_price"]
+                    live["live_status"] = _live_status(pick.get("spread_type"), last_track["underlying_price"], ks, kl)
             elif _am and _am.get("mark") is not None:
                 # Same arbitrage bound as the stream branch: never below
                 # intrinsic, never above the width. FCX 73/72 at spot 71.53 came
@@ -1820,7 +1831,13 @@ def actuals():
         # with no assignment-risk row yet had no spot at all and badged a flat "open" (GOOGL 2026-10-01).
         _spot = (_stream_spots.get(pk.get("ticker")) or (ar or {}).get("spot")
                  or _scan_spots.get(pk.get("ticker")))
-        if _spot and not r.get("outcome_row"):
+        # A HELD mark (no quote now -- after the bell) keeps the spot it was quoted at, already set by
+        # _stream_overlay; a later spot beside it would badge the row off a different moment than
+        # its P&L, and Actuals would disagree with History, which has no override here.
+        _lt0 = r.get("last_track")
+        _held = (isinstance(_lt0, dict) and "(held)" in str(_lt0.get("mark_basis") or "")
+                 and bool(_lt0.get("underlying_price")))
+        if _spot and not r.get("outcome_row") and not _held:
             lt = r.get("last_track")
             if not isinstance(lt, dict):
                 # No tracker row yet (a pick added from Snapshots has none), so
