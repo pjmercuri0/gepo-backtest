@@ -868,22 +868,31 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                     # the credit cell, not the mark, not the shade. On 2026-10-06 the mark was let
                     # through on any width, and FCX 74/73 (spot 71.28, 1.72 under the long strike,
                     # leg book -2.79/+1.93 on a 1.00 spread) marked 0.43 and showed +$7 on an L badge.
-                    # A wide-book row shows its scan quote, shades on the scan's gate (GS 902.5/900:
-                    # cell 1.43, floor 1.41, lit) and is marked by the model at the live spot.
+                    # A wide-book row is marked by the model at the live spot; its credit cell and
+                    # shade still use the stream quote (see below).
                     _wide = _bw > 1.0 * w + 1e-9
                     if not _wide:
                         _live_mid = float(_q["mid"])
                 except (TypeError, ValueError, KeyError):
                     _live_mid = None
-            # Quote gate on the live quote, same rule as the live tab: credible book and quote >= model
-            # at the 2dp shown (a tie clears). Only set when the stream holds this spread credibly.
-            if _live_mid is not None:
+            # Quote gate on the live quote, same rule as the live tab: quote >= model at the 2dp shown
+            # (a tie clears). Set whenever the stream holds this spread, at any book width.
+            if prefer_stream and _q and _q.get("mid") is not None:
                 try:
                     _wa = (pick.get("credit_targets") or {}).get("walkaway_credit")
                     if _wa is None and pick.get("model_credit"):
                         _wa = math.floor(float(pick["model_credit"]) * 100 + 0.5) / 100
                     if _wa is not None:
                         live["gate_ok"] = bool(_gate_book_ok and math.floor(float(_q["mid"]) * 100 + 0.5) / 100 >= float(_wa))
+                except (TypeError, ValueError):
+                    pass
+            # The CREDIT CELL shows the stream quote at any width (user 2026-10-07: "still put the quote
+            # i dont care about the width"), and the shade is judged on that same number. Only the
+            # MARK stays off a wide book -- that is what put +$7 on FCX's L badge -- so a wide-book
+            # row is quoted live and marked by the model.
+            if _wide:
+                try:
+                    live["live_quote"] = round(float(_q["mid"]), 4); live["live_quote_ts"] = _q.get("ts")
                 except (TypeError, ValueError):
                     pass
             if _live_mid is not None:
