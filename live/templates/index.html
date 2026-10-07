@@ -676,7 +676,7 @@ async function refresh() {
       `All ranked candidates${tickStr ? ` · scan ${tickStr}` : ""}` +
       (qStr ? ` · quotes ${qStr} ET (live)` : "");
     if (data.frozen) {
-      // Stream off = flashing red, frozen board or not (user 2026-10-07). The frozen check ran
+      // Stream off = red, frozen board or not (user 2026-10-07). The frozen check ran
       // first, so from the 15:45 freeze until the next morning's first scan the dot stayed blue
       // while the stream was down (2026-10-06 23:44 to 2026-10-07 09:00).
       // ...and stream on with the market not open yet is YELLOW (user 2026-10-07): the frozen
