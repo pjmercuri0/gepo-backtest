@@ -33,7 +33,7 @@
       &middot; {{ wk.settled }} settled, {{ wk.open }} open
       &middot; credit ${{ '%.0f'|format(wk.credit) }}
       &middot; risk ${{ '%.0f'|format(wk.max_loss) }}
-      {% if wk.pct_of_credit is not none %}&middot; {{ '%+.1f'|format(wk.pct_of_credit) }}% of credit{% endif %}
+      {% if wk.pct_of_risk is not none %}&middot; <span class="pct-risk">{{ '%+.1f'|format(wk.pct_of_risk) }}% of risk</span>{% endif %}
       {% if wk.settled and wk.open %}
         &middot; realized ${{ '%+.0f'|format(wk.realized) }}, marked ${{ '%+.0f'|format(wk.unrealized) }}
       {% endif %}

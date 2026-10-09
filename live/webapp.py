@@ -1885,8 +1885,10 @@ def _actuals_weeks(rows: list[dict]) -> list[dict]:
             wk[k] = round(wk[k], 2)
         if not wk["has_pnl"]:
             wk["total"] = None
-        wk["pct_of_credit"] = (round(100.0 * wk["total"] / wk["credit"], 1)
-                               if wk["total"] is not None and wk["credit"] else None)
+        # Result as a share of the capital at RISK -- the card's own "risk $" (user 2026-10-09;
+        # was a share of the credit collected).
+        wk["pct_of_risk"] = (round(100.0 * wk["total"] / wk["max_loss"], 1)
+                             if wk["total"] is not None and wk["max_loss"] else None)
         out.append(wk)
     return sorted(out, key=lambda w: w["expiry"], reverse=True)
 
