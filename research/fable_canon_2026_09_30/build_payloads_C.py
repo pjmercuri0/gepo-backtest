@@ -1,5 +1,5 @@
 """Site payloads for strategy C: floor model credit >= 0.45 x width (both sides), bear calls only below the
-prior-session SPY 100d SMA and IV < 0.35, pooled top 6 per day by GROUND (no threshold, no quote gate),
+prior-session SPY 100d SMA and IV < 0.35, pooled top 6 per day by GROUND (floor config.FABLE_GROUND_MIN, no quote gate),
 entries only when the name has >= 252 sessions of close history (start 2021-01-04), booked 1.04 x model.
 Writes live/data/backtest_equity.json and live/data/oot_equity.json (caller backs up first)."""
 import os, sys, io, json, contextlib, warnings; warnings.filterwarnings("ignore")
@@ -10,6 +10,10 @@ import ent_canon as ec, config as cfg, report_mid_canon as rmc, report_bear_regi
 from bear_regime_sweep import add_earnings_gate, add_exdiv_gate, add_regimes, add_split_gate, add_split_window_gate, prepare, realize
 HERE = Path(__file__).resolve().parent; KEY = ["ticker", "entry_date", "expiry_date", "spread_type", "short_strike", "long_strike"]
 FLOOR, BEAR_IV, TOP = 0.45, 0.35, 6
+# 2026-10-09 (user, new canon): GROUND floor on both sleeves before the pooled top-N cap --
+# 1 bp of entropy-discounted Kelly growth. Fable mode had no threshold, so 15.9% of this book
+# sat at GROUND <= 0. Mirrors config.FABLE_GROUND_MIN, which live/ranker.py reads.
+GMIN = getattr(cfg, "FABLE_GROUND_MIN", None)
 K = float(sys.argv[1]) if len(sys.argv) > 1 else float(ec.K)   # D_ent penalty in the rank key (user 2026-09-30: 24)
 FILL = float(sys.argv[2]) if len(sys.argv) > 2 else float(ec.FILL_MULT)   # 2026-09-30 (user): site book at 1.00 x model; live booking keeps ec.FILL_MULT
 with contextlib.redirect_stdout(io.StringIO()):
@@ -46,6 +50,10 @@ c["GROUND"] = c.EV * np.exp(-K * c.D_ent)   # rank key at this K (prepare() scor
 g = ~c.exdiv_hit & ~c.earnings_hit & ~c.split_hit & ~c.split_window_hit
 cw = c.model_credit / c.width
 elig = (c.spread_type.eq("bull_put") & g & (cw >= FLOOR)) | (c.spread_type.eq("bear_call") & g & (cw >= FLOOR) & (c.IV < BEAR_IV) & c.below_100)
+if GMIN is not None:
+    _gok = c.GROUND >= float(GMIN)
+    print(f"GROUND floor {float(GMIN):g}: dropped {int((elig & ~_gok).sum()):,} of {int(elig.sum()):,} eligible candidates")
+    elig = elig & _gok
 sel = c[elig].sort_values(["entry_date", "GROUND"], ascending=[True, False]).groupby("entry_date", sort=False).head(TOP)
 picks = rbr.enrich(realize(sel, 10**6, fill=FILL))
 # 2026-10-01 (user): size the Kelly arms on GROUND+carry -- the stake that earns CARRY_RATE x DTE/365
@@ -58,7 +66,7 @@ picks.to_parquet(HERE / f"picks_C_252_k{K:g}.parquet")
 
 def captions(payload):
     k = payload["config"]
-    k["selection"] = (f"strategy C: model credit >= {FLOOR:.2f}x width (both sides), pooled top-{TOP}/day by GROUND at k={K:g} (no threshold); "
+    k["selection"] = (f"strategy C: model credit >= {FLOOR:.2f}x width (both sides), pooled top-{TOP}/day by GROUND at k={K:g}" + (f" (GROUND >= {float(GMIN):g})" if GMIN is not None else " (no threshold)") + "; "
                       f"entries only once the name has {ec.WINDOW} sessions of history (start {picks.entry_date.min().date()})")
     k["regime"] = "bull puts every day; bear calls only below the prior-session SPY 100d SMA"
     k["bear_gates"] = (f"bear calls: IV < {BEAR_IV:.2f}, same credit floor, share the pooled top-{TOP}. Earnings, ex-dividend and "
