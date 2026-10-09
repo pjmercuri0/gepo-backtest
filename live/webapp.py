@@ -1587,6 +1587,14 @@ def snapshots():
         if stats_start and fp.stem < stats_start and not show_archive:
             archived_days += 1
             continue
+        # No Fridays (user 2026-10-09: "don't show Fridays on the snap page"). Dropped here, with the
+        # out-of-hours scans below, so a Friday leaves the day cards, the counts AND the by-time
+        # aggregate. Nothing is deleted from disk.
+        try:
+            if datetime.strptime(fp.stem, "%Y-%m-%d").weekday() == 4:
+                continue
+        except ValueError:
+            pass
         d = _read_json(fp)
         if d:
             # Drop out-of-hours scans (00:19, 16:00, 16:30, 20:11 are all in the
