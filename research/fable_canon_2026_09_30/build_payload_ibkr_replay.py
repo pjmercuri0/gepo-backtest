@@ -2,7 +2,7 @@
 
 Picks: every archived 15:30/15:45 IBKR snapshot re-ranked with the current canon
 (ibkr_replay_candidates_1530_1545.csv), strategy C + quote gate: model credit >= 0.45 x width,
-quoted mid >= model, pooled top 6 by GROUND at k=24, 15:30 scan then 15:45 top-up to 6.
+quoted mid >= model, pooled top 6 by GROUND at k=24 (floor config.FABLE_GROUND_MIN), 15:30 scan then 15:45 top-up to 6.
 Same builder as the Backtest/OOT tabs (report_mid_canon.build_payload + report_bear_regime.patch_config).
 Writes live/data/ibkr_replay_equity.json.  Usage: build_payload_ibkr_replay.py [fill=1.00]
 """
@@ -22,6 +22,13 @@ R["slot"] = R.hm.map(lambda h: "15:30" if h in ("1530", "1531") else "15:45")
 # which dropped 90 candidates live accepts (NOW 0.49 vs model 0.4939). Not `qualified`: that also needs the
 # own-gap store, which starts 2026-09-17, so it would empty every earlier day.
 E = R[(R.model_cw >= FLOOR) & R.above_min.astype(bool) & R.spread_type.eq("bull_put")].copy()
+# 2026-10-09 (user, new canon): GROUND floor before the top-N cap, config.FABLE_GROUND_MIN -- the same
+# gate live/ranker.py and build_payloads_C.py apply. None is no floor.
+import config as cfg
+GMIN = getattr(cfg, "FABLE_GROUND_MIN", None)
+if GMIN is not None:
+    print(f"GROUND floor {float(GMIN):g}: dropped {int((E.G24 < float(GMIN)).sum()):,} of {len(E):,} eligible candidates")
+    E = E[E.G24 >= float(GMIN)].copy()
 E["r"] = E.groupby(["day", "hm"]).G24.rank(ascending=False, method="first"); T = E[E.r <= TOP]
 key = ["day", "ticker", "short_strike", "long_strike", "exp"]; out = []
 for day, g in T.groupby("day"):
@@ -39,7 +46,6 @@ win = np.where(bp, P.settle >= P.short_strike, P.settle <= P.short_strike); loss
 P["_outcome"] = np.where(win, "WIN", np.where(loss, "LOSS", "PARTIAL")); P["expiry_close"] = P.settle
 b = (P.model_credit / (P.width - P.model_credit)).values
 P["w_star"], P["G"] = ec.kelly(P.p.values, P.q.values, P.ro.values, b)
-import config as cfg
 P["w_star_carry"] = ec.kelly_carry(P.p.values, P.q.values, P.ro.values, b, (cfg.CARRY_RATE * np.clip(P.DTE.astype(float), 1, None) / 365.0).values)
 P["DKL"] = P.D_ent; P["GROUND"] = P.G24
 
@@ -48,7 +54,7 @@ with contextlib.redirect_stdout(io.StringIO()):
 k = pay["config"]
 k["universe"] = "SP100 + SPY/QQQ/IWM, IBKR live snapshots"
 k["selection"] = (f"current canon on IBKR 15:30/15:45 snapshots: model credit >= {FLOOR:.2f}x width, quoted mid >= model, "
-                  f"pooled top-{TOP} by GROUND at k={K:g}; 15:30 scan, 15:45 tops up to {TOP}")
+                  f"pooled top-{TOP} by GROUND at k={K:g}" + (f" (GROUND >= {float(GMIN):g})" if GMIN is not None else "") + f"; 15:30 scan, 15:45 tops up to {TOP}")
 k["regime"] = "bull puts every day; bear calls only below the prior-session SPY 100d SMA"
 k["bear_gates"] = "bear calls: IV < 0.35, same credit floor, share the pooled top-6. Earnings and ex-dividend gates apply to both sleeves."
 k["parity"] = "no bull parity veto; no bear parity veto"
