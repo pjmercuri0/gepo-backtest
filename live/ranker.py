@@ -954,7 +954,8 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
                                  + (f"; bulls IV > {backtest_config.FABLE_MIN_IV:g}" if getattr(backtest_config, "FABLE_USE_IV_FILTER", True) else "; bulls no IV filter")
                                  + (f"; bears IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}" if getattr(backtest_config, "FABLE_BEAR_USE_IV_FILTER", False) else "; bears no IV filter")
                                  + (f"; quote >= {float(getattr(backtest_config, 'FABLE_QUOTE_GATE')):g}x model" if getattr(backtest_config, "FABLE_QUOTE_GATE", None) is not None else "; no quote gate")
-                                 + "; no GROUND threshold, no parity"
+                                 + (f"; GROUND >= {float(getattr(backtest_config, 'FABLE_GROUND_MIN')):g}" if getattr(backtest_config, "FABLE_GROUND_MIN", None) is not None else "; no GROUND threshold")
+                                 + ", no parity"
                                  if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable"
                                  else f"GROUND >= {backtest_config.GROUND_THRESHOLD:g}, top {live_config.TOP_N_DISPLAY}"),
             "BEAR_GROUND_THRESHOLD": getattr(backtest_config, "BEAR_GROUND_THRESHOLD", 0.001),
