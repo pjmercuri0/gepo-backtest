@@ -104,6 +104,24 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.72 MINI 2026-10-09: §0.71 floor carried to the live caption and the Plot tab; QUEUED — remove the carry
+
+- **Mini pulled §0.71 at 10:50 ET.** The 10:45 scan ran on the old canon (`git_sha e08113f`); 11:00 is the first scan
+  on the floor. Backtest and OOT payloads rsynced to Mya and reconciled against the rendered `/backtest` and `/oot`.
+- **Live caption** (`live/ranker.py` `SELECTION`): "no GROUND threshold" was hardcoded and survived §0.71; it now reads
+  "GROUND >= 0.0001" whenever `FABLE_GROUND_MIN` is set.
+- **Plot tab** (`build_payload_ibkr_replay.py`): the same floor applied before the top-6 cap. It dropped 583 of 626
+  eligible replay candidates: **38 trades (was 146), qty2 $12,064 (was $12,515), $-Sh 8.23 (was 3.54), DD 0.0% (was
+  -6.02%)**; 19 WIN / 10 PARTIAL / 9 LOSS. Candidate frame still ends 2026-10-02 (not extended); the equity points run
+  flat to 2026-10-08.
+- **User requirement (2026-10-09):** "i wanna still see the <ground on the live page as candidates, but they just cant
+  qualify". The floor sits in the `qualified` mask only; `ticker_rows` in `_serialize` is filtered on the model-credit
+  floor alone. Do not add a GROUND filter to the table.
+- **QUEUED, NOT STARTED (user 2026-10-09): "later i wanna remove the carry".** Scope not yet given by the user. Carry
+  today: `config.CARRY_RATE = 0.04` (display GROUND with carry, §0.69j) and the carry-adjusted Kelly sizing arms
+  (`ec.kelly_carry`, `w_star_carry` in `build_payloads_C.py` and `build_payload_ibkr_replay.py`). Ask what "remove"
+  covers before touching it.
+
 ## 0.71 CANON 2026-10-09 (user): a 1 bp GROUND FLOOR on the Fable selection — `FABLE_GROUND_MIN = 0.0001`
 
 **The problem the user stated:** "i'm betting on too many different names. by the end of the week i have 25 names out of
