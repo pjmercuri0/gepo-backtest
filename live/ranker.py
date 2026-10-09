@@ -645,10 +645,16 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         # book -- so the check mark on the live tab and the pick set can never disagree (2026-10-01).
         _quote_ok = (ranked["above_min"].astype(bool) if _qg is not None else pd.Series(True, index=ranked.index))
         _rk = str(getattr(backtest_config, "FABLE_RANK_KEY", "GROUND"))
+        # 2026-10-09 (user, new canon): GROUND FLOOR on both sleeves, before the pooled top-N cap.
+        # 1 bp of entropy-discounted Kelly growth, (e^G-1)*e^(-k*D_ent) >= FABLE_GROUND_MIN. Fable
+        # mode had no threshold, so 15.9% of the vendor-frame book sat at GROUND <= 0 -- picked on
+        # days with fewer than FABLE_TOP_N positive candidates. None is no floor (the old behaviour).
+        _gmin = getattr(backtest_config, "FABLE_GROUND_MIN", None)
+        _ground_ok = (ranked["GROUND"].astype(float) >= float(_gmin)) if _gmin is not None else pd.Series(True, index=ranked.index)
         _elig = (ranked["spread_type"].eq("bull_put")
                  & ((ranked["IV"].astype(float) > float(backtest_config.FABLE_MIN_IV)) if _use_iv else True)
                  & (ranked["cw_floor"] >= float(backtest_config.FABLE_MIN_CW))
-                 & _quote_ok & feature_ok)
+                 & _ground_ok & _quote_ok & feature_ok)
         # 2026-09-30 16:xx (user): both sleeves rank by GROUND (was qedge for bulls; live archive
         # at 15:30: bulls by GROUND +$1,774 6/6 vs qedge +$2,145 6/6 -- aligned for one visible key).
         _keep = ranked[_elig].sort_values(_rk, ascending=False).index[:int(backtest_config.FABLE_TOP_N)]
@@ -657,7 +663,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         _elig_b = (ranked["spread_type"].eq("bear_call")
                    & ((ranked["IV"].astype(float) < float(getattr(backtest_config, "FABLE_BEAR_MAX_IV", 0.35))) if _use_iv_b else True)
                    & (ranked["cw_floor"] >= float(getattr(backtest_config, "FABLE_BEAR_MIN_CW", 0.50)))
-                   & _quote_ok & feature_ok)
+                   & _ground_ok & _quote_ok & feature_ok)
         _keep_b = ranked[_elig_b].sort_values(_rk, ascending=False).index[:int(getattr(backtest_config, "FABLE_BEAR_TOP_N", 5))]
         ranked["qualified"] = False
         if bool(getattr(backtest_config, "FABLE_POOLED", False)):
@@ -673,7 +679,8 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         print(f"  Fable Canon: {int(_elig.sum())} eligible bull put(s) ({_ivs}credit >= {backtest_config.FABLE_MIN_CW:g}x width at {_floor_lbl}); "
               f"top {backtest_config.FABLE_TOP_N} by {_rk} qualified; {int(_elig_b.sum())} eligible bear call(s) ({_ivb}"
               f"credit >= {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width); top {getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} by {_rk} qualified"
-              + (f"; quote >= {float(_qg):g}x model required" if _qg is not None else ""), flush=True)
+              + (f"; quote >= {float(_qg):g}x model required" if _qg is not None else "")
+              + (f"; GROUND floor {float(_gmin):g} dropped {int((~_ground_ok).sum())} of {len(ranked)}" if _gmin is not None else ""), flush=True)
     n_below = int((above_thr & ~ranked["above_min"]).sum())
     if n_below and not _fable:
         print(f"  execution gate: {n_below} candidate(s) above GROUND {thr} but quoted BELOW fair value (1.00x model) — not qualified", flush=True)
@@ -699,7 +706,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
                    else f"top {backtest_config.FABLE_TOP_N}/{getattr(backtest_config, 'FABLE_BEAR_TOP_N', 5)} per side by {_rk}")
         print(f"  qualified: {n_bull_q} bull puts (Fable Canon: credit >= {backtest_config.FABLE_MIN_CW:g}x width) + "
               f"{n_bear_q} bear calls (credit >= {getattr(backtest_config, 'FABLE_BEAR_MIN_CW', 0.5):g}x width, IV < {getattr(backtest_config, 'FABLE_BEAR_MAX_IV', 0.35):g}); "
-              f"{_capmsg}; of {len(ranked)}", flush=True)
+              f"{_capmsg}" + (f", GROUND >= {float(_gmin):g}" if _gmin is not None else "") + f"; of {len(ranked)}", flush=True)
         return ranked
     print(f"  qualified: {n_bull_q} bull puts (GROUND >= {thr}, {_bull_par}, cap {backtest_config.TOP_N}) + "
           f"{n_bear_q} bear calls (GROUND >= {bear_thr}, {_bear_par}, "

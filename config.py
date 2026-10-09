@@ -346,3 +346,11 @@ QUOTE_MAX_BOOK_W = 1.0
 # six-week IBKR replay with it on fell from +$909 to +$159 at 1.04x model (research/fable_canon_2026_09_30/
 # ibkr_replay_bookfix.py). None = no book check; the gate is quote >= model at 2dp on any book.
 QUOTE_MAX_BOOK_W = None
+# 2026-10-09 (user): GROUND FLOOR on the Fable/strategy-C selection -- 1 bp of entropy-discounted
+# Kelly growth per trade, (e^G-1)*e^(-k*D_ent) >= 0.0001, applied to BOTH sleeves before the pooled
+# top-6 cap. Fable mode had no threshold at all. Vendor frame (strategy C, booked 1.00x model,
+# research/fable_canon_2026_09_30, thr x top sweep 2026-10-09): IS 3,045 trades $61,304 $-Sh 1.52
+# DD -17.7% at 10.4 names/wk, vs the no-floor cell's 5,779 / $83,391 / 1.26 / -30.3% at 17.4 names/wk.
+# OOT 2.71 / -12.7% vs 2.90 / -15.2% -- the Sharpe and DD gain is in-sample; the name count is the
+# reason for the change (user: "25 names out of 100 is not selection, that's overload").
+FABLE_GROUND_MIN = 0.0001
