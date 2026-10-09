@@ -15,8 +15,19 @@
         {% if wk.total is not none %}${{ '%+.0f'|format(wk.total) }}{% if wk.open %}<span class="live-dot" style="margin-left:6px"></span>{% endif %}{% else %}—{% endif %}
       </div>
     </div>
+    {# W / L / P counted off the SAME chain the Status badge reads, row by row, so the
+       counts are the badges added up (user 2026-10-09). Open rows count at their live badge. #}
+    {% set wlp = namespace(W=0, L=0, P=0) %}
+    {% for row in wk.rows %}
+      {% if row.outcome_row and row.outcome_row.result %}{% set _b = row.outcome_row.result[0] %}
+      {% elif row.pick.outcome %}{% set _b = row.pick.outcome[0] %}
+      {% elif row.last_track and row.last_track.live_status %}{% set _b = row.last_track.live_status[0] %}
+      {% else %}{% set _b = '' %}{% endif %}
+      {% if _b == 'W' %}{% set wlp.W = wlp.W + 1 %}{% elif _b == 'L' %}{% set wlp.L = wlp.L + 1 %}{% elif _b == 'P' %}{% set wlp.P = wlp.P + 1 %}{% endif %}
+    {% endfor %}
     <div class="week-sub">
       {{ wk.n }} trade{{ '' if wk.n == 1 else 's' }}
+      &middot; <span class="wlp-count" title="count of the Status badges below; open rows at their live badge"><span class="pos">{{ wlp.W }} W</span> / <span class="neg">{{ wlp.L }} L</span> / {{ wlp.P }} P</span>
       &middot; {{ wk.settled }} settled, {{ wk.open }} open
       &middot; credit ${{ '%.0f'|format(wk.credit) }}
       &middot; risk ${{ '%.0f'|format(wk.max_loss) }}
