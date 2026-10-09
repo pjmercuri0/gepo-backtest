@@ -1,4 +1,9 @@
 {% if rows %}
+  {# Stamp of the streamed spots behind the open rows (user 2026-10-09). Inside the
+     polled fragment so it moves with the numbers it describes. #}
+  {% if stream_ts and stream_ts|length >= 19 %}
+  <div class="subtitle" id="actuals-updated" title="time of the streamed spots the open rows are marked from">updated {{ stream_ts[11:19] }} ET{% if stream_ts[:10] != today_iso %} ({{ stream_ts[:10] }}){% endif %}</div>
+  {% endif %}
   {# One card per expiry Friday. Every pick in a group shares an expiry, so the
      group total is the number that matters for the week: realized where the
      trade settled, marked where it is still open. #}
@@ -26,7 +31,7 @@
         <th>Date</th><th>Time</th><th>Ticker</th>
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>Credit ($/sh)</th>
         <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">Min / Target ($/sh)</th>
-        <th>Max-Loss ($/sh)</th><th>Ratio</th><th title="GROUND + carry on the capital at risk (display only)">GROUND + carry (bps)</th>
+        <th>Max-Loss ($/sh)</th><th title="credit / spread width; in brackets, your fill / width">Ratio</th><th title="GROUND + carry on the capital at risk (display only)">GROUND + carry (bps)</th>
         <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>
       </tr></thead>
       <tbody>
@@ -65,7 +70,7 @@
                            and last_track and last_track.live_status == 'PARTIAL'
                            and p.expiry_date and (p.expiry_date|string)[:10] == today_iso) %}
         <tr class="{% if _pin_row %}assign-watch{% endif %}">
-          <td><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button>
+          <td data-sort="{{ (row.date or (p.entry_date or '')[:10]) }} {{ row.source_time or '' }}"><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button>
             {{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>
           <td>{{ row.source_time or '—' }}</td>
           {# Source column dropped 2026-09-03 to save width; row.source_label is
@@ -134,17 +139,16 @@
             <td>—</td>
           {% endif %}
           <td>${{ "%.2f"|format(ml|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span class="actual-shown" style="color:{% if (p.actual_max_loss|rd(2)) > (ml|rd(2)) %}#c46868{% else %}#ff6b6b{% endif %}">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>
-          {# Modelled ratio, plus the ratio on your real fill once recorded.
-             All recorded values use the one light green (#7ec99a). History
-             darkens to #5b9474 when a fill came in worse than modelled, but
-             here credit and ratio sat beside an always-light max-loss in the
-             same row, so the shade read as a mismatched colour rather than as
-             a signal. #}
-          <td>{% if (ml|rd(2)) > 0 %}{{ "%.2f"|format(((cr|rd(2)) / (ml|rd(2)))|rd(2)) }}{% else %}—{% endif %}
+          {# Ratio = credit / spread WIDTH (user 2026-10-09; was credit / max-loss), plus the
+             same ratio on your real fill once recorded. Width is the row's own credit +
+             max-loss, so the cell always agrees with the two columns beside it.
+             All recorded values use the one light green (#7ec99a). #}
+          {% set _w = (cr|rd(2)) + (ml|rd(2)) %}
+          <td>{% if _w > 0 %}{{ "%.2f"|format(((cr|rd(2)) / _w)|rd(2)) }}{% else %}—{% endif %}
             {%- if p.actual_credit is defined and p.actual_credit is not none
                   and p.actual_max_loss is defined and p.actual_max_loss is not none
-                  and (p.actual_max_loss|rd(2)) > 0 %}
-              {%- set ar = ((p.actual_credit|rd(2)) / (p.actual_max_loss|rd(2)))|rd(2) %}
+                  and ((p.actual_credit|rd(2)) + (p.actual_max_loss|rd(2))) > 0 %}
+              {%- set ar = ((p.actual_credit|rd(2)) / ((p.actual_credit|rd(2)) + (p.actual_max_loss|rd(2))))|rd(2) %}
               <span class="actual-shown" style="color:#7ec99a">({{ "%.2f"|format(ar) }})</span>
             {%- endif %}
           </td>

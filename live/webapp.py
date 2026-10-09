@@ -1921,7 +1921,8 @@ def _fill_stats(rows: list[dict]) -> dict:
 def actuals():
     rows = _actuals_rows()
     risk = _assignment_lookup()
-    _stream_spots = (_read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}).get("spots") or {}
+    _stream = _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
+    _stream_spots = _stream.get("spots") or {}
     _scan_spots = {}
     try:
         _snapf = sorted((Path(live_config.ROOT_DIR) / "snapshots" / ddate.today().isoformat()).glob("[0-9][0-9][0-9][0-9].parquet"))
@@ -2014,6 +2015,10 @@ def actuals():
     fill_stats = _fill_stats(rows)
     ctx = dict(fill_stats=fill_stats, rows=rows, weeks=_actuals_weeks(rows),
                assign_ts=risk.get("_ts"),
+               # Time of the streamed spots the open rows are marked from (user 2026-10-09:
+               # "i need timestamp on updates"). The stream's own stamp, not the render time:
+               # the page re-renders every poll whether or not a quote moved.
+               stream_ts=str(_stream.get("ts") or ""),
                today_iso=ddate.today().isoformat(),
                poll_seconds=live_config.WEBAPP_POLL_SECONDS)
     # ?fragment=1 returns just the cards, rendered by the SAME template the full

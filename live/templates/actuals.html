@@ -81,6 +81,57 @@ document.addEventListener('click', e => {
 </script>
 
 <script>
+// Click a column header to sort every card by that column; click again to reverse
+// (user 2026-10-09). Row ORDER only -- every value is still the server's. The choice
+// is kept in the tab and re-applied after each poll swaps the cards in.
+(() => {
+  const host = document.getElementById('actuals-live');
+  if (!host) return;
+  let state = null;                       // {col, dir}
+  try { state = JSON.parse(sessionStorage.getItem('actualsSort') || 'null'); } catch (e) {}
+  const key = td => {
+    if (!td) return null;
+    if (td.dataset.sort !== undefined) return td.dataset.sort.trim() || null;
+    const t = td.textContent.replace(/\s+/g, ' ').trim();
+    if (!t || t === '—') return null;
+    const m = t.replace(/[$,×]/g, '').match(/^[+-]?\d+(\.\d+)?/);
+    return m ? parseFloat(m[0]) : t.toLowerCase();
+  };
+  const apply = () => {
+    host.querySelectorAll('table.actuals-table').forEach(tb => {
+      tb.querySelectorAll('thead th').forEach((th, i) => {
+        th.style.cursor = 'pointer';
+        const old = th.querySelector('.sort-mark'); if (old) old.remove();
+        if (state && state.col === i) {
+          const s = document.createElement('span'); s.className = 'sort-mark';
+          s.textContent = state.dir > 0 ? ' ▲' : ' ▼'; th.appendChild(s);
+        }
+      });
+      if (!state) return;
+      const body = tb.tBodies[0]; if (!body) return;
+      const rows = Array.from(body.rows).map((r, i) => ({ r, i, k: key(r.cells[state.col]) }));
+      rows.sort((a, b) => {
+        if (a.k === null || b.k === null) return (a.k === null) - (b.k === null) || a.i - b.i;   // blanks last
+        const c = (typeof a.k === 'number' && typeof b.k === 'number') ? a.k - b.k : String(a.k).localeCompare(String(b.k));
+        return c * state.dir || a.i - b.i;
+      });
+      rows.forEach(x => body.appendChild(x.r));
+    });
+  };
+  host.addEventListener('click', e => {
+    const th = e.target.closest('table.actuals-table thead th');
+    if (!th) return;
+    const col = th.cellIndex;
+    state = (state && state.col === col) ? { col, dir: -state.dir } : { col, dir: 1 };
+    try { sessionStorage.setItem('actualsSort', JSON.stringify(state)); } catch (e) {}
+    apply();
+  });
+  window.actualsApplySort = apply;
+  apply();
+})();
+</script>
+
+<script>
 // Live spots. The cards are re-rendered SERVER-side every POLL_MS and swapped in
 // whole, so every number on this page -- spot, mark, P&L, week total, the P/W/L
 // badge and the pin highlight -- comes from the same code path as a full page
@@ -127,6 +178,7 @@ document.addEventListener('click', e => {
       const pageY = window.scrollY;
 
       host.innerHTML = html;
+      if (window.actualsApplySort) window.actualsApplySort();
 
       host.querySelectorAll('.table-scroll').forEach(el => {
         const k = scrollKey(el);
