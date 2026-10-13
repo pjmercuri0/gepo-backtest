@@ -77,7 +77,7 @@ their cron slot (:00/:15/:30/:45); out-of-hours runs are not shown.
         <th>actual</th>
         <th>ticker</th><th>type</th><th>strikes</th><th>credit ($/sh)</th>
         <th>min / target ($/sh)</th>
-        <th>entry ({{ "%.2f"|format(fill_mult) if fill_mult else "canon" }}&times; model)</th><th title="GROUND + carry on the capital at risk (display only)">&Gamma; + carry (bps)</th><th>expiry</th>
+        <th>entry ({{ "%.2f"|format(fill_mult) if fill_mult else "canon" }}&times; model)</th><th title="GROUND, in basis points">&Gamma; (bps)</th><th>expiry</th>
         <th>spot</th><th>mark</th>
         <th>expiry px</th><th>outcome</th><th>P&amp;L</th>
       </tr></thead>
@@ -99,7 +99,7 @@ their cron slot (:00/:15/:30/:45); out-of-hours runs are not shown.
           {% set tg = p.credit_targets %}
           {% if tg and tg.min_credit is defined %}<td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }})"><span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span></td>{% else %}<td>—</td>{% endif %}
           <td>${{ '%.2f' % p.entry_credit }}</td>
-          <td>{{ '%.2f' % ((p.GROUND + carry(p.DTE)) * 10000) if p.GROUND is not none else '—' }}</td>
+          <td>{{ '%.2f' % (p.GROUND * 10000) if p.GROUND is not none else '—' }}</td>
           <td>{{ (p.expiry_date or '')[:10] }}</td>
           {# live mark from track_frozen (pick.live); settled picks show expiry px instead #}
           <td>{% if p.live and p.live.underlying_price %}${{ "%.2f"|format(p.live.underlying_price|rd(2)) }}{% else %}<span style="color:#888780">—</span>{% endif %}</td>

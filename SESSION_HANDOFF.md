@@ -117,10 +117,11 @@ For detailed evidence of the completed 2026-09-01 integration, see §0.14. For t
 - **User requirement (2026-10-09):** "i wanna still see the <ground on the live page as candidates, but they just cant
   qualify". The floor sits in the `qualified` mask only; `ticker_rows` in `_serialize` is filtered on the model-credit
   floor alone. Do not add a GROUND filter to the table.
-- **QUEUED, NOT STARTED (user 2026-10-09): "later i wanna remove the carry".** Scope not yet given by the user. Carry
-  today: `config.CARRY_RATE = 0.04` (display GROUND with carry, §0.69j) and the carry-adjusted Kelly sizing arms
-  (`ec.kelly_carry`, `w_star_carry` in `build_payloads_C.py` and `build_payload_ibkr_replay.py`). Ask what "remove"
-  covers before touching it.
+- **DONE 2026-10-13 (user: "drop the +carry from every on the site all tabs").** The display add-on is gone from
+  Live, Backtest, OOT, Plot, History, Snap and Actuals: columns read GROUND (bps) and show GROUND alone; `_carry`,
+  `_carry_from_dow` and the `carry*` Jinja globals are deleted from `live/webapp.py`. NOT touched: `config.CARRY_RATE`,
+  `ec.kelly_carry` and the `w_star_carry` / quarter-Kelly fields in the payload builders (not shown on any tab).
+  Same day: live-table rows under `FABLE_GROUND_MIN` render grey (`ground_ok` per row from `ranker._serialize`).
 
 ## 0.71 CANON 2026-10-09 (user): a 1 bp GROUND FLOOR on the Fable selection — `FABLE_GROUND_MIN = 0.0001`
 
