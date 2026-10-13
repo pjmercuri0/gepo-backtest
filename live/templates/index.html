@@ -330,7 +330,9 @@ function renderRanked(rows, maxGround, kVal) {
     // on the LIVE quote (above_min). The scan's picks are the cards above; a pick whose
     // quote has slipped below model dims like any other row.
     if (r.qualified === true) qualSeen += 1;
-    const isPrimary = (r.above_min === true) || (r.qualified === true && r.above_min == null);
+    // GROUND floor (user 2026-10-13): a row under the floor cannot qualify, so it is grey even
+    // when its quote clears the gate. It stays on the table.
+    const isPrimary = r.ground_ok !== false && ((r.above_min === true) || (r.qualified === true && r.above_min == null));
     // Blue only when it is a pick you already hold (user 2026-09-15). A held name that is
     // not currently qualified stays grey like any other unqualified row.
     // Held = the + is painted blue (user 2026-09-15); row text stays white / grey.

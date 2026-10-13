@@ -890,6 +890,10 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             # is latent, but it is a trading gate: it must not fail open.
             "qualified":        _flag(r.get("qualified")),
             "above_min":        (None if r.get("above_min") is None else bool(r.get("above_min"))),
+            # GROUND floor (user 2026-10-13): a below-floor row stays on the table but renders grey --
+            # it cannot qualify, so it must not look like a row that can. None = no floor in force.
+            "ground_ok":        (None if getattr(backtest_config, "FABLE_GROUND_MIN", None) is None or _num(r.get("GROUND")) is None
+                                 else bool(_num(r.get("GROUND")) >= float(backtest_config.FABLE_GROUND_MIN))),
             "qedge":            _num(r.get("qedge")),
             "fable":            _fable_mode,
             "cw_fill":          _num(r.get("cw_fill")),
