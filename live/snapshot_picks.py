@@ -23,6 +23,7 @@ import pandas as pd
 from live import live_config
 import spreads
 import ent_canon as ec
+import config as backtest_config
 
 # 2026-09-17: snapshots used to book 0.80 x the IBKR quote, a pre-canon basis. The
 # canon books FILL_MULT x the smile-fit MODEL credit, so every settled snap P&L was
@@ -66,10 +67,15 @@ def capture(latest_path: Path) -> None:
         return
     day = ts[:10]
     hhmm = ts[11:16].replace(":", "")
-    rows = [r for r in d.get("ticker") or [] if r.get("qualified")]
-    rows = sorted(rows, key=lambda r: r.get("GROUND") or 0, reverse=True)[
-        :live_config.TOP_N_DISPLAY
-    ]
+    # 2026-10-13 (user: "show the top 6 ground even if they're not highlighted as qualifying. Just so
+    # we keep the data"): the scan's top FABLE_TOP_N rows by GROUND are kept whether or not they
+    # qualify, each carrying its own `qualified` flag. A qualified pick ranked below them is kept too,
+    # so a real pick is never displaced by rows that failed the quote gate.
+    _key = lambda r: r.get("GROUND") if r.get("GROUND") is not None else float("-inf")
+    _all = sorted(d.get("ticker") or [], key=_key, reverse=True)
+    _qual = [r for r in _all if r.get("qualified")][:live_config.TOP_N_DISPLAY]
+    _topn = int(getattr(backtest_config, "FABLE_TOP_N", 6))
+    rows = _all[:_topn] + [r for r in _qual if not any(r is t for t in _all[:_topn])]
 
     PICKS_DIR.mkdir(exist_ok=True)
     day_path = PICKS_DIR / f"{day}.json"
@@ -85,6 +91,7 @@ def capture(latest_path: Path) -> None:
     picks = []
     for r in rows:
         p = {k: r.get(k) for k in PICK_FIELDS}
+        p["qualified"] = bool(r.get("qualified"))
         _mc = r.get("model_credit")
         if _mc:
             p["entry_credit"] = round(float(_mc) * ec.FILL_MULT, 4)
@@ -99,7 +106,7 @@ def capture(latest_path: Path) -> None:
     payload["scans"].append({"hhmm": hhmm, "snapshot_ts": ts, "picks": picks})
     payload["scans"].sort(key=lambda s: s["hhmm"])
     day_path.write_text(json.dumps(payload, indent=1))
-    print(f"[snapshot_picks] captured {len(picks)} qualified pick(s) at {hhmm}")
+    print(f"[snapshot_picks] captured {len(picks)} row(s) at {hhmm}, {sum(1 for p in picks if p['qualified'])} qualified")
 
 
 def _expiry_close(ticker: str, expiry: str):

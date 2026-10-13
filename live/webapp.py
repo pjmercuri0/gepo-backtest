@@ -1638,6 +1638,10 @@ def snapshots():
             })
             slot["scans"] += 1
             for p in scan.get("picks", []):
+                # Rows kept for the record only (qualified False, from 2026-10-13) stay out of the
+                # stats; a pick stored before the flag existed is a qualified pick.
+                if p.get("qualified") is False:
+                    continue
                 slot["n"] += 1
                 if p.get("pnl") is not None:
                     slot["settled"] += 1

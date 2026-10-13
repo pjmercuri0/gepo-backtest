@@ -65,7 +65,7 @@ their cron slot (:00/:15/:30/:45); out-of-hours runs are not shown.
   {% for scan in d.scans|reverse %}
   <div style="margin-top:10px">
     <div class="week-sub">
-      scan {{ scan.hhmm_actual[:2] }}:{{ scan.hhmm_actual[2:] }} · {{ scan.picks|length }} qualified
+      scan {{ scan.hhmm_actual[:2] }}:{{ scan.hhmm_actual[2:] }} · {{ scan.picks|rejectattr('qualified', 'false')|list|length }} qualified{% if scan.picks|selectattr('qualified', 'false')|list %} · {{ scan.picks|selectattr('qualified', 'false')|list|length }} not qualified{% endif %}
       {% if scan.hhmm_actual != scan.hhmm_round %}
         <span style="color:#888780">(bucket {{ scan.hhmm_round[:2] }}:{{ scan.hhmm_round[2:] }})</span>
       {% endif %}
@@ -86,8 +86,10 @@ their cron slot (:00/:15/:30/:45); out-of-hours runs are not shown.
         {% set _pin = pin_open(p, (p.live.underlying_price if p.live and p.live.underlying_price else none), (p.outcome or p.expiry_close is not none)) %}
         {# Shade (user 2026-10-07): an open pick is grey when its quote is below the model floor and white
            when it clears. Held picks grey out too (user 2026-10-13). gate_ok is set in the route. #}
-        {% set _dim = (p.pnl is none and not p.outcome and p.expiry_close is none and p.gate_ok is defined and not p.gate_ok) %}
-        <tr{% if _pin %} class="assign-watch{% if _dim %} hist-dim{% endif %}" title="PIN risk: spot inside the strikes — short assigned, long expires worthless, shares delivered"{% elif _dim %} class="hist-dim" title="quote below model -- not fillable right now"{% endif %}>
+        {# A row kept for the record only (qualified false, user 2026-10-13) is grey, settled or not. #}
+        {% set _nq = (p.qualified is defined and p.qualified is false) %}
+        {% set _dim = _nq or (p.pnl is none and not p.outcome and p.expiry_close is none and p.gate_ok is defined and not p.gate_ok) %}
+        <tr{% if _pin %} class="assign-watch{% if _dim %} hist-dim{% endif %}" title="PIN risk: spot inside the strikes — short assigned, long expires worthless, shares delivered"{% elif _dim %} class="hist-dim" title="{{ 'did not qualify at the scan -- kept for the record' if _nq else 'quote below model -- not fillable right now' }}"{% endif %}>
           <td>{% set _hc = held_cmp(p) %}<button class="actuals-add{% if _hc == 'same' %} held-add{% elif _hc == 'better' %} held-better{% elif _hc == 'worse' %} held-worse{% endif %}" data-url="{{ url_for('add_actual_from_snapshot', date=d.date, hhmm=scan.hhmm, index=loop.index0) }}" title="{% if _hc == 'same' %}already in Actuals — IBKR will refuse a second order on the same option{% elif _hc == 'better' %}same name and side you hold, strike away from the move{% elif _hc == 'worse' %}same name and side you hold, strike has followed the stock{% else %}add this pick to actuals{% endif %}">+</button></td>
           <td class="fw"><span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}">{{ '▲' if p.spread_type == 'bull_put' else '▼' }}</span> {{ p.ticker }}</td>
           <td>{{ 'bull put' if p.spread_type == 'bull_put' else 'bear call' }}</td>
