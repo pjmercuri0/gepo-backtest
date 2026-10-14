@@ -158,6 +158,16 @@ this can only be run where the gateway lives.
 
 **Do not guess the retention window.** It was not verified from the MacBook and is the only number this hinges on.
 
+**RESULT, run on the mini 2026-10-14 (client 777, read-only).** Entitled: BRFG, BRFUPDN, DJ-N, DJ-RT, DJ-RTA, DJ-RTE,
+DJ-RTG, DJNL. NFLX, one reqHistoricalNews per provider from 2020-01-01, 300 cap:
+DJ-N 300 (capped) oldest 2026-07-16; DJ-RT 300 (capped) 2026-04-22; DJ-RTG 300 (capped) 2026-06-03; DJ-RTA 184 2026-04-17;
+DJ-RTE 192 2026-04-17; BRFUPDN 85 2024-11-20; BRFG 16 2023-10-19; DJNL 0. Re-requesting with end = the oldest time
+returned gave the same 300 back, so paging past the cap did not work as called -- the capped feeds' true depth is
+unmeasured. The uncapped Dow Jones feeds (RTA/RTE) stop at April 2026; only Briefing reaches 2023, at 16-85 items.
+No Sep 29 - Oct 3 headline mentions cuts (20 headlines: upgrades, price targets, Paramount); the first layoff headline
+is 2026-10-14 (WSJ/Barron's). Fields: time, providerCode, articleId, headline string only -- no sentiment or relevance.
+Per the rule above: depth is months, not years -> no gate; log news forward.
+
 **Scope limits.** Nothing in this item changes canon. No payload, parquet or JSON was written by the 2026-10-14 work;
 the sweep scripts live in the session scratchpad only. `research/fetch_edgar_8k_events.py` refuses to overwrite an
 existing `--out`.
