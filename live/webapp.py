@@ -2023,6 +2023,13 @@ def actuals():
                 r["last_track"] = lt
             if isinstance(lt, dict):
                 lt["underlying_price"] = _spot
+                # The ticker tooltip quoted the cron payload's spot (AMGN 426.11) beside a
+                # streamed 425.80 in the Spot cell (2026-10-14). Restate it off the row's spot.
+                if ar and ar.get("spot") is not None and ar.get("spot") != _spot:
+                    _old = f"spot {float(ar['spot']):.2f}"
+                    ar = dict(ar, spot=_spot,
+                              reasons=[s.replace(_old, f"spot {float(_spot):.2f}") for s in (ar.get("reasons") or [])])
+                    r["assign_risk"] = ar
                 st = (r.get("pick") or {}).get("spread_type")
                 ss = (r.get("pick") or {}).get("short_strike")
                 ls = (r.get("pick") or {}).get("long_strike")
