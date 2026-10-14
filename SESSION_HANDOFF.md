@@ -104,6 +104,64 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.73 MINI WORK ORDER 2026-10-14: measure the IBKR historical-news depth — a news gate is UNTESTED, not rejected
+
+**Why this came up.** NFLX announced a 1,000-job layoff (6% of staff) on 2026-10-14 and the stock fell. Two open canon
+positions were in the name (NFLX 71/70 bull puts expiring 10-16, entered 10-12 and 10-13, both PARTIAL, about -$35 each
+at 15:31). The user asked whether a news gate would have avoided it.
+
+**What was already tested, and what it settles.** `research/fetch_edgar_8k_events.py` (new, untracked; writes the
+gitignored `output/edgar_8k_events.csv`, 7,581 8-Ks / 93 symbols / 2020-06-01..2026-10-14) pulled every 8-K item code
+for the SP100, and the gate was swept on the canon strategy-C book (base reproduced exactly: IS 3,045 / $51,304 /
+$-Sh 1.52 / DD -17.73%; OOT 568 / $12,840 / 2.71 / -12.72%).
+
+| gate, filed in the 7d before entry | IS $ | IS $-Sh | IS DD | OOT $ | OOT $-Sh |
+|---|---|---|---|---|---|
+| base, no news gate | 51,304 | 1.52 | -17.7% | 12,840 | 2.71 |
+| restructuring 2.04/2.05/2.06 | 51,750 | 1.54 | -16.5% | 12,840 | 2.71 |
+| officer exit 5.02 | 46,711 | 1.39 | -17.5% | 13,145 | 2.76 |
+| both | 47,162 | 1.41 | -16.2% | 13,145 | 2.76 |
+
+**EDGAR is structurally blind to this event class — treat that as settled.** Item 2.05 (exit / disposal costs, the
+layoff analogue) has only 31 filings across 13 names in six years; NFLX has **zero**, and filed **no 8-K at all** since
+2026-09-15, so today's layoff is absent from the filings in every item code. The restructuring gate touches 145
+candidates and **zero OOT trades** (its OOT row is byte-identical to base) — the +0.02 IS Sharpe is noise on 49
+filings. Officer exits (5.02, 1,585 filings) are dense enough to measure and **cost 9% of IS dollars** (-$4,593) for no
+drawdown gain. The hindsight column is the decisive one: gating 5.02 filings that land DURING the hold — perfect
+foreknowledge, the ceiling on any news gate — still drops IS to $50,584 / 1.49. Do not revisit EDGAR for this.
+
+**What is NOT settled: press flow.** The NFLX story broke in the press on 2026-10-01 (TheWrap/Breitbart reported ~5%
+cuts; Deadline and Variety confirmed 6% / 1,000 on 10-14) — 13 days of public signal that EDGAR never saw. That is the
+gate worth testing, and it needs a timestamped news corpus the MacBook does not have.
+
+### The one measurement that decides everything — run this on the mini
+
+`IB.reqHistoricalNews` is present in the installed ib_insync 0.9.86 (verified on the MacBook):
+`reqHistoricalNews(conId, providerCodes, startDateTime, endDateTime, totalResults)`, with `reqNewsArticle` for bodies
+and `reqNewsProviders` for entitlements. IB Gateway is not on the MacBook (127.0.0.1:4001 and :4002 both closed), so
+this can only be run where the gateway lives.
+
+1. `reqNewsProviders()` — record which providers the account is entitled to (Dow Jones, Benzinga Pro, Reuters, ...).
+   Use a free client id: **777**. In use already are 1, 11, 12, 100-109, 110, 193 (`live/live_config.py`).
+2. One `reqHistoricalNews` call for NFLX (qualify the Stock to get its conId), `startDateTime` 2020-01-01,
+   `endDateTime` now, `totalResults` 300. **Report the OLDEST headline timestamp returned.** That single number is the
+   whole decision.
+3. Also report whether the 2026-10-01 pre-announcement NFLX story appears, and whether headlines carry anything
+   machine-usable beyond the string (provider code, article id, any sentiment or relevance field).
+
+**Decision rule, set in advance so the result is not reinterpreted after the fact.**
+- Oldest headline reaches back to 2021 or earlier -> the gate is backtestable on the canon frame. Build the corpus,
+  then sweep it exactly like the table above (same harness, base must reproduce 1.52 / -17.73% before any variant is
+  believed).
+- Oldest headline is recent (months) -> **do not build a gate.** Log news forward from that date and revisit in six
+  months. A gate that cannot be backtested does not get switched on.
+
+**Do not guess the retention window.** It was not verified from the MacBook and is the only number this hinges on.
+
+**Scope limits.** Nothing in this item changes canon. No payload, parquet or JSON was written by the 2026-10-14 work;
+the sweep scripts live in the session scratchpad only. `research/fetch_edgar_8k_events.py` refuses to overwrite an
+existing `--out`.
+
 ## 0.72 MINI 2026-10-09: §0.71 floor carried to the live caption and the Plot tab; QUEUED — remove the carry
 
 - **Mini pulled §0.71 at 10:50 ET.** The 10:45 scan ran on the old canon (`git_sha e08113f`); 11:00 is the first scan
