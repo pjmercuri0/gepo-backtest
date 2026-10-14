@@ -73,6 +73,11 @@ def capture(latest_path: Path) -> None:
     # so a real pick is never displaced by rows that failed the quote gate.
     _key = lambda r: r.get("GROUND") if r.get("GROUND") is not None else float("-inf")
     _all = sorted(d.get("ticker") or [], key=_key, reverse=True)
+    # 2026-10-14 (user): nothing under the GROUND floor goes on Snap -- the top 6 come from rows at or
+    # above FABLE_GROUND_MIN only.
+    _gm = getattr(backtest_config, "FABLE_GROUND_MIN", None)
+    if _gm is not None:
+        _all = [r for r in _all if r.get("GROUND") is not None and float(r["GROUND"]) >= float(_gm)]
     _qual = [r for r in _all if r.get("qualified")][:live_config.TOP_N_DISPLAY]
     _topn = int(getattr(backtest_config, "FABLE_TOP_N", 6))
     rows = _all[:_topn] + [r for r in _qual if not any(r is t for t in _all[:_topn])]

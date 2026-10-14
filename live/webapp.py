@@ -1586,6 +1586,17 @@ def snapshots():
             kept = [sc for sc in d.get("scans", []) if _in_market_hours(sc.get("hhmm", ""))]
             if not kept:
                 continue
+            # Under-floor rows kept-for-the-record before 2026-10-14 stay on disk but off the page (user:
+            # nothing under the 1 bp GROUND floor on Snap). Qualified picks are never dropped.
+            _gm = getattr(__import__("config"), "FABLE_GROUND_MIN", None)
+            if _gm is not None:
+                for sc in kept:
+                    # _idx = position in the file, which the "+" (add_actual_from_snapshot) indexes.
+                    for _i, _p in enumerate(sc.get("picks") or []):
+                        _p["_idx"] = _i
+                    sc["picks"] = [p for p in (sc.get("picks") or [])
+                                   if p.get("qualified") is not False
+                                   or (p.get("GROUND") is not None and float(p["GROUND"]) >= float(_gm))]
             d["scans"] = kept
             for scan in kept:
                 hhmm = scan.get("hhmm", "")
