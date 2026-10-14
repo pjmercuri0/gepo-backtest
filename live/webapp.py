@@ -1607,6 +1607,27 @@ def snapshots():
     total_days = len(all_days)
     days = all_days if limit is None else all_days[:limit]
 
+    # One quote per spread (user 2026-10-14: CME showed 1.30 and 1.33 on the same page). A spread the
+    # stream does not hold shows the NEWEST scan quote for it on every row, not each row's own scan quote:
+    # the live board first, else the latest of today's scans carrying it.
+    def _qkey(x):
+        try:
+            return (x.get("ticker"), x.get("spread_type"), str(x.get("expiry_date") or "")[:10],
+                    float(x.get("short_strike")), float(x.get("long_strike")))
+        except (TypeError, ValueError):
+            return None
+    _cur_q = {}
+    if days:
+        for _sc in sorted(days[0].get("scans") or [], key=lambda s: s.get("hhmm", "")):
+            for _p in _sc.get("picks") or []:
+                if _p.get("net_credit") is not None:
+                    _cur_q[_qkey(_p)] = (float(_p["net_credit"]), _sc.get("hhmm", ""))
+        _bd = _live_board() or {}
+        _bts = str(_bd.get("snapshot_ts") or "")
+        if _bts[:10] == days[0].get("date"):
+            for _r in _bd.get("ticker") or []:
+                if _r.get("net_credit") is not None:
+                    _cur_q[_qkey(_r)] = (float(_r["net_credit"]), _bts[11:16].replace(":", ""))
     # Only the days actually rendered need a live badge computed.
     for d in days:
         for scan in d.get("scans", []):
@@ -1628,10 +1649,14 @@ def snapshots():
                     # holds the spread, else the scan quote against it (2dp as shown, a tie clears).
                     _g = (_lt or {}).get("gate_ok") if isinstance(_lt, dict) else None
                     if _g is None:
+                        _cq = _cur_q.get(_qkey(pk))
+                        if _cq is not None:
+                            pk["cur_quote"], pk["cur_quote_hhmm"] = _cq
                         try:
                             _wa = (pk.get("credit_targets") or {}).get("walkaway_credit")
-                            if _wa is not None and pk.get("net_credit") is not None:
-                                _g = math.floor(float(pk["net_credit"]) * 100 + 0.5) / 100 >= float(_wa)
+                            _qv = pk.get("cur_quote", pk.get("net_credit"))
+                            if _wa is not None and _qv is not None:
+                                _g = math.floor(float(_qv) * 100 + 0.5) / 100 >= float(_wa)
                         except (TypeError, ValueError):
                             _g = None
                     if _g is not None:
