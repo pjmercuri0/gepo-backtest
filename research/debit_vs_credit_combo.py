@@ -53,8 +53,8 @@ from live import live_config                      # noqa: E402
 from live.combo_quotes import _has_quote          # noqa: E402
 from live.fetcher import _connect_with_retry      # noqa: E402
 
-# 110 is the live scan's combo pass; do not share it or a running scan loses its book.
-CLIENT_ID = 111
+# 110 = the scan's combo pass, 111 = combo_stream (live), 193 = assignment risk; 113 is free.
+CLIENT_ID = 113
 
 
 def _board(qualified_only: bool, limit: int) -> list[dict]:
@@ -77,7 +77,7 @@ def _board(qualified_only: bool, limit: int) -> list[dict]:
             continue
         out.append({"ticker": str(r["ticker"]), "expiry": exp, "k_s": ks, "k_l": kl,
                     "spread_type": r["spread_type"], "qualified": bool(r.get("qualified")),
-                    "ground": r.get("ground"), "scan_credit": r.get("credit")})
+                    "ground": r.get("GROUND"), "scan_credit": r.get("net_credit")})
         if len(out) >= limit:
             break
     return out
