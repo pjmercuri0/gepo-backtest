@@ -1654,7 +1654,14 @@ def snapshots():
         s["win_rate"] = round(100.0 * s["wins"] / s["settled"], 1) if s["settled"] else None
         s["per_trade"] = round(s["pnl"] / s["settled"], 2) if s["settled"] else None
     import config as backtest_config
+    # ?fragment=1: the newest day card alone, from the SAME include the page uses, for the poll.
+    if request.args.get("fragment"):
+        if not days:
+            return ""
+        return render_template("_snap_day.html", d=days[0],
+                               fill_mult=getattr(__import__("ent_canon"), "FILL_MULT", None))
     return render_template("snapshots.html", days=days, agg=agg,
+                           poll_seconds=live_config.WEBAPP_POLL_SECONDS,
                            thr=backtest_config.GROUND_THRESHOLD,
                            fill_mult=getattr(__import__("ent_canon"), "FILL_MULT", None),
                            shown_days=len(days), total_days=total_days,

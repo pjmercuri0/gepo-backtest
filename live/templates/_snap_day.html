@@ -1,0 +1,67 @@
+{# One Snap day card. The page includes it per day; ?fragment=1 renders the newest day alone so the
+   page can poll it (user 2026-10-14: "Snap needs to stay updated with quotes"). #}
+<div class="week-card">
+  <div class="week-title">{{ d.date }}</div>
+  {% for scan in d.scans|reverse %}
+  <div style="margin-top:10px">
+    <div class="week-sub">
+      scan {{ scan.hhmm_actual[:2] }}:{{ scan.hhmm_actual[2:] }} · {{ scan.picks|rejectattr('qualified', 'false')|list|length }} qualified{% if scan.picks|selectattr('qualified', 'false')|list %} · {{ scan.picks|selectattr('qualified', 'false')|list|length }} not qualified{% endif %}
+      {% if scan.hhmm_actual != scan.hhmm_round %}
+        <span style="color:#888780">(bucket {{ scan.hhmm_round[:2] }}:{{ scan.hhmm_round[2:] }})</span>
+      {% endif %}
+    </div>
+    {% if scan.picks %}
+    <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th>actual</th>
+        <th>ticker</th><th>type</th><th>strikes</th><th>credit ($/sh)</th>
+        <th>min / target ($/sh)</th>
+        <th>entry ({{ "%.2f"|format(fill_mult) if fill_mult else "canon" }}&times; model)</th><th title="GROUND, in basis points">&Gamma; (bps)</th><th>expiry</th>
+        <th>spot</th><th>mark</th>
+        <th>expiry px</th><th>outcome</th><th>P&amp;L</th>
+      </tr></thead>
+      <tbody>
+      {% for p in scan.picks %}
+        {% set _pin = pin_open(p, (p.live.underlying_price if p.live and p.live.underlying_price else none), (p.outcome or p.expiry_close is not none)) %}
+        {# Shade (user 2026-10-07): an open pick is grey when its quote is below the model floor and white
+           when it clears. Held picks grey out too (user 2026-10-13). gate_ok is set in the route. #}
+        {# A row kept for the record only (qualified false, user 2026-10-13) is grey, settled or not. #}
+        {% set _nq = (p.qualified is defined and p.qualified is false) %}
+        {% set _dim = _nq or (p.pnl is none and not p.outcome and p.expiry_close is none and p.gate_ok is defined and not p.gate_ok) %}
+        <tr{% if _pin %} class="assign-watch{% if _dim %} hist-dim{% endif %}" title="PIN risk: spot inside the strikes — short assigned, long expires worthless, shares delivered"{% elif _dim %} class="hist-dim" title="{{ 'did not qualify at the scan -- kept for the record' if _nq else 'quote below model -- not fillable right now' }}"{% endif %}>
+          <td>{% set _hc = held_cmp(p) %}<button class="actuals-add{% if _hc == 'same' %} held-add{% elif _hc == 'better' %} held-better{% elif _hc == 'worse' %} held-worse{% endif %}" data-url="{{ url_for('add_actual_from_snapshot', date=d.date, hhmm=scan.hhmm, index=loop.index0) }}" title="{% if _hc == 'same' %}already in Actuals — IBKR will refuse a second order on the same option{% elif _hc == 'better' %}same name and side you hold, strike away from the move{% elif _hc == 'worse' %}same name and side you hold, strike has followed the stock{% else %}add this pick to actuals{% endif %}">+</button></td>
+          <td class="fw"><span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}">{{ '▲' if p.spread_type == 'bull_put' else '▼' }}</span> {{ p.ticker }}</td>
+          <td>{{ 'bull put' if p.spread_type == 'bull_put' else 'bear call' }}</td>
+          <td>${{ '%.2f' % p.short_strike }} / ${{ '%.2f' % p.long_strike }}</td>
+          {# Credit and min / target: the same cells as History (user 2026-10-07) -- the live quote with
+             its dot when the stream holds the spread on a credible book, else the quoted mid at the scan. #}
+          {% set _open = p.pnl is none and not p.outcome and p.expiry_close is none %}
+          {% if _open and p.live and p.live.live_quote is defined and p.live.live_quote is not none %}<td title="LIVE quote ({{ p.live.live_quote_ts }}); scan quote ${{ '%.2f' % p.net_credit }}; booked at ${{ '%.2f' % p.entry_credit }}">${{ "%.2f"|format(p.live.live_quote|rd(2)) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span></td>{% else %}<td title="quoted mid at the scan (no live quote); booked at ${{ '%.2f' % p.entry_credit }}">${{ "%.2f"|format(p.net_credit|rd(2)) }}</td>{% endif %}
+          {% set tg = p.credit_targets %}
+          {% if tg and tg.min_credit is defined %}<td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }})"><span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span></td>{% else %}<td>—</td>{% endif %}
+          <td>${{ '%.2f' % p.entry_credit }}</td>
+          <td>{{ '%.2f' % (p.GROUND * 10000) if p.GROUND is not none else '—' }}</td>
+          <td>{{ (p.expiry_date or '')[:10] }}</td>
+          {# live mark from track_frozen (pick.live); settled picks show expiry px instead #}
+          <td>{% if p.live and p.live.underlying_price %}${{ "%.2f"|format(p.live.underlying_price|rd(2)) }}{% else %}<span style="color:#888780">—</span>{% endif %}</td>
+          <td>{% if p.live and p.live.current_mark is not none %}${{ "%.2f"|format(p.live.current_mark|rd(2)) }}{% else %}<span style="color:#888780">—</span>{% endif %}</td>
+          <td>{% if p.expiry_close is not none %}${{ '%.2f' % p.expiry_close }}{% else %}<span style="color:#888780">—</span>{% endif %}</td>
+          <td>{% if p.outcome %}<span class="badge badge-{{ p.outcome }}">{{ p.outcome }}</span>
+              {% elif p.live and p.live.live_status %}<span class="badge {% if p.live.live_status == 'WINNING' %}badge-WIN{% elif p.live.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}">{{ p.live.live_status[0] }}</span><span class="live-dot" style="margin-left:6px"></span>
+              {% else %}<span style="color:#888780">open</span>{% endif %}</td>
+          {# realized P&L once settled, otherwise the unrealized mark-to-market #}
+          {% set shown_pnl = p.pnl if p.pnl is not none else (p.live.unrealized_pnl_per_contract if p.live else none) %}
+          <td class="{{ 'pos' if shown_pnl is not none and shown_pnl > 0 else ('neg' if shown_pnl is not none and shown_pnl < 0 else '') }}">
+            {% if shown_pnl is not none %}${{ '%+.0f' % shown_pnl }}{% if p.pnl is none %}<span class="live-dot" style="margin-left:5px"></span>{% endif %}{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="week-sub" style="color:#888780">no qualified picks this scan</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
