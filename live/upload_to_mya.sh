@@ -154,7 +154,12 @@ USER_KEYS = ('actual_credit', 'actual_max_loss')
 loc = {t.get('id'): t for t in (local.get('trades') or []) if t.get('id')}
 rem = {t.get('id'): t for t in (remote.get('trades') or []) if t.get('id')}
 by_id = {}
+# 2026-10-14: ids X'd on the site are tombstoned in Mya's "deleted"; drop them from both
+# sides, or the union re-adds every removed trade on the next upload.
+deleted = set(local.get('deleted') or []) | set(remote.get('deleted') or [])
 for tid in list(loc) + [k for k in rem if k not in loc]:
+    if tid in deleted:
+        continue
     if tid in loc and tid in rem:
         t = dict(loc[tid])
         for k in USER_KEYS:
@@ -164,6 +169,8 @@ for tid in list(loc) + [k for k in rem if k not in loc]:
     else:
         by_id[tid] = loc.get(tid) or rem.get(tid)
 merged['trades'] = list(by_id.values())
+if deleted:
+    merged['deleted'] = sorted(deleted)
 updated = max([x for x in [local.get('updated_at'), remote.get('updated_at')] if x] or [''])
 if updated:
     merged['updated_at'] = updated

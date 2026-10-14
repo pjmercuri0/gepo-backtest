@@ -2468,6 +2468,10 @@ def delete_actual(trade_id: str):
     store["trades"] = [t for t in store.get("trades") or [] if t.get("id") != trade_id]
     if len(store["trades"]) == before:
         abort(404)
+    # Tombstone (2026-10-14): upload_to_mya.sh unions the mini's copy with Mya's, so a
+    # removal with no record came back on the next scan's upload (UPS re-appeared after X).
+    if trade_id not in (store.setdefault("deleted", [])):
+        store["deleted"].append(trade_id)
     store["updated_at"] = datetime.now().isoformat(timespec="seconds")
     _atomic_write_json(_actuals_path(), store)
     return jsonify({"ok": True, "removed": trade_id})
