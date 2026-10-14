@@ -1605,6 +1605,10 @@ def snapshots():
                 # render whatever the last scan stored: on 2026-10-06 all 73 rows it shared with
                 # Actuals showed a different spot, and GS 902.5/900 read L at a 15-minute-old mark.
                 _attach_targets(pk)      # min / target, the same function History uses
+                # GROUND floor at the row's own scan, the Live tab's ground_ok (user 2026-10-14).
+                _gm = getattr(__import__("config"), "FABLE_GROUND_MIN", None)
+                if _gm is not None and pk.get("GROUND") is not None:
+                    pk["ground_ok"] = float(pk["GROUND"]) >= float(_gm)
                 if pk.get("pnl") is None and not pk.get("outcome") and pk.get("expiry_close") is None:
                     _lt, _ = _stream_overlay(pk, pk.get("live"), None, None, prefer_stream=True)
                     if isinstance(_lt, dict):
