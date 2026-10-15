@@ -89,7 +89,9 @@
           {# Source column dropped 2026-09-03 to save width; row.source_label is
              still produced by webapp.py and used elsewhere. #}
           <td class="fw"{% if arisk and arisk.at_risk %} title="{{ arisk.reasons | join('; ') }}"{% elif arisk and arisk.in_pin_zone %} title="PIN risk: spot {{ arisk.spot }} inside {{ arisk.pin_zone[0] }}-{{ arisk.pin_zone[1] }} — short assigned, long expires worthless, shares delivered"{% elif arisk and arisk.extrinsic_unknown %} title="ASSIGNMENT risk: parity leg not quoting, extrinsic UNKNOWN on a short leg {{ arisk.short_itm_by }} ITM"{% elif arisk and arisk.extrinsic_watch %} title="ASSIGNMENT risk: extrinsic {{ arisk.extrinsic }} on a short leg {{ arisk.short_itm_by }} ITM"{% endif %}>{{ p.ticker }}
-            {% if p.spread_type == 'bull_put' %}
+            {% if p.structure == 'debit' %}
+              <span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}" style="margin-left:6px;font-size:10px;font-weight:600" title="{{ 'bull-call debit' if p.spread_type == 'bull_put' else 'bear-put debit' }}">{{ '▲ CD' if p.spread_type == 'bull_put' else '▼ PD' }}</span>
+            {% elif p.spread_type == 'bull_put' %}
               <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
             {% elif p.spread_type == 'bear_call' %}
               <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600" title="bear-call">▼ BC</span>
@@ -127,13 +129,16 @@
           {% endif %}
           {# Click the (+) / ($X.XX) to record the credit you actually filled at.
              Once set it drives this row's P&L and the week total above. #}
-          <td>${{ "%.2f"|format(cr|rd(2)) }}
+          {# Debit trade (live/debit_mode.py): he types and reads the DEBIT; data-dw makes the edit
+             store width - debit, so the trade keeps a credit-equivalent fill like every other row. #}
+          {% set _dw = ('%g' % ((p.short_strike|float) - (p.long_strike|float))|abs) if p.structure == 'debit' else '' %}
+          <td>${{ "%.2f"|format(cr|px(p)|rd(2)) }}
             {% if p.actual_credit is defined and p.actual_credit is not none %}
-              <span class="actual-trade-edit actual-shown" data-id="{{ row.id }}" data-current="{{ "%.2f"|format(p.actual_credit|rd(2)) }}"
+              <span class="actual-trade-edit actual-shown" data-id="{{ row.id }}" data-dw="{{ _dw }}" data-current="{{ "%.2f"|format(p.actual_credit|px(p)|rd(2)) }}"
                     style="color:#7ec99a"
-                    title="your actual fill — click to edit">(${{ "%.2f"|format(p.actual_credit|rd(2)) }})</span>
+                    title="your actual fill{{ ' (debit paid)' if _dw }} — click to edit">(${{ "%.2f"|format(p.actual_credit|px(p)|rd(2)) }})</span>
             {% else %}
-              <span class="actual-trade-edit" data-id="{{ row.id }}" data-current=""
+              <span class="actual-trade-edit" data-id="{{ row.id }}" data-dw="{{ _dw }}" data-current=""
                     style="color:#666"
                     title="click to record your actual fill">(+)</span>
             {% endif %}
@@ -144,9 +149,15 @@
           {% set tg = p.credit_targets %}
           {% if tg and tg.min_credit is defined %}
             <td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }}); breakeven ${{ '%.2f'|format(tg.breakeven_credit) }}">
+              {% if p.structure == 'debit' %}
+              <span style="color:#c9a227" title="max debit = width − min credit">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span>
+              <span style="opacity:0.6"> / </span>
+              <span style="color:#7ec99a">${{ "%.2f"|format(tg.target_hi_credit|px(p)) }}–${{ "%.2f"|format(tg.target_lo_credit|px(p)) }}</span>
+              {% else %}
               <span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span>
               <span style="opacity:0.6"> / </span>
               <span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>
+              {% endif %}
             </td>
           {% else %}
             <td>—</td>
@@ -180,7 +191,7 @@
           {% if outcome_row %}
             <td>—</td>
           {% elif last_marked %}
-            <td>${{ "%.2f"|format(last_marked.current_mark|rd(2)) }}</td>
+            <td>${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</td>
           {% else %}
             <td>—</td>
           {% endif %}

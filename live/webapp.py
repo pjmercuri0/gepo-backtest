@@ -121,6 +121,20 @@ def _pin_open(pick, spot, settled=False) -> bool:
 app.jinja_env.filters['rd'] = _round_half_up
 
 
+def _px(v, p):
+    """Price as he trades it (live/debit_mode.py): a debit row's credit equivalent shows as the debit,
+    width minus the credit at the 2dp shown, so a gate tie reads as a tie both ways. Credit rows pass through."""
+    if v is None or not isinstance(p, dict) or p.get("structure") != "debit":
+        return v
+    try:
+        return round(abs(float(p["short_strike"]) - float(p["long_strike"])) - _round_half_up(float(v), 2), 4)
+    except (KeyError, TypeError, ValueError):
+        return v
+
+
+app.jinja_env.filters['px'] = _px
+
+
 app.jinja_env.globals['pin_open'] = _pin_open
 
 
@@ -2028,7 +2042,7 @@ def actuals():
                 if ar and ar.get("spot") is not None and ar.get("spot") != _spot:
                     _old = f"spot {float(ar['spot']):.2f}"
                     ar = dict(ar, spot=_spot,
-                              reasons=[s.replace(_old, f"spot {float(_spot):.2f}") for s in (ar.get("reasons") or [])])
+                              reasons=[s.replace(_old, f"spot {_round_half_up(float(_spot), 2):.2f}") for s in (ar.get("reasons") or [])])
                     r["assign_risk"] = ar
                 st = (r.get("pick") or {}).get("spread_type")
                 ss = (r.get("pick") or {}).get("short_strike")

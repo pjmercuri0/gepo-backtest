@@ -323,6 +323,14 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
          backtest_config.MAX_MAX_LOSS) = _saved_gates
     print(f"  built {len(candidates)} candidate spreads", flush=True)
 
+    # Debit execution (user 2026-10-15, live/debit_mode.py): quote the parity twin and carry it as its
+    # credit equivalent, so everything below runs unchanged.
+    from live import debit_mode
+    if debit_mode.enabled() and not candidates.empty:
+        candidates = debit_mode.attach_parity_legs(candidates, df)
+        if candidates.empty:
+            return pd.DataFrame()
+
     # Re-price on IBKR's complex-order book, then re-apply the credit gates.
     if live_config.LIVE_COMBO_ENABLED and not candidates.empty:
         candidates = _reprice_on_combos(candidates)
@@ -586,11 +594,13 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     _mbw = getattr(backtest_config, "QUOTE_MAX_BOOK_W", None)      # None = rule off (user 2026-10-01)
     if not ranked.empty and _mbw is not None:
         _sw = (ranked["short_strike"].astype(float) - ranked["long_strike"].astype(float)).abs()
-        _bk = ((ranked["short_ask"].astype(float) - ranked["short_bid"].astype(float))
-               + (ranked["long_ask"].astype(float) - ranked["long_bid"].astype(float)))
+        # Debit rows are quoted off the parity twin's legs, so their book is checked on those legs.
+        _lp = "par_" if "par_short_bid" in ranked.columns else ""
+        _bk = ((ranked[f"{_lp}short_ask"].astype(float) - ranked[f"{_lp}short_bid"].astype(float))
+               + (ranked[f"{_lp}long_ask"].astype(float) - ranked[f"{_lp}long_bid"].astype(float)))
         _src = ranked["credit_source"].astype(str) if "credit_source" in ranked.columns else pd.Series("leg_mid", index=ranked.index)
         _legsrc = ~_src.str.startswith("combo")
-        _bid_ok = (ranked["short_bid"].astype(float) > 0) & (ranked["long_bid"].astype(float) > 0)
+        _bid_ok = (ranked[f"{_lp}short_bid"].astype(float) > 0) & (ranked[f"{_lp}long_bid"].astype(float) > 0)
         ranked["quote_book_w"] = (_bk / _sw).round(3)
         ranked["quote_ok"] = ~_legsrc | (_bid_ok & (_bk <= float(_mbw) * _sw))
         _nbad = int((ranked["above_min"] & ~ranked["quote_ok"]).sum())
@@ -829,6 +839,9 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             "leg_mid_credit":   _num(r.get("leg_mid_credit")),
             "combo_priced":     bool(r.get("combo_priced")) if r.get("combo_priced") is not None else None,
             "credit_source":    r.get("credit_source"),
+            # "debit" = quoted and traded as the parity debit spread (live/debit_mode.py); credits on
+            # this row are credit equivalents, the page shows width - credit as the debit.
+            "structure":        ("debit" if r.get("structure") == "debit" else "credit"),
             "combo_too_wide":   bool(r.get("combo_too_wide")) if r.get("combo_too_wide") is not None else None,
             "combo_bid":        _num(r.get("combo_bid")),
             "combo_ask":        _num(r.get("combo_ask")),

@@ -118,7 +118,9 @@
               {% if p.freeze_added_at %}<span style="font-size:10px;color:#e8b366;margin-left:6px" title="added from later freeze snapshot">+{{ p.freeze_added_at }}</span>{% endif %}
               {%- set sv = p.short_volume|default(none) -%}
               {%- set lv = p.long_volume|default(none) -%}
-              {% if p.spread_type == 'bull_put' %}
+              {% if p.structure == 'debit' %}
+                <span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="{{ 'bull-call debit: bought lower-strike call, sold higher-strike call' if p.spread_type == 'bull_put' else 'bear-put debit: bought higher-strike put, sold lower-strike put' }}">{{ '▲ CD' if p.spread_type == 'bull_put' else '▼ PD' }}</span>
+              {% elif p.spread_type == 'bull_put' %}
                 <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="bull-put: sold higher-strike put, bought lower-strike put">▲ BP</span>
               {% elif p.spread_type == 'bear_call' %}
                 <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="bear-call: sold lower-strike call, bought higher-strike call">▼ BC</span>
@@ -147,6 +149,7 @@
                you'd set: fill at midmid or skip. Fall back to mid if no
                fill_targets (means no bid/ask available to compute natural). #}
             {# Credit/Max-Loss/Ratio shown as 75%×mid placeholder; actual fill in brackets if recorded. #}
+            {% set _dw = ('%g' % ((p.short_strike|float) - (p.long_strike|float))|abs) if p.structure == 'debit' else '' %}
             {% if p.fill_targets %}
               {# White = booked basis (1.04 x model) even when a fill is recorded; the fill shows green beside it. #}
               {% set _bk = p.book_target if p.book_target is defined and p.book_target else p.fill_targets[0] %}
@@ -154,15 +157,15 @@
               {% set mm_l = _bk.max_loss %}
               {# Credit always green: bright #7ec99a if actual >= target, dull #5b9474 if worse. #}
               {# Credit cell (user 2026-09-30): the QUOTED mid at the scan; booking, max-loss and P&L stay on the low target (1.04 x model = mm_c). #}
-              {% if last_track and last_track.live_quote is defined and last_track.live_quote is not none and outcome_row is none %}<td title="LIVE quote ({{ last_track.live_quote_ts }}); scan quote ${{ "%.2f"|format((p.net_credit or mm_c)|rd(2)) }}; booked at ${{ "%.2f"|format(mm_c|rd(2)) }} (1.04 x model)">${{ "%.2f"|format(last_track.live_quote|rd(2)) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span> {% else %}<td title="quoted mid at the scan (no live quote); booked at ${{ "%.2f"|format(mm_c|rd(2)) }} (1.04 x model)">${{ "%.2f"|format((p.net_credit if p.net_credit is defined and p.net_credit is not none else mm_c)|rd(2)) }} {% endif %}{% if p.actual_credit is defined and p.actual_credit is not none %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-current="{{ "%.2f"|format(p.actual_credit|rd(2)) }}" style="color:{% if (p.actual_credit | rd(2)) < (mm_c | rd(2)) %}#5b9474{% else %}#7ec99a{% endif %};cursor:pointer;border-bottom:1px dotted currentColor" title="click to edit actual fill">(${{ "%.2f"|format(p.actual_credit|rd(2)) }})</span>{% else %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-current="" style="color:#666;cursor:pointer;border-bottom:1px dotted #666" title="click to record actual fill">(+)</span>{% endif %}</td>
+              {% if last_track and last_track.live_quote is defined and last_track.live_quote is not none and outcome_row is none %}<td title="LIVE quote ({{ last_track.live_quote_ts }}); scan quote ${{ "%.2f"|format((p.net_credit or mm_c)|rd(2)) }}; booked at ${{ "%.2f"|format(mm_c|rd(2)) }} (1.04 x model)">${{ "%.2f"|format(last_track.live_quote|px(p)|rd(2)) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span> {% else %}<td title="quoted mid at the scan (no live quote); booked at ${{ "%.2f"|format(mm_c|rd(2)) }} (1.04 x model)">${{ "%.2f"|format((p.net_credit if p.net_credit is defined and p.net_credit is not none else mm_c)|px(p)|rd(2)) }} {% endif %}{% if p.actual_credit is defined and p.actual_credit is not none %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-dw="{{ _dw }}" data-current="{{ "%.2f"|format(p.actual_credit|px(p)|rd(2)) }}" style="color:{% if (p.actual_credit | rd(2)) < (mm_c | rd(2)) %}#5b9474{% else %}#7ec99a{% endif %};cursor:pointer;border-bottom:1px dotted currentColor" title="click to edit actual fill{{ ' (debit paid)' if _dw }}">(${{ "%.2f"|format(p.actual_credit|px(p)|rd(2)) }})</span>{% else %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-dw="{{ _dw }}" data-current="" style="color:#666;cursor:pointer;border-bottom:1px dotted #666" title="click to record actual fill">(+)</span>{% endif %}</td>
               {# Max-loss always red: bright #ff6b6b if actual <= target (less risk), dull #c46868 if actual > target. #}
               {% set tg = p.credit_targets %}
-              {% if tg and tg.min_credit is defined %}<td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }})"><span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span></td>{% else %}<td>—</td>{% endif %}
+              {% if tg and tg.min_credit is defined %}<td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }})">{% if p.structure == 'debit' %}<span style="color:#c9a227" title="max debit = width − min credit">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_hi_credit|px(p)) }}–${{ "%.2f"|format(tg.target_lo_credit|px(p)) }}</span>{% else %}<span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>{% endif %}</td>{% else %}<td>—</td>{% endif %}
               <td>${{ "%.2f"|format(mm_l|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span style="color:{% if (p.actual_max_loss | rd(2)) > (mm_l | rd(2)) %}#c46868{% else %}#ff6b6b{% endif %}">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>
               {# Ratio always green: bright #7ec99a if actual >= target, dull #5b9474 if worse. #}
               <td>{% if (mm_l | rd(2)) > 0 %}{{ "%.2f"|format(((mm_c | rd(2)) / (mm_l | rd(2)))|rd(2)) }}{% else %}—{% endif %}{% if p.actual_credit is defined and p.actual_credit is not none and p.actual_max_loss is defined and p.actual_max_loss is not none and (p.actual_max_loss | rd(2)) > 0 and (mm_l | rd(2)) > 0 %}{% set ar = ((p.actual_credit | rd(2)) / (p.actual_max_loss | rd(2))) | rd(2) %}{% set tr = ((mm_c | rd(2)) / (mm_l | rd(2))) | rd(2) %} <span style="color:{% if ar < tr %}#5b9474{% else %}#7ec99a{% endif %}">({{ "%.2f"|format(ar) }})</span>{% endif %}</td>
             {% else %}
-              <td>${{ "%.2f"|format(p.net_credit|rd(2)) }}</td>
+              <td>${{ "%.2f"|format(p.net_credit|px(p)|rd(2)) }}</td>
               <td>${{ "%.2f"|format(p.max_loss|rd(2)) }}</td>
               <td>{% if p.max_loss > 0 %}{{ "%.2f"|format((p.net_credit / p.max_loss)|rd(2)) }}{% else %}—{% endif %}</td>
             {% endif %}
@@ -187,7 +190,7 @@
             {% if outcome_row %}
               <td>—</td>
             {% elif last_marked %}
-              <td>${{ "%.2f"|format(last_marked.current_mark|rd(2)) }}</td>
+              <td>${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</td>
             {% else %}
               <td>—</td>
             {% endif %}
@@ -286,6 +289,8 @@ document.addEventListener('click', e => {
     if (raw !== '') {
       val = parseFloat(raw);
       if (isNaN(val) || val < 0) { alert('invalid number'); restore(); return; }
+      // Debit pick: he typed the debit paid; the store keeps the credit equivalent, width - debit.
+      if (span.dataset.dw) val = Math.round((parseFloat(span.dataset.dw) - val) * 10000) / 10000;
     }
     done = true;
     try {

@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from ib_insync import IB, Stock, Option, Bag, ComboLeg, Contract
-from live import live_config
+from live import debit_mode, live_config
 from live.combo_quotes import _bag_for
 from live.fetcher import _connect_with_retry
 
@@ -69,7 +69,7 @@ def _positions(ib) -> list[dict]:
         exp = str(p.get("expiry_date") or "")[:10]
         if not exp or exp < today or p.get("pnl") is not None:
             continue
-        right = "P" if p.get("spread_type") == "bull_put" else "C"
+        right = debit_mode.right_for(p)      # a debit row streams its parity twin
         legs = []
         for k in ("short_strike", "long_strike"):
             try:
@@ -103,7 +103,7 @@ def _board() -> list[dict]:
     out = []
     for r in rows:
         exp = str(r.get("expiry_date"))[:10]
-        pc = "put" if r.get("spread_type") == "bull_put" else "call"
+        pc = "put" if debit_mode.right_for(r) == "P" else "call"
         s = idx.get((r.get("ticker"), exp, float(r.get("short_strike")), pc))
         l = idx.get((r.get("ticker"), exp, float(r.get("long_strike")), pc))
         if s and l:
@@ -133,7 +133,7 @@ def _frozen_earlier(ib) -> list[dict]:
             exp = str(r.get("expiry_date") or "")[:10]
             if not exp or exp < today or r.get("pnl") is not None or r.get("ticker") in settled:
                 continue
-            right = "P" if r.get("spread_type") == "bull_put" else "C"
+            right = debit_mode.right_for(r)
             legs = []
             for k in ("short_strike", "long_strike"):
                 try:
@@ -171,7 +171,7 @@ def _frozen_today() -> list[dict]:
     out = []
     for r in payload.get("top_picks") or []:
         exp = str(r.get("expiry_date"))[:10]
-        pc = "put" if r.get("spread_type") == "bull_put" else "call"
+        pc = "put" if debit_mode.right_for(r) == "P" else "call"
         s_ = idx.get((r.get("ticker"), exp, float(r.get("short_strike")), pc))
         l_ = idx.get((r.get("ticker"), exp, float(r.get("long_strike")), pc))
         if s_ and l_:
@@ -228,6 +228,7 @@ def main() -> int:
     spots: dict[str, tuple] = {}         # symbol -> (contract, ticker)
     legs: dict[str, tuple] = {}          # key -> (short_conid, long_conid)
     widths: dict[str, float] = {}        # key -> spread width, for the sanity check
+    debit_k: dict[str, bool] = {}        # key -> streamed as the parity debit spread (live/debit_mode.py)
     leg_c: dict[int, object] = {}        # conid -> contract
     leg_t: dict[int, object] = {}        # conid -> ticker
     try:
@@ -301,6 +302,7 @@ def main() -> int:
                         except Exception: pass
                 for k, r in want.items():
                     legs[k] = (r.get("short_conid"), r.get("long_conid"))
+                    debit_k[k] = debit_mode.is_debit(r)
                     try:
                         widths[k] = float(r.get("spread_width") or abs(float(r["short_strike"]) - float(r["long_strike"])))
                     except (TypeError, ValueError, KeyError):
@@ -358,6 +360,9 @@ def main() -> int:
             ok = lambda v: v is not None and v == v and v != 0          # not None/NaN/0
             for k, (_bag, t) in subs.items():
                 bid, ask, last = t.bid, t.ask, t.last
+                if debit_k.get(k) and ok(bid) and ok(ask) and widths.get(k):
+                    # Debit bag -> credit-bag scale, so everything below reads it as a credit spread.
+                    bid, ask, last = debit_mode.to_credit_bag(bid, ask, last if ok(last) else None, widths[k])
                 if ok(bid) and ok(ask):
                     _w = widths.get(k)
                     # Validate EACH SIDE against [0, width] before averaging. A
@@ -399,6 +404,19 @@ def main() -> int:
                 s_mid = (float(st_.bid) + float(st_.ask)) / 2.0
                 l_mid = (float(lt_.bid) + float(lt_.ask)) / 2.0
                 mid = s_mid - l_mid
+                _dw = widths.get(k) if debit_k.get(k) else None
+                if _dw:
+                    # Parity-twin legs: the long leg is the dear one and the bag is a debit. Same bag
+                    # formulas, then shift onto the credit scale (credit equivalent = width - debit).
+                    mid = _dw - (l_mid - s_mid)
+                    if not (l_mid > s_mid and mid > 0):
+                        continue
+                    if mid > _dw:
+                        mid = _dw
+                    quotes[k] = {"bid": round((float(lt_.bid) - float(st_.ask)) - _dw, 4),
+                                 "ask": round((float(lt_.ask) - float(st_.bid)) - _dw, 4),
+                                 "mid": round(mid, 4), "last": None, "src": "legs", "ts": ts}
+                    continue
                 # Sanity (2026-09-17, after the first evening this ran): leg quotes decay
                 # once the bell goes -- sizes drop out, one side stops updating -- and the
                 # subtraction then yields 0.0 or a NEGATIVE spread value. A short vertical

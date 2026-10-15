@@ -34,7 +34,7 @@ sys.path.insert(0, str(ROOT))
 
 from ib_insync import IB, Option
 
-from live import live_config
+from live import debit_mode, live_config
 from live.fetcher import _connect_with_retry
 
 CLIENT_ID = int(getattr(live_config, "MARK_ACTUALS_CLIENT_ID", 120))
@@ -97,7 +97,7 @@ def mark_positions(ib: IB, picks: list[dict]) -> dict:
     contracts, index = [], []
     for p in picks:
         exp = str(p.get("expiry_date"))[:10].replace("-", "")
-        right = "P" if p.get("spread_type") == "bull_put" else "C"
+        right = debit_mode.right_for(p)      # a debit trade is held in its parity twin's legs
         for leg, strike in (("short", p["short_strike"]), ("long", p["long_strike"])):
             contracts.append(Option(p["ticker"], exp, float(strike), right, "SMART"))
             index.append((_key(p), leg))
@@ -163,7 +163,9 @@ def mark_positions(ib: IB, picks: list[dict]) -> dict:
                "iv_short": s.get("iv"), "iv_long": l.get("iv")}
         sm, lm = s.get("mid"), l.get("mid")
         if sm is not None and lm is not None:
-            mark = sm - lm
+            # Debit trade: its legs are the parity twin, worth lm - sm; cost to close the
+            # equivalent credit spread is width minus that (live/debit_mode.py).
+            mark = (width - (lm - sm)) if debit_mode.is_debit(p) else (sm - lm)
             # A vertical is worth 0..width. Anything outside is a bad book, not
             # a number to show -- the same rule combo_stream applies.
             if 0.0 <= mark <= width + 1e-9:

@@ -235,6 +235,10 @@ LIVE_CREDIT_SCALE = 1.0
 LIVE_QUOTE_EXCHANGE = "ISE"
 
 LIVE_COMBO_ENABLED   = True    # verified live 2026-09-01
+# Debit execution (user 2026-10-15, live/debit_mode.py). True: each canon pick is quoted and traded as its
+# parity debit spread (bull put -> bull call debit, bear call -> bear put debit), same strikes. Selection,
+# gate, P&L and books are unchanged -- credits stay credit equivalents inside, the pages show the debit.
+DEBIT_MODE           = False
 LIVE_COMBO_CLIENT_ID = 110     # avoid 100-109 (fetchers), 11 (default), 12 (SPY)
 LIVE_COMBO_TIMEOUT   = 60      # wall-clock budget for the whole combo pass
 LIVE_COMBO_EXCHANGE  = "SMART" # 2026-09-16: SMART is the aggregated book and is what TWS shows.

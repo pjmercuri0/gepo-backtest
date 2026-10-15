@@ -53,6 +53,9 @@ PICK_FIELDS = [
     "parity_bull_raw", "parity_bull_signed", "parity_pct", "parity_pairs",
     "short_bid", "short_ask", "long_bid", "long_ask",
     "short_oi", "long_oi",
+    # 2026-10-15: "debit" when the pick was quoted and traded as its parity debit spread
+    # (live/debit_mode.py); the pages show the debit off it, Actuals takes a debit fill.
+    "structure",
 ]
 
 

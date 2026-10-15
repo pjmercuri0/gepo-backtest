@@ -41,7 +41,7 @@ from pathlib import Path
 
 from ib_insync import IB, Option, Stock
 
-from live import live_config
+from live import debit_mode, live_config
 from live.fetcher import _connect_with_retry
 
 ALERT_DIR = Path(live_config.NOTIFICATIONS_DIR)
@@ -74,6 +74,7 @@ def _open_positions(include_frozen: bool = False) -> list[dict]:
         out.setdefault(key, {
             "ticker": key[0], "spread_type": key[1], "expiry": key[2],
             "short_strike": key[3], "long_strike": key[4], "source": source,
+            "structure": pick.get("structure") or "credit",
         })
 
     store = Path(live_config.ROOT_DIR) / "actuals.json"
@@ -120,7 +121,7 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
     subs = []
     for p in positions:
         exp = p["expiry"].replace("-", "")
-        short_right = "P" if p["spread_type"] == "bull_put" else "C"
+        short_right = debit_mode.right_for(p)    # a debit trade's short leg is the parity twin's
         opp_right = "C" if short_right == "P" else "P"
         try:
             stock = ib.qualifyContracts(Stock(p["ticker"], "SMART", "USD"))[0]
@@ -165,7 +166,7 @@ def assess(ib: IB, positions: list[dict], wait: float = 8.0) -> list[dict]:
         in_pin = spot is not None and spot == spot and lo <= spot <= hi
 
         if spot is not None and spot == spot:
-            itm_by = (ss - spot) if p["spread_type"] == "bull_put" else (spot - ss)
+            itm_by = (ss - spot) if debit_mode.right_for(p) == "P" else (spot - ss)
         else:
             itm_by = None
 
@@ -304,7 +305,7 @@ def _exercise_benefit(p: dict) -> tuple:
     """
     exp = p["expiry"]
     today_iso = date.today().isoformat()
-    if p["spread_type"] == "bear_call":
+    if debit_mode.right_for(p) == "C":       # a short CALL: bear call credit, or a bull call debit
         try:
             import csv as _csv
             path = Path(getattr(live_config, "DATA_DIR",

@@ -146,10 +146,22 @@ function dirClass(spread_type) {
   if (spread_type === "bear_call") return "dir-bear";
   return "";
 }
-function dirLabel(spread_type) {
+function dirLabel(spread_type, structure) {
+  if (structure === "debit") {
+    if (spread_type === "bull_put") return "bull-call debit";
+    if (spread_type === "bear_call") return "bear-put debit";
+  }
   if (spread_type === "bull_put") return "bull-put";
   if (spread_type === "bear_call") return "bear-call";
   return spread_type || "—";
+}
+// Debit execution (live/debit_mode.py): the row carries credit equivalents; he pays width - credit.
+// The debit is width minus the credit AT THE 2dp SHOWN, so the gate tie rule reads the same both ways.
+const isDebit = p => p && p.structure === "debit";
+const widthOf = p => Math.abs(Number(p.short_strike) - Number(p.long_strike));
+function pxCell(p, credit) {
+  if (credit == null || isNaN(Number(credit))) return "—";
+  return isDebit(p) ? fmtMoney(widthOf(p) - rd(Number(credit), 2)) : fmtMoney(credit);
 }
 // Both inputs are the stored canonical score (Kelly EV · exp(−k·DKL),
 // a positive fractional return). Bar width is proportional to score
@@ -200,6 +212,9 @@ function tgtCell(p) {
   const gate = p.above_min == null ? "" : (p.above_min
     ? ` <span class="pos" title="IBKR credit ≥ min">✓</span>`
     : ` <span class="neg" title="IBKR credit below min — not qualified">✗</span>`);
+  if (isDebit(p)) {    // max debit = width - min; the target band flips (cheapest debit = richest credit)
+    return `<span style="color:#c9a227" title="max debit = width − min credit">${pxCell(p, t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${pxCell(p, t.target_hi_credit)}–${pxCell(p, t.target_lo_credit)}</span>${gate}`;
+  }
   return `<span style="color:#c9a227">${fmtMoney(t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${fmtMoney(t.target_lo_credit)}–${fmtMoney(t.target_hi_credit)}</span>${gate}`;
 }
 // Midmid credit/max_loss: prefer fill_targets[0] (set by webapp from leg bid/ask),
@@ -251,7 +266,7 @@ function renderTopPicks(picks, maxGround, kVal) {
       <div class="week-head">
         <div>
           <div class="week-title">#${i+1} &nbsp; <strong>${p.ticker}</strong>
-            <span class="${dirClass(p.spread_type)}">${dirLabel(p.spread_type)}</span>
+            <span class="${dirClass(p.spread_type)}">${dirLabel(p.spread_type, p.structure)}</span>
             ${oiWarning(p)}</div>
           <div class="week-sub">${fmtMoney(p.short_strike)} / ${fmtMoney(p.long_strike)} &nbsp;·&nbsp;
             expires ${p.expiry_date} &nbsp;·&nbsp; DTE ${p.DTE} &nbsp;·&nbsp; 1 contract = 100 shares &nbsp;·&nbsp;
@@ -263,8 +278,8 @@ function renderTopPicks(picks, maxGround, kVal) {
             <div class="week-sub">contracts (¹⁄₁₆K)</div>
           </div>
           <div>
-            <div class="week-pnl pos">${fmtContract(mmCredit(p) * (p.suggested_qty || 1))}</div>
-            <div class="week-sub">total credit</div>
+            <div class="week-pnl pos">${fmtContract((isDebit(p) ? mmMaxLoss(p) : mmCredit(p)) * (p.suggested_qty || 1))}</div>
+            <div class="week-sub">${isDebit(p) ? "total debit" : "total credit"}</div>
           </div>
           <div>
             <div class="week-pnl neg">${fmtContract(mmMaxLoss(p) * (p.suggested_qty || 1))}</div>
@@ -292,8 +307,8 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${fmtNum(p.short_delta, 3)}</td>
           <td>${fmtNum(p.long_delta, 3)}</td>
           <td>${fmtPct(p.IV)}</td>
-          <td>${p.quoted_credit != null ? fmtMoney(p.quoted_credit) : fmtMoney(p.net_credit)}${p.credit_source ? `<br><span style="opacity:0.6;font-size:10px">${p.credit_source.replace('_',' ')}</span>` : ''}</td>
-          <td class="fw">${p.model_credit != null ? fmtMoney(p.model_credit) : "—"}</td>
+          <td>${pxCell(p, p.quoted_credit != null ? p.quoted_credit : p.net_credit)}${p.credit_source ? `<br><span style="opacity:0.6;font-size:10px">${p.credit_source.replace('_',' ')}</span>` : ''}</td>
+          <td class="fw">${p.model_credit != null ? pxCell(p, p.model_credit) : "—"}</td>
           <td>${tgtCell(p)}</td>
           <td>${fmtMoney(mmMaxLoss(p))}</td>
           <td>${rd(mmMaxLoss(p) > 0 ? mmCredit(p)/mmMaxLoss(p) : 0, 2).toFixed(2)}</td>
@@ -335,12 +350,12 @@ function renderRanked(rows, maxGround, kVal) {
     const rowClass = isPrimary ? "" : " unqualified";
     return `<tr class="ranked-row${rowClass}">
       <td class="rank-cell"><button class="actuals-add${r.held_cmp === "same" ? " held-add" : r.held_cmp === "better" ? " held-better" : r.held_cmp === "worse" ? " held-worse" : ""}" data-url="/api/actuals/from_live/${i}" title="${r.held_cmp === "same" ? "already in Actuals — IBKR will refuse a second order on the same option" : r.held_cmp === "better" ? "same name and side you hold, strike away from the move" : r.held_cmp === "worse" ? "same name and side you hold, strike has followed the stock — selling into the move" : "add this pick to actuals"}">+</button> ${i+1}</td>
-      <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> ${r.ticker}${oiWarning(r)}</td>
+      <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type, r.structure)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> ${r.ticker}${isDebit(r) ? ' <span style="font-size:10px;opacity:0.7">DR</span>' : ''}${oiWarning(r)}</td>
       <td>${r.entry_price != null ? fmtMoney(r.entry_price) : "—"}</td>
       <td>${fmtMoney(r.short_strike)} / ${fmtMoney(r.long_strike)}</td>
       <td>${fmtNum(r.short_delta, 2)}</td>
       <td>${r.DTE ?? "—"}</td>
-      <td>${fmtMoney(mmCredit(r))}</td>
+      <td>${pxCell(r, mmCredit(r))}</td>
       <td>${tgtCell(r)}</td>
       <td>${fmtMoney(mmMaxLoss(r))}</td>
       <td>${rd(mmMaxLoss(r) > 0 ? mmCredit(r)/mmMaxLoss(r) : 0, 2).toFixed(2)}</td>

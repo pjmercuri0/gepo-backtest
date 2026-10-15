@@ -54,6 +54,8 @@ document.addEventListener('click', e => {
     if (raw !== '') {
       val = parseFloat(raw);
       if (isNaN(val) || val < 0) { alert('invalid number'); restore(); return; }
+      // Debit trade: he typed the debit paid; the store keeps the credit equivalent, width - debit.
+      if (span.dataset.dw) val = Math.round((parseFloat(span.dataset.dw) - val) * 10000) / 10000;
     }
     done = true;
     try {

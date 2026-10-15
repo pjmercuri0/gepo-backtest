@@ -167,6 +167,10 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
     for (idx, _), (bid, ask, last) in zip(live_pairs, quotes):
         if bid is None or ask is None or pd.isna(bid) or pd.isna(ask):
             continue
+        if "structure" in df.columns and df.at[idx, "structure"] == "debit":
+            # Debit bag -> credit-bag scale (live/debit_mode.py): subtract the width.
+            from live import debit_mode
+            bid, ask, last = debit_mode.to_credit_bag(bid, ask, last, float(df.at[idx, "spread_width"]))
         df.at[idx, "combo_bid"] = float(bid)
         df.at[idx, "combo_ask"] = float(ask)
         if last is not None and pd.notna(last):
