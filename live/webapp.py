@@ -1488,11 +1488,12 @@ def oot():
 
 @app.route("/plot")
 def plot():
-    """IBKR fair replay under the current canon (user 2026-10-01): the archived 15:30/15:45 IBKR
-    snapshots re-ranked with today's rule, rendered with the OOT page. Payload written by
-    research/fable_canon_2026_09_30/build_payload_ibkr_replay.py to live/data/ibkr_replay_equity.json."""
-    return _sized_page("oot.html", "ibkr_replay_equity.json", page_title="GEPO IBKR replay",
-                       page_heading="GEPO IBKR Fair Replay", page_prefix="IBKR snapshots, current canon",
+    """The History tab's settled picks as an equity curve (user 2026-10-17: "make plot match"; was the
+    IBKR fair replay of the archived 15:30/15:45 snapshots). Same picks and per-row P&L as /history.
+    Payload written by research/fable_canon_2026_09_30/build_payload_history.py to
+    live/data/ibkr_replay_equity.json."""
+    return _sized_page("oot.html", "ibkr_replay_equity.json", page_title="GEPO History book",
+                       page_heading="GEPO History Book", page_prefix="History tab picks",
                        hide_fill_sens=True)
 
 
