@@ -71,6 +71,14 @@ def _latest_snapshot() -> Path | None:
 # 09:36). Reset per rank_snapshot call.
 _GAP_STATE: dict = {"names": 0, "total": 0}
 
+# Every candidate's IBKR combo quote from the scan in progress, archived by main() next to the ranked
+# payload (user 2026-10-17: "you should be saving combo quotes with each scan") so the Plot replay can
+# gate on the same combo-first quote live used. The ranked JSON keeps only the top picks.
+_COMBO_STATE: dict = {"df": None}
+COMBO_ARCHIVE_COLS = ["ticker", "spread_type", "short_strike", "long_strike", "expiry_date",
+                      "combo_bid", "combo_ask", "combo_last", "combo_credit_mid", "combo_credit_touch",
+                      "combo_credit_last"]
+
 
 def _reprice_on_combos(candidates: pd.DataFrame) -> pd.DataFrame:
     """Replace leg-mid net_credit with IBKR's combo quote, then gate.
@@ -83,6 +91,7 @@ def _reprice_on_combos(candidates: pd.DataFrame) -> pd.DataFrame:
 
     before = len(candidates)
     candidates = combo_quotes.attach_combo_quotes(candidates)
+    _COMBO_STATE["df"] = candidates[[c for c in COMBO_ARCHIVE_COLS if c in candidates.columns]].copy()
 
     # Credit priority (user 2026-09-15, replacing the 09-13 last-first order):
     #   combo MID   — midpoint of the combo book, when the book is narrower than
@@ -1086,6 +1095,7 @@ def main() -> int:
         return 1
 
     print(f"ranking snapshot: {snap_path}", flush=True)
+    _COMBO_STATE["df"] = None
     df = pd.read_parquet(snap_path)
     print(f"  {len(df)} option rows loaded", flush=True)
 
@@ -1108,6 +1118,16 @@ def main() -> int:
     _atomic_write_json(archive_path, payload)
     print(f"wrote {latest_path}", flush=True)
     print(f"wrote {archive_path}", flush=True)
+    _cq = _COMBO_STATE.get("df")
+    if _cq is not None and not _cq.empty:
+        try:
+            _cdir = Path(live_config.RANKED_DIR) / "combo"
+            _cdir.mkdir(exist_ok=True)
+            _cpath = _cdir / f"{snap_path.parent.name}_{snap_path.stem}.csv"
+            _cq.to_csv(_cpath, index=False)
+            print(f"wrote {_cpath} ({int(_cq['combo_credit_mid'].notna().sum())}/{len(_cq)} with a combo mid)", flush=True)
+        except Exception as exc:          # the archive must never fail a scan
+            print(f"combo archive not written: {exc}", flush=True)
     # The live tab's end-of-day board: the last 15:xx scan at or before LIVE_BOARD_FREEZE_AT that
     # ranked anything. The site serves it once a later scan has replaced latest.json.
     _stem = snap_path.stem

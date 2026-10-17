@@ -1491,8 +1491,8 @@ def oot():
 @app.route("/plot")
 def plot():
     """History as today's canon would have picked it (user 2026-10-17): every archived snapshot day
-    re-ranked with the current code on History's schedule -- 15:15 freeze, 15:30 and 15:45 top-ups to 6 --
-    booked at 1.04 x model. Payload written by
+    re-ranked with the current code on History's schedule and logic -- 15:15 freeze, 15:30 and 15:45
+    top-ups by what he held in Actuals, combo quote first (else leg mids) -- booked at 1.00 x model. Payload written by
     research/fable_canon_2026_09_30/build_payload_canon_history.py to live/data/ibkr_replay_equity.json."""
     return _sized_page("oot.html", "ibkr_replay_equity.json", page_title="GEPO canon history",
                        page_heading="GEPO History, Current Canon", page_prefix="IBKR snapshots, current canon",
