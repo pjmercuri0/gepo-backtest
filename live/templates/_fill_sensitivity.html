@@ -27,8 +27,8 @@
           ('1.08','1.13','0.53','$71.1k','-28%','$17.9k','-4%'),
           ('1.10','1.17','0.54','$79.7k','-27%','$19.4k','-3%')
       ] %}
-        <tr class="{% if r[0] == '1.04' %}fs-canon{% elif r[0] == '1.00' %}fs-gate{% endif %}">
-          <td class="fw">{{ r[0] }}{% if r[0] == '1.04' %} <span class="fs-tag">canon</span>{% elif r[0] == '1.00' %} <span class="fs-tag">min / gate</span>{% endif %}</td>
+        <tr class="{% if r[0] == '1.00' %}fs-canon{% endif %}">
+          <td class="fw">{{ r[0] }}{% if r[0] == '1.00' %} <span class="fs-tag">canon / gate</span>{% endif %}</td>
           <td>{{ r[1] }}</td><td>{{ r[2] }}</td>
           <td class="{% if r[3].startswith('-') %}neg{% else %}pos{% endif %}">{{ r[3] }}</td>
           <td class="neg">{{ r[4] }}</td>
@@ -43,6 +43,6 @@
     Every row is the same trade list repriced at a different fill; win/partial/loss
     counts never move, so the whole difference is price. 2020–25 P&amp;L moves about
     $4,350 per 1% of model credit and turns negative near 0.92×; 2026 stays positive
-    across the range. 1.00× is fair value (the execution gate); 1.04× is the canon fill.
+    across the range. 1.00× is fair value: the execution gate and the canon fill.
   </div>
 </details>

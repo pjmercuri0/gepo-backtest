@@ -30,7 +30,7 @@ import config as backtest_config
 # on a different basis to Backtest/OOT and could not be compared with them. Capture
 # now prefers model_credit x ent_canon.FILL_MULT and only falls back to 0.80 x quote
 # when a row carries no model credit (pre-2026-09-15 scans).
-FILL_FRAC = 0.80          # legacy fallback only
+FILL_FRAC = 0.80          # legacy fallback only: picks with no model credit (user 2026-10-17: kept at 0.80)
 PICKS_DIR = Path(live_config.ROOT_DIR) / "intraday_picks"
 BARS_DIR = Path(live_config.ROOT_DIR).parent / "data" / "daily_bars_yahoo"
 PICK_FIELDS = [

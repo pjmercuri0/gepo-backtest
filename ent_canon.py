@@ -37,7 +37,7 @@ P_REAL_DEMEAN = True      # 2026-09-28 (user): subtract each name's window-mean 
                           # trailing-1y return vs +3% drift-free). False reproduces the pre-2026-09-28 canon.
 MIN_OBS      = 1          # use whatever history the name has (user 2026-09-13); the 0.5 pseudo-count per
                           # state is the only regularisation, so a name with very few sessions scores near the prior
-FILL_MULT    = 1.04       # user 2026-09-20: "that's what we really fill at" (was 1.08, measured on 19 early fills)
+FILL_MULT    = 1.00       # user 2026-10-17: "everything should be at 1x booking on every part of the site" (was 1.04 from 2026-09-20, 1.08 before)
 COMMISSION   = 0.0        # $ per spread per contract. 2026-09-17 (user: "ignore all
                           # commission everywhere"). Was 1.30. Every book and every live
                           # P&L reads this constant, so setting it here zeroes it

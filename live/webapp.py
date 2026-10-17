@@ -61,6 +61,8 @@ def _inject_app_profile():
     return {
         "app_profile": APP_PROFILE,
         "is_euro_profile": IS_EURO_PROFILE,
+        # The canon booking multiple, so no template hardcodes it (user 2026-10-17: 1x everywhere).
+        "book_mult": "%.2f" % float(getattr(__import__("ent_canon"), "FILL_MULT", 1.0)),
     }
 
 

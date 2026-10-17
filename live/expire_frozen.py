@@ -203,16 +203,6 @@ def main() -> int:
             any_actual = False
             wins = losses = partials = 0
 
-            # Entry-credit basis (canonical 2026-06-12, matches the history
-            # page's fill view in webapp._enrich_pick): actual_credit when
-            # the user recorded a real fill, else 0.80 x the freeze-time
-            # combo MID recomputed from the leg quotes (also repairs OLD
-            # frozen files whose stored net_credit is the phantom
-            # LAST-clamped credit), else 0.80 x stored net_credit. The old
-            # 0.85 x LAST basis here was the last survivor of the LAST
-            # canon and made settled P&L disagree with the displayed
-            # max-loss column (error #78).
-            FILL_FRAC = 0.80
             for pick in picks:
                 tk         = pick["ticker"]
                 spread_typ = pick["spread_type"]
@@ -222,17 +212,12 @@ def main() -> int:
                 mid_ml     = float(pick["max_loss"])
                 spread_w   = mid_credit + mid_ml
 
-                actual_c0 = pick.get("actual_credit")
-                sb = pick.get("short_bid"); sa = pick.get("short_ask")
-                lb = pick.get("long_bid");  la = pick.get("long_ask")
-                if actual_c0 is not None:
-                    credit = round(float(actual_c0), 4)
-                elif None not in (sb, sa, lb, la) and float(sa) > 0 and float(la) > 0:
-                    qmid = (float(sb) + float(sa)) / 2.0 - (float(lb) + float(la)) / 2.0
-                    credit = round(max(qmid, 0.0) * FILL_FRAC, 4)
-                else:
-                    credit = round(mid_credit * FILL_FRAC, 4)
-                credit = min(credit, round(spread_w, 4))
+                # 2026-10-17: book through live/credit_basis.entry_credit, the function History's open
+                # rows and its "booked at" use (actual fill, else FILL_MULT x model, else FILL_FRAC x mid).
+                # This block had its own 0.80 x quoted mid, so a settled day disagreed with its own page
+                # (GE 312.5/310 on 10-15 settled at 1.428 against a stated 1.04 x model of 1.345).
+                from live import credit_basis
+                credit = credit_basis.entry_credit(pick)
                 max_loss = round(spread_w - credit, 4)
 
                 close = _underlying_price(ib, tk)

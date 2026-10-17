@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from ent_canon import FILL_MULT as MODEL_FILL_MULT  # noqa: F401  (re-exported below)
 
-FILL_FRAC = 0.80
+FILL_FRAC = 0.80   # picks with no model credit (before 2026-09-14) stay at 0.80 x quoted mid (user 2026-10-17)
 # MODEL_FILL_MULT is ent_canon.FILL_MULT, imported rather than copied. It was a
 # hardcoded 1.08 here and did NOT move when the canon went to 1.04 on
 # 2026-09-20, which left History/Actuals marking at a different fill from the
