@@ -293,6 +293,9 @@ FABLE_TOPUP_HHMM  = ("15:30", "15:45")
 # 6 minus the trades added to Actuals today, from names the day and Actuals do not already have.
 # Picks he has not placed stay on the day. False = count the day's own picks (the old rule).
 FABLE_TOPUP_BY_ACTUALS = True
+# 2026-10-17 (user): "don't make history top off based on what i pick in actuals" -- top-ups fill the day to
+# FABLE_TOP_N by its own picks.
+FABLE_TOPUP_BY_ACTUALS = False
 # 2026-09-30 evening (user): "credit floor only, 3 per side". Waterfall on the live archive showed
 # the credit floor does the work; the IV split, GROUND and D_ent add nothing. Rank by credit/width.
 # Variant B timing: 104 picks, 62% win, +$6,685, $64/pick, 72% yield on risk, 6/6 weeks, max weekly risk $2.6k.

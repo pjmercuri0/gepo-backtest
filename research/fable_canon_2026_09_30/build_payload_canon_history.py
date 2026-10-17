@@ -6,8 +6,8 @@ History's schedule and with History's logic (user 2026-10-17: "then the plot sho
            every candidate, from 2026-10-17; before that only the ranked payload's rows), else leg mids
   schedule the 15:15 scan is the frozen day (15:01 on the half-hour days before 2026-09-02), topped up
            at 15:30 (15:31) and 15:45
-  top-ups  6 minus the trades he held in Actuals by then (config.FABLE_TOPUP_BY_ACTUALS), one per
-           ticker, skipping names the day or Actuals already have (freeze_snapshot._dedupe_key)
+  top-ups  fill the day to 6 by its own picks, one per ticker (freeze_snapshot._dedupe_key); with
+           config.FABLE_TOPUP_BY_ACTUALS on, 6 minus the trades he held in Actuals by then
 Gates as live: model credit >= 0.45 x width, quote above the min, GROUND >= config.FABLE_GROUND_MIN;
 ranked by GROUND. Booked at ent_canon.FILL_MULT x model, settled at the expiry close.
 
@@ -121,8 +121,10 @@ for day, g in E.groupby("day"):
             # freeze_snapshot: a day with no picks yet is written whole from this scan -- no Actuals cap.
             picks = [r._asdict() for r in g[g.slot == slot].head(TOP).itertuples(index=False)]
             continue
-        h = _held(day, slot)
-        seen = {p["ticker"] for p in picks} | h; n = len(h)
+        # config.FABLE_TOPUP_BY_ACTUALS: count what he held in Actuals by then, else the day's own picks.
+        by_actuals = bool(getattr(cfg, "FABLE_TOPUP_BY_ACTUALS", False))
+        h = _held(day, slot) if by_actuals else set()
+        seen = {p["ticker"] for p in picks} | h; n = len(h) if by_actuals else len(picks)
         for r in g[g.slot == slot].itertuples(index=False):
             if n >= TOP:
                 break
@@ -148,7 +150,7 @@ with contextlib.redirect_stdout(io.StringIO()):
 k = pay["config"]
 k["universe"] = "SP100 + SPY/QQQ/IWM, IBKR live snapshots"
 k["selection"] = (f"History's schedule and logic under the current canon: 15:15 freeze, topped up at 15:30 and 15:45 to {TOP} "
-                  f"less the trades held in Actuals; model credit >= {FLOOR:.2f}x width, combo quote (else leg mids) >= model, "
+                  f"{'less the trades held in Actuals' if getattr(cfg, 'FABLE_TOPUP_BY_ACTUALS', False) else 'by its own picks'}; model credit >= {FLOOR:.2f}x width, combo quote (else leg mids) >= model, "
                   f"top-{TOP} by GROUND at k={K:g}"
                   + (f" (GROUND >= {float(GMIN):g})" if GMIN is not None else ""))
 k["fill_basis"] = f"{FILL:.2f}× smile-fit model credit; partial-WIN at 50% intrinsic; no commission"
