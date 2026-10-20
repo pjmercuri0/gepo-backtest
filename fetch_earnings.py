@@ -46,10 +46,10 @@ def fetch_one_day(date_str, session, retries=3):
                 time.sleep(2.0 ** attempt)
                 continue
             else:
-                return []
+                return None
         except Exception:
             time.sleep(0.5 * (attempt + 1))
-    return []
+    return None   # failed day: distinct from a day with no SP100 reports
 
 
 def main():
@@ -74,6 +74,7 @@ def main():
     session.mount("https://", adapter)
 
     collected = []
+    failed_days = []
     done_count = 0
     lock = Lock()
     t0 = time.time()
@@ -86,7 +87,10 @@ def main():
         for fut in as_completed(futures):
             rows = fut.result()
             with lock:
-                collected.extend(rows)
+                if rows is None:
+                    failed_days.append(futures[fut].strftime("%Y-%m-%d"))
+                else:
+                    collected.extend(rows)
                 done_count += 1
                 if done_count % 50 == 0 or done_count == n_total:
                     elapsed = time.time() - t0
@@ -111,6 +115,24 @@ def main():
     if os.path.exists(OUT_PATH):
         old = pd.read_csv(OUT_PATH)
         old["EarningsDate"] = pd.to_datetime(old["EarningsDate"])
+        # A name NASDAQ now lists inside the fetched window keeps only the
+        # date(s) it lists now: a revised date replaces the provisional one
+        # instead of sitting beside it (KO carried 10-20 and 10-27). Skipped
+        # when any day failed -- the name's real date could be on that day.
+        if failed_days:
+            print(f"WARNING: {len(failed_days)} day(s) failed "
+                  f"({', '.join(sorted(failed_days))}); superseded dates kept")
+        else:
+            in_win = old["EarningsDate"].between(pd.Timestamp(args.start),
+                                                 pd.Timestamp(args.end))
+            listed = old["Symbol"].isin(set(new_df["Symbol"]))
+            stale  = in_win & listed & ~old.set_index(["Symbol", "EarningsDate"]).index.isin(
+                         new_df.set_index(["Symbol", "EarningsDate"]).index)
+            if stale.any():
+                print("Superseded: " + ", ".join(
+                    f"{r.Symbol} {r.EarningsDate.date()}"
+                    for r in old[stale].itertuples()))
+            old = old[~stale]
         merged = (pd.concat([old, new_df], ignore_index=True)
                     .drop_duplicates(subset=["Symbol", "EarningsDate"]))
         added = len(merged) - len(old)
@@ -119,6 +141,7 @@ def main():
         print(f"\nMerged into {OUT_PATH}: {len(merged):,} total rows "
               f"(+{added} new), range {merged['EarningsDate'].min().date()} → "
               f"{merged['EarningsDate'].max().date()}")
+        df = merged
     else:
         df = new_df.sort_values(["EarningsDate", "Symbol"]).reset_index(drop=True)
         df.to_csv(OUT_PATH, index=False)
