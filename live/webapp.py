@@ -400,6 +400,12 @@ def _live_status(spread_type: str, spot, short_strike, long_strike):
     return "LOSING" if spot >= ls + 0.01 else "PARTIAL"
 
 
+# The quote fields a + stores on an actuals trade (see _overlay_stream). Re-reading a
+# snapshot-sourced trade must not overwrite them with the scan's own quote.
+_ACTUAL_SAVED_CREDIT_KEYS = ("net_credit", "quoted_credit", "credit_source", "combo_bid",
+                             "combo_ask", "combo_credit_mid", "quote_ts", "max_loss", "credit_ratio")
+
+
 def _actuals_rows() -> list[dict]:
     store = _actuals_store()
     rows = []
@@ -470,7 +476,12 @@ def _actuals_rows() -> list[dict]:
                     # backfill_actuals_fields had restored to actuals.json, so
                     # the column rendered "-" no matter what the store said.
                     # Fresh values win; stored keys the source lacks survive.
-                    pick = {**pick, **_json_clone(fresh)}
+                    # The credit stays what he saw when he pressed +, not the scan's: XOM
+                    # 180/177.5 was saved at 1.27 (stream mid, 14:29) and displayed the
+                    # 14:16 scan's 1.075 leg mid (user 2026-10-20). The scan refreshes
+                    # marks and outcomes only.
+                    _saved = {k: pick[k] for k in _ACTUAL_SAVED_CREDIT_KEYS if pick.get(k) is not None}
+                    pick = {**pick, **_json_clone(fresh), **_saved}
                     source_time = f"{str(scan.get('hhmm', ''))[:2]}:{str(scan.get('hhmm', ''))[2:]}"
             # Snapshot-sourced trades used to render a dash for spot, mark and
             # P&L: only the frozen branch above ever set last_track/last_marked/
