@@ -151,6 +151,43 @@ def _frozen_earlier(ib) -> list[dict]:
     return out
 
 
+def _snap_today(ib) -> list[dict]:
+    """Every pick of today's scans (the Snap tab), user 2026-10-20: a pick that fell off the
+    next scan was cancelled with it, so Snap showed MO 75/74 at the 15:01 leg mid 0.54 while
+    IBKR's legs read 0.41. conIds are qualified from IBKR and cached, as for earlier days."""
+    today = datetime.now().date().isoformat()
+    fp = Path(live_config.ROOT_DIR) / "intraday_picks" / f"{today}.json"
+    if not fp.exists():
+        return []
+    payload = json.loads(fp.read_text())
+    out, seen = [], set()
+    for scan in reversed(payload.get("scans") or []):      # newest scan first
+        for r in scan.get("picks") or []:
+            exp = str(r.get("expiry_date") or "")[:10]
+            if not exp or exp < today or r.get("pnl") is not None:
+                continue
+            try:
+                k = _key(r)
+            except (KeyError, TypeError, ValueError):
+                continue
+            if k in seen:
+                continue
+            seen.add(k)
+            right = debit_mode.right_for(r)
+            legs = []
+            for f in ("short_strike", "long_strike"):
+                ck = (r["ticker"], exp, float(r[f]), right)
+                if ck not in _CONID_CACHE:
+                    o = Option(ck[0], exp.replace("-", ""), ck[2], right, "SMART", currency="USD")
+                    if not ib.qualifyContracts(o) or not o.conId:
+                        legs = []; break
+                    _CONID_CACHE[ck] = o.conId
+                legs.append(_CONID_CACHE[ck])
+            if len(legs) == 2:
+                out.append({**r, "short_conid": legs[0], "long_conid": legs[1], "_key": k})
+    return out
+
+
 def _frozen_today() -> list[dict]:
     """Today's frozen History picks, streamed as picks (2026-10-01): once the next scan replaces the
     board, the frozen 15:30 picks dropped out of the stream and History fell back to their scan-time
@@ -290,6 +327,12 @@ def main() -> int:
                 except Exception as e:
                     _earlier = []
                     print(f"[combo_stream] earlier frozen read failed: {e}", flush=True)
+                # Today's Snap picks ride with them, ahead of the non-pick board rows.
+                try:
+                    _have |= {r["_key"] for r in _earlier}
+                    _earlier += [r for r in _snap_today(ib) if r["_key"] not in _have]
+                except Exception as e:
+                    print(f"[combo_stream] snap picks read failed: {e}", flush=True)
                 _earlier = _earlier[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos))]
                 _ek = {r["_key"] for r in _earlier}
                 _rest = [r for r in _rest if r["_key"] not in _ek]
