@@ -274,6 +274,7 @@ def main() -> int:
         print(f"[combo_stream] connected, client {CLIENT_ID}, max {MAX_BAGS} bags", flush=True)
         last_reload = 0.0
         last_pub = 0.0
+        last_pre = ""
         # Last IN-SESSION quote per spread (user 2026-10-06). After the bell the quotes stop and the
         # page fell to a model floored at intrinsic: TMO 662.5/660, spot 659.00, read 2.50 (max loss)
         # at 19:56 against a last live mid of 2.05 at 15:57. Carried in the stream file itself so it
@@ -485,6 +486,12 @@ def main() -> int:
                 if v is not None and v == v and v != 0:
                     sp[sym] = round(float(v), 4)
             _now = datetime.now()
+            # Pre-open spot record, once a minute (user 2026-10-21): the file is overwritten every
+            # second, so nothing showed whether held names moved at 09:01/09:15.
+            if _now.weekday() < 5 and "09:00" <= _now.strftime("%H:%M") < "09:30" \
+                    and _now.strftime("%H:%M") != last_pre:
+                last_pre = _now.strftime("%H:%M")
+                print(f"[combo_stream] pre-open {ts} spots {json.dumps(sp, sort_keys=True)}", flush=True)
             if _now.weekday() < 5 and "09:30" <= _now.strftime("%H:%M") < "16:00":
                 for k, q in quotes.items():
                     _w = widths.get(k)
