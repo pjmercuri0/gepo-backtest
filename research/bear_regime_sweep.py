@@ -81,6 +81,11 @@ def prepare() -> tuple[pd.DataFrame, pd.DataFrame]:
     c["EV"] = np.exp(ell) - 1.0
     c = c.dropna(subset=["EV"]).copy()
     c["GROUND"] = c.EV * np.exp(-ec.K * c.D_ent)
+    # 2026-10-21 (user, new canon): margin of victory as the rank key -- same window, demeaning
+    # and own-gap drift as P_real, but each historical move scored by HOW FAR it finished past
+    # the strike (in sd units) instead of counted WIN/LOSS/PARTIAL. GROUND remains the gate.
+    c["M"] = ec.margin_score(c, closes, mu=mu)
+    c["GROUND_M"] = c.M * np.exp(-ec.K * c.D_ent)
 
     f = pd.read_parquet(
         CHAIN_FEATURES,

@@ -45,7 +45,12 @@ cl = pd.read_parquet(ROOT / "output/daily_closes.parquet"); cl["date"] = pd.to_d
 cl = cl.dropna(subset=["close"]).sort_values(["ticker", "date"]); cl["n_before"] = cl.groupby("ticker").cumcount()
 c = c.merge(cl[["ticker", "date", "n_before"]].rename(columns={"date": "entry_date"}), on=["ticker", "entry_date"], how="left")
 c = c[c.n_before >= ec.WINDOW].copy()
-c["GROUND"] = c.EV * np.exp(-K * c.D_ent)   # rank key at this K (prepare() scored at ec.K)
+c["GROUND"] = c.EV * np.exp(-K * c.D_ent)   # GATE at this K (prepare() scored at ec.K)
+# 2026-10-21 (user, new canon): RANK on the margin of victory, M * exp(-K * D_ent). Same window,
+# demeaning and own-gap drift as P_real; each historical move scored by how far it finished past
+# the strike in sd units, so a big win outranks a narrow one. GROUND stays the 1 bp gate.
+c["GROUND_M"] = c.M * np.exp(-K * c.D_ent)
+RANK = "GROUND_M"
 # 2026-10-01 (user): third exclusion beside earnings and ex-dividend -- corporate actions (split / reverse split / spinoff)
 g = ~c.exdiv_hit & ~c.earnings_hit & ~c.split_hit & ~c.split_window_hit
 cw = c.model_credit / c.width
@@ -54,7 +59,7 @@ if GMIN is not None:
     _gok = c.GROUND >= float(GMIN)
     print(f"GROUND floor {float(GMIN):g}: dropped {int((elig & ~_gok).sum()):,} of {int(elig.sum()):,} eligible candidates")
     elig = elig & _gok
-sel = c[elig].sort_values(["entry_date", "GROUND"], ascending=[True, False]).groupby("entry_date", sort=False).head(TOP)
+sel = c[elig & c[RANK].notna()].sort_values(["entry_date", RANK], ascending=[True, False]).groupby("entry_date", sort=False).head(TOP)
 picks = rbr.enrich(realize(sel, 10**6, fill=FILL))
 # 2026-10-01 (user): size the Kelly arms on GROUND+carry -- the stake that earns CARRY_RATE x DTE/365
 # on the capital at risk while held. Display GROUND already carries it; selection stays on raw GROUND.
@@ -66,14 +71,16 @@ picks.to_parquet(HERE / f"picks_C_252_k{K:g}.parquet")
 
 def captions(payload):
     k = payload["config"]
-    k["selection"] = (f"strategy C: model credit >= {FLOOR:.2f}x width (both sides), pooled top-{TOP}/day by GROUND at k={K:g}" + (f" (GROUND >= {float(GMIN):g})" if GMIN is not None else " (no threshold)") + "; "
+    k["selection"] = (f"strategy C: model credit >= {FLOOR:.2f}x width (both sides), pooled top-{TOP}/day by margin of victory M\u00b7e^(\u2212k\u00b7D_ent) at k={K:g}" + (f" (GROUND >= {float(GMIN):g})" if GMIN is not None else " (no threshold)") + "; "
                       f"entries only once the name has {ec.WINDOW} sessions of history (start {picks.entry_date.min().date()})")
     k["regime"] = "bull puts every day; bear calls only below the prior-session SPY 100d SMA"
     k["bear_gates"] = (f"bear calls: IV < {BEAR_IV:.2f}, same credit floor, share the pooled top-{TOP}. Earnings, ex-dividend and "
                        "corporate-action (split / reverse split / spinoff) gates, entry through expiry+1, apply to both sleeves.")
     k["parity"] = "no bull parity veto; no bear parity veto"
     k["fill_basis"] = f"{FILL:.2f}\u00d7 min(smile-fit model credit, |short delta| \u00d7 width, best quoted credit); quote gates: touch > 0, no crossed or inverted quotes, $0.50 strike ladder; partial-WIN at 50% intrinsic; no commission"
-    k["scoring"] = f"G = Kelly log-growth on P_real at the delta-capped model credit; GROUND = (e^G\u22121)\u00b7e^(\u2212k\u00b7D_ent), k = {K:g}"
+    k["scoring"] = (f"rank: M = mean margin of victory in sd units over the same 252-session window as P_real "
+                    f"(how far each historical move finished past the strike), discounted M\u00b7e^(\u2212k\u00b7D_ent), k = {K:g}; "
+                    f"gate: GROUND = (e^G\u22121)\u00b7e^(\u2212k\u00b7D_ent) on Kelly growth at the delta-capped model credit")
     return payload
 for lab, m, yr, path in (("IS", picks.entry_date.dt.year <= 2025, 2025, "backtest_equity.json"),
                          ("OOT", picks.entry_date.dt.year == 2026, 2026, "oot_equity.json")):

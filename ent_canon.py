@@ -416,6 +416,60 @@ def p_real(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW, mu=N
     return out
 
 
+def margin_score(cands: pd.DataFrame, closes: pd.DataFrame, window: int = WINDOW, mu=None) -> np.ndarray:
+    """Margin of victory per candidate, in sd units of its own move window (user 2026-10-21).
+
+    Same window, demeaning and own-gap drift as p_real -- only the scoring of each historical
+    move changes: instead of counting it as WIN / LOSS / PARTIAL, it is scored by HOW FAR it
+    finished past the strike, so a big win outranks a narrow one.
+
+        bull put : r > ths -> +(r - ths)/sd ;  r <= thl -> -(thl - r)/sd ; else 0
+        bear call: r < ths -> +(ths - r)/sd ;  r >= thl -> -(r - thl)/sd ; else 0
+
+    sd is that window's own sd of (demeaned, drifted) returns.  Returns the mean over the
+    window; NaN where p_real would also be NaN (no usable history, or a degenerate sd).
+    """
+    out = np.full(len(cands), np.nan)
+    C = cands.reset_index(drop=True)
+    MU = np.zeros(len(C)) if mu is None else np.nan_to_num(np.asarray(mu, dtype=float))
+    C['entry_date'] = pd.to_datetime(C.entry_date).dt.normalize()
+    px = closes.dropna().drop_duplicates(['ticker', 'date']).sort_values(['ticker', 'date'])
+    by = {tk: g for tk, g in px.groupby('ticker')}
+    for tk, g in C.groupby('ticker'):
+        s = by.get(tk)
+        if s is None or len(s) < 60:
+            continue
+        dates = pd.to_datetime(s.date).values.astype('datetime64[ns]'); cl = s.close.values.astype(float)
+        pos = np.clip(np.searchsorted(dates, g.entry_date.values.astype('datetime64[ns]')), 0, len(cl) - 1)
+        for d in (1, 2, 3, 4):
+            m = (g.DTE.clip(1, 4).astype(int) == d).values
+            if not m.any():
+                continue
+            R = cl[d:] / cl[:-d] - 1.0
+            p0 = pos[m]; sub = g[m]; bp = (sub.spread_type == 'bull_put').values
+            ths = sub.short_strike.values / sub.entry_price.values - 1
+            thl = sub.long_strike.values / sub.entry_price.values - 1
+            idx = (p0 - d - 1)[:, None] - np.arange(window)[None, :]; ok = idx >= 0
+            raw = np.where(ok, R[np.clip(idx, 0, len(R) - 1)], np.nan)
+            if P_REAL_DEMEAN:
+                raw = raw - np.nanmean(raw, axis=1, keepdims=True)
+            r = raw + MU[sub.index.values][:, None]
+            sd = np.nanstd(r, axis=1, keepdims=True)
+            sd = np.where(sd > 0, sd, np.nan)
+            BP = bp[:, None]
+            win_m = np.where(BP, (r - ths[:, None]) / sd, (ths[:, None] - r) / sd)
+            los_m = np.where(BP, (r - thl[:, None]) / sd, (thl[:, None] - r) / sd)
+            cell = np.where(np.isfinite(win_m) & (win_m > 0), win_m,
+                            np.where(np.isfinite(los_m) & (los_m < 0), los_m, 0.0))
+            cell = np.where(ok & np.isfinite(r), cell, np.nan)
+            n = ok.sum(1)
+            with np.errstate(invalid='ignore'):
+                mm = np.nanmean(np.where(np.isfinite(cell), cell, np.nan), axis=1)
+            mm[n < MIN_OBS] = np.nan
+            out[sub.index.values] = mm
+    return out
+
+
 SPLIT_HISTORY = 'output/yahoo_split_history.csv'
 # 2026-10-01 (mini caught this): the match tolerance was an ABSOLUTE 0.05 in return units, which is
 # wider than the move itself for a small-ratio spinoff factor -- on the IBKR store HON 2026-06-29
@@ -646,6 +700,10 @@ def score(C: pd.DataFrame, closes: pd.DataFrame, k: float = K, thr: float = THR,
     C['w_star'] = w; C['G'] = ell; C['EV'] = np.exp(ell) - 1.0
     C['DKL'] = C['D_ent']
     C['GROUND'] = C.EV * np.exp(-k * C.D_ent)
+    # 2026-10-21 (user, new canon): the RANK key is the margin of victory, not Kelly growth --
+    # M weights a big win above a narrow one. GROUND stays the GATE (FABLE_GROUND_MIN / thr).
+    C['M'] = margin_score(C, closes, mu=mu)
+    C['GROUND_M'] = C.M * np.exp(-k * C.D_ent)
     C['qualified'] = C.GROUND >= thr
     return C
 
