@@ -256,8 +256,6 @@ def build_payload(picks, end_year, label):
             'qty_h2':   int(_kelly_qty(r, 0.5)),
             'pnl':      round(float(r['_pnl']), 2),
             'ground':   round(float(r['GROUND']), 6),
-            # 2026-10-21: the RANK key, margin of victory M*exp(-k*D_ent). GROUND above is the gate.
-            'ground_m': round(float(r['GROUND_M']), 6) if pd.notna(r.get('GROUND_M')) else None,
             'dkl':      round(float(r['DKL']), 4) if pd.notna(r.get('DKL')) else None,
             'kelly_ev': round((math.exp(float(r['G']))-1.0)*100, 2) if pd.notna(r.get('G')) else None,
             'outcome':  r['_outcome'],
@@ -265,8 +263,7 @@ def build_payload(picks, end_year, label):
 
     weeks = []
     for wk, grp in sp.groupby('_week', sort=True):
-        _rk = 'GROUND_M' if 'GROUND_M' in grp.columns and grp['GROUND_M'].notna().any() else 'GROUND'
-        grp = grp.sort_values(['entry_date_dt', _rk], ascending=[True,False])
+        grp = grp.sort_values(['entry_date_dt','GROUND'], ascending=[True,False])
         n_bp = int((grp['spread_type'] == 'bull_put').sum())
         n_bc = int((grp['spread_type'] == 'bear_call').sum())
         weeks.append({

@@ -9,7 +9,7 @@ History's schedule and with History's logic (user 2026-10-17: "then the plot sho
   top-ups  fill the day to 6 by its own picks, one per ticker (freeze_snapshot._dedupe_key); with
            config.FABLE_TOPUP_BY_ACTUALS on, 6 minus the trades he held in Actuals by then
 Gates as live: model credit >= 0.45 x width, quote above the min, GROUND >= config.FABLE_GROUND_MIN;
-ranked by the margin of victory GROUND_M = M x exp(-k D_ent) (config.FABLE_RANK_KEY). Booked at ent_canon.FILL_MULT x model, settled at the expiry close.
+ranked by GROUND. Booked at ent_canon.FILL_MULT x model, settled at the expiry close.
 
 The candidate frame is cached in canon_history_candidates.csv; pass --rebuild to re-rank the snapshots.
 Writes live/data/ibkr_replay_equity.json.  Usage: build_payload_canon_history.py [--rebuild] [since=2026-08-20]
@@ -92,7 +92,7 @@ if REBUILD or not FRAME.exists():
     R["G24"] = R.EV * np.exp(-K * R.D_ent)
     R["settle"] = [px.get((t, e), np.nan) for t, e in zip(R.ticker, R.exp)]
     cols = ["day", "slot", "hm", "ticker", "spread_type", "short_strike", "long_strike", "width", "exp", "DTE", "entry_price",
-            "net_credit", "model_credit", "model_cw", "IV", "p", "q", "ro", "G", "EV", "D_ent", "GROUND", "G24", "M", "GROUND_M", "settle",
+            "net_credit", "model_credit", "model_cw", "IV", "p", "q", "ro", "G", "EV", "D_ent", "GROUND", "G24", "settle",
             "above_min", "qualified", "credit_source"]
     R[cols].to_csv(FRAME, index=False)
     print(f"{len(R)} rows, {R.day.nunique()} days, {R.settle.isna().sum()} unsettled -> {FRAME.name}")
@@ -103,8 +103,7 @@ E = R[(R.model_cw >= FLOOR) & R.above_min.astype(bool)].copy()
 GMIN = getattr(cfg, "FABLE_GROUND_MIN", None)
 if GMIN is not None:
     E = E[E.G24 >= float(GMIN)].copy()
-# 2026-10-21 (user, new canon): rank on the margin of victory GROUND_M, as live; GROUND (G24) stays the gate.
-E = E.sort_values(["day", "slot", "GROUND_M"], ascending=[True, True, False], na_position="last")
+E = E.sort_values(["day", "slot", "G24"], ascending=[True, True, False])
 # Top-ups fill to TOP by what he HELD in Actuals before that scan, one per ticker (freeze_snapshot).
 _A = json.loads((ROOT / "live/actuals.json").read_text()).get("trades") or []
 def _held(day, before):
@@ -152,7 +151,7 @@ k = pay["config"]
 k["universe"] = "SP100 + SPY/QQQ/IWM, IBKR live snapshots"
 k["selection"] = (f"History's schedule and logic under the current canon: 15:15 freeze, topped up at 15:30 and 15:45 to {TOP} "
                   f"{'less the trades held in Actuals' if getattr(cfg, 'FABLE_TOPUP_BY_ACTUALS', False) else 'by its own picks'}; model credit >= {FLOOR:.2f}x width, combo quote (else leg mids) >= model, "
-                  f"top-{TOP} by margin of victory M·e^(−k·D_ent) at k={K:g}"
+                  f"top-{TOP} by GROUND at k={K:g}"
                   + (f" (GROUND >= {float(GMIN):g})" if GMIN is not None else ""))
 k["fill_basis"] = f"{FILL:.2f}× smile-fit model credit; partial-WIN at 50% intrinsic; no commission"
 k["days"] = "every scan day in the archive"

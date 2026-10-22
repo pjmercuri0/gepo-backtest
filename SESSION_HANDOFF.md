@@ -172,44 +172,11 @@ Per the rule above: depth is months, not years -> no gate; log news forward.
 the sweep scripts live in the session scratchpad only. `research/fetch_edgar_8k_events.py` refuses to overwrite an
 existing `--out`.
 
-## 0.73 CANON 2026-10-21 (user): the RANK key is the MARGIN OF VICTORY, `GROUND_M = M · e^(−k·D_ent)`
+## 0.73 REVERTED 2026-10-21 (user): rank stays on GROUND (pure Kelly)
 
-`ent_canon.margin_score()` scores every move in the same 252-session, DTE-matched, demeaned,
-own-gap-drifted window P_real uses — but by HOW FAR it finished past the strike, in sd units of that
-window, instead of counting it WIN / LOSS / PARTIAL:
-
-    bull put : r > ths -> +(r - ths)/sd ;  r <= thl -> -(thl - r)/sd ; else 0
-    bear call: r < ths -> +(ths - r)/sd ;  r >= thl -> -(r - thl)/sd ; else 0
-
-M is the window mean. The rank key is `GROUND_M = M · exp(−k·D_ent)`, k = 24. **GROUND (Kelly-growth)
-stays the GATE** — `FABLE_GROUND_MIN = 0.0001` is unchanged, and so is every other gate, the delta cap,
-the quote screens, the 252-session history rule and the pooled top-6. Only the ORDER inside the gated
-pool changes. `ec.score()` emits `M` / `GROUND_M` for the live path, `bear_regime_sweep.prepare()` for
-the backtest; `config.FABLE_RANK_KEY = "GROUND_M"`; payload rows carry `ground_m` beside `ground`.
-
-| | trades | qty2 $ | $-Sharpe | DD | yield |
-|---|---|---|---|---|---|
-| Backtest, GROUND rank (was) | 3,045 | $61,304 | 1.52 | −17.73% | 10.24% |
-| Backtest, GROUND_M rank | 3,045 | $62,142 | 1.53 | −15.47% | 10.32% |
-| OOT, GROUND rank (was) | 584 | $24,306 | 2.88 | −12.72% | 15.04% |
-| OOT, GROUND_M rank | 584 | $28,533 | 3.69 | −11.59% | 19.28% |
-
-Same pool and same trade counts: **93% of picks are identical** (2,828/3,045 IS, 541/584 OOT). The 43
-swapped 2026 trades are the whole difference — the ones margin DROPPED lost $831/contract at a 63% loss
-rate, the ones it ADDED made $1,282/contract at 28%. corr(M, Kelly EV) = 0.164 across 93,963 candidates,
-so the keys disagree often; they rarely disagree *inside* the 1 bp-floored pool.
-
-**Rejected variants** (same margin key, floor changed): dropping the GROUND floor and ranking on margin
-alone gives IS $69,902 at $-Sharpe 1.03 / DD −60.4%; an M > 0 floor gives $62,595 / 1.01 / −51.7%. The
-1 bp GROUND gate is what holds the drawdown; margin only re-orders within it.
-
-**HONEST LIMIT.** One sample, no clean holdout: the key was conceived and scored on 2020-26, and the OOT
-window is the extended sample, not a holdout. The IS gain is $838 on 3,045 trades (+1.4%); the OOT gain
-is $4,227 on 584 (+17%) and rests on 43 swapped trades.
-
-**NOT DONE.** The Plot tab still ranks by `G24` from its cached `canon_history_candidates.csv`; it needs
-`build_payload_canon_history.py --rebuild` to pick up `GROUND_M` from the ranker. **MINI MUST PULL** —
-the live ranker changes its pick ORDER with this commit.
+The margin-of-victory rank key (`GROUND_M`, commit 08b60eb) was reverted the same evening for simplicity: on the IBKR
+live replay (Plot, 08-20..10-21) it picked the identical 72 trades ($15,155) because no scan had more than 4 gated
+candidates, so order never mattered. `config.FABLE_RANK_KEY = "GROUND"`; backtest/OOT/Plot payloads are the GROUND ones.
 
 ## 0.72 MINI 2026-10-09: §0.71 floor carried to the live caption and the Plot tab; QUEUED — remove the carry
 
