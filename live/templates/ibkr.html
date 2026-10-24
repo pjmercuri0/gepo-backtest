@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}GEPO IBKR account{% endblock %}
+{% block content %}
+{# The account as traded, from IBKR daily Activity Statements (user 2026-10-23). Laid out like Plot
+   (oot.html): the equity curve, stats and week P&L are the account's NAV in CAD; the trade rows are
+   per spread in USD, as IBKR books them. Payload: live/build_ibkr_payload.py. #}
+
+{% if data %}
+  {% set s = data.summary %}
+  {% set c = data.config %}
+
+  <h1 style="font-size:24px;font-weight:600;margin:18px 0 4px">IBKR Account, As Traded</h1>
+  <div class="subtitle">{{ c.source }} · NAV in {{ c.base_currency }} · spreads in USD</div>
+
+  <details class="params-fold">
+    <summary><span class="chip-k">params</span><span class="chip-v">statement basis</span></summary>
+    <div class="params-row">
+      <span class="chip"><span class="chip-k">range</span><span class="chip-v">{{ s.window_start }} → {{ s.window_end }}</span></span>
+      <span class="chip"><span class="chip-k">sessions</span><span class="chip-v">{{ s.trading_days }}</span></span>
+      <span class="chip"><span class="chip-k">weeks</span><span class="chip-v">{{ data.weeks|length }}</span></span>
+      <span class="chip"><span class="chip-k">spreads</span><span class="chip-v">{{ s.n_trades }} ({{ s.n_open }} open)</span></span>
+      <span class="chip"><span class="chip-k">account</span><span class="chip-v">{{ c.account }}, base {{ c.base_currency }}</span></span>
+      <span class="chip"><span class="chip-k">equity</span><span class="chip-v">{{ c.equity_basis }}</span></span>
+      <span class="chip"><span class="chip-k">trades</span><span class="chip-v">{{ c.trade_basis }}</span></span>
+    </div>
+  </details>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">starting NAV ({{ c.base_currency }})</div>
+      <div class="stat-value">${{ '{:,.0f}'.format(c.starting_bankroll) }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">NAV {{ s.window_end }}</div>
+      <div class="stat-value {{ 'pos' if s.strategy_final >= c.starting_bankroll else 'neg' }}">${{ '{:,.0f}'.format(s.strategy_final) }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">total return</div>
+      <div class="stat-value {{ 'pos' if s.strategy_total_return >= 0 else 'neg' }}">{% if s.strategy_total_return >= 0 %}+{% endif %}{{ s.strategy_total_return }}%</div>
+      <div class="subtitle">{% if s.strategy_pnl >= 0 %}+{% endif %}${{ '{:,.0f}'.format(s.strategy_pnl) }} {{ c.base_currency }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">yield (P&amp;L / risked)</div>
+      <div class="stat-value {{ 'pos' if (s.strategy_yield or 0) >= 0 else 'neg' }}">{% if s.strategy_yield is not none %}{% if s.strategy_yield >= 0 %}+{% endif %}{{ s.strategy_yield }}%{% else %}—{% endif %}</div>
+      <div class="subtitle">closed spreads, USD</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">$-P&amp;L Sharpe</div>
+      <div class="stat-value">{{ '%+.2f'|format(s.strategy_sharpe_dollar) }}</div>
+      <div class="subtitle">daily dollar P&amp;L, annualised</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">max drawdown</div>
+      <div class="stat-value neg">{{ s.strategy_max_dd }}%</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">up / down days</div>
+      <div class="stat-value"><span class="pos">{{ s.up_days }}</span> / <span class="neg">{{ s.down_days }}</span></div>
+      <div class="subtitle">best {{ s.best_day[1][5:] }} +${{ '{:,.0f}'.format(s.best_day[0]) }} · worst {{ s.worst_day[1][5:] }} −${{ '{:,.0f}'.format(-s.worst_day[0]) }}</div>
+    </div>
+  </div>
+
+  <div class="params-row" style="margin-bottom:22px">
+    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY, same start</span><span class="chip-v">${{ '{:,.0f}'.format(s.spy_final) }}</span></span>
+    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY return</span><span class="chip-v {{ 'pos' if s.spy_total_return >= 0 else 'neg' }}">{% if s.spy_total_return >= 0 %}+{% endif %}{{ s.spy_total_return }}%</span></span>
+    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY $-Sharpe</span><span class="chip-v">{{ '%+.2f'|format(s.spy_sharpe_dollar) }}</span></span>
+    <span class="chip" style="background:rgba(136,135,128,0.08)"><span class="chip-k">SPY max DD</span><span class="chip-v neg">{{ s.spy_max_dd }}%</span></span>
+  </div>
+
+  <div class="charts">
+    <div class="chart-card">
+      <div class="chart-label">Equity curve · NAV at each close ({{ c.base_currency }})</div>
+      <div style="position:relative;height:340px"><canvas id="equity-chart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Weekly P&amp;L · NAV change ({{ c.base_currency }})</div>
+      <div style="position:relative;height:340px"><canvas id="pnl-chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:32px">
+    <div class="chart-label">Net direction · positive = bull-put surplus, negative = bear-call surplus</div>
+    <div style="position:relative;height:160px"><canvas id="direction-chart"></canvas></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    const points  = {{ data.points | tojson }};
+    const weeks   = {{ weeks_chart | tojson }};
+    const tip = { backgroundColor: '#1a1a1a', borderColor: '#3a3a3a', borderWidth: 1, titleColor: '#e0e0d8', bodyColor: '#e0e0d8' };
+    const money = v => '$' + Number(v).toLocaleString(undefined, {maximumFractionDigits: 0});
+
+    new Chart(document.getElementById('equity-chart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: points.map(p => p.date),
+        datasets: [
+          { label: 'account NAV', data: points.map(p => p.strategy), borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', borderWidth: 2.2, pointRadius: 2, fill: true, tension: 0.05 },
+          { label: 'SPY', data: points.map(p => p.spy), borderColor: '#888780', borderWidth: 1.5, pointRadius: 0, fill: false, borderDash: [4, 3], tension: 0.05 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend:  { labels: { color: '#e0e0d8', font: { size: 12 } } },
+          tooltip: { ...tip, callbacks: { label: c => `${c.dataset.label}: ${money(c.parsed.y)}` } }
+        },
+        scales: {
+          x: { ticks: { color: '#888780', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: 'rgba(80,80,80,0.2)' } },
+          y: { ticks: { color: '#888780', callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(80,80,80,0.2)' } }
+        }
+      }
+    });
+
+    new Chart(document.getElementById('pnl-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: weeks.map(w => w.start),
+        datasets: [{ label: 'P&L', data: weeks.map(w => w.pnl),
+          backgroundColor: weeks.map(w => w.pnl >= 0 ? 'rgba(29,158,117,0.85)' : 'rgba(226,75,74,0.85)'), borderWidth: 0 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { ...tip, callbacks: { label: c => money(c.parsed.y) } } },
+        scales: {
+          x: { ticks: { color: '#888780', maxTicksLimit: 8, maxRotation: 0 }, grid: { display: false } },
+          y: { ticks: { color: '#888780', callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(80,80,80,0.2)' } }
+        }
+      }
+    });
+
+    new Chart(document.getElementById('direction-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: weeks.map(w => w.start),
+        datasets: [{ label: 'net direction', data: weeks.map(w => w.direction),
+          backgroundColor: weeks.map(w => w.direction >= 0 ? 'rgba(29,158,117,0.85)' : 'rgba(226,75,74,0.85)'), borderWidth: 0 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { ...tip, callbacks: { label: c => {
+          const w = weeks[c.dataIndex]; return `${w.n_bull_put} bull put · ${w.n_bear_call} bear call`; } } } },
+        scales: {
+          x: { ticks: { color: '#888780', maxTicksLimit: 12, maxRotation: 0 }, grid: { display: false } },
+          y: { ticks: { color: '#888780', stepSize: 1 }, grid: { color: 'rgba(80,80,80,0.2)' } }
+        }
+      }
+    });
+  </script>
+
+  {% if data.weeks %}
+  <div class="section-label">Week-by-week spreads · {{ data.weeks|length }} weeks · {{ data.trades|length }} spreads · listed in the week they closed</div>
+  {% set _wk = data.weeks|reverse|list %}
+  {% for w in (_wk[:week_limit] if week_limit else _wk) %}
+  <div class="week-card">
+    <div class="week-head">
+      <div>
+        <div class="week-title">{{ w.label }}</div>
+        <div class="week-sub">{{ w.n_trades }} spread{{ 's' if w.n_trades != 1 else '' }} · NAV ${{ '{:,.2f}'.format(w.pre_bank) }} → ${{ '{:,.2f}'.format(w.post_bank) }} {{ c.base_currency }}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="week-pnl {{ 'pos' if w.pnl > 0 else ('neg' if w.pnl < 0 else '') }}">{% if w.pnl >= 0 %}+{% endif %}${{ '{:,.2f}'.format(w.pnl) }}</div>
+        <div class="week-sub" style="margin-top:2px">NAV change, {{ c.base_currency }}</div>
+      </div>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr>
+        <th>entry</th><th>dow</th><th>ticker</th><th>direction</th>
+        <th>short / long</th><th>expiry</th><th>credit</th><th>max loss</th>
+        <th style="text-align:right">qty</th>
+        <th>closed</th>
+        <th>spot@exp</th>
+        <th>result</th>
+        <th style="text-align:right">P&amp;L (USD)</th>
+      </tr></thead>
+      <tbody>
+        {% for t in w.trades %}
+        <tr>
+          <td>{{ t.entry }}</td>
+          <td style="color:#888780">{{ t.dow }}</td>
+          <td class="fw">{{ t.ticker }}</td>
+          <td><span class="{{ 'dir-bull' if t.type == 'bull_put' else 'dir-bear' }}">{{ '▲ bull put' if t.type == 'bull_put' else '▼ bear call' }}</span></td>
+          <td>${{ '%.2f'|format(t.k_s) }} / ${{ '%.2f'|format(t.k_l) }}</td>
+          <td style="color:#888780">{{ t.expiry[5:] }}</td>
+          <td>{% if t.credit is not none %}${{ '%.3f'|format(t.credit) }}{% else %}—{% endif %}</td>
+          <td>{% if t.max_loss is not none %}${{ '%.3f'|format(t.max_loss) }}{% else %}—{% endif %}</td>
+          <td style="text-align:right">{{ t.qty }}×</td>
+          <td style="color:#888780">{% if t.closed %}{{ t.closed[5:] }}{% if t.assigned %} <span title="assigned / exercised">(A)</span>{% endif %}{% else %}open{% endif %}</td>
+          <td>{% if t.spot is not none %}${{ '%.2f'|format(t.spot) }}{% else %}—{% endif %}</td>
+          <td>{% if t.outcome == 'OPEN' %}<span class="badge" style="background:rgba(136,135,128,0.15);color:#b4b2a9" title="held at the last statement: unrealized P/L">OPEN</span>{% else %}<span class="badge badge-{{ t.outcome }}">{{ t.outcome }}</span>{% endif %}</td>
+          <td class="fw {{ 'pos' if t.pnl > 0 else ('neg' if t.pnl < 0 else '') }}" style="text-align:right">{% if t.pnl >= 0 %}+{% endif %}${{ '%.2f'|format(t.pnl) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    <div class="summary-row">
+      <span>credit collected: <strong>${{ '{:,.0f}'.format(w.credit) }}</strong> USD</span>
+      <span>at risk: <strong>${{ '{:,.0f}'.format(w.risk) }}</strong> USD</span>
+      <span>spreads P&amp;L: <strong class="{{ 'pos' if w.trade_pnl > 0 else ('neg' if w.trade_pnl < 0 else '') }}">{% if w.trade_pnl >= 0 %}+{% endif %}${{ '{:,.2f}'.format(w.trade_pnl) }}</strong> USD</span>
+    </div>
+  </div>
+  {% endfor %}
+  {% if week_limit and data.weeks|length > week_limit %}
+  <div class="week-card">
+    <div class="week-sub" style="padding:10px 0">
+      Showing the {{ week_limit }} most recent of {{ data.weeks|length }} weeks.
+      <a href="{{ url_for(request.endpoint, weeks='all') }}" style="margin-left:10px">show all ({{ data.weeks|length }})</a>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+{% else %}
+  <h2 style="margin:18px 0">IBKR</h2>
+  <div class="week-card" style="padding:16px">
+    <p>No statement payload yet. Run:</p>
+    <pre style="background:#0a0a0a;padding:10px;border-radius:6px;overflow-x:auto">python3 live/build_ibkr_payload.py</pre>
+  </div>
+{% endif %}
+{% endblock %}

@@ -349,6 +349,80 @@ def _save_actual_from_source(source: dict, pick: dict, source_label: str, source
     return row, added
 
 
+def _apply_quote(r: dict, mid: float, source: str, ts=None, bid=None, ask=None) -> None:
+    """Set a row's credit to a quote: the credit, max-loss, fill target and ratio move together."""
+    if bid is not None:
+        r["combo_bid"], r["combo_ask"] = bid, ask
+        r["combo_credit_mid"] = mid
+    r["quoted_credit"] = r["net_credit"] = mid
+    r["credit_source"] = source
+    r["quote_ts"] = ts
+    w = r.get("spread_width")
+    if w:
+        r["max_loss"] = round(float(w) - mid, 4)
+        r["fill_targets"] = [{"credit": mid, "max_loss": r["max_loss"]}]
+        r["credit_ratio"] = round(mid / r["max_loss"], 4) if r["max_loss"] > 0 else None
+
+
+def _pick_as_shown(pick: dict, newest_scan_quote=None) -> dict:
+    """The pick as the Snap / History row displays it, for the + to save. Both credit cells show
+    the LIVE stream quote on an open spread the stream holds (Snap falls back to the newest scan's
+    quote), and the + saved the row's own scan quote instead: UPS 102/101 on Snap read ~0.48 live
+    and was saved at the 15:15 scan's 0.40 (user 2026-10-22). The live tab's + already overlays
+    the stream (EOG, 2026-09-23); this is the same rule for the other two tabs."""
+    pick = _json_clone(pick)
+    if pick.get("pnl") is not None or pick.get("outcome") or pick.get("expiry_close") is not None:
+        return pick                                   # settled: the scan quote is the record
+    try:
+        q = ((_stream_state().get("quotes") or {}).get(
+            f"{pick.get('ticker')}|{pick.get('spread_type')}|{float(pick.get('short_strike')):g}"
+            f"|{float(pick.get('long_strike')):g}|{str(pick.get('expiry_date'))[:10]}"))
+    except (TypeError, ValueError):
+        q = None
+    if q and q.get("mid") is not None:
+        _apply_quote(pick, q["mid"], "stream_mid", q.get("ts"), q.get("bid"), q.get("ask"))
+    elif newest_scan_quote is not None:
+        mid, hhmm = newest_scan_quote
+        _apply_quote(pick, mid, f"scan_mid_{hhmm}")
+    return pick
+
+
+def _newest_scan_quote(pick: dict):
+    """Snap's fallback credit when the stream does not hold the spread (see _cur_q in the Snap
+    view): the newest quote for it among the scans of the newest day the page shows, then the
+    live board if it is on that day."""
+    def _k(x):
+        try:
+            return (x.get("ticker"), x.get("spread_type"), str(x.get("expiry_date") or "")[:10],
+                    float(x.get("short_strike")), float(x.get("long_strike")))
+        except (TypeError, ValueError):
+            return None
+    payload, date = None, ""
+    for fp in sorted((Path(live_config.ROOT_DIR) / "intraday_picks").glob("*.json"), reverse=True):
+        try:
+            if datetime.strptime(fp.stem, "%Y-%m-%d").weekday() == 4:
+                continue                              # Snap shows no Fridays
+        except ValueError:
+            pass
+        d = _read_json(fp)
+        if d and any(_in_market_hours(sc.get("hhmm", "")) for sc in d.get("scans") or []):
+            payload, date = d, str(d.get("date") or fp.stem)
+            break
+    key, found = _k(pick), None
+    scans = [sc for sc in (payload or {}).get("scans") or [] if _in_market_hours(sc.get("hhmm", ""))]
+    for sc in sorted(scans, key=lambda s: s.get("hhmm", "")):
+        for p in sc.get("picks") or []:
+            if p.get("net_credit") is not None and _k(p) == key:
+                found = (float(p["net_credit"]), sc.get("hhmm", ""))
+    bd = _live_board() or {}
+    bts = str(bd.get("snapshot_ts") or "")
+    if bts[:10] == date:
+        for r in bd.get("ticker") or []:
+            if r.get("net_credit") is not None and _k(r) == key:
+                found = (float(r["net_credit"]), bts[11:16].replace(":", ""))
+    return found
+
+
 def _source_time_from_frozen(payload: dict, pick: dict) -> str | None:
     if pick.get("freeze_added_at"):
         return str(pick["freeze_added_at"])
@@ -436,7 +510,12 @@ def _actuals_rows() -> list[dict]:
             if day and 0 <= idx < len(day.get("top_picks") or []):
                 fresh = day["top_picks"][idx]
                 if _pick_identity(fresh) == _pick_identity(pick):
-                    pick = {**pick, **_json_clone(fresh)}   # merge, see below
+                    # A + saved at the live quote (_pick_as_shown) keeps it, as the snapshot branch
+                    # does; a scan-quoted save still follows a restated day's fresh credit.
+                    _saved = ({k: pick[k] for k in _ACTUAL_SAVED_CREDIT_KEYS if pick.get(k) is not None}
+                              if str(pick.get("credit_source") or "").startswith(("stream_mid", "scan_mid_"))
+                              else {})
+                    pick = {**pick, **_json_clone(fresh), **_saved}   # merge, see below
                     rbp = (day.get("outcome") or {}).get("results_by_pick") or []
                     if idx < len(rbp):
                         outcome_row = rbp[idx]
@@ -1510,6 +1589,23 @@ def plot():
                        hide_fill_sens=True)
 
 
+@app.route("/ibkr")
+def ibkr():
+    """The account's real results from IBKR daily Activity Statements, laid out like Plot (user
+    2026-10-23): NAV equity curve vs SPY, weekly P&L and every spread by week. Payload written by
+    live/build_ibkr_payload.py to live/data/ibkr_actual_equity.json. Booked as traded, so no
+    sizing toggle and no wagering block (its per-$10k normalisation is the model books')."""
+    raw_weeks = (request.args.get("weeks") or "").strip().lower()
+    try:
+        week_limit = None if raw_weeks in ("all", "0") else max(int(raw_weeks or WEEK_CARDS_DEFAULT), 1)
+    except ValueError:
+        week_limit = WEEK_CARDS_DEFAULT
+    payload = _read_json(_data_path("ibkr_actual_equity.json"))
+    weeks_chart = [{k: w.get(k) for k in ("start", "pnl", "direction", "n_bull_put", "n_bear_call")}
+                   for w in ((payload or {}).get("weeks") or [])]
+    return render_template("ibkr.html", data=payload, week_limit=week_limit, weeks_chart=weeks_chart)
+
+
 @app.route("/qr")
 def qr():
     default_site = ("https://gepo-euro-backtest.peter.cloudmallinc.com/"
@@ -2416,7 +2512,7 @@ def add_actual_from_frozen(date: str, index: int):
     picks = payload.get("top_picks") or []
     if index < 0 or index >= len(picks):
         abort(404)
-    pick = picks[index]
+    pick = _pick_as_shown(picks[index])
     source = {"kind": "frozen", "date": date, "index": index}
     row, added = _save_actual_from_source(
         source,
@@ -2435,7 +2531,7 @@ def add_actual_from_snapshot(date: str, hhmm: str, index: int):
     picks = scan.get("picks") or []
     if index < 0 or index >= len(picks):
         abort(404)
-    pick = picks[index]
+    pick = _pick_as_shown(picks[index], _newest_scan_quote(picks[index]))
     source = {"kind": "snapshot", "date": date, "hhmm": hhmm, "index": index}
     row, added = _save_actual_from_source(
         source,
