@@ -43,7 +43,7 @@ from live import live_config
 from live.fetcher import _connect_with_retry
 
 
-def _bag_for(row) -> Bag | None:
+def _bag_for(row, exch: str | None = None) -> Bag | None:
     """BAG contract for one candidate. None if either conId is missing.
 
     A credit spread is opened by selling the short leg and buying the long
@@ -59,7 +59,7 @@ def _bag_for(row) -> Bag | None:
     # NOT "SMART". SMART returns nan on every combo field; a named exchange
     # serves the quote (2026-09-01, AAPL 325/322.5P: SMART nan/nan, CBOE
     # -1.10/-0.95, ISE identical to CBOE). Verified against the Gateway.
-    exch = getattr(live_config, "LIVE_COMBO_EXCHANGE", "CBOE")
+    exch = exch or getattr(live_config, "LIVE_COMBO_EXCHANGE", "CBOE")
     return Bag(
         symbol=str(row["ticker"]),
         exchange=exch,

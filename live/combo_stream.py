@@ -38,6 +38,11 @@ CLIENT_ID = int(getattr(live_config, "LIVE_STREAM_CLIENT_ID", 111))
 # reached" at 100 on this account). Budget: open positions always get a line, the
 # ranked board fills what is left, and spots are capped separately.
 MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 26))
+# Check both books (user 2026-10-26): SMART returned nothing for PFE 30/29.5 while CBOE quoted
+# -0.27/-0.22, so the page showed leg mids. A bag with no usable quote after SWAP_S flips to the
+# other exchange -- one market-data line per spread either way (the account caps lines at 100).
+BAG_EXCHANGES = ("SMART", "CBOE")
+SWAP_S    = float(getattr(live_config, "LIVE_STREAM_SWAP_S", 5.0))
 MAX_SPOTS = int(getattr(live_config, "LIVE_STREAM_MAX_SPOTS", 40))
 RELOAD_S  = float(getattr(live_config, "LIVE_STREAM_RELOAD_S", 20))
 WRITE_S   = float(getattr(live_config, "LIVE_STREAM_WRITE_S", 1.0))
@@ -262,6 +267,7 @@ def main() -> int:
 
     ib = IB()
     subs: dict[str, tuple] = {}          # key -> (bag, ticker)
+    sub_ex: dict[str, list] = {}         # key -> [exchange, monotonic time subscribed]
     spots: dict[str, tuple] = {}         # symbol -> (contract, ticker)
     legs: dict[str, tuple] = {}          # key -> (short_conid, long_conid)
     widths: dict[str, float] = {}        # key -> spread width, for the sanity check
@@ -342,6 +348,7 @@ def main() -> int:
                 for k in list(subs):
                     if k not in want:
                         bag, _t = subs.pop(k)
+                        sub_ex.pop(k, None)
                         try: ib.cancelMktData(bag)
                         except Exception: pass
                 for k, r in want.items():
@@ -353,11 +360,12 @@ def main() -> int:
                         widths[k] = None
                     if k in subs:
                         continue
-                    bag = _bag_for(r)
+                    bag = _bag_for(r, BAG_EXCHANGES[0])
                     if bag is None:
                         continue
                     try:
                         subs[k] = (bag, ib.reqMktData(bag, "", False, False))
+                        sub_ex[k] = [BAG_EXCHANGES[0], time.monotonic()]
                     except Exception as e:
                         print(f"[combo_stream] subscribe failed {k}: {e}", flush=True)
                 # Leg subscriptions: the combo book is usually empty, so the legs are
@@ -402,6 +410,7 @@ def main() -> int:
             ts = datetime.now().isoformat(timespec="seconds")
             quotes = {}
             ok = lambda v: v is not None and v == v and v != 0          # not None/NaN/0
+            _swap = []
             for k, (_bag, t) in subs.items():
                 bid, ask, last = t.bid, t.ask, t.last
                 if debit_k.get(k) and ok(bid) and ok(ask) and widths.get(k):
@@ -437,6 +446,9 @@ def main() -> int:
                 # LEGS: bid = short_ask - long_bid, ask = short_bid - long_ask,
                 # mid = short_mid - long_mid. Do the same so a missing combo book no
                 # longer falls back to the scan's stale leg mids.
+                _se = sub_ex.get(k)
+                if _se and time.monotonic() - _se[1] >= SWAP_S:
+                    _swap.append(k)
                 lg = legs.get(k)
                 if not lg:
                     continue
@@ -480,6 +492,18 @@ def main() -> int:
                              "ask": round(-(float(st_.bid) - float(lt_.ask)), 4),
                              "mid": round(mid, 4),
                              "last": None, "src": "legs", "ts": ts}
+            for k in _swap:
+                old, _t = subs[k]
+                ex = BAG_EXCHANGES[(BAG_EXCHANGES.index(sub_ex[k][0]) + 1) % len(BAG_EXCHANGES)]
+                bag = Bag(symbol=old.symbol, exchange=ex, currency="USD",
+                          comboLegs=[ComboLeg(conId=l.conId, ratio=l.ratio, action=l.action, exchange=ex)
+                                     for l in old.comboLegs])
+                try:
+                    ib.cancelMktData(old)
+                    subs[k] = (bag, ib.reqMktData(bag, "", False, False))
+                    sub_ex[k] = [ex, time.monotonic()]
+                except Exception as e:
+                    print(f"[combo_stream] exchange swap failed {k}: {e}", flush=True)
             sp = {}
             for sym, (_c, t) in spots.items():
                 v = t.last if (t.last is not None and t.last == t.last and t.last != 0) else t.close
