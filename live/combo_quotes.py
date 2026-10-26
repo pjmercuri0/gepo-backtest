@@ -71,6 +71,12 @@ def _bag_for(row, exch: str | None = None) -> Bag | None:
     )
 
 
+# Book order (user 2026-10-26): CBOE combo book first, SMART for whatever CBOE left empty, then
+# the caller's leg mids. Each pass re-quotes only the rows still missing, inside the same
+# LIVE_COMBO_TIMEOUT budget, so the scan cannot run longer than before.
+COMBO_EXCHANGES = ("CBOE", "SMART")
+
+
 def _has_quote(t) -> bool:
     return (t.bid is not None and pd.notna(t.bid)
             and t.ask is not None and pd.notna(t.ask))
@@ -132,9 +138,8 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
                 "combo_credit_touch", "combo_credit_last"):
         df[col] = float("nan")
 
-    pairs = [(idx, _bag_for(row)) for idx, row in df.iterrows()]
-    live_pairs = [(idx, bag) for idx, bag in pairs if bag is not None]
-    if not live_pairs:
+    rows = {idx: row for idx, row in df.iterrows() if _bag_for(row) is not None}
+    if not rows:
         print("  [combo] no candidate carries a conId pair; skipping", flush=True)
         return df
 
@@ -143,17 +148,22 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
     try:
         _connect_with_retry(ib, int(live_config.LIVE_COMBO_CLIENT_ID))
         ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
-        bags = [bag for _, bag in live_pairs]
         batch = int(live_config.LIVE_COMBO_BATCH)
         wait_s = float(live_config.LIVE_COMBO_WAIT)
         deadline = time.monotonic() + float(live_config.LIVE_COMBO_TIMEOUT)
-        quotes: list = []
-        for i in range(0, len(bags), batch):
-            chunk = bags[i:i + batch]
-            if time.monotonic() >= deadline:
-                quotes.extend([(None, None, None)] * len(chunk))
-                continue
-            quotes.extend(_quote_batch(ib, chunk, wait_s))
+        got: dict = {}                    # idx -> (bid, ask, last)
+        for ex in COMBO_EXCHANGES:
+            todo = [idx for idx in rows if idx not in got]
+            n0 = len(got)
+            for i in range(0, len(todo), batch):
+                if time.monotonic() >= deadline:
+                    break
+                chunk = todo[i:i + batch]
+                res = _quote_batch(ib, [_bag_for(rows[idx], ex) for idx in chunk], wait_s)
+                for idx, (bid, ask, last) in zip(chunk, res):
+                    if bid is not None and ask is not None and pd.notna(bid) and pd.notna(ask):
+                        got[idx] = (bid, ask, last)
+            print(f"  [combo] {ex}: +{len(got) - n0} quoted", flush=True)
     except Exception as e:
         print(f"  [combo] quoting failed ({e}); falling back to leg mids", flush=True)
         return df
@@ -164,9 +174,7 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
             pass
 
     filled = 0
-    for (idx, _), (bid, ask, last) in zip(live_pairs, quotes):
-        if bid is None or ask is None or pd.isna(bid) or pd.isna(ask):
-            continue
+    for idx, (bid, ask, last) in got.items():
         if "structure" in df.columns and df.at[idx, "structure"] == "debit":
             # Debit bag -> credit-bag scale (live/debit_mode.py): subtract the width.
             from live import debit_mode

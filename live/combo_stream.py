@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT))
 
 from ib_insync import IB, Stock, Option, Bag, ComboLeg, Contract
 from live import debit_mode, live_config
-from live.combo_quotes import _bag_for
+from live.combo_quotes import COMBO_EXCHANGES, _bag_for
 from live.fetcher import _connect_with_retry
 
 CLIENT_ID = int(getattr(live_config, "LIVE_STREAM_CLIENT_ID", 111))
@@ -39,9 +39,10 @@ CLIENT_ID = int(getattr(live_config, "LIVE_STREAM_CLIENT_ID", 111))
 # ranked board fills what is left, and spots are capped separately.
 MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 26))
 # Check both books (user 2026-10-26): SMART returned nothing for PFE 30/29.5 while CBOE quoted
-# -0.27/-0.22, so the page showed leg mids. A bag with no usable quote after SWAP_S flips to the
-# other exchange -- one market-data line per spread either way (the account caps lines at 100).
-BAG_EXCHANGES = ("SMART", "CBOE")
+# -0.27/-0.22, so the page showed leg mids. Order (user 2026-10-26): CBOE combo book first, SMART
+# backup, leg mids last. A bag with no usable quote after SWAP_S flips to the other exchange --
+# one market-data line per spread either way (the account caps lines at 100).
+BAG_EXCHANGES = COMBO_EXCHANGES
 SWAP_S    = float(getattr(live_config, "LIVE_STREAM_SWAP_S", 5.0))
 MAX_SPOTS = int(getattr(live_config, "LIVE_STREAM_MAX_SPOTS", 40))
 RELOAD_S  = float(getattr(live_config, "LIVE_STREAM_RELOAD_S", 20))
