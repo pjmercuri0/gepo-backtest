@@ -59,22 +59,29 @@ def _bag_for(row, exch: str | None = None) -> Bag | None:
     # NOT "SMART". SMART returns nan on every combo field; a named exchange
     # serves the quote (2026-09-01, AAPL 325/322.5P: SMART nan/nan, CBOE
     # -1.10/-0.95, ISE identical to CBOE). Verified against the Gateway.
-    exch = exch or getattr(live_config, "LIVE_COMBO_EXCHANGE", "CBOE")
+    # 2026-10-27 (user: "it must be picking the best one"): a SMART bag whose LEGS are tagged
+    # SMART is what returns nan. Tag the legs with a named exchange and the SMART bag quotes the
+    # best bid and best ask across every options exchange -- EOG 162.5/160P read -1.29/-1.15
+    # (BATS bid, ISE/BOX/MIAX ask) while CBOE alone said -1.50/-0.45 and SMART/SMART said nan.
+    # Any named exchange works (CBOE, ISE, AMEX gave identical SMART quotes).
+    exch = exch or getattr(live_config, "LIVE_COMBO_EXCHANGE", "SMART")
     return Bag(
         symbol=str(row["ticker"]),
         exchange=exch,
         currency="USD",
         comboLegs=[
-            ComboLeg(conId=int(short_conid), ratio=1, action="SELL", exchange=exch),
-            ComboLeg(conId=int(long_conid), ratio=1, action="BUY", exchange=exch),
+            ComboLeg(conId=int(short_conid), ratio=1, action="SELL", exchange=LEG_EXCHANGE),
+            ComboLeg(conId=int(long_conid), ratio=1, action="BUY", exchange=LEG_EXCHANGE),
         ],
     )
 
 
-# Book order (user 2026-10-26): CBOE combo book first, SMART for whatever CBOE left empty, then
-# the caller's leg mids. Each pass re-quotes only the rows still missing, inside the same
-# LIVE_COMBO_TIMEOUT budget, so the scan cannot run longer than before.
-COMBO_EXCHANGES = ("CBOE", "SMART")
+# Book order (user 2026-10-27): SMART first -- the best bid/ask across every exchange's combo
+# book (see _bag_for) -- CBOE's own book for whatever SMART left empty, then the caller's leg
+# mids. Each pass re-quotes only the rows still missing, inside the same LIVE_COMBO_TIMEOUT
+# budget, so the scan cannot run longer than before.
+COMBO_EXCHANGES = ("SMART", "CBOE")
+LEG_EXCHANGE = "CBOE"            # leg tag only; see _bag_for
 
 
 def _has_quote(t) -> bool:

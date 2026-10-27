@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT))
 
 from ib_insync import IB, Stock, Option, Bag, ComboLeg, Contract
 from live import debit_mode, live_config
-from live.combo_quotes import COMBO_EXCHANGES, _bag_for
+from live.combo_quotes import COMBO_EXCHANGES, LEG_EXCHANGE, _bag_for
 from live.fetcher import _connect_with_retry
 
 CLIENT_ID = int(getattr(live_config, "LIVE_STREAM_CLIENT_ID", 111))
@@ -39,8 +39,9 @@ CLIENT_ID = int(getattr(live_config, "LIVE_STREAM_CLIENT_ID", 111))
 # ranked board fills what is left, and spots are capped separately.
 MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 26))
 # Check both books (user 2026-10-26): SMART returned nothing for PFE 30/29.5 while CBOE quoted
-# -0.27/-0.22, so the page showed leg mids. Order (user 2026-10-26): CBOE combo book first, SMART
-# backup, leg mids last. A bag with no usable quote after SWAP_S flips to the other exchange --
+# -0.27/-0.22, so the page showed leg mids. Order (user 2026-10-27): SMART (best across every
+# exchange's book, legs tagged CBOE -- see combo_quotes._bag_for) first, CBOE's own book as backup,
+# leg mids last. A bag with no usable quote after SWAP_S flips to the other exchange --
 # one market-data line per spread either way (the account caps lines at 100).
 BAG_EXCHANGES = COMBO_EXCHANGES
 SWAP_S    = float(getattr(live_config, "LIVE_STREAM_SWAP_S", 5.0))
@@ -497,7 +498,7 @@ def main() -> int:
                 old, _t = subs[k]
                 ex = BAG_EXCHANGES[(BAG_EXCHANGES.index(sub_ex[k][0]) + 1) % len(BAG_EXCHANGES)]
                 bag = Bag(symbol=old.symbol, exchange=ex, currency="USD",
-                          comboLegs=[ComboLeg(conId=l.conId, ratio=l.ratio, action=l.action, exchange=ex)
+                          comboLegs=[ComboLeg(conId=l.conId, ratio=l.ratio, action=l.action, exchange=LEG_EXCHANGE)
                                      for l in old.comboLegs])
                 try:
                     ib.cancelMktData(old)
