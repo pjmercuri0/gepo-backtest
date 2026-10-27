@@ -82,32 +82,42 @@ def pair_spreads(fills, open_pos):
             for x in legs:
                 held[x["sym"]].append(s)
             continue
-        # A closing fill (sold-to-close, bought-to-close, expired, assigned, exercised)
-        s = held[r["sym"]].pop(0) if held.get(r["sym"]) else None
-        if s is None:                                  # opened before the first statement
-            s = next((x for x in spreads if x.get("pre") and x["ticker"] == u and x["expiry"] == exp
-                      and x["closed_legs"] < 2 and k not in (x["k_s"], x["k_l"])), None)
-            if s is None:
-                s = {"ticker": u, "expiry": exp, "pc": pc, "entry": None, "pre": True, "k_s": None, "k_l": None,
-                     "qty": int(abs(float(r["qty"]))), "open_proceeds": None, "close_proceeds": 0.0, "rpl": 0.0,
-                     "closed_legs": 0, "assigned": False, "close_day": None}
-                spreads.append(s)
-            # the leg bought back (qty > 0) was the short one
-            if float(r["qty"]) > 0:
-                s["k_s"] = k
+        # A closing fill (sold-to-close, bought-to-close, expired, assigned, exercised). One fill can
+        # close several spreads on the same leg (2026-10-23: XOM 180/177.5 opened Oct 19 and again
+        # Oct 21, both bought back in one qty-2 order), so it is split across the spreads it covers,
+        # oldest first, pro rata by contracts; the Oct 21 lot used to stay "open" at $0.
+        rem = tot = abs(float(r["qty"]))
+        while rem > 0:
+            s = held[r["sym"]].pop(0) if held.get(r["sym"]) else None
+            if s is None:                                  # opened before the first statement
+                s = next((x for x in spreads if x.get("pre") and x["ticker"] == u and x["expiry"] == exp
+                          and x["closed_legs"] < 2 and k not in (x["k_s"], x["k_l"])), None)
+                if s is None:
+                    s = {"ticker": u, "expiry": exp, "pc": pc, "entry": None, "pre": True, "k_s": None, "k_l": None,
+                         "qty": int(rem), "open_proceeds": None, "close_proceeds": 0.0, "rpl": 0.0,
+                         "closed_legs": 0, "assigned": False, "close_day": None}
+                    spreads.append(s)
+                # the leg bought back (qty > 0) was the short one
+                if float(r["qty"]) > 0:
+                    s["k_s"] = k
+                else:
+                    s["k_l"] = k
+                take = rem
             else:
-                s["k_l"] = k
-        s["close_proceeds"] += float(r["proceeds"])
-        s["rpl"] += float(r["rpl"])
-        s["closed_legs"] += 1
-        s["close_day"] = max(s["close_day"] or r["day"], r["day"])
-        if _codes(r) & {"A", "Ex"}:
-            s["assigned"] = True
-            # the stock fill booked at the same moment belongs to this spread
-            for st in by_dt[(r["dt"], u)]:
-                if st["cat"] == "Stocks" and not st.get("_used"):
-                    st["_used"] = True
-                    s["rpl"] += float(st["rpl"])
+                take = min(s["qty"], rem)
+            frac = take / tot
+            s["close_proceeds"] += float(r["proceeds"]) * frac
+            s["rpl"] += float(r["rpl"]) * frac
+            s["closed_legs"] += 1
+            s["close_day"] = max(s["close_day"] or r["day"], r["day"])
+            if _codes(r) & {"A", "Ex"}:
+                s["assigned"] = True
+                # the stock fill booked at the same moment belongs to this spread
+                for st in by_dt[(r["dt"], u)]:
+                    if st["cat"] == "Stocks" and not st.get("_used"):
+                        st["_used"] = True
+                        s["rpl"] += float(st["rpl"])
+            rem -= take
     # Still held at the last statement: unrealized P/L of its legs
     upl = {p["sym"]: p["upl"] for p in open_pos}
     for sym, ss in held.items():
