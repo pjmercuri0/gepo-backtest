@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT))
 
 from ib_insync import IB, Stock, Option, Bag, ComboLeg, Contract
 from live import debit_mode, live_config
-from live.combo_quotes import COMBO_EXCHANGES, LEG_EXCHANGE, _bag_for
+from live.combo_quotes import COMBO_EXCHANGES, LEG_EXCHANGE, _bag_for, usable_combo
 from live.fetcher import _connect_with_retry
 
 CLIENT_ID = int(getattr(live_config, "LIVE_STREAM_CLIENT_ID", 111))
@@ -48,6 +48,8 @@ SWAP_S    = float(getattr(live_config, "LIVE_STREAM_SWAP_S", 5.0))
 MAX_SPOTS = int(getattr(live_config, "LIVE_STREAM_MAX_SPOTS", 40))
 RELOAD_S  = float(getattr(live_config, "LIVE_STREAM_RELOAD_S", 20))
 WRITE_S   = float(getattr(live_config, "LIVE_STREAM_WRITE_S", 1.0))
+HIST_DIR  = Path(__file__).resolve().parent / "logs"
+_now_d    = lambda: datetime.now().strftime("%Y%m%d")
 OUT   = Path(live_config.RANKED_DIR) / "combo_stream.json"
 PUBLISH_S = float(getattr(live_config, "LIVE_STREAM_PUBLISH_S", 2.0))
 LOCK  = ROOT / "live" / "logs" / "combo_stream.lock"
@@ -438,6 +440,11 @@ def main() -> int:
                     # 72.28) showed +$11 against own-leg mids of 0.725. Fall through
                     # to the leg mids instead.
                     _m = (sum(_sides) / 2.0) if len(_sides) == 2 else -1.0
+                    # 2026-10-28 UPS 105/104: SMART bid -0.96 / ask -0.06 on a 1.00 width -- both
+                    # sides inside the width, mid 0.51, app ticket 0.28. A gap wider than half the
+                    # width is a stub book: not usable, flip to the next exchange / leg mids.
+                    if not usable_combo(bid, ask, _w):
+                        _m = -1.0
                     if _m > 0 and (_w is None or _m <= _w + 1e-9):
                         quotes[k] = {"bid": float(bid), "ask": float(ask), "mid": round(_m, 4),
                                      "last": (float(last) if ok(last) else None),
@@ -494,6 +501,22 @@ def main() -> int:
                              "ask": round(-(float(st_.bid) - float(lt_.ask)), 4),
                              "mid": round(mid, 4),
                              "last": None, "src": "legs", "ts": ts}
+            # Raw book record, one line per tick (user 2026-10-28, "where you getting .53"): the
+            # JSON is overwritten every second, so a screenshot could not be reconciled after the
+            # fact. live/logs/combo_hist_YYYYMMDD.jsonl: {ts, bags: {key: [exchange, bid, ask]},
+            # legs: {key: [short_bid, short_ask, long_bid, long_ask]}}.
+            try:
+                _f = lambda v: (round(float(v), 4) if (v is not None and v == v) else None)
+                _hb = {k: [sub_ex.get(k, [None])[0], _f(t.bid), _f(t.ask)] for k, (_b, t) in subs.items()}
+                _hl = {}
+                for k, lg in legs.items():
+                    st_, lt_ = leg_t.get(lg[0]), leg_t.get(lg[1])
+                    if st_ and lt_:
+                        _hl[k] = [_f(st_.bid), _f(st_.ask), _f(lt_.bid), _f(lt_.ask)]
+                with open(HIST_DIR / f"combo_hist_{_now_d()}.jsonl", "a") as _hf:
+                    _hf.write(json.dumps({"ts": ts, "bags": _hb, "legs": _hl}, separators=(",", ":")) + "\n")
+            except Exception as e:
+                print(f"[combo_stream] hist write failed: {e}", flush=True)
             for k in _swap:
                 old, _t = subs[k]
                 ex = BAG_EXCHANGES[(BAG_EXCHANGES.index(sub_ex[k][0]) + 1) % len(BAG_EXCHANGES)]

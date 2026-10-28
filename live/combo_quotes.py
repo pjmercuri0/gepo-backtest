@@ -81,7 +81,28 @@ def _bag_for(row, exch: str | None = None) -> Bag | None:
 # mids. Each pass re-quotes only the rows still missing, inside the same LIVE_COMBO_TIMEOUT
 # budget, so the scan cannot run longer than before.
 COMBO_EXCHANGES = ("SMART", "CBOE")
-LEG_EXCHANGE = "CBOE"            # leg tag only; see _bag_for
+LEG_EXCHANGE = "CBOE"
+# A combo book is usable only when BOTH sides sit inside [0, width] AND the bid-ask gap is at
+# most MAX_GAP_FRAC of the width. UPS 105/104 on 2026-10-28 15:32: SMART bid -0.96 / ask -0.06 on
+# a 1.00-wide spread -- each side inside the width, mid 0.51, page showed $0.53 while the app's
+# ticket read -0.47/-0.09 (0.28). A 0.90 market on a 1.00 width is a stub, not a quote.
+MAX_GAP_FRAC = float(getattr(live_config, "LIVE_COMBO_MAX_GAP_FRAC", 0.5))
+
+
+def usable_combo(bid, ask, width) -> bool:
+    """True if a credit-bag bid/ask (both negative) is a real two-sided market for `width`."""
+    try:
+        cb, ca = -float(bid), -float(ask)
+    except (TypeError, ValueError):
+        return False
+    if cb != cb or ca != ca:
+        return False
+    if width is None or width != width or width <= 0:
+        return cb >= 0 and ca >= 0
+    w = float(width)
+    if not (0.0 <= cb <= w + 1e-9 and 0.0 <= ca <= w + 1e-9):
+        return False
+    return abs(cb - ca) <= MAX_GAP_FRAC * w + 1e-9            # leg tag only; see _bag_for
 
 
 def _has_quote(t) -> bool:
@@ -169,7 +190,14 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
                 res = _quote_batch(ib, [_bag_for(rows[idx], ex) for idx in chunk], wait_s)
                 for idx, (bid, ask, last) in zip(chunk, res):
                     if bid is not None and ask is not None and pd.notna(bid) and pd.notna(ask):
-                        got[idx] = (bid, ask, last)
+                        _r = rows[idx]
+                        _w = _r.get("spread_width")
+                        if _w is None or pd.isna(_w):
+                            _w = abs(float(_r["short_strike"]) - float(_r["long_strike"]))
+                        if _r.get("structure") == "debit":
+                            got[idx] = (bid, ask, last)      # debit scale; validated after conversion below
+                        elif usable_combo(bid, ask, _w):
+                            got[idx] = (bid, ask, last)
             print(f"  [combo] {ex}: +{len(got) - n0} quoted", flush=True)
     except Exception as e:
         print(f"  [combo] quoting failed ({e}); falling back to leg mids", flush=True)
