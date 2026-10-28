@@ -58,6 +58,18 @@ def pair_spreads(fills, open_pos):
         if r["cat"] == "Equity and Index Options" and "O" in _codes(r):
             u, exp, _, _ = _leg(r["sym"])
             opens[(r["dt"], u, exp)].append(r)
+    # Netting (2026-10-27): EOG 162.5/160 was opened while 165/162.5 from the day before was still
+    # held, so IBKR booked the 162.5P sale as a CLOSE of that long leg (code C, same order as the
+    # 160P open). It is the new spread's short leg: pair it there, and carry the 162.5P on both
+    # spreads as a "phantom" leg (long on the old, short on the new) that settles at intrinsic
+    # against the close, since no position and no later fill exists for it. The sale's rpl is
+    # not booked: its proceeds are the new spread's credit.
+    for r in fills:
+        if r["cat"] == "Equity and Index Options" and "O" not in _codes(r):
+            u, exp, _, _ = _leg(r["sym"])
+            if opens.get((r["dt"], u, exp)):
+                opens[(r["dt"], u, exp)].append(r)
+                r["_net"] = True
     by_dt = defaultdict(list)
     for r in fills:
         by_dt[(r["dt"], r["sym"].split()[0])].append(r)
@@ -66,7 +78,7 @@ def pair_spreads(fills, open_pos):
         if r["cat"] != "Equity and Index Options":
             continue
         u, exp, k, pc = _leg(r["sym"])
-        if "O" in _codes(r):
+        if "O" in _codes(r) or r.get("_net"):
             key = (r["dt"], u, exp)
             if key in done_open:
                 continue
@@ -77,10 +89,22 @@ def pair_spreads(fills, open_pos):
                  "k_s": _leg(sh[0]["sym"])[2] if sh else None, "k_l": _leg(lg[0]["sym"])[2] if lg else None,
                  "qty": int(abs(float(sh[0]["qty"]))) if sh else 1,
                  "open_proceeds": sum(float(x["proceeds"]) for x in legs),
-                 "close_proceeds": 0.0, "rpl": 0.0, "closed_legs": 0, "assigned": False, "close_day": None}
+                 "close_proceeds": 0.0, "rpl": 0.0, "closed_legs": 0, "assigned": False, "close_day": None,
+                 "phantom": [], "leg_cash": {x["sym"]: float(x["proceeds"]) + float(x["comm"]) for x in legs}}
             spreads.append(s)
             for x in legs:
-                held[x["sym"]].append(s)
+                if x.get("_net"):
+                    # The leg the older spread held leaves its real legs; both spreads carry it as a
+                    # phantom with its own cash: the old one what it paid, the new one what it received.
+                    xk, xpc = _leg(x["sym"])[2], _leg(x["sym"])[3]
+                    old = held[x["sym"]].pop(0) if held.get(x["sym"]) else None
+                    if old is not None:
+                        old.setdefault("phantom", []).append({"k": xk, "pc": xpc, "sign": 1 if float(x["qty"]) < 0 else -1,
+                                                             "cash": old.get("leg_cash", {}).get(x["sym"], 0.0)})
+                    s["phantom"].append({"k": xk, "pc": xpc, "sign": -1 if float(x["qty"]) < 0 else 1,
+                                         "cash": float(x["proceeds"]) + float(x["comm"])})
+                else:
+                    held[x["sym"]].append(s)
             continue
         # A closing fill (sold-to-close, bought-to-close, expired, assigned, exercised). One fill can
         # close several spreads on the same leg (2026-10-23: XOM 180/177.5 opened Oct 19 and again
@@ -188,7 +212,20 @@ def build():
 
     spreads = pair_spreads(fills, open_pos)
     credits = _actual_credit_lookup()
-    spot_pairs = _closes_on([(s["ticker"], s["expiry"]) for s in spreads])
+    spot_pairs = _closes_on([(s["ticker"], s["expiry"]) for s in spreads]
+                            + [(s["ticker"], days[-1]) for s in spreads if s.get("phantom")])
+
+    def _phantom(s, spot):
+        """P&L of the netted leg(s): the cash paid or received for it, plus its intrinsic value
+        against the close (+ for a long leg, - for a short one). Sums to IBKR's own P&L across the
+        two spreads."""
+        if not s.get("phantom"):
+            return 0.0
+        v = 0.0
+        for ph in s["phantom"]:
+            intr = 0.0 if spot is None else (max(ph["k"] - spot, 0.0) if ph["pc"] == "P" else max(spot - ph["k"], 0.0))
+            v += ph["cash"] + ph["sign"] * intr * 100 * max(int(s["qty"] or 1), 1)
+        return v
     trades = []
     for s in spreads:
         q = max(int(s["qty"] or 1), 1)
@@ -205,9 +242,9 @@ def build():
         sp = spot_pairs.get((s["ticker"], s["expiry"])) if s["expiry"] <= days[-1] else None
         bp = s["pc"] == "P"
         if is_open:
-            outcome, pnl = "OPEN", s["open_upl"] + s["rpl"]
+            outcome, pnl = "OPEN", s["open_upl"] + s["rpl"] + _phantom(s, spot_pairs.get((s["ticker"], days[-1])))
         else:
-            pnl = s["rpl"]
+            pnl = s["rpl"] + _phantom(s, sp)
             if sp is None:
                 outcome = "WIN" if pnl > 0 else "LOSS"
             elif (sp >= s["k_s"]) if bp else (sp <= s["k_s"]):
