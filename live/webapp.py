@@ -2535,6 +2535,12 @@ def add_actual_from_snapshot(date: str, hhmm: str, index: int):
     # 2026-10-29: NFLX 62/61 snapped 15:16 at 0.475 and Actuals showed the 15:17 stream mid 0.49).
     # This reverses the 2026-10-22 overlay for Snap rows only; History and Live keep _pick_as_shown.
     pick = _json_clone(picks[index])
+    # ...and the credit saved is the one the Snap row's P&L books at (credit_basis.entry_credit:
+    # model x FILL_MULT), not the raw scan quote: GE 312.5/310 at 14:46 had a 2.58/4.30 short leg,
+    # so its leg-mid "quote" was 1.63 against a 1.17 book (user: "no way that GE was 1.63").
+    _booked = credit_basis.entry_credit({k: v for k, v in pick.items() if k != "actual_credit"})
+    if _booked and _booked > 0:
+        _apply_quote(pick, round(float(_booked), 4), "snap_booked")
     source = {"kind": "snapshot", "date": date, "hhmm": hhmm, "index": index}
     row, added = _save_actual_from_source(
         source,
