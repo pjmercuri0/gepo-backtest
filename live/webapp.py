@@ -2531,7 +2531,10 @@ def add_actual_from_snapshot(date: str, hhmm: str, index: int):
     picks = scan.get("picks") or []
     if index < 0 or index >= len(picks):
         abort(404)
-    pick = _pick_as_shown(picks[index], _newest_scan_quote(picks[index]))
+    # The Snap + saves the scan's own quote, the credit the row had when it snapped (user
+    # 2026-10-29: NFLX 62/61 snapped 15:16 at 0.475 and Actuals showed the 15:17 stream mid 0.49).
+    # This reverses the 2026-10-22 overlay for Snap rows only; History and Live keep _pick_as_shown.
+    pick = _json_clone(picks[index])
     source = {"kind": "snapshot", "date": date, "hhmm": hhmm, "index": index}
     row, added = _save_actual_from_source(
         source,
