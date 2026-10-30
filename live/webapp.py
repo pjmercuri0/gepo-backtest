@@ -282,6 +282,10 @@ def _debit_view(d: dict) -> None:
         lst = d.get(key)
         if isinstance(lst, list) and lst and isinstance(lst[0], dict) and "short_strike" in lst[0]:
             d[key] = [r for r in lst if _debit_row(r)]
+            if not d[key]:
+                # Every pick was a credit-only row (a day from before the debit book): History and
+                # Snap skip it, or its card shows the credit book's totals over an empty table.
+                d["_debit_empty"] = True
     for sc in d.get("scans") or []:
         if isinstance(sc, dict):
             _debit_view(sc)
@@ -1260,6 +1264,8 @@ def _frozen_history(limit: int = 60) -> list[dict]:
         except ValueError:
             pass
         payload = _read_json(fp)
+        if payload and payload.get("_debit_empty"):
+            continue                                  # debit site: no twins on this day
         if payload is None:
             continue
         payload["date"] = fp.stem
@@ -1756,7 +1762,7 @@ def snapshots():
             # day cards AND the by-time aggregate. Filtered on the RAW time, not
             # the bucket: 15:45/15:46/15:55 are in-hours scans and must survive.
             # Nothing is deleted from disk.
-            kept = [sc for sc in d.get("scans", []) if _in_market_hours(sc.get("hhmm", ""))]
+            kept = [sc for sc in d.get("scans", []) if _in_market_hours(sc.get("hhmm", "")) and not sc.get("_debit_empty")]
             if not kept:
                 continue
             # Under-floor rows kept-for-the-record before 2026-10-14 stay on disk but off the page (user:
