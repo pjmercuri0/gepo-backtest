@@ -1762,7 +1762,8 @@ def snapshots():
             # day cards AND the by-time aggregate. Filtered on the RAW time, not
             # the bucket: 15:45/15:46/15:55 are in-hours scans and must survive.
             # Nothing is deleted from disk.
-            kept = [sc for sc in d.get("scans", []) if _in_market_hours(sc.get("hhmm", "")) and not sc.get("_debit_empty")]
+            kept = [sc for sc in d.get("scans", []) if _in_market_hours(sc.get("hhmm", "")) and not sc.get("_debit_empty")
+                    and not (IS_DEBIT_SITE and not sc.get("picks"))]      # debit book starts 2026-11-02; no empty cards before
             if not kept:
                 continue
             # Under-floor rows kept-for-the-record before 2026-10-14 stay on disk but off the page (user:
