@@ -56,6 +56,11 @@ PICK_FIELDS = [
     # 2026-10-15: "debit" when the pick was quoted and traded as its parity debit spread
     # (live/debit_mode.py); the pages show the debit off it, Actuals takes a debit fill.
     "structure",
+    # 2026-10-30: the pick's parity debit twin (live/stores.py); gepo-debit-ticker renders the Snap row
+    # from these and its + saves the twin.
+    "twin_short_conid", "twin_long_conid", "twin_leg_credit",
+    "twin_combo_bid", "twin_combo_ask", "twin_combo_credit_mid",
+    "par_short_bid", "par_short_ask", "par_long_bid", "par_long_ask",
 ]
 
 
@@ -272,11 +277,16 @@ def _orphaned_frozen(src: dict, p: dict) -> bool:
 
 
 def _settle_live_actuals(today, ib, ib_close_cache) -> None:
+    from live import stores
+    for name in stores.ACTUALS:              # credit book and debit book (gepo-debit-ticker)
+        _settle_live_actuals_file(today, ib, ib_close_cache, Path(live_config.ROOT_DIR) / name)
+
+
+def _settle_live_actuals_file(today, ib, ib_close_cache, fp) -> None:
     """Same settlement for Actuals rows added from the live tab (kind "live"): they
     are ranked rows, not snapshot-record entries, so _settle_files never sees them.
     Credit basis = the IBKR credit the row was added at; a typed fill overrides at
     render (_actuals_row_pnl)."""
-    fp = Path(live_config.ROOT_DIR) / "actuals.json"
     if not fp.exists():
         return
     try:

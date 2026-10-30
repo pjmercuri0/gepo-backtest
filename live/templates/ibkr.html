@@ -180,7 +180,7 @@
           <td>{{ t.entry }}</td>
           <td style="color:#888780">{{ t.dow }}</td>
           <td class="fw">{{ t.ticker }}</td>
-          <td><span class="{{ 'dir-bull' if t.type == 'bull_put' else 'dir-bear' }}">{{ '▲ bull put' if t.type == 'bull_put' else '▼ bear call' }}</span></td>
+          <td><span class="{{ 'dir-bull' if t.type == 'bull_put' else 'dir-bear' }}">{{ '▲ bull put' if t.type == 'bull_put' else '▼ bear call' }}{% if t.structure == 'debit' %} debit{% endif %}</span></td>
           <td>${{ '%.2f'|format(t.k_s) }} / ${{ '%.2f'|format(t.k_l) }}</td>
           <td style="color:#888780">{{ t.expiry[5:] }}</td>
           <td>{% if t.credit is not none %}${{ '%.3f'|format(t.credit) }}{% else %}—{% endif %}</td>

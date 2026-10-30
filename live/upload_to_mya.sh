@@ -121,65 +121,66 @@ import json, os, subprocess
 from pathlib import Path
 host = os.environ['MYA_SSH_HOST']
 remote_base = os.environ.get('MYA_REMOTE_BASE', '/opt/vito/gepo-backtest/live')
-local_path = Path('live/actuals.json')
-ssh_key = os.environ.get('MYA_SSH_KEY', '')
-ssh_opts = ['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new']
-if ssh_key: ssh_opts += ['-i', ssh_key]
+for _store_name in ('actuals.json', 'actuals_debit.json'):   # credit book and debit book (live/stores.py)
+  local_path = Path('live') / _store_name
+  ssh_key = os.environ.get('MYA_SSH_KEY', '')
+  ssh_opts = ['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new']
+  if ssh_key: ssh_opts += ['-i', ssh_key]
 
-def empty():
-    return {'version': 1, 'trades': []}
+  def empty():
+      return {'version': 1, 'trades': []}
 
-try:
-    out = subprocess.check_output(['ssh'] + ssh_opts + [host,
-        f"python3 -c \"import json, pathlib; p=pathlib.Path('{remote_base}/actuals.json'); print(p.read_text() if p.exists() else '{{}}')\""
-    ], stderr=subprocess.DEVNULL, timeout=15).decode()
-    remote = json.loads(out) if out.strip() else empty()
-except Exception:
-    remote = empty()
+  try:
+      out = subprocess.check_output(['ssh'] + ssh_opts + [host,
+          f"python3 -c \"import json, pathlib; p=pathlib.Path('{remote_base}/{_store_name}'); print(p.read_text() if p.exists() else '{{}}')\""
+      ], stderr=subprocess.DEVNULL, timeout=15).decode()
+      remote = json.loads(out) if out.strip() else empty()
+  except Exception:
+      remote = empty()
 
-if local_path.exists():
-    try:
-        local = json.loads(local_path.read_text())
-    except Exception:
-        local = empty()
-else:
-    local = empty()
+  if local_path.exists():
+      try:
+          local = json.loads(local_path.read_text())
+      except Exception:
+          local = empty()
+  else:
+      local = empty()
 
-merged = {'version': 1, 'trades': []}
-# 2026-09-15: field-aware. The mini writes marks and settlement into a trade's
-# pick (track_frozen / snapshot_picks.settle for kind "live"); Mya holds the
-# user's inline fill edits. "Remote wins wholesale" threw the marks away on
-# every upload. Now: local trade as the base, Mya's fill fields on top.
-USER_KEYS = ('actual_credit', 'actual_max_loss')
-loc = {t.get('id'): t for t in (local.get('trades') or []) if t.get('id')}
-rem = {t.get('id'): t for t in (remote.get('trades') or []) if t.get('id')}
-by_id = {}
-# 2026-10-14: ids X'd on the site are tombstoned in Mya's "deleted"; drop them from both
-# sides, or the union re-adds every removed trade on the next upload.
-deleted = set(local.get('deleted') or []) | set(remote.get('deleted') or [])
-for tid in list(loc) + [k for k in rem if k not in loc]:
-    if tid in deleted:
-        continue
-    if tid in loc and tid in rem:
-        t = dict(loc[tid])
-        for k in USER_KEYS:
-            if k in rem[tid]:
-                t[k] = rem[tid][k]
-        by_id[tid] = t
-    else:
-        by_id[tid] = loc.get(tid) or rem.get(tid)
-merged['trades'] = list(by_id.values())
-if deleted:
-    merged['deleted'] = sorted(deleted)
-updated = max([x for x in [local.get('updated_at'), remote.get('updated_at')] if x] or [''])
-if updated:
-    merged['updated_at'] = updated
+  merged = {'version': 1, 'trades': []}
+  # 2026-09-15: field-aware. The mini writes marks and settlement into a trade's
+  # pick (track_frozen / snapshot_picks.settle for kind "live"); Mya holds the
+  # user's inline fill edits. "Remote wins wholesale" threw the marks away on
+  # every upload. Now: local trade as the base, Mya's fill fields on top.
+  USER_KEYS = ('actual_credit', 'actual_max_loss')
+  loc = {t.get('id'): t for t in (local.get('trades') or []) if t.get('id')}
+  rem = {t.get('id'): t for t in (remote.get('trades') or []) if t.get('id')}
+  by_id = {}
+  # 2026-10-14: ids X'd on the site are tombstoned in Mya's "deleted"; drop them from both
+  # sides, or the union re-adds every removed trade on the next upload.
+  deleted = set(local.get('deleted') or []) | set(remote.get('deleted') or [])
+  for tid in list(loc) + [k for k in rem if k not in loc]:
+      if tid in deleted:
+          continue
+      if tid in loc and tid in rem:
+          t = dict(loc[tid])
+          for k in USER_KEYS:
+              if k in rem[tid]:
+                  t[k] = rem[tid][k]
+          by_id[tid] = t
+      else:
+          by_id[tid] = loc.get(tid) or rem.get(tid)
+  merged['trades'] = list(by_id.values())
+  if deleted:
+      merged['deleted'] = sorted(deleted)
+  updated = max([x for x in [local.get('updated_at'), remote.get('updated_at')] if x] or [''])
+  if updated:
+      merged['updated_at'] = updated
 
-if merged['trades'] or local_path.exists():
-    tmp = local_path.with_suffix('.tmp')
-    tmp.write_text(json.dumps(merged, indent=2))
-    tmp.replace(local_path)
-print(f"  → preserved/merged {len(merged['trades'])} actual trade(s)")
+  if merged['trades'] or local_path.exists():
+      tmp = local_path.with_suffix('.tmp')
+      tmp.write_text(json.dumps(merged, indent=2))
+      tmp.replace(local_path)
+  print(f"  → preserved/merged {len(merged['trades'])} actual trade(s) in {_store_name}")
 PYEOF
 
 # rsync flags:
@@ -207,6 +208,8 @@ UPLOAD_FILES=(
   "live/frozen/"                    # daily 15:45 freeze snapshots (History tab)
   "live/intraday_picks/"            # every :01/:31 scan's qualified picks (Snapshots tab)
   "live/actuals.json"               # user-selected actual trades (Actuals tab)
+  "live/actuals_debit.json"         # the debit site's actual trades (gepo-debit-ticker)
+  "live/ranked/actuals_marks_debit.json"  # its open-position marks
   "live/data/backtest_equity.json"  # precomputed equity curve (Backtest tab)
   "live/data/oot_equity.json"       # 2026 out-of-time equity curve (OOT tab)
   "live/data/ibkr_replay_equity.json"  # IBKR fair replay under the current canon (Plot tab)

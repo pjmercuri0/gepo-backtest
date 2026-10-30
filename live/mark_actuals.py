@@ -38,7 +38,8 @@ from live import debit_mode, live_config
 from live.fetcher import _connect_with_retry
 
 CLIENT_ID = int(getattr(live_config, "MARK_ACTUALS_CLIENT_ID", 120))
-OUT = Path(live_config.RANKED_DIR) / "actuals_marks.json"
+STORE = "actuals.json"                                   # --store actuals_debit.json for the debit book
+OUT = Path(live_config.RANKED_DIR) / "actuals_marks.json"  # set from STORE in main()
 LOCK = Path(live_config.ROOT_DIR) / "logs" / "mark_actuals.lock"
 # 6s was not enough for 28 legs to populate: some came back empty, fell through
 # to Black-Scholes, and the book printed +15 when fresh leg mids said -26
@@ -54,7 +55,7 @@ def _key(p: dict) -> str:
 
 def open_positions() -> list[dict]:
     """Every distinct Actuals spread that has not expired."""
-    path = Path(live_config.ROOT_DIR) / "actuals.json"
+    path = Path(live_config.ROOT_DIR) / STORE
     try:
         store = json.loads(path.read_text())
     except (OSError, ValueError):
@@ -202,6 +203,12 @@ def mark_positions(ib: IB, picks: list[dict]) -> dict:
 
 
 def main() -> int:
+    global STORE, OUT, LOCK
+    if "--store" in sys.argv:
+        from live import stores as _stores
+        STORE = sys.argv[sys.argv.index("--store") + 1]
+        OUT = Path(live_config.RANKED_DIR) / _stores.MARKS[STORE]
+        LOCK = LOCK.with_name(LOCK.name.replace(".lock", f".{STORE}.lock"))
     if LOCK.exists():
         try:
             os.kill(int(LOCK.read_text().strip()), 0)

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}GEPO Live — Actuals{% endblock %}
+{% block title %}{% if is_debit_site %}GEPO Debit{% else %}GEPO Live{% endif %} — Actuals{% endblock %}
 
 {% block content %}
 <h1>Actuals</h1>

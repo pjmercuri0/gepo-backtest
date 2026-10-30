@@ -259,9 +259,16 @@ fi
 echo "Marking open Actuals positions..."
 "${GEPO_PYTHON:-python3}" -m live.mark_actuals 2>&1 | sed "s/^/  [Marks] /" \
     || echo "  ✗ mark_actuals failed (non-fatal)"
-if [ -n "${MYA_SSH_HOST:-}" ] && [ -f live/ranked/actuals_marks.json ]; then
-    rsync -az --timeout=20 -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
-        live/ranked/actuals_marks.json \
-        "$MYA_SSH_HOST:${MYA_REMOTE_BASE:-/opt/vito/gepo-backtest/live}/ranked/actuals_marks.json" \
-        && echo "  [Marks] ✓ uploaded" || echo "  [Marks] ✗ upload failed (non-fatal)"
+# The debit book (gepo-debit-ticker, live/stores.py): same marks, its own store and file.
+if [ -f live/actuals_debit.json ]; then
+    "${GEPO_PYTHON:-python3}" -m live.mark_actuals --store actuals_debit.json 2>&1 | sed "s/^/  [Marks/debit] /" \
+        || echo "  ✗ mark_actuals (debit) failed (non-fatal)"
 fi
+for _mf in actuals_marks.json actuals_marks_debit.json; do
+  if [ -n "${MYA_SSH_HOST:-}" ] && [ -f "live/ranked/$_mf" ]; then
+    rsync -az --timeout=20 -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+        "live/ranked/$_mf" \
+        "$MYA_SSH_HOST:${MYA_REMOTE_BASE:-/opt/vito/gepo-backtest/live}/ranked/$_mf" \
+        && echo "  [Marks] ✓ uploaded $_mf" || echo "  [Marks] ✗ upload failed $_mf (non-fatal)"
+  fi
+done

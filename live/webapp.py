@@ -47,6 +47,10 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0   # static files served with no-cach
 
 APP_PROFILE = os.environ.get("GEPO_APP_PROFILE", "main").strip().lower()
 IS_EURO_PROFILE = APP_PROFILE in {"euro", "gepo-euro", "gepo_euro"}
+# gepo-debit-ticker (user 2026-10-30): GEPO_SITE=debit renders the same payloads as parity debit
+# spreads, with its own Actuals store, marks and IBKR payload (live/stores.py).
+from live import stores as _stores
+IS_DEBIT_SITE = _stores.is_debit_site()
 
 
 def _data_path(name: str) -> Path:
@@ -135,6 +139,7 @@ def _px(v, p):
 
 
 app.jinja_env.filters['px'] = _px
+app.jinja_env.globals['is_debit_site'] = IS_DEBIT_SITE
 
 
 app.jinja_env.globals['pin_open'] = _pin_open
@@ -227,9 +232,59 @@ def _read_json(path: Path) -> dict | None:
         return None
     try:
         with open(path) as f:
-            return json.load(f)
+            d = json.load(f)
     except (json.JSONDecodeError, OSError):
         return None
+    if IS_DEBIT_SITE and isinstance(d, dict):
+        _debit_view(d)
+    return d
+
+
+def _debit_row(r: dict) -> bool:
+    """Rewrite one ranked/frozen/snap row as its parity debit twin, in place. The credit inside stays a
+    credit equivalent (width - debit), which is what every book, gate and P&L already runs on; the
+    templates' px filter shows the debit. False when the row has no twin (not tradable as a debit)."""
+    if not isinstance(r, dict) or r.get("structure") == "debit":
+        return True
+    ts, tl = r.get("twin_short_conid"), r.get("twin_long_conid")
+    if not ts or not tl:
+        return False
+    r["credit_short_conid"], r["credit_long_conid"] = r.get("short_conid"), r.get("long_conid")
+    r["short_conid"], r["long_conid"] = ts, tl
+    r["structure"] = "debit"
+    for a, b in (("short_bid", "par_short_bid"), ("short_ask", "par_short_ask"),
+                 ("long_bid", "par_long_bid"), ("long_ask", "par_long_ask")):
+        if r.get(b) is not None:
+            r[a] = r[b]
+    mid = r.get("twin_combo_credit_mid")
+    src = "twin_combo_mid"
+    if mid is None:
+        mid, src = r.get("twin_leg_credit"), "twin_leg_mid"
+    r["combo_bid"], r["combo_ask"] = r.get("twin_combo_bid"), r.get("twin_combo_ask")
+    r["combo_credit_mid"] = r.get("twin_combo_credit_mid")
+    if mid is not None and r.get("pnl") is None and not r.get("outcome"):
+        try:
+            w = float(r.get("spread_width") or abs(float(r["short_strike"]) - float(r["long_strike"])))
+            mid = max(0.0, min(float(mid), w))
+            r["quoted_credit"] = r["net_credit"] = round(mid, 4)
+            r["credit_source"] = src
+            r["max_loss"] = round(w - mid, 4)
+            r["fill_targets"] = [{"credit": round(mid, 4), "max_loss": r["max_loss"]}]
+            r["credit_ratio"] = round(mid / r["max_loss"], 4) if r["max_loss"] > 0 else None
+        except (KeyError, TypeError, ValueError):
+            pass
+    return True
+
+
+def _debit_view(d: dict) -> None:
+    """Debit site: every pick list in a payload becomes its twins; rows without a twin are dropped."""
+    for key in ("ticker", "top_picks", "picks"):
+        lst = d.get(key)
+        if isinstance(lst, list) and lst and isinstance(lst[0], dict) and "short_strike" in lst[0]:
+            d[key] = [r for r in lst if _debit_row(r)]
+    for sc in d.get("scans") or []:
+        if isinstance(sc, dict):
+            _debit_view(sc)
 
 
 def _atomic_write_json(path: Path, payload: dict) -> None:
@@ -264,7 +319,7 @@ def _frozen_payload_today() -> dict | None:
 
 
 def _actuals_path() -> Path:
-    return Path(live_config.ROOT_DIR) / "actuals.json"
+    return Path(live_config.ROOT_DIR) / _stores.actuals_name()
 
 
 def _json_clone(obj):
@@ -374,9 +429,7 @@ def _pick_as_shown(pick: dict, newest_scan_quote=None) -> dict:
     if pick.get("pnl") is not None or pick.get("outcome") or pick.get("expiry_close") is not None:
         return pick                                   # settled: the scan quote is the record
     try:
-        q = ((_stream_state().get("quotes") or {}).get(
-            f"{pick.get('ticker')}|{pick.get('spread_type')}|{float(pick.get('short_strike')):g}"
-            f"|{float(pick.get('long_strike')):g}|{str(pick.get('expiry_date'))[:10]}"))
+        q = ((_stream_state().get("quotes") or {}).get(_stores.qkey(pick)))
     except (TypeError, ValueError):
         q = None
     if q and q.get("mid") is not None:
@@ -827,9 +880,9 @@ def _actuals_marks() -> dict:
     try:
         cached = getattr(g, "_actuals_marks", None)
     except RuntimeError:            # called outside a request (scripts, tests)
-        return (_read_json(Path(live_config.RANKED_DIR) / "actuals_marks.json") or {}).get("marks") or {}
+        return (_read_json(Path(live_config.RANKED_DIR) / _stores.marks_name()) or {}).get("marks") or {}
     if cached is None:
-        blob = _read_json(Path(live_config.RANKED_DIR) / "actuals_marks.json") or {}
+        blob = _read_json(Path(live_config.RANKED_DIR) / _stores.marks_name()) or {}
         cached = blob.get("marks") or {}
         g._actuals_marks = cached
     return cached
@@ -904,9 +957,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
     _out_track, _out_marked = last_track, last_marked
     try:
         _st = _stream_state()
-        _q = (_st.get("quotes") or {}).get(
-            f"{pick.get('ticker')}|{pick.get('spread_type')}|{float(pick.get('short_strike')):g}"
-            f"|{float(pick.get('long_strike')):g}|{str(pick.get('expiry_date'))[:10]}")
+        _q = (_st.get("quotes") or {}).get(_stores.qkey(pick))
         _sp = (_st.get("spots") or {}).get(pick.get("ticker"))
         # Also enter on a mark_actuals mark alone (2026-10-01): a position the stream is not holding
         # (26-spread cap; picks go first) has no streamed quote or spot, and the row showed "open -- --"
@@ -916,9 +967,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             f"|{float(pick.get('short_strike')):g}|{float(pick.get('long_strike')):g}"
             f"|{str(pick.get('expiry_date'))[:10]}")
         # Last in-session stream quote for this spread (combo_stream "last"); see the hold below.
-        _lq = (_st.get("last") or {}).get(
-            f"{pick.get('ticker')}|{pick.get('spread_type')}|{float(pick.get('short_strike')):g}"
-            f"|{float(pick.get('long_strike')):g}|{str(pick.get('expiry_date'))[:10]}")
+        _lq = (_st.get("last") or {}).get(_stores.qkey(pick))
         if outcome_row is None and (_q or _sp or _am0 or _lq):
             ks, kl = float(pick["short_strike"]), float(pick["long_strike"])
             w = float(pick.get("spread_width") or abs(ks - kl))
@@ -1600,7 +1649,7 @@ def ibkr():
         week_limit = None if raw_weeks in ("all", "0") else max(int(raw_weeks or WEEK_CARDS_DEFAULT), 1)
     except ValueError:
         week_limit = WEEK_CARDS_DEFAULT
-    payload = _read_json(_data_path("ibkr_actual_equity.json"))
+    payload = _read_json(_data_path(_stores.IBKR[_stores.site()]))
     weeks_chart = [{k: w.get(k) for k in ("start", "pnl", "direction", "n_bull_put", "n_bear_call")}
                    for w in ((payload or {}).get("weeks") or [])]
     return render_template("ibkr.html", data=payload, week_limit=week_limit, weeks_chart=weeks_chart)
@@ -2307,8 +2356,7 @@ def _overlay_stream(payload: dict) -> None:
         for lst in (payload.get("ticker") or [], payload.get("top_picks") or []):
             for r in lst:
                 try:
-                    k = (f"{r['ticker']}|{r['spread_type']}|{float(r['short_strike']):g}"
-                         f"|{float(r['long_strike']):g}|{str(r['expiry_date'])[:10]}")
+                    k = _stores.qkey(r)
                 except (KeyError, TypeError, ValueError):
                     continue
                 sp = spots.get(r.get("ticker"))

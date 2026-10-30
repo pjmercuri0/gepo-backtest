@@ -100,3 +100,39 @@ def attach_parity_legs(candidates, snap):
     if dropped:
         print(f"  [debit] {dropped} candidate(s) have no parity-twin legs in the snapshot -- dropped", flush=True)
     return df.loc[keep].copy()
+
+
+def attach_twin_columns(candidates, snap):
+    """Both-sides mode (user 2026-10-30, gepo-debit-ticker): keep every candidate as the credit
+    spread it is and ADD its parity twin's conIds and leg quotes as twin_* / par_* columns, so one
+    scan prices the credit bag and the debit bag. twin_leg_credit is the twin's leg-mid price on
+    the credit scale (width - debit). Rows whose twin is not in the snapshot keep NaN."""
+    import pandas as pd
+    if candidates.empty:
+        return candidates
+    s = snap.copy()
+    s["exp_"] = pd.to_datetime(s["ExpirationDate"]).dt.strftime("%Y-%m-%d")
+    s["pc_"] = s["PutCall"].astype(str).str.lower().str[0]
+    idx = {(r.Symbol, r.exp_, float(r.StrikePrice), r.pc_): r for r in s.itertuples()}
+    df = candidates.copy()
+    for col in ("twin_short_conid", "twin_long_conid", "twin_leg_credit",
+                "par_short_bid", "par_short_ask", "par_long_bid", "par_long_ask"):
+        df[col] = float("nan")
+    n = 0
+    for i, r in df.iterrows():
+        pc = parity_right(r["spread_type"]).lower()
+        exp = pd.Timestamp(r["expiry_date"]).strftime("%Y-%m-%d")
+        so = idx.get((r["ticker"], exp, float(r["short_strike"]), pc))
+        lo = idx.get((r["ticker"], exp, float(r["long_strike"]), pc))
+        if so is None or lo is None or not getattr(so, "conId", None) or not getattr(lo, "conId", None):
+            continue
+        sb, sa, lb, la = (float(so.BidPrice), float(so.AskPrice), float(lo.BidPrice), float(lo.AskPrice))
+        w = float(r["spread_width"])
+        df.at[i, "twin_short_conid"], df.at[i, "twin_long_conid"] = int(so.conId), int(lo.conId)
+        df.at[i, "par_short_bid"], df.at[i, "par_short_ask"] = sb, sa
+        df.at[i, "par_long_bid"], df.at[i, "par_long_ask"] = lb, la
+        if sb > 0 and sa > 0 and lb > 0 and la > 0:
+            df.at[i, "twin_leg_credit"] = round(w - ((lb + la) / 2.0 - (sb + sa) / 2.0), 4)
+        n += 1
+    print(f"  [debit] twin legs attached for {n}/{len(df)} candidates", flush=True)
+    return df

@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}GEPO Live — Threshold-Qualified Candidates{% endblock %}
+{% block title %}{% if is_debit_site %}GEPO Debit{% else %}GEPO Live{% endif %} — Threshold-Qualified Candidates{% endblock %}
 
 {% block content %}
 <h1>
   <span id="status-dot" class="live-dot"></span>
-  <span id="status-text">GEPO Live Tracker</span>
+  <span id="status-text">{% if is_debit_site %}GEPO Debit Tracker{% else %}GEPO Live Tracker{% endif %}</span>
   <span id="regime-badge"></span>
 </h1>
 <div class="subtitle" id="snapshot-meta">loading...</div>

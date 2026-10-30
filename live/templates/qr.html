@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}GEPO Live — QR{% endblock %}
+{% block title %}{% if is_debit_site %}GEPO Debit{% else %}GEPO Live{% endif %} — QR{% endblock %}
 
 {% block content %}
 <h1>Mobile QR</h1>

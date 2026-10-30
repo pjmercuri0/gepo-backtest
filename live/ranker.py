@@ -77,7 +77,7 @@ _GAP_STATE: dict = {"names": 0, "total": 0}
 _COMBO_STATE: dict = {"df": None}
 COMBO_ARCHIVE_COLS = ["ticker", "spread_type", "short_strike", "long_strike", "expiry_date",
                       "combo_bid", "combo_ask", "combo_last", "combo_credit_mid", "combo_credit_touch",
-                      "combo_credit_last"]
+                      "combo_credit_last", "twin_combo_bid", "twin_combo_ask", "twin_combo_credit_mid"]
 
 
 def _reprice_on_combos(candidates: pd.DataFrame) -> pd.DataFrame:
@@ -339,6 +339,8 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         candidates = debit_mode.attach_parity_legs(candidates, df)
         if candidates.empty:
             return pd.DataFrame()
+    elif getattr(live_config, "DEBIT_TWIN", False) and not candidates.empty:
+        candidates = debit_mode.attach_twin_columns(candidates, df)
 
     # Re-price on IBKR's complex-order book, then re-apply the credit gates.
     if live_config.LIVE_COMBO_ENABLED and not candidates.empty:
@@ -851,6 +853,17 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             # "debit" = quoted and traded as the parity debit spread (live/debit_mode.py); credits on
             # this row are credit equivalents, the page shows width - credit as the debit.
             "structure":        ("debit" if r.get("structure") == "debit" else "credit"),
+            # Parity twin (live/stores.py, gepo-debit-ticker): the debit site swaps these in.
+            "twin_short_conid": (int(r["twin_short_conid"]) if _num(r.get("twin_short_conid")) is not None else None),
+            "twin_long_conid":  (int(r["twin_long_conid"]) if _num(r.get("twin_long_conid")) is not None else None),
+            "twin_leg_credit":  _num(r.get("twin_leg_credit")),
+            "twin_combo_bid":   _num(r.get("twin_combo_bid")),
+            "twin_combo_ask":   _num(r.get("twin_combo_ask")),
+            "twin_combo_credit_mid": _num(r.get("twin_combo_credit_mid")),
+            "par_short_bid":    _num(r.get("par_short_bid")),
+            "par_short_ask":    _num(r.get("par_short_ask")),
+            "par_long_bid":     _num(r.get("par_long_bid")),
+            "par_long_ask":     _num(r.get("par_long_ask")),
             "combo_too_wide":   bool(r.get("combo_too_wide")) if r.get("combo_too_wide") is not None else None,
             "combo_bid":        _num(r.get("combo_bid")),
             "combo_ask":        _num(r.get("combo_ask")),

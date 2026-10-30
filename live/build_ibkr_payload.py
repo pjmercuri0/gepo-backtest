@@ -18,7 +18,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 STMT_DIR = ROOT / "data" / "ibkr_statements"
-OUT = ROOT / "live" / "data" / "ibkr_actual_equity.json"
+# --site debit (gepo-debit-ticker): only the parity debit spreads (calls with short > long, puts with
+# short < long), written to ibkr_actual_equity_debit.json. Default: the credit spreads.
+SITE = sys.argv[sys.argv.index("--site") + 1] if "--site" in sys.argv else "credit"
+OUT = ROOT / "live" / "data" / ("ibkr_actual_equity_debit.json" if SITE == "debit" else "ibkr_actual_equity.json")
 FIELDS = ["sec", "kind", "disc", "cat", "ccy", "sym", "dt", "qty", "tpx", "cpx", "proceeds", "comm",
           "basis", "rpl", "mtm", "code"]
 
@@ -57,7 +60,7 @@ def pair_spreads(fills, open_pos):
     for r in fills:
         if r["cat"] == "Equity and Index Options" and "O" in _codes(r):
             u, exp, _, _ = _leg(r["sym"])
-            opens[(r["dt"], u, exp)].append(r)
+            opens[(r["dt"], u, exp, _leg(r["sym"])[3])].append(r)
     # Netting (2026-10-27): EOG 162.5/160 was opened while 165/162.5 from the day before was still
     # held, so IBKR booked the 162.5P sale as a CLOSE of that long leg (code C, same order as the
     # 160P open). It is the new spread's short leg: pair it there, and carry the 162.5P on both
@@ -67,8 +70,8 @@ def pair_spreads(fills, open_pos):
     for r in fills:
         if r["cat"] == "Equity and Index Options" and "O" not in _codes(r):
             u, exp, _, _ = _leg(r["sym"])
-            if opens.get((r["dt"], u, exp)):
-                opens[(r["dt"], u, exp)].append(r)
+            if opens.get((r["dt"], u, exp, _leg(r["sym"])[3])):
+                opens[(r["dt"], u, exp, _leg(r["sym"])[3])].append(r)
                 r["_net"] = True
     by_dt = defaultdict(list)
     for r in fills:
@@ -79,7 +82,7 @@ def pair_spreads(fills, open_pos):
             continue
         u, exp, k, pc = _leg(r["sym"])
         if "O" in _codes(r) or r.get("_net"):
-            key = (r["dt"], u, exp)
+            key = (r["dt"], u, exp, pc)
             if key in done_open:
                 continue
             done_open.add(key)
@@ -154,7 +157,7 @@ def pair_spreads(fills, open_pos):
 def _actual_credit_lookup():
     """Fill credits typed on Actuals, for spreads opened before the first statement."""
     try:
-        store = json.loads((ROOT / "live" / "actuals.json").read_text())
+        store = json.loads((ROOT / "live" / ("actuals_debit.json" if SITE == "debit" else "actuals.json")).read_text())
     except (OSError, ValueError):
         return {}
     out = {}
@@ -211,6 +214,13 @@ def build():
     start_nav = nav[days[0]]["start"]
 
     spreads = pair_spreads(fills, open_pos)
+    # Structure from the legs alone: a credit vertical sells the strike nearer the money (puts short >
+    # long, calls short < long); its parity twin, the debit, is the reverse in the other right.
+    for s_ in spreads:
+        ks, kl = s_.get("k_s"), s_.get("k_l")
+        s_["structure"] = ("debit" if (ks is not None and kl is not None and
+                                       ((s_["pc"] == "C" and ks > kl) or (s_["pc"] == "P" and ks < kl))) else "credit")
+    spreads = [s_ for s_ in spreads if s_["structure"] == SITE]
     credits = _actual_credit_lookup()
     spot_pairs = _closes_on([(s["ticker"], s["expiry"]) for s in spreads]
                             + [(s["ticker"], days[-1]) for s in spreads if s.get("phantom")])
@@ -232,6 +242,8 @@ def build():
         width = abs((s["k_s"] or 0) - (s["k_l"] or 0))
         is_open = "open_upl" in s and s["closed_legs"] < 2
         credit = (s["open_proceeds"] / 100 / q) if s["open_proceeds"] is not None else None
+        if credit is not None and s.get("structure") == "debit":
+            credit = width + credit                  # debit paid -> credit equivalent (width - debit)
         entry = s["entry"]
         if credit is None:
             hit = credits.get((s["ticker"], s["expiry"], s["k_s"], s["k_l"]))
@@ -256,7 +268,10 @@ def build():
         e = entry or s["close_day"]
         trades.append({
             "entry": entry or "before " + days[0], "dow": date.fromisoformat(e).strftime("%a") if entry else "",
-            "ticker": s["ticker"], "type": "bull_put" if s["pc"] == "P" else "bear_call",
+            "ticker": s["ticker"], "structure": s.get("structure", "credit"),
+            # the bet, not the right: a bull call debit is the bull put's twin
+            "type": ("bull_put" if s["pc"] == "P" else "bear_call") if s.get("structure") != "debit"
+                    else ("bull_put" if s["pc"] == "C" else "bear_call"),
             "k_s": s["k_s"], "k_l": s["k_l"], "expiry": s["expiry"],
             "credit": round(credit, 4) if credit is not None else None,
             "max_loss": round(width - credit, 4) if credit is not None else None,

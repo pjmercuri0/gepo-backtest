@@ -239,6 +239,9 @@ LIVE_COMBO_ENABLED   = True    # verified live 2026-09-01
 # parity debit spread (bull put -> bull call debit, bear call -> bear put debit), same strikes. Selection,
 # gate, P&L and books are unchanged -- credits stay credit equivalents inside, the pages show the debit.
 DEBIT_MODE           = False
+# Both sides (user 2026-10-30): the scan also carries each pick's parity debit twin (conIds, legs,
+# combo quote) so gepo-debit-ticker (GEPO_SITE=debit) shows the same picks as debit spreads.
+DEBIT_TWIN           = True
 LIVE_COMBO_CLIENT_ID = 110     # avoid 100-109 (fetchers), 11 (default), 12 (SPY)
 LIVE_COMBO_TIMEOUT   = 60      # wall-clock budget for the whole combo pass
 LIVE_COMBO_EXCHANGE  = "SMART" # 2026-09-16: SMART is the aggregated book and is what TWS shows.

@@ -311,10 +311,15 @@ def _track_intraday(df: pd.DataFrame, today: date) -> None:
 
 
 def _track_live_actuals(df: pd.DataFrame, today: date) -> None:
+    from live import stores
+    for name in stores.ACTUALS:              # credit book and debit book (gepo-debit-ticker)
+        _track_live_actuals_file(df, today, Path(live_config.ROOT_DIR) / name)
+
+
+def _track_live_actuals_file(df: pd.DataFrame, today: date, fp) -> None:
     """Mark Actuals rows added from the LIVE tab (source.kind == "live"). Those rows
     hold the ranked row itself, not a snapshot-record entry, so nothing else marks
     them (2026-09-15: CSX showed a flat "open"). Same _track_pick, same parquet."""
-    fp = Path(live_config.ROOT_DIR) / "actuals.json"
     if not fp.exists():
         return
     try:

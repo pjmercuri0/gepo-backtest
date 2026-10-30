@@ -37,7 +37,10 @@ CLIENT_ID = int(getattr(live_config, "LIVE_STREAM_CLIENT_ID", 111))
 # IBKR caps concurrent market-data lines (error 101 "Max number of tickers has been
 # reached" at 100 on this account). Budget: open positions always get a line, the
 # ranked board fills what is left, and spots are capped separately.
-MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 26))
+MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 20))
+# Parity-twin (debit) bags for gepo-debit-ticker, on top of MAX_BAGS: debit positions first, then the
+# picks. No leg lines for them (the 100-line cap), so a twin with no book has no stream quote.
+TWIN_BAGS = int(getattr(live_config, "LIVE_STREAM_TWIN_BAGS", 8))
 # Check both books (user 2026-10-26): SMART returned nothing for PFE 30/29.5 while CBOE quoted
 # -0.27/-0.22, so the page showed leg mids. Order (user 2026-10-27): SMART (best across every
 # exchange's book, legs tagged CBOE -- see combo_quotes._bag_for) first, CBOE's own book as backup,
@@ -56,7 +59,10 @@ LOCK  = ROOT / "live" / "logs" / "combo_stream.lock"
 
 
 def _key(r) -> str:
-    return f"{r['ticker']}|{r['spread_type']}|{float(r['short_strike']):g}|{float(r['long_strike']):g}|{str(r['expiry_date'])[:10]}"
+    # A debit row (parity twin) streams under '|debit' so it cannot collide with the credit bag of
+    # the same spread (live/stores.py, gepo-debit-ticker 2026-10-30).
+    from live import stores
+    return stores.qkey(r)
 
 
 def _positions(ib) -> list[dict]:
@@ -64,16 +70,19 @@ def _positions(ib) -> list[dict]:
     outside the scan's fetch band -- a position that ran deep ITM is exactly the one
     the fetcher stops pulling -- so conIds are qualified straight from IBKR rather
     than looked up in the snapshot."""
-    fp = ROOT / "live" / "actuals.json"
-    if not fp.exists():
-        return []
-    try:
-        store = json.loads(fp.read_text())
-    except (OSError, json.JSONDecodeError):
-        return []
+    from live import stores
+    trades = []
+    for name in stores.ACTUALS:              # the credit book and the debit book (gepo-debit-ticker)
+        fp = ROOT / "live" / name
+        if not fp.exists():
+            continue
+        try:
+            trades += (json.loads(fp.read_text()).get("trades") or [])
+        except (OSError, json.JSONDecodeError, AttributeError):
+            continue
     today = datetime.now().date().isoformat()
     out = []
-    for t in store.get("trades") or []:
+    for t in trades:
         p = t.get("pick") or {}
         exp = str(p.get("expiry_date") or "")[:10]
         if not exp or exp < today or p.get("pnl") is not None:
@@ -348,6 +357,21 @@ def main() -> int:
                 _ek = {r["_key"] for r in _earlier}
                 _rest = [r for r in _rest if r["_key"] not in _ek]
                 board = _picks + _keep_pos + _earlier + _rest[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos) - len(_earlier))]
+                # Debit twins (gepo-debit-ticker): debit positions already ride in pos with their '|debit'
+                # key; add twin bags for the picks and the board rows that carry twin conIds, up to TWIN_BAGS.
+                _dpos = [r for r in board if debit_mode.is_debit(r)]
+                board = [r for r in board if not debit_mode.is_debit(r)]
+                _twins = list(_dpos)
+                for r in _picks + _rest:
+                    if len(_twins) >= TWIN_BAGS:
+                        break
+                    if r.get("twin_short_conid") and r.get("twin_long_conid") and not debit_mode.is_debit(r):
+                        tw = {**r, "structure": "debit", "short_conid": r["twin_short_conid"],
+                              "long_conid": r["twin_long_conid"]}
+                        tw["_key"] = _key(tw)
+                        if tw["_key"] not in {x["_key"] for x in _twins}:
+                            _twins.append(tw)
+                board = board + _twins[:TWIN_BAGS]
                 want = {r["_key"]: r for r in board}
                 for k in list(subs):
                     if k not in want:
@@ -356,8 +380,8 @@ def main() -> int:
                         try: ib.cancelMktData(bag)
                         except Exception: pass
                 for k, r in want.items():
-                    legs[k] = (r.get("short_conid"), r.get("long_conid"))
                     debit_k[k] = debit_mode.is_debit(r)
+                    legs[k] = (None, None) if debit_k[k] else (r.get("short_conid"), r.get("long_conid"))
                     try:
                         widths[k] = float(r.get("spread_width") or abs(float(r["short_strike"]) - float(r["long_strike"])))
                     except (TypeError, ValueError, KeyError):
