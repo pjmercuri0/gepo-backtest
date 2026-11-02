@@ -55,10 +55,13 @@
           {% if _open and p.live and p.live.live_quote is defined and p.live.live_quote is not none %}<td title="LIVE quote ({{ p.live.live_quote_ts }}); scan quote ${{ '%.2f' % p.net_credit }}; booked at ${{ '%.2f' % (p.entry_credit|px(p)|rd(2)) }}">${{ "%.2f"|format(p.live.live_quote|px(p)|rd(2)) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span></td>{% elif _open and p.cur_quote is defined %}<td title="newest scan quote ({{ p.cur_quote_hhmm[:2] }}:{{ p.cur_quote_hhmm[2:] }}, no live quote); this scan quote ${{ '%.2f' % p.net_credit }}; booked at ${{ '%.2f' % (p.entry_credit|px(p)|rd(2)) }}">${{ "%.2f"|format(p.cur_quote|px(p)|rd(2)) }}</td>{% else %}<td title="quoted mid at the scan (no live quote); booked at ${{ '%.2f' % (p.entry_credit|px(p)|rd(2)) }}">${{ "%.2f"|format(p.net_credit|px(p)|rd(2)) }}</td>{% endif %}
           {% set tg = p.credit_targets %}
           {% if tg and tg.min_credit is defined %}<td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }})">{% if p.structure == 'debit' %}<span style="color:#c9a227" title="max debit = width − min credit">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_hi_credit|px(p)) }}–${{ "%.2f"|format(tg.target_lo_credit|px(p)) }}</span>{% else %}<span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>{% endif %}</td>{% else %}<td>—</td>{% endif %}
-          {# Max-loss and ratio on the booked basis, as History: width minus the booked credit. #}
+          {# Max-loss and ratio on the booked basis, as History: width minus the booked credit. On the debit
+             site the max win is width minus the debit AS SHOWN in the cell to the left (user 2026-11-02:
+             'you have to do width - the rounded debit'). #}
           {% set _w = ((p.short_strike|float) - (p.long_strike|float))|abs %}
           {% set _ml = _w - (p.entry_credit|rd(2)) %}
-          <td>${{ "%.2f"|format((p.entry_credit|fl2) if p.structure == 'debit' else (_ml|rd(2))) }}</td>
+          {% set _sc = p.live.live_quote if (_open and p.live and p.live.live_quote is defined and p.live.live_quote is not none) else (p.cur_quote if (_open and p.cur_quote is defined) else p.net_credit) %}
+          <td>${{ "%.2f"|format((_sc|fl2) if p.structure == 'debit' else (_ml|rd(2))) }}</td>
           <td>{% if (_ml|rd(2)) > 0 %}{{ "%.2f"|format(((p.entry_credit|rd(2)) / (_ml|rd(2)))|rd(2)) }}{% else %}—{% endif %}</td>
           <td class="fw">{{ "%.2f"|format((p.GROUND * 10000)|rd(2)) if p.GROUND is not none else '—' }}</td>
           <td>{{ "%.2f"|format(p.short_delta|rd(2)) if p.short_delta is not none else '—' }}</td>
