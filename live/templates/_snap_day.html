@@ -58,7 +58,7 @@
           {# Max-loss and ratio on the booked basis, as History: width minus the booked credit. #}
           {% set _w = ((p.short_strike|float) - (p.long_strike|float))|abs %}
           {% set _ml = _w - (p.entry_credit|rd(2)) %}
-          <td>${{ "%.2f"|format((p.entry_credit if p.structure == 'debit' else _ml)|rd(2)) }}</td>
+          <td>${{ "%.2f"|format((p.entry_credit|fl2) if p.structure == 'debit' else (_ml|rd(2))) }}</td>
           <td>{% if (_ml|rd(2)) > 0 %}{{ "%.2f"|format(((p.entry_credit|rd(2)) / (_ml|rd(2)))|rd(2)) }}{% else %}—{% endif %}</td>
           <td class="fw">{{ "%.2f"|format((p.GROUND * 10000)|rd(2)) if p.GROUND is not none else '—' }}</td>
           <td>{{ "%.2f"|format(p.short_delta|rd(2)) if p.short_delta is not none else '—' }}</td>

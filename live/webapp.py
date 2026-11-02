@@ -140,6 +140,9 @@ def _px(v, p):
 
 
 app.jinja_env.filters['px'] = _px
+# Max win on a debit row = width - the debit AS SHOWN = the floored credit equivalent (user 2026-11-02:
+# 'some of them add up to more than the width. you have to do width - the rounded debit').
+app.jinja_env.filters['fl2'] = lambda v: (math.floor(float(v) * 100 + 1e-9) / 100) if v is not None else v
 app.jinja_env.globals['is_debit_site'] = IS_DEBIT_SITE
 
 
