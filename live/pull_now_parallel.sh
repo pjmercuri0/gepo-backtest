@@ -261,7 +261,7 @@ echo "Marking open Actuals positions..."
     || echo "  ✗ mark_actuals failed (non-fatal)"
 # The debit book (gepo-debit-ticker, live/stores.py): same marks, its own store and file.
 if [ -f live/actuals_debit.json ]; then
-    "${GEPO_PYTHON:-python3}" -m live.mark_actuals --store actuals_debit.json 2>&1 | sed "s/^/  [Marks/debit] /" \
+    "${GEPO_PYTHON:-python3}" -m live.mark_actuals --store actuals_debit.json 2>&1 | sed "s|^|  [Marks/debit] |" \
         || echo "  ✗ mark_actuals (debit) failed (non-fatal)"
 fi
 for _mf in actuals_marks.json actuals_marks_debit.json; do
