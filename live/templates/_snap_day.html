@@ -17,7 +17,7 @@
         {# Same columns, same order as History (user 2026-10-15). #}
         <th>Actual</th>
         <th>Rank</th><th>Ticker</th>
-        <th>Spot</th><th>Strikes</th><th>Qty</th><th title="live quote when the stream holds the spread, else the quoted mid at the scan; P&amp;L is booked at {{ "%.2f"|format(fill_mult) if fill_mult else "canon" }} x model">Credit ($/sh)</th><th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair (fair = smile-fit model credit, else fair(delta, DTE)).">Min / Target ($/sh)</th><th>Max-Loss ($/sh)</th><th>Ratio</th><th title="GROUND, in basis points">GROUND (bps)</th>
+        <th>Spot</th><th>Strikes</th><th>Qty</th><th title="live quote when the stream holds the spread, else the quoted mid at the scan; P&amp;L is booked at {{ "%.2f"|format(fill_mult) if fill_mult else "canon" }} x model">{% if is_debit_site %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th><th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair (fair = smile-fit model credit, else fair(delta, DTE)).">{% if is_debit_site %}Max / Target debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th><th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th>Ratio</th><th title="GROUND, in basis points">GROUND (bps)</th>
         <th>Δ short</th><th>DTE</th>
         <th>Status</th><th>Mark</th><th style="text-align:right">P&amp;L</th>
       </tr></thead>
@@ -58,7 +58,7 @@
           {# Max-loss and ratio on the booked basis, as History: width minus the booked credit. #}
           {% set _w = ((p.short_strike|float) - (p.long_strike|float))|abs %}
           {% set _ml = _w - (p.entry_credit|rd(2)) %}
-          <td>${{ "%.2f"|format(_ml|rd(2)) }}</td>
+          <td>${{ "%.2f"|format((p.entry_credit if p.structure == 'debit' else _ml)|rd(2)) }}</td>
           <td>{% if (_ml|rd(2)) > 0 %}{{ "%.2f"|format(((p.entry_credit|rd(2)) / (_ml|rd(2)))|rd(2)) }}{% else %}—{% endif %}</td>
           <td class="fw">{{ "%.2f"|format((p.GROUND * 10000)|rd(2)) if p.GROUND is not none else '—' }}</td>
           <td>{{ "%.2f"|format(p.short_delta|rd(2)) if p.short_delta is not none else '—' }}</td>

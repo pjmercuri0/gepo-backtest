@@ -133,7 +133,8 @@ def _px(v, p):
     if v is None or not isinstance(p, dict) or p.get("structure") != "debit":
         return v
     try:
-        return round(abs(float(p["short_strike"]) - float(p["long_strike"])) - _round_half_up(float(v), 2), 4)
+        # Ceiling of the debit (user 2026-11-02: 'debit side should ceiling'): width minus the FLOORED credit.
+        return round(abs(float(p["short_strike"]) - float(p["long_strike"])) - math.floor(float(v) * 100 + 1e-9) / 100, 4)
     except (KeyError, TypeError, ValueError):
         return v
 
