@@ -166,6 +166,12 @@ const widthOf = p => Math.abs(Number(p.short_strike) - Number(p.long_strike));
 // credit side on scan prices and the debit side on its own quotes, the two numbers are not comparable
 // moment to moment. best_book stays on the row as data.
 function bestCell(p) { return ""; }
+// Green flashing dot beside any price that is a live stream quote (user 2026-11-02): the row's
+// credit_source is stream_mid only when combo_stream holds that bag right now.
+function liveDot(p) {
+  return p && p.credit_source === "stream_mid"
+    ? ` <span class="live-dot" style="display:inline-block;vertical-align:middle;margin-left:4px" title="live stream quote${p.quote_ts ? " " + String(p.quote_ts).slice(11, 19) : ""}"></span>` : "";
+}
 function strikesOf(p) {
   const a = Number(p.short_strike), b = Number(p.long_strike);
   return isDebit(p) ? `${fmtMoney(b)} / ${fmtMoney(a)}` : `${fmtMoney(a)} / ${fmtMoney(b)}`;
@@ -322,7 +328,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${fmtNum(p.short_delta, 3)}</td>
           <td>${fmtNum(p.long_delta, 3)}</td>
           <td>${fmtPct(p.IV)}</td>
-          <td>${pxCell(p, p.quoted_credit != null ? p.quoted_credit : p.net_credit)}${bestCell(p)}${p.credit_source ? `<br><span style="opacity:0.6;font-size:10px">${p.credit_source.replace('_',' ')}</span>` : ''}</td>
+          <td>${pxCell(p, p.quoted_credit != null ? p.quoted_credit : p.net_credit)}${bestCell(p)}${liveDot(p)}${p.credit_source ? `<br><span style="opacity:0.6;font-size:10px">${p.credit_source.replace('_',' ')}</span>` : ''}</td>
           <td class="fw">${p.model_credit != null ? pxCell(p, p.model_credit) : "—"}</td>
           <td>${tgtCell(p)}</td>
           <td>${fmtMoney(isDebit(p) ? mmCredit(p) : mmMaxLoss(p))}</td>
@@ -370,7 +376,7 @@ function renderRanked(rows, maxGround, kVal) {
       <td>${strikesOf(r)}</td>
       <td>${fmtNum(r.short_delta, 2)}</td>
       <td>${r.DTE ?? "—"}</td>
-      <td>${pxCell(r, mmCredit(r))}${bestCell(r)}</td>
+      <td>${pxCell(r, mmCredit(r))}${bestCell(r)}${liveDot(r)}</td>
       <td>${tgtCell(r)}</td>
       <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : fmtMoney(isDebit(r) ? mmCredit(r) : mmMaxLoss(r))}</td>
       <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : rd(mmMaxLoss(r) > 0 ? mmCredit(r)/mmMaxLoss(r) : 0, 2).toFixed(2)}</td>
