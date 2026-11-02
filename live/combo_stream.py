@@ -371,6 +371,7 @@ def main() -> int:
                     print(f"[combo_stream] snap picks read failed: {e}", flush=True)
                 _earlier = _earlier[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos))]
                 _ek = {r["_key"] for r in _earlier}
+                _rest_all = list(_rest)          # board order, before Snap/History rows are pulled out
                 _rest = [r for r in _rest if r["_key"] not in _ek]
                 board = _picks + _keep_pos + _earlier + _rest[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos) - len(_earlier))]
                 # Debit twins (gepo-debit-ticker): debit positions already ride in pos with their '|debit'
@@ -388,7 +389,10 @@ def main() -> int:
                 # first TWIN_LEG_ROWS of them also get leg lines, so a twin with an empty complex book
                 # still prices off its legs like the credit bags do.
                 _nleg = 0
-                for r in sorted(_picks + _rest, key=lambda x: not x.get("qualified_debit")):
+                # Twin slots follow the BOARD order (2026-11-02: GM, BMY, BA, JNJ, PM at the top of the
+                # table had no slot because they were also today's Snap picks and had been moved out of
+                # _rest into _earlier, so the slots went to rows further down).
+                for r in sorted(_picks + _rest_all, key=lambda x: not x.get("qualified_debit")):
                     if len(_twins) >= _twin_cap:
                         break
                     if r.get("twin_short_conid") and r.get("twin_long_conid") and not debit_mode.is_debit(r):
