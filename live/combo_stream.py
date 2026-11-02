@@ -291,6 +291,10 @@ def main() -> int:
             fd = os.open(LOCK, os.O_CREAT | os.O_WRONLY); os.write(fd, str(os.getpid()).encode()); os.close(fd)
 
     ib = IB()
+    # No IB request may block the loop forever (2026-11-02: the restart that first subscribed 40 twin
+    # legs sat 5 minutes after 'connected' with nothing written -- a qualifyContracts that never
+    # answered; ib_insync's default is no timeout).
+    ib.RequestTimeout = 10
     subs: dict[str, tuple] = {}          # key -> (bag, ticker)
     sub_ex: dict[str, list] = {}         # key -> [exchange, monotonic time subscribed]
     spots: dict[str, tuple] = {}         # symbol -> (contract, ticker)
