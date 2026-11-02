@@ -2,7 +2,7 @@
 'track some last prices on both books and see'). live/logs/combo_hist_YYYYMMDD.jsonl holds, per
 second, every held bag's exchange/bid/ask (and, from 2026-11-02 12:xx, last): credit bags under
 their key, the parity twin under key|debit. Everything is reported on the CREDIT scale so the two
-books compare directly: a put spread's credit, and width - the call spread's debit.
+books compare directly: the credit spread's credit, and width - the debit twin's debit (puts or calls depending on the side).
   hit  = what you get selling into the book right now (credit: -ask; debit: width - ask)
   mid  = the book midpoint
   last = the bag's last trade on that exchange, when IB prints one (sparse)
@@ -51,13 +51,13 @@ for k, a in acc.items():
                  st.mean(x[1] for x in a["last_c"]) if a["last_c"] else None,
                  st.mean(x[1] for x in a["last_d"]) if a["last_d"] else None))
 rows.sort(key=lambda r: r[0])
-print(f"{day}: {len(rows)} spreads with both books quoted >= {min_secs}s  (credit scale: puts credit vs width - calls debit)")
-print(f"{'spread':34} {'w':>4} {'secs c/d':>11} {'hit put':>8} {'hit call':>9} {'mid put':>8} {'mid call':>9} {'lasts c/d':>10} {'last put':>9} {'last call':>10}")
+print(f"{day}: {len(rows)} spreads with both books quoted >= {min_secs}s  (credit scale: the credit book's credit vs width - the debit book's debit)")
+print(f"{'spread':34} {'w':>4} {'secs c/d':>11} {'hit cr':>8} {'hit deb':>9} {'mid cr':>8} {'mid deb':>9} {'lasts c/d':>10} {'last cr':>9} {'last deb':>10}")
 for r in rows:
     k, w, nc, nd, ch, dh, cm, dm, lc, ld, lcm, ldm = r
     print(f"{k:34} {w:4.2f} {nc:5d}/{nd:<5d} {ch:8.3f} {dh:9.3f} {cm:8.3f} {dm:9.3f} {lc:4d}/{ld:<5d} "
           f"{(f'{lcm:.3f}' if lcm is not None else '—'):>9} {(f'{ldm:.3f}' if ldm is not None else '—'):>10}")
 if rows:
     dh = [r[5] - r[4] for r in rows]; dm = [r[7] - r[6] for r in rows]
-    print(f"\ncalls minus puts, mean over spreads: hit {st.mean(dh):+.3f}  mid {st.mean(dm):+.3f}   "
-          f"(calls better on hit: {sum(1 for x in dh if x > 0)}/{len(dh)}, on mid: {sum(1 for x in dm if x > 0)}/{len(dm)})")
+    print(f"\ndebit book minus credit book, mean over spreads: hit {st.mean(dh):+.3f}  mid {st.mean(dm):+.3f}   "
+          f"(debit better on hit: {sum(1 for x in dh if x > 0)}/{len(dh)}, on mid: {sum(1 for x in dm if x > 0)}/{len(dm)})")
