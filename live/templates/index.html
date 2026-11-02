@@ -187,7 +187,9 @@ function strikesOf(p) {
 function pxCell(p, credit) {
   if (credit == null || isNaN(Number(credit))) return "—";
   if (isDebit(p) && p.credit_source === "twin_unquoted") return "—";   // no twin price in this scan
-  return isDebit(p) ? fmtMoney(widthOf(p) - rd(Number(credit), 2)) : fmtMoney(credit);
+  // Debit rounded as a debit, the way the IBKR ticket shows it (user 2026-11-02: VZ book 0.20/0.35,
+  // app 0.28, site 0.27 from rounding the credit equivalent first). The debit gate rounds the same way.
+  return isDebit(p) ? fmtMoney(rd(widthOf(p) - Number(credit), 2)) : fmtMoney(credit);
 }
 // Both inputs are the stored canonical score (Kelly EV · exp(−k·DKL),
 // a positive fractional return). Bar width is proportional to score

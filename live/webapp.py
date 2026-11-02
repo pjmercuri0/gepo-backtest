@@ -340,7 +340,8 @@ def _debit_row(r: dict) -> bool:
                                         model_credit=float(mc) if mc is not None else None)
                 wa = (tg or {}).get("walkaway_credit")
             if wa is not None:
-                above = math.floor(mid * 100 + 0.5) / 100 >= float(wa)
+                # Debit scale, rounded as the page shows it: debit at 2dp <= max debit at 2dp (2026-11-02).
+                above = math.floor((w - mid) * 100 + 0.5) / 100 <= math.floor((w - float(wa)) * 100 + 0.5) / 100 + 1e-9
                 _mbw = getattr(_cfg, "QUOTE_MAX_BOOK_W", None)
                 if _mbw is not None:
                     if r.get("combo_priced"):
@@ -2547,10 +2548,13 @@ def _overlay_stream(payload: dict) -> None:
                         r["fill_targets"] = [{"credit": q["mid"], "max_loss": r["max_loss"]}]
                         r["credit_ratio"] = round(q["mid"] / r["max_loss"], 4) if r["max_loss"] > 0 else None
                     if wa is not None:
-                        # The check mark judges the price shown, parity-derived or not (user 2026-11-02:
-                        # 'so why not lighting up then' -- VZ showed 0.27 live beside a ✗ from the scan's 0.13).
+                        # The check mark judges the price shown (user 2026-11-02). A debit row is judged on
+                        # the debit scale, rounded as the page rounds it: debit at 2dp <= max debit at 2dp.
                         r["quote_ok"] = _book_ok(q, w)
-                        own_above = _r2(q["mid"]) >= wa and r["quote_ok"]
+                        if is_deb and w:
+                            own_above = (_r2(float(w) - q["mid"]) <= _r2(float(w) - wa) + 1e-9) and r["quote_ok"]
+                        else:
+                            own_above = _r2(q["mid"]) >= wa and r["quote_ok"]
                     n += 1
                 if r.get("best_src") == "live":
                     r["credit_px"], r["debit_px"] = _qc["mid"], _qd["mid"]
