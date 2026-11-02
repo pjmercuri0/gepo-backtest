@@ -159,11 +159,12 @@ function dirLabel(spread_type, structure) {
 // The debit is width minus the credit AT THE 2dp SHOWN, so the gate tie rule reads the same both ways.
 const isDebit = p => p && p.structure === "debit";
 const widthOf = p => Math.abs(Number(p.short_strike) - Number(p.long_strike));
-// Strike pair as printed. Debit rows read low / high, the way the IBKR app labels a vertical
-// (user 2026-11-02: '58/57 here is 57/58 there'); credit rows stay short / long.
+// Strike pair as printed. Debit rows read long / short -- the leg you BUY first, which is how the
+// IBKR app labels a debit vertical (user 2026-11-02: calls 58/59 = buy 58 sell 59; puts 45.5/45 =
+// buy 45.5 sell 45). Credit rows stay short / long.
 function strikesOf(p) {
   const a = Number(p.short_strike), b = Number(p.long_strike);
-  return isDebit(p) ? `${fmtMoney(Math.min(a, b))} / ${fmtMoney(Math.max(a, b))}` : `${fmtMoney(a)} / ${fmtMoney(b)}`;
+  return isDebit(p) ? `${fmtMoney(b)} / ${fmtMoney(a)}` : `${fmtMoney(a)} / ${fmtMoney(b)}`;
 }
 function pxCell(p, credit) {
   if (credit == null || isNaN(Number(credit))) return "—";

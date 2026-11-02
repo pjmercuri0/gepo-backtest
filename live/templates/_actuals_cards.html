@@ -115,7 +115,7 @@
               —
             {% endif %}
           </td>
-          <td>{% if p.structure == 'debit' %}${{ '%.2f' % ([p.short_strike|float, p.long_strike|float]|min) }} / ${{ '%.2f' % ([p.short_strike|float, p.long_strike|float]|max) }}{% else %}${{ p.short_strike|strike }} / ${{ p.long_strike|strike }}{% endif %}</td>
+          <td>{% if p.structure == 'debit' %}${{ '%.2f' % (p.long_strike|float) }} / ${{ '%.2f' % (p.short_strike|float) }}{% else %}${{ p.short_strike|strike }} / ${{ p.long_strike|strike }}{% endif %}</td>
           <td style="color:#e8b366;font-weight:600">{{ p.suggested_qty or 1 }}×</td>
           {% if p.fill_targets %}
             {% set cr = p.fill_targets[0].credit %}
