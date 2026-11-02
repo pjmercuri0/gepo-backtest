@@ -631,13 +631,19 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         _sw2 = (ranked["short_strike"].astype(float) - ranked["long_strike"].astype(float)).abs()
         _tc = _col("twin_combo_credit_mid")
         _tc_ok = _tc.notna() & (_tc > 0) & (_tc < _sw2 - 1e-9)      # a 0/0 twin bag reads as the width: not a quote
-        _tm = _tc.where(_tc_ok, _col("twin_leg_credit"))
-        _ta = _tm.notna() & (_r2(_tm.fillna(-1.0)) >= ranked["tgt_walkaway_credit"].astype(float))
+        # Twin price chain, same shape as the credit side's: usable twin combo > credible twin legs >
+        # parity off the credit quote (width - debit == credit; the debit site shows that price, so
+        # the check mark must judge it -- user 2026-11-02).
+        _tl = _col("twin_leg_credit")
+        _tl_ok = _tl.notna()
         if _mbw is not None:
             _pb, _pa, _lb, _la = _col("par_short_bid"), _col("par_short_ask"), _col("par_long_bid"), _col("par_long_ask")
-            _tleg_ok = ((_pb > 0) & (_lb > 0) & (((_pa - _pb) + (_la - _lb)) <= float(_mbw) * _sw2)).fillna(False)
+            _tl_ok = _tl_ok & ((_pb > 0) & (_lb > 0) & (((_pa - _pb) + (_la - _lb)) <= float(_mbw) * _sw2)).fillna(False)
             _tcombo_ok = ((_col("twin_combo_ask") - _col("twin_combo_bid")).abs() <= float(_mbw) * _sw2).fillna(False)
-            _ta = _ta & pd.Series(np.where(_tc_ok, _tcombo_ok, _tleg_ok), index=ranked.index).astype(bool)
+            _tc_ok = _tc_ok & _tcombo_ok
+        _par = pd.to_numeric(ranked["net_credit"], errors="coerce")
+        _tm = _tc.where(_tc_ok, _tl.where(_tl_ok, _par))
+        _ta = _tm.notna() & (_r2(_tm.fillna(-1.0)) >= ranked["tgt_walkaway_credit"].astype(float))
         ranked["debit_above_min"] = _ta.fillna(False).astype(bool)
     # Each site gates on ITS OWN book (user 2026-11-02, after seeing 'via puts': 'no i just want it to
     # be based on its own'): above_min / qualified stay the put book's verdict for gepo-ticker;

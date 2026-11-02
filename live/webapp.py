@@ -285,6 +285,20 @@ def _debit_row(r: dict) -> bool:
         r["twin_combo_bid"] = r["twin_combo_ask"] = r["twin_combo_credit_mid"] = None
     if mid is None:
         mid, src = r.get("twin_leg_credit"), "twin_leg_mid"
+        # Twin legs on a book wider than the spread are not a price (the scan's credible-book rule);
+        # fall through to parity off the credit quote, the same chain the ranker uses for qualified_debit.
+        try:
+            import config as _cfg0
+            _mbw0 = getattr(_cfg0, "QUOTE_MAX_BOOK_W", None)
+            if mid is not None and _mbw0 is not None and w:
+                _bw0 = sum(abs(float(r.get(a) or 0) - float(r.get(b) or 0))
+                           for a, b in (("par_short_ask", "par_short_bid"), ("par_long_ask", "par_long_bid")))
+                if _bw0 > float(_mbw0) * w + 1e-9 or not (float(r.get("par_short_bid") or 0) > 0 and float(r.get("par_long_bid") or 0) > 0):
+                    mid = None
+        except (TypeError, ValueError):
+            pass
+        if mid is None and r.get("net_credit") is not None:
+            mid, src = r.get("net_credit"), "parity"        # width - the credit book's quote
     r["combo_bid"], r["combo_ask"] = r.get("twin_combo_bid"), r.get("twin_combo_ask")
     r["combo_credit_mid"] = r.get("twin_combo_credit_mid")
     r["combo_priced"] = r.get("twin_combo_credit_mid") is not None
@@ -332,6 +346,8 @@ def _debit_row(r: dict) -> bool:
                 if _mbw is not None:
                     if r.get("combo_priced"):
                         bw = abs(float(r["twin_combo_ask"]) - float(r["twin_combo_bid"]))
+                    elif src == "parity":
+                        bw = 0.0                      # judged on the credit book's quote, already gated there
                     else:
                         bw = sum(abs(float(r.get(a) or 0) - float(r.get(b) or 0))
                                  for a, b in (("short_ask", "short_bid"), ("long_ask", "long_bid")))
@@ -2520,7 +2536,9 @@ def _overlay_stream(payload: dict) -> None:
                         r["max_loss"] = round(float(w) - q["mid"], 4)
                         r["fill_targets"] = [{"credit": q["mid"], "max_loss": r["max_loss"]}]
                         r["credit_ratio"] = round(q["mid"] / r["max_loss"], 4) if r["max_loss"] > 0 else None
-                    if wa is not None and not q.get("_parity"):
+                    if wa is not None:
+                        # The check mark judges the price shown, parity-derived or not (user 2026-11-02:
+                        # 'so why not lighting up then' -- VZ showed 0.27 live beside a ✗ from the scan's 0.13).
                         r["quote_ok"] = _book_ok(q, w)
                         own_above = _r2(q["mid"]) >= wa and r["quote_ok"]
                     n += 1
