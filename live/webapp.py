@@ -2497,6 +2497,13 @@ def _overlay_stream(payload: dict) -> None:
                 _best_book(r)
                 if q is None and qo is None:
                     continue
+                # Debit site, same logic as the credit site (user 2026-11-02: 'it has to be the same logic
+                # as the credit site'): a debit row whose twin bag the stream does not hold is priced LIVE
+                # off the credit bag through parity, width - the live credit, instead of the scan's leg
+                # mids (VZ 45/45.5 showed a 0.37 debit off a 0.33/0.58 scan leg against the app's 0.28).
+                # The gate below still judges the debit book on its own (scan twin verdict).
+                if is_deb and q is None and qo is not None and w:
+                    q = {"bid": qo["bid"], "ask": qo["ask"], "mid": qo["mid"], "ts": qo["ts"], "_parity": True}
                 tg = r.get("credit_targets") or {}
                 wa = tg.get("walkaway_credit")
                 own_above = other_above = None
@@ -2504,7 +2511,7 @@ def _overlay_stream(payload: dict) -> None:
                     r["combo_bid"], r["combo_ask"] = q["bid"], q["ask"]
                     r["combo_credit_mid"] = q["mid"]
                     r["quoted_credit"] = r["net_credit"] = q["mid"]
-                    r["credit_source"] = "stream_mid"
+                    r["credit_source"] = "stream_parity" if q.get("_parity") else "stream_mid"
                     r["quote_ts"] = q["ts"]
                     # The table renders fill_targets[0] (mmCredit/mmMaxLoss), written by
                     # _enrich_payload before this overlay runs -- leaving it stale showed the
@@ -2513,7 +2520,7 @@ def _overlay_stream(payload: dict) -> None:
                         r["max_loss"] = round(float(w) - q["mid"], 4)
                         r["fill_targets"] = [{"credit": q["mid"], "max_loss": r["max_loss"]}]
                         r["credit_ratio"] = round(q["mid"] / r["max_loss"], 4) if r["max_loss"] > 0 else None
-                    if wa is not None:
+                    if wa is not None and not q.get("_parity"):
                         r["quote_ok"] = _book_ok(q, w)
                         own_above = _r2(q["mid"]) >= wa and r["quote_ok"]
                     n += 1
