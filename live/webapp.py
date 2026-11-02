@@ -324,7 +324,7 @@ def _debit_row(r: dict) -> bool:
             mid = max(0.0, min(float(mid), w))
             r["quoted_credit"] = r["net_credit"] = round(mid, 4)
             r["credit_source"] = src
-            r["debit_px"] = None if src == "parity" else round(mid, 4)   # the star needs a real debit-book price
+            r["debit_px"] = round(mid, 4)                 # the price the debit site shows (parity copy -> tie)
             _best_book(r)
             r["max_loss"] = round(w - mid, 4)
             r["fill_targets"] = [{"credit": round(mid, 4), "max_loss": r["max_loss"]}]
@@ -2496,14 +2496,10 @@ def _overlay_stream(payload: dict) -> None:
                 if qo is not None and qo.get("mid") is None:
                     qo = None
                 w = r.get("spread_width")
-                # Best-book marker (user 2026-11-02: 'does the star work properly?'): compare like with
-                # like. Both bags streamed -> live vs live. Neither streamed -> the scan's credit quote vs
-                # the scan's twin price (usable twin combo, else credible twin legs). One live, one not ->
-                # no star: a live credit against a 15-minute-old twin leg is not a comparison (VZ 45/45.5
-                # starred credit off 0.245 live vs a 0.13 scan leg while the row showed 0.25 via parity).
-                _qc, _qd = (qo, q) if is_deb else (q, qo)         # credit bag quote, debit bag quote
-                if not is_deb:
-                    r.setdefault("credit_px", r.get("net_credit"))
+                # Best-book star (user 2026-11-02: 'just show star when one is the best price'): the two
+                # sites' SHOWN prices, whatever each is priced off; a tie stars both. Scan defaults here,
+                # the shown live prices overwrite them below.
+                def _scan_twin():
                     _tw = r.get("twin_combo_credit_mid")
                     try:
                         if _tw is None or float(_tw) <= 0 or (w and float(_tw) >= float(w) - 1e-9):
@@ -2515,17 +2511,11 @@ def _overlay_stream(payload: dict) -> None:
                                     _tw = None
                     except (TypeError, ValueError):
                         _tw = None
-                    r.setdefault("debit_px", _tw)
-                if _qc is not None and _qd is not None:
-                    r["credit_px"], r["debit_px"] = _qc["mid"], _qd["mid"]
-                    r["best_src"] = "live"
-                elif _qc is None and _qd is None:
-                    r["best_src"] = "scan"
-                else:
-                    r["best_src"] = None
-                    r["best_book"] = None
-                if r.get("best_src"):
-                    _best_book(r)
+                    return _tw if _tw is not None else r.get("net_credit")      # parity: the debit site shows this
+                if not is_deb:
+                    r.setdefault("credit_px", r.get("net_credit"))
+                    r.setdefault("debit_px", _scan_twin())
+                _best_book(r)
                 if q is None and qo is None:
                     continue
                 # Debit site, same logic as the credit site (user 2026-11-02: 'it has to be the same logic
@@ -2557,6 +2547,15 @@ def _overlay_stream(payload: dict) -> None:
                         r["quote_ok"] = _book_ok(q, w)
                         own_above = _r2(q["mid"]) >= wa and r["quote_ok"]
                     n += 1
+                # Shown prices after the live overlay: this site's net_credit, the other site's stream
+                # bag if held, else its parity copy of this one (which is what that site shows).
+                if is_deb:
+                    r["debit_px"] = r.get("net_credit")
+                    r["credit_px"] = qo["mid"] if qo is not None else r.get("credit_px")
+                else:
+                    r["credit_px"] = r.get("net_credit")
+                    r["debit_px"] = qo["mid"] if qo is not None else (q["mid"] if q is not None else r.get("debit_px"))
+                _best_book(r)
                 if qo is not None and wa is not None:
                     other_above = _r2(qo["mid"]) >= wa and _book_ok(qo, w)
                 if wa is None:
