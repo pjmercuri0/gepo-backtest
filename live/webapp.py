@@ -240,6 +240,21 @@ def _read_json(path: Path) -> dict | None:
     return d
 
 
+def _best_book(r: dict) -> None:
+    """Which book pays more right now (user 2026-11-02: 'a mix of both debits and credits, whichever
+    one is giving the better credit/max win'). credit_px = the put book's credit, debit_px = the call
+    book's credit equivalent (width - debit). Compared at the 2dp shown; same payoff either way."""
+    c, d = r.get("credit_px"), r.get("debit_px")
+    try:
+        if c is None or d is None:
+            r["best_book"] = None
+            return
+        c2, d2 = math.floor(float(c) * 100 + 0.5) / 100, math.floor(float(d) * 100 + 0.5) / 100
+        r["best_book"] = "tie" if c2 == d2 else ("credit" if c2 > d2 else "debit")
+    except (TypeError, ValueError):
+        r["best_book"] = None
+
+
 def _debit_row(r: dict) -> bool:
     """Rewrite one ranked/frozen/snap row as its parity debit twin, in place. The credit inside stays a
     credit equivalent (width - debit), which is what every book, gate and P&L already runs on; the
@@ -250,6 +265,7 @@ def _debit_row(r: dict) -> bool:
     if not ts or not tl:
         return False
     r["credit_short_conid"], r["credit_long_conid"] = r.get("short_conid"), r.get("long_conid")
+    r["credit_px"] = r.get("net_credit")          # the put book's credit, for the best-book marker
     r["short_conid"], r["long_conid"] = ts, tl
     r["structure"] = "debit"
     for a, b in (("short_bid", "par_short_bid"), ("short_ask", "par_short_ask"),
@@ -280,6 +296,8 @@ def _debit_row(r: dict) -> bool:
             r["quoted_credit"] = r["net_credit"] = None
             r["credit_source"] = "twin_unquoted"
             r["fill_targets"] = []
+            r["debit_px"] = None
+            _best_book(r)
             c_above = r.get("credit_above_min")
             if c_above is None:
                 c_above = r.get("above_min")
@@ -292,6 +310,8 @@ def _debit_row(r: dict) -> bool:
             mid = max(0.0, min(float(mid), w))
             r["quoted_credit"] = r["net_credit"] = round(mid, 4)
             r["credit_source"] = src
+            r["debit_px"] = round(mid, 4)
+            _best_book(r)
             r["max_loss"] = round(w - mid, 4)
             r["fill_targets"] = [{"credit": round(mid, 4), "max_loss": r["max_loss"]}]
             r["credit_ratio"] = round(mid / r["max_loss"], 4) if r["max_loss"] > 0 else None
@@ -2459,9 +2479,24 @@ def _overlay_stream(payload: dict) -> None:
                     q = None
                 if qo is not None and qo.get("mid") is None:
                     qo = None
+                w = r.get("spread_width")
+                # Best-book marker: each book's price from the scan, replaced by the stream where held.
+                if not is_deb:
+                    r.setdefault("credit_px", r.get("net_credit"))
+                    _tw = r.get("twin_combo_credit_mid")
+                    try:
+                        if _tw is None or float(_tw) <= 0 or (w and float(_tw) >= float(w) - 1e-9):
+                            _tw = r.get("twin_leg_credit")
+                    except (TypeError, ValueError):
+                        _tw = r.get("twin_leg_credit")
+                    r.setdefault("debit_px", _tw)
+                if q is not None:
+                    r["debit_px" if is_deb else "credit_px"] = q["mid"]
+                if qo is not None:
+                    r["credit_px" if is_deb else "debit_px"] = qo["mid"]
+                _best_book(r)
                 if q is None and qo is None:
                     continue
-                w = r.get("spread_width")
                 tg = r.get("credit_targets") or {}
                 wa = tg.get("walkaway_credit")
                 own_above = other_above = None

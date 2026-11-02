@@ -162,6 +162,17 @@ const widthOf = p => Math.abs(Number(p.short_strike) - Number(p.long_strike));
 // Strike pair as printed. Debit rows read long / short -- the leg you BUY first, which is how the
 // IBKR app labels a debit vertical (user 2026-11-02: calls 58/59 = buy 58 sell 59; puts 45.5/45 =
 // buy 45.5 sell 45). Credit rows stay short / long.
+// Best book right now (user 2026-11-02): same payoff in puts or calls, so take the better price.
+// ★ = this book pays the most; otherwise the other book's price in its own terms.
+function bestCell(p) {
+  if (!p.best_book) return "";
+  const own = isDebit(p) ? "debit" : "credit";
+  if (p.best_book === "tie" || p.best_book === own)
+    return ` <span style="font-size:10px;color:#7ec99a" title="this book pays the most right now">★</span>`;
+  const other = Number(isDebit(p) ? p.credit_px : p.debit_px);     // credit-equivalent of the other book
+  const shown = isDebit(p) ? fmtMoney(other) : fmtMoney(widthOf(p) - rd(other, 2));
+  return ` <span style="font-size:10px;color:#e8b366" title="the other book pays more: credit-equivalent ${fmtMoney(other)} vs ${fmtMoney(Number(isDebit(p) ? p.debit_px : p.credit_px))} here">${isDebit(p) ? "puts" : "calls"} ${shown}</span>`;
+}
 function strikesOf(p) {
   const a = Number(p.short_strike), b = Number(p.long_strike);
   return isDebit(p) ? `${fmtMoney(b)} / ${fmtMoney(a)}` : `${fmtMoney(a)} / ${fmtMoney(b)}`;
@@ -318,7 +329,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${fmtNum(p.short_delta, 3)}</td>
           <td>${fmtNum(p.long_delta, 3)}</td>
           <td>${fmtPct(p.IV)}</td>
-          <td>${pxCell(p, p.quoted_credit != null ? p.quoted_credit : p.net_credit)}${p.credit_source ? `<br><span style="opacity:0.6;font-size:10px">${p.credit_source.replace('_',' ')}</span>` : ''}</td>
+          <td>${pxCell(p, p.quoted_credit != null ? p.quoted_credit : p.net_credit)}${bestCell(p)}${p.credit_source ? `<br><span style="opacity:0.6;font-size:10px">${p.credit_source.replace('_',' ')}</span>` : ''}</td>
           <td class="fw">${p.model_credit != null ? pxCell(p, p.model_credit) : "—"}</td>
           <td>${tgtCell(p)}</td>
           <td>${fmtMoney(isDebit(p) ? mmCredit(p) : mmMaxLoss(p))}</td>
@@ -366,7 +377,7 @@ function renderRanked(rows, maxGround, kVal) {
       <td>${strikesOf(r)}</td>
       <td>${fmtNum(r.short_delta, 2)}</td>
       <td>${r.DTE ?? "—"}</td>
-      <td>${pxCell(r, mmCredit(r))}</td>
+      <td>${pxCell(r, mmCredit(r))}${bestCell(r)}</td>
       <td>${tgtCell(r)}</td>
       <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : fmtMoney(isDebit(r) ? mmCredit(r) : mmMaxLoss(r))}</td>
       <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : rd(mmMaxLoss(r) > 0 ? mmCredit(r)/mmMaxLoss(r) : 0, 2).toFixed(2)}</td>
