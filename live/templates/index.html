@@ -431,8 +431,8 @@ async function refreshSpyLive() {
           </div>
         </div>
         <div id="spy-detail" style="display:${detailDisplay};margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px">
-          <div style="display:flex;gap:24px;align-items:flex-start">
-            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;flex-wrap:wrap;gap:14px 24px;align-items:flex-start">
+            <div style="flex:1 1 150px;min-width:0;display:flex;flex-direction:column;gap:14px">
               <div>
                 <div class="week-sub">SPY · ${d.source}</div>
                 <div class="week-title">$${rd(d.mark ?? d.last ?? 0, 2).toFixed(2)}
@@ -445,11 +445,11 @@ async function refreshSpyLive() {
               <div>
                 <div class="week-sub">bid / ask</div>
                 <div class="week-title" style="font-size:14px">
-                  $${rd(d.bid ?? 0, 2).toFixed(2)} &nbsp;/&nbsp; $${rd(d.ask ?? 0, 2).toFixed(2)}
+                  <span style="white-space:nowrap">$${rd(d.bid ?? 0, 2).toFixed(2)} / $${rd(d.ask ?? 0, 2).toFixed(2)}</span>
                 </div>
               </div>
             </div>
-            <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;gap:14px">
+            <div style="text-align:right;flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:14px">
               <div>
                 <div class="week-sub">intraday vs ${d.sma_window}d SMA (informational; gate uses prior close)</div>
                 <div class="week-title ${regCls}" style="font-size:14px">
