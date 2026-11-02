@@ -41,6 +41,9 @@ MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 20))
 # Parity-twin (debit) bags for gepo-debit-ticker, on top of MAX_BAGS: debit positions first, then the
 # picks. No leg lines for them (the 100-line cap), so a twin with no book has no stream quote.
 TWIN_BAGS = int(getattr(live_config, "LIVE_STREAM_TWIN_BAGS", 8))
+# Twins of the debit site's own picks that also get leg lines (2 lines each; the 100-line budget sat
+# at 28 bags + 37 legs + 19 spots = 84 on 2026-11-02 12:04).
+TWIN_LEG_ROWS = int(getattr(live_config, "LIVE_STREAM_TWIN_LEG_ROWS", 4))
 # Check both books (user 2026-10-26): SMART returned nothing for PFE 30/29.5 while CBOE quoted
 # -0.27/-0.22, so the page showed leg mids. Order (user 2026-10-27): SMART (best across every
 # exchange's book, legs tagged CBOE -- see combo_quotes._bag_for) first, CBOE's own book as backup,
@@ -362,7 +365,13 @@ def main() -> int:
                 _dpos = [r for r in board if debit_mode.is_debit(r)]
                 board = [r for r in board if not debit_mode.is_debit(r)]
                 _twins = list(_dpos)
-                for r in _picks + _rest:
+                # The debit site's OWN picks (ranker qualified_debit) take the twin slots first, then the
+                # credit picks, then the rest (2026-11-02: VZ 45/45.5 was a debit pick with no stream
+                # slot, so its site showed the 12:47 scan price while the app showed 0.28 live). The
+                # first TWIN_LEG_ROWS of them also get leg lines, so a twin with an empty complex book
+                # still prices off its legs like the credit bags do.
+                _nleg = 0
+                for r in sorted(_picks + _rest, key=lambda x: not x.get("qualified_debit")):
                     if len(_twins) >= TWIN_BAGS:
                         break
                     if r.get("twin_short_conid") and r.get("twin_long_conid") and not debit_mode.is_debit(r):
@@ -370,6 +379,8 @@ def main() -> int:
                               "long_conid": r["twin_long_conid"]}
                         tw["_key"] = _key(tw)
                         if tw["_key"] not in {x["_key"] for x in _twins}:
+                            if r.get("qualified_debit") and _nleg < TWIN_LEG_ROWS:
+                                tw["_twin_legs"] = True; _nleg += 1
                             _twins.append(tw)
                 board = board + _twins[:TWIN_BAGS]
                 want = {r["_key"]: r for r in board}
@@ -381,7 +392,8 @@ def main() -> int:
                         except Exception: pass
                 for k, r in want.items():
                     debit_k[k] = debit_mode.is_debit(r)
-                    legs[k] = (None, None) if debit_k[k] else (r.get("short_conid"), r.get("long_conid"))
+                    legs[k] = ((None, None) if (debit_k[k] and not r.get("_twin_legs"))
+                               else (r.get("short_conid"), r.get("long_conid")))
                     try:
                         widths[k] = float(r.get("spread_width") or abs(float(r["short_strike"]) - float(r["long_strike"])))
                     except (TypeError, ValueError, KeyError):
