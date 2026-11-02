@@ -165,7 +165,15 @@ const widthOf = p => Math.abs(Number(p.short_strike) - Number(p.long_strike));
 // Best-book star removed (user 2026-11-02: 'remove the stars now it doesnt make any sense'): with the
 // credit side on scan prices and the debit side on its own quotes, the two numbers are not comparable
 // moment to moment. best_book stays on the row as data.
-function bestCell(p) { return ""; }
+function bestCell(p) {
+  // Stars back (user 2026-11-02: 'put the stars back appropriately'): only when both books were priced
+  // at the same freshness (both live, or both from the same scan). A tie stars both sites.
+  if (!p.best_book || !p.best_src) return "";
+  const own = isDebit(p) ? "debit" : "credit";
+  if (p.best_book === "tie" || p.best_book === own)
+    return ` <span style="font-size:10px;color:#7ec99a" title="this book pays the most right now (${p.best_src})">★</span>`;
+  return "";
+}
 // Green flashing dot beside any price that is a live stream quote (user 2026-11-02): the row's
 // credit_source is stream_mid only when combo_stream holds that bag right now.
 function liveDot(p) {
