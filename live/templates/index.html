@@ -162,15 +162,10 @@ const widthOf = p => Math.abs(Number(p.short_strike) - Number(p.long_strike));
 // Strike pair as printed. Debit rows read long / short -- the leg you BUY first, which is how the
 // IBKR app labels a debit vertical (user 2026-11-02: calls 58/59 = buy 58 sell 59; puts 45.5/45 =
 // buy 45.5 sell 45). Credit rows stay short / long.
-// Best book right now (user 2026-11-02): same payoff in puts or calls, so take the better price.
-// ★ = this book pays the most; otherwise the other book's price in its own terms.
-function bestCell(p) {
-  if (!p.best_book) return "";
-  const own = isDebit(p) ? "debit" : "credit";
-  if (p.best_book === "tie" || p.best_book === own)
-    return ` <span style="font-size:10px;color:#7ec99a" title="this book pays the most right now">★</span>`;
-  return "";   // the other book pays more: its site shows the star (user 2026-11-02: 'just put star')
-}
+// Best-book star removed (user 2026-11-02: 'remove the stars now it doesnt make any sense'): with the
+// credit side on scan prices and the debit side on its own quotes, the two numbers are not comparable
+// moment to moment. best_book stays on the row as data.
+function bestCell(p) { return ""; }
 function strikesOf(p) {
   const a = Number(p.short_strike), b = Number(p.long_strike);
   return isDebit(p) ? `${fmtMoney(b)} / ${fmtMoney(a)}` : `${fmtMoney(a)} / ${fmtMoney(b)}`;
