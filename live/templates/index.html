@@ -80,9 +80,11 @@ function fmtPct(v, dec=1) {
   if (v == null) return "—";
   return rd(Number(v) * 100, dec).toFixed(dec) + "%";
 }
-// Conservative rounding (user 2026-11-02): a credit shown is its FLOOR at 2dp, a debit shown is its
-// CEILING -- width minus the floored credit equivalent. The gate uses the same floor.
-const floor2 = x => Math.floor(Number(x) * 100 + 1e-9) / 100;
+// Proper rounding, half-up (user 2026-11-02: 'just proper round for both credit and debit sites'): a
+// credit shows rounded, a debit shows width - credit rounded AS A DEBIT (the ticket's number); the risk
+// cell beside it is width minus that shown number, so the pair always sums to the width.
+const floor2 = x => Math.floor(Number(x) * 100 + 0.5) / 100;
+const shownPx = (p, credit) => isDebit(p) ? floor2(widthOf(p) - Number(credit)) : floor2(credit);
 function fmtMoney(v, dec=2) {
   if (v == null) return "—";
   return "$" + rd(v, dec).toFixed(dec);
@@ -192,7 +194,7 @@ function pxCell(p, credit) {
   if (isDebit(p) && p.credit_source === "twin_unquoted") return "—";   // no twin price in this scan
   // Debit rounded as a debit, the way the IBKR ticket shows it (user 2026-11-02: VZ book 0.20/0.35,
   // app 0.28, site 0.27 from rounding the credit equivalent first). The debit gate rounds the same way.
-  return isDebit(p) ? fmtMoney(widthOf(p) - floor2(credit)) : fmtMoney(floor2(credit));
+  return fmtMoney(shownPx(p, credit));
 }
 // Both inputs are the stored canonical score (Kelly EV · exp(−k·DKL),
 // a positive fractional return). Bar width is proportional to score
@@ -344,7 +346,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${pxCell(p, p.quoted_credit != null ? p.quoted_credit : p.net_credit)}${liveDot(p)}${bestCell(p)}${p.credit_source ? `<br><span style="opacity:0.6;font-size:10px">${p.credit_source.replace('_',' ')}</span>` : ''}</td>
           <td class="fw">${p.model_credit != null ? pxCell(p, p.model_credit) : "—"}</td>
           <td>${tgtCell(p)}</td>
-          <td>${fmtMoney(isDebit(p) ? floor2(mmCredit(p)) : widthOf(p) - floor2(mmCredit(p)))}</td>
+          <td>${fmtMoney(widthOf(p) - shownPx(p, mmCredit(p)))}</td>
           <td>${rd(mmMaxLoss(p) > 0 ? mmCredit(p)/mmMaxLoss(p) : 0, 2).toFixed(2)}</td>
           <td>${fmtNum(p.p, 2)} / ${fmtNum(p.ro, 2)} / ${fmtNum(p.q, 2)}</td>
           <td>${p.p_hat != null ? fmtNum(p.p_hat, 2) : "—"} / ${p.ro_hat != null ? fmtNum(p.ro_hat, 2) : "—"} / ${p.q_hat != null ? fmtNum(p.q_hat, 2) : "—"}</td>
@@ -391,7 +393,7 @@ function renderRanked(rows, maxGround, kVal) {
       <td>${r.DTE ?? "—"}</td>
       <td>${pxCell(r, mmCredit(r))}${liveDot(r)}${bestCell(r)}</td>
       <td>${tgtCell(r)}</td>
-      <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : fmtMoney(isDebit(r) ? floor2(mmCredit(r)) : widthOf(r) - floor2(mmCredit(r)))}</td>
+      <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : fmtMoney(widthOf(r) - shownPx(r, mmCredit(r)))}</td>
       <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : rd(mmMaxLoss(r) > 0 ? mmCredit(r)/mmMaxLoss(r) : 0, 2).toFixed(2)}</td>
       <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}<br>
           <span style="opacity:0.7;font-size:11px">${r.p_hat != null ? `bs ${fmtNum(r.p_hat,2)} / ${fmtNum(r.ro_hat,2)} / ${fmtNum(r.q_hat,2)}` : "—"}</span></td>

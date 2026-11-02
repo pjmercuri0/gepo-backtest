@@ -64,8 +64,9 @@
           {# Both sites (user 2026-11-02: 'what about the credit too'): the risk cell is width minus the price
              shown beside it -- max loss = width - floored credit, max win = floored credit -- and the ratio
              is max win / max loss on those same two numbers. #}
-          {% set _mw = _sc|fl2 %}{% set _mlx = (_w - _mw)|rd(2) %}
-          <td>${{ "%.2f"|format(_mw if p.structure == 'debit' else _mlx) }}</td>
+          {% set _shown = (_sc|px(p))|rd(2) %}{% set _other = (_w - _shown)|rd(2) %}
+          {% set _mw = _shown if p.structure != 'debit' else _other %}{% set _mlx = _other if p.structure != 'debit' else _shown %}
+          <td>${{ "%.2f"|format(_other) }}</td>
           <td>{% if _mlx > 0 %}{{ "%.2f"|format((_mw / _mlx)|rd(2)) }}{% else %}—{% endif %}</td>
           <td class="fw">{{ "%.2f"|format((p.GROUND * 10000)|rd(2)) if p.GROUND is not none else '—' }}</td>
           <td>{{ "%.2f"|format(p.short_delta|rd(2)) if p.short_delta is not none else '—' }}</td>

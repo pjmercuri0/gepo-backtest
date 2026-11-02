@@ -162,7 +162,7 @@
           {% else %}
             <td>—</td>
           {% endif %}
-          {% if p.structure == 'debit' %}<td>${{ "%.2f"|format(cr|fl2) }}{% if p.actual_credit is defined and p.actual_credit is not none %} <span class="actual-shown" style="color:#7ec99a">(${{ "%.2f"|format(p.actual_credit|fl2) }})</span>{% endif %}</td>{% else %}<td>${{ "%.2f"|format(ml|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span class="actual-shown" style="color:{% if (p.actual_max_loss|rd(2)) > (ml|rd(2)) %}#c46868{% else %}#ff6b6b{% endif %}">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>{% endif %}
+          {% if p.structure == 'debit' %}{% set _wd = ((p.short_strike|float) - (p.long_strike|float))|abs %}<td>${{ "%.2f"|format((_wd - ((cr|px(p))|rd(2)))|rd(2)) }}{% if p.actual_credit is defined and p.actual_credit is not none %} <span class="actual-shown" style="color:#7ec99a">(${{ "%.2f"|format((_wd - ((p.actual_credit|px(p))|rd(2)))|rd(2)) }})</span>{% endif %}</td>{% else %}<td>${{ "%.2f"|format(ml|rd(2)) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span class="actual-shown" style="color:{% if (p.actual_max_loss|rd(2)) > (ml|rd(2)) %}#c46868{% else %}#ff6b6b{% endif %}">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>{% endif %}
           {# Ratio = credit / spread WIDTH (user 2026-10-09; was credit / max-loss), plus the
              same ratio on your real fill once recorded. Width is the row's own credit +
              max-loss, so the cell always agrees with the two columns beside it.

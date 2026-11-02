@@ -133,8 +133,8 @@ def _px(v, p):
     if v is None or not isinstance(p, dict) or p.get("structure") != "debit":
         return v
     try:
-        # Ceiling of the debit (user 2026-11-02: 'debit side should ceiling'): width minus the FLOORED credit.
-        return round(abs(float(p["short_strike"]) - float(p["long_strike"])) - math.floor(float(v) * 100 + 1e-9) / 100, 4)
+        # The debit rounded as a debit, the way the ticket shows it (user 2026-11-02: 'just proper round').
+        return _round_half_up(abs(float(p["short_strike"]) - float(p["long_strike"])) - float(v), 2)
     except (KeyError, TypeError, ValueError):
         return v
 
@@ -142,7 +142,7 @@ def _px(v, p):
 app.jinja_env.filters['px'] = _px
 # Max win on a debit row = width - the debit AS SHOWN = the floored credit equivalent (user 2026-11-02:
 # 'some of them add up to more than the width. you have to do width - the rounded debit').
-app.jinja_env.filters['fl2'] = lambda v: (math.floor(float(v) * 100 + 1e-9) / 100) if v is not None else v
+app.jinja_env.filters['fl2'] = lambda v: _round_half_up(float(v), 2) if v is not None else v   # proper rounding (user 2026-11-02)
 app.jinja_env.globals['is_debit_site'] = IS_DEBIT_SITE
 
 
@@ -244,6 +244,22 @@ def _read_json(path: Path) -> dict | None:
     return d
 
 
+def _r2(x) -> float:
+    """Proper rounding at 2dp, half-up (user 2026-11-02: 'just proper round for both credit and debit sites')."""
+    return math.floor(float(x) * 100 + 0.5) / 100
+
+
+def _gate_clears(p: dict, mid, wa) -> bool:
+    """The check mark judges the price AS SHOWN: a credit rounded >= walkaway; a debit rounded <= max
+    debit (width - walkaway). Same test both sites, on the number the user reads."""
+    if mid is None or wa is None:
+        return False
+    if (p or {}).get("structure") == "debit":
+        w = float(p.get("spread_width") or abs(float(p["short_strike"]) - float(p["long_strike"])))
+        return _r2(w - float(mid)) <= _r2(w - float(wa)) + 1e-9
+    return _r2(mid) >= float(wa)
+
+
 def _best_book(r: dict) -> None:
     """Which book pays more right now (user 2026-11-02: 'a mix of both debits and credits, whichever
     one is giving the better credit/max win'). credit_px = the put book's credit, debit_px = the call
@@ -253,7 +269,7 @@ def _best_book(r: dict) -> None:
         if c is None or d is None:
             r["best_book"] = None
             return
-        c2, d2 = math.floor(float(c) * 100 + 1e-9) / 100, math.floor(float(d) * 100 + 1e-9) / 100
+        c2, d2 = _r2(c), _r2(d)
         r["best_book"] = "tie" if c2 == d2 else ("credit" if c2 > d2 else "debit")
     except (TypeError, ValueError):
         r["best_book"] = None
@@ -344,10 +360,7 @@ def _debit_row(r: dict) -> bool:
                                         model_credit=float(mc) if mc is not None else None)
                 wa = (tg or {}).get("walkaway_credit")
             if wa is not None:
-                # Floor the credit equivalent (user 2026-11-02: 'debit side should ceiling, credit side
-                # should floor'): the debit shown is width - floor(credit), i.e. the debit's ceiling, and it
-                # clears when that is <= max debit, which is the same test as floor(credit) >= walkaway.
-                above = math.floor(mid * 100 + 1e-9) / 100 >= float(wa)
+                above = _gate_clears(r, mid, wa)      # rounded debit <= max debit
                 _mbw = getattr(_cfg, "QUOTE_MAX_BOOK_W", None)
                 if _mbw is not None:
                     if r.get("combo_priced"):
@@ -1180,7 +1193,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                     if _wa is None and pick.get("model_credit"):
                         _wa = math.floor(float(pick["model_credit"]) * 100 + 0.5) / 100
                     if _wa is not None:
-                        live["gate_ok"] = bool(_gate_book_ok and math.floor(float(_q["mid"]) * 100 + 1e-9) / 100 >= float(_wa))
+                        live["gate_ok"] = bool(_gate_book_ok and _gate_clears(pick, _q["mid"], _wa))
                 except (TypeError, ValueError):
                     pass
             # The CREDIT CELL shows the stream quote at any width (user 2026-10-07: "still put the quote
@@ -1952,7 +1965,7 @@ def snapshots():
                             _wa = (pk.get("credit_targets") or {}).get("walkaway_credit")
                             _qv = pk.get("cur_quote", pk.get("net_credit"))
                             if _wa is not None and _qv is not None:
-                                _g = math.floor(float(_qv) * 100 + 1e-9) / 100 >= float(_wa)
+                                _g = _gate_clears(pk, _qv, _wa)
                         except (TypeError, ValueError):
                             _g = None
                     if _g is not None:
@@ -2477,7 +2490,7 @@ def _overlay_stream(payload: dict) -> None:
             return
         n = 0
         _mbw = getattr(backtest_config, "QUOTE_MAX_BOOK_W", None)   # None = rule off
-        _r2 = lambda v: math.floor(float(v) * 100 + 1e-9) / 100     # floor (user 2026-11-02)
+        _r2l = _r2                                                   # proper rounding (user 2026-11-02)
         def _book_ok(qq, w):
             # Same credible-book rule as the scan (2026-10-01): a streamed book wider than
             # QUOTE_MAX_BOOK_W x the spread width is not a price.
@@ -2561,15 +2574,14 @@ def _overlay_stream(payload: dict) -> None:
                         # The check mark judges the price shown (user 2026-11-02). A debit row is judged on
                         # the debit scale, rounded as the page rounds it: debit at 2dp <= max debit at 2dp.
                         r["quote_ok"] = _book_ok(q, w)
-                        # One rule both ways: floor(credit equivalent) >= walkaway. On the debit site that is
-                        # ceiling(debit) <= max debit, which is what the page shows.
-                        own_above = _r2(q["mid"]) >= wa and r["quote_ok"]
+                        own_above = _gate_clears(r, q["mid"], wa) and r["quote_ok"]
                     n += 1
                 if r.get("best_src") == "live":
                     r["credit_px"], r["debit_px"] = _qc["mid"], _qd["mid"]
                     _best_book(r)
                 if qo is not None and wa is not None:
-                    other_above = _r2(qo["mid"]) >= wa and _book_ok(qo, w)
+                    _other_row = {**r, "structure": ("credit" if is_deb else "debit")}
+                    other_above = _gate_clears(_other_row, qo["mid"], wa) and _book_ok(qo, w)
                 if wa is None:
                     continue
                 # Union gate: this book's live verdict, the other book's live verdict when the stream
