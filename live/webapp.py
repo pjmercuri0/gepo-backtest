@@ -383,7 +383,11 @@ def _debit_view(d: dict) -> None:
         lst = d.get(key)
         if isinstance(lst, list) and lst and isinstance(lst[0], dict) and "short_strike" in lst[0]:
             d[key] = [r for r in lst if _debit_row(r)]
-            if key == "top_picks" and isinstance(d.get("ticker"), list) and any("qualified_debit" in r for r in d["ticker"]):
+            # Live board only (not a frozen day): the frozen file's top_picks are what expire_frozen settles,
+            # so a rebuilt set on the debit site's History would never get a result (2026-11-02 pre-freeze
+            # audit). The debit site's History shows the frozen credit picks as twins until the debit book
+            # gets its own freeze and settlement.
+            if key == "top_picks" and not d.get("frozen_at") and isinstance(d.get("ticker"), list) and any("qualified_debit" in r for r in d["ticker"]):
                 # The live board's picks are the debit site's OWN qualified rows (ranker qualified_debit),
                 # not the credit book's (user 2026-11-02).
                 d[key] = [r for r in d["ticker"] if r.get("qualified")]

@@ -86,7 +86,9 @@ def capture(latest_path: Path) -> None:
     _gm = getattr(backtest_config, "FABLE_GROUND_MIN", None)
     if _gm is not None:
         _all = [r for r in _all if r.get("GROUND") is not None and float(r["GROUND"]) >= float(_gm)]
-    _qual = [r for r in _all if r.get("qualified")][:live_config.TOP_N_DISPLAY]
+    # The debit site's own picks (ranker qualified_debit) are captured too, so a debit pick ranked below
+    # the top 6 by GROUND still reaches Snap and settles under its own key (2026-11-02).
+    _qual = [r for r in _all if r.get("qualified") or r.get("qualified_debit")][:live_config.TOP_N_DISPLAY * 2]
     _topn = int(getattr(backtest_config, "FABLE_TOP_N", 6))
     rows = _all[:_topn] + [r for r in _qual if not any(r is t for t in _all[:_topn])]
 
