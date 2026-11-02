@@ -531,12 +531,14 @@ def main() -> int:
             # legs: {key: [short_bid, short_ask, long_bid, long_ask]}}.
             try:
                 _f = lambda v: (round(float(v), 4) if (v is not None and v == v) else None)
-                _hb = {k: [sub_ex.get(k, [None])[0], _f(t.bid), _f(t.ask)] for k, (_b, t) in subs.items()}
+                # 4th bag field / 5th-6th leg fields (2026-11-02, user: 'track some last prices on both
+                # books'): the last trade IB prints for the bag on its exchange, and for each leg.
+                _hb = {k: [sub_ex.get(k, [None])[0], _f(t.bid), _f(t.ask), _f(t.last)] for k, (_b, t) in subs.items()}
                 _hl = {}
                 for k, lg in legs.items():
                     st_, lt_ = leg_t.get(lg[0]), leg_t.get(lg[1])
                     if st_ and lt_:
-                        _hl[k] = [_f(st_.bid), _f(st_.ask), _f(lt_.bid), _f(lt_.ask)]
+                        _hl[k] = [_f(st_.bid), _f(st_.ask), _f(lt_.bid), _f(lt_.ask), _f(st_.last), _f(lt_.last)]
                 with open(HIST_DIR / f"combo_hist_{_now_d()}.jsonl", "a") as _hf:
                     _hf.write(json.dumps({"ts": ts, "bags": _hb, "legs": _hl}, separators=(",", ":")) + "\n")
             except Exception as e:
