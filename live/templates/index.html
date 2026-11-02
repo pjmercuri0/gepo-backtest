@@ -215,8 +215,7 @@ function tgtCell(p) {
     : ` <span class="neg" title="IBKR credit below min — not qualified">✗</span>`);
   // Union gate (2026-11-02): fair value cleared on the other book only -- say so beside the check.
   const _other = isDebit(p) ? "credit" : "debit";
-  const via = (p.above_min && p.gate_via === _other)
-    ? ` <span style="font-size:10px;opacity:0.7" title="fair value cleared on the ${isDebit(p) ? "put" : "call"} book, not this one">via ${isDebit(p) ? "puts" : "calls"}</span>` : "";
+  const via = "";   // each site gates on its own book (user 2026-11-02); gate_via is informational only
   if (isDebit(p)) {    // max debit = width - min; the target band flips (cheapest debit = richest credit)
     return `<span style="color:#c9a227" title="max debit = width − min credit">${pxCell(p, t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${pxCell(p, t.target_hi_credit)}–${pxCell(p, t.target_lo_credit)}</span>${gate}${via}`;
   }

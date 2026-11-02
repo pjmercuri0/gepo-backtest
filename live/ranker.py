@@ -639,13 +639,17 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
             _tcombo_ok = ((_col("twin_combo_ask") - _col("twin_combo_bid")).abs() <= float(_mbw) * _sw2).fillna(False)
             _ta = _ta & pd.Series(np.where(_tc_ok, _tcombo_ok, _tleg_ok), index=ranked.index).astype(bool)
         ranked["debit_above_min"] = _ta.fillna(False).astype(bool)
+    # Each site gates on ITS OWN book (user 2026-11-02, after seeing 'via puts': 'no i just want it to
+    # be based on its own'): above_min / qualified stay the put book's verdict for gepo-ticker;
+    # debit_above_min / qualified_debit are the call book's for gepo-debit-ticker. gate_via is kept
+    # as information only.
     if not ranked.empty:
         _c, _d = ranked["credit_above_min"].astype(bool), ranked["debit_above_min"].astype(bool)
-        ranked["above_min"] = _c | _d
+        ranked["above_min"] = _c
         ranked["gate_via"] = pd.Series(np.select([_c & _d, _c, _d], ["both", "credit", "debit"], None), index=ranked.index)
         _nvia = int((_d & ~_c).sum())
         if _nvia:
-            print(f"  union gate: {_nvia} spread(s) clear fair value on the call book only", flush=True)
+            print(f"  call book: {_nvia} spread(s) clear fair value on the call book only (debit site)", flush=True)
     else:
         ranked["gate_via"] = None
     # 2026-09-29 canon (§0.66/§0.67): the bull parity veto is OFF (config.PARITY_FILTER False); bears keep theirs.
@@ -663,14 +667,16 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     feature_ok = ranked["own_gap_available"].astype(bool)
     above_thr = ranked["GROUND"] >= thr_side
     ranked["qualified"] = above_thr & parity_ok & ranked["above_min"] & feature_ok
+    ranked["qualified_debit"] = above_thr & parity_ok & ranked["debit_above_min"].astype(bool) & feature_ok
     # Per-side daily cap, applied to the QUALIFIED set in GROUND order so every downstream
     # consumer (latest.json, freeze_snapshot top-up, snapshot_picks) inherits it.
     if not ranked.empty:
         cap_side = np.where(is_bear, getattr(backtest_config, "BEAR_TOP_N", 5), backtest_config.TOP_N)
         order = ranked.sort_values("GROUND", ascending=False)
-        pos = order[order["qualified"]].groupby("spread_type").cumcount()
-        over = pos.index[pos.values >= cap_side[pos.index]]
-        ranked.loc[over, "qualified"] = False
+        for _qcol in ("qualified", "qualified_debit"):
+            pos = order[order[_qcol]].groupby("spread_type").cumcount()
+            over = pos.index[pos.values >= cap_side[pos.index]]
+            ranked.loc[over, _qcol] = False
     # Fable Canon (config.SELECTION_MODE == "fable", 2026-09-30): replaces the GROUND
     # threshold / parity / execution gate above. Bull puts only, IV > FABLE_MIN_IV,
     # fill-adjusted credit >= FABLE_MIN_CW x width, top FABLE_TOP_N per scan by qedge.
@@ -694,6 +700,8 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         # The gate IS above_min: quote >= model at the 2dp the page shows (a tie qualifies) on a credible
         # book -- so the check mark on the live tab and the pick set can never disagree (2026-10-01).
         _quote_ok = (ranked["above_min"].astype(bool) if _qg is not None else pd.Series(True, index=ranked.index))
+        # The debit site's own pick set (user 2026-11-02): the same rules on the call book's verdict.
+        _quote_ok_debit = (ranked["debit_above_min"].astype(bool) if _qg is not None else pd.Series(True, index=ranked.index))
         _rk = str(getattr(backtest_config, "FABLE_RANK_KEY", "GROUND"))
         # 2026-10-09 (user, new canon): GROUND FLOOR on both sleeves, before the pooled top-N cap.
         # 1 bp of entropy-discounted Kelly growth, (e^G-1)*e^(-k*D_ent) >= FABLE_GROUND_MIN. Fable
@@ -701,27 +709,41 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
         # days with fewer than FABLE_TOP_N positive candidates. None is no floor (the old behaviour).
         _gmin = getattr(backtest_config, "FABLE_GROUND_MIN", None)
         _ground_ok = (ranked["GROUND"].astype(float) >= float(_gmin)) if _gmin is not None else pd.Series(True, index=ranked.index)
-        _elig = (ranked["spread_type"].eq("bull_put")
+        _elig_base = (ranked["spread_type"].eq("bull_put")
                  & ((ranked["IV"].astype(float) > float(backtest_config.FABLE_MIN_IV)) if _use_iv else True)
                  & (ranked["cw_floor"] >= float(backtest_config.FABLE_MIN_CW))
-                 & _ground_ok & _quote_ok & feature_ok)
+                 & _ground_ok & feature_ok)
+        _elig = _elig_base & _quote_ok
         # 2026-09-30 16:xx (user): both sleeves rank by GROUND (was qedge for bulls; live archive
         # at 15:30: bulls by GROUND +$1,774 6/6 vs qedge +$2,145 6/6 -- aligned for one visible key).
         _keep = ranked[_elig].sort_values(_rk, ascending=False).index[:int(backtest_config.FABLE_TOP_N)]
         # Bear sleeve: bear calls every day, IV < FABLE_BEAR_MAX_IV, credit > FABLE_BEAR_MIN_CW x width,
         # top FABLE_BEAR_TOP_N by GROUND (the bear side ranks by GROUND, not qedge -- live archive).
-        _elig_b = (ranked["spread_type"].eq("bear_call")
+        _elig_b_base = (ranked["spread_type"].eq("bear_call")
                    & ((ranked["IV"].astype(float) < float(getattr(backtest_config, "FABLE_BEAR_MAX_IV", 0.35))) if _use_iv_b else True)
                    & (ranked["cw_floor"] >= float(getattr(backtest_config, "FABLE_BEAR_MIN_CW", 0.50)))
-                   & _ground_ok & _quote_ok & feature_ok)
+                   & _ground_ok & feature_ok)
+        _elig_b = _elig_b_base & _quote_ok
         _keep_b = ranked[_elig_b].sort_values(_rk, ascending=False).index[:int(getattr(backtest_config, "FABLE_BEAR_TOP_N", 5))]
         ranked["qualified"] = False
-        if bool(getattr(backtest_config, "FABLE_POOLED", False)):
+        ranked["qualified_debit"] = False
+        _pooled = bool(getattr(backtest_config, "FABLE_POOLED", False))
+        if _pooled:
             # One pooled cap: both sides ranked together, top FABLE_TOP_N per scan.
             _keep = ranked[_elig | _elig_b].sort_values(_rk, ascending=False).index[:int(backtest_config.FABLE_TOP_N)]
             _keep_b = _keep[:0]
         ranked.loc[_keep, "qualified"] = True
         ranked.loc[_keep_b, "qualified"] = True
+        # Debit site's set: identical rules, the call book's gate.
+        _elig_d, _elig_bd = _elig_base & _quote_ok_debit, _elig_b_base & _quote_ok_debit
+        if _pooled:
+            _keep_d = ranked[_elig_d | _elig_bd].sort_values(_rk, ascending=False).index[:int(backtest_config.FABLE_TOP_N)]
+            _keep_bd = _keep_d[:0]
+        else:
+            _keep_d = ranked[_elig_d].sort_values(_rk, ascending=False).index[:int(backtest_config.FABLE_TOP_N)]
+            _keep_bd = ranked[_elig_bd].sort_values(_rk, ascending=False).index[:int(getattr(backtest_config, "FABLE_BEAR_TOP_N", 5))]
+        ranked.loc[_keep_d, "qualified_debit"] = True
+        ranked.loc[_keep_bd, "qualified_debit"] = True
         # Display order: bull picks by qedge, bear picks by GROUND, then the rest.
         ranked["fable_rank"] = ranked[_rk].astype(float)
         _ivs = f"IV > {backtest_config.FABLE_MIN_IV:g}, " if _use_iv else ""
@@ -953,6 +975,7 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             # QUALIFIED pick. ent_canon always sets a real bool today, so this
             # is latent, but it is a trading gate: it must not fail open.
             "qualified":        _flag(r.get("qualified")),
+            "qualified_debit":  _flag(r.get("qualified_debit")),
             "above_min":        (None if r.get("above_min") is None else bool(r.get("above_min"))),
             "credit_above_min": (None if r.get("credit_above_min") is None else bool(r.get("credit_above_min"))),
             "debit_above_min":  (None if r.get("debit_above_min") is None else bool(r.get("debit_above_min"))),

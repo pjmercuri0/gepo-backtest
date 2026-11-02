@@ -284,10 +284,9 @@ def _debit_row(r: dict) -> bool:
             if c_above is None:
                 c_above = r.get("above_min")
             r["credit_above_min"], r["debit_above_min"] = bool(c_above), False
-            r["above_min"] = bool(c_above)             # union gate: the put book can still carry it
+            r["above_min"] = False                     # its own book: no twin price, no gate
             r["gate_via"] = "credit" if c_above else None
-            if not c_above:
-                r["qualified"] = False
+            r["qualified"] = False
             return True
         try:
             mid = max(0.0, min(float(mid), w))
@@ -324,12 +323,15 @@ def _debit_row(r: dict) -> bool:
                     c_above = r.get("above_min")       # payload from before the union: above_min was the credit's own
                 c_above, d_above = bool(c_above), bool(above)
                 r["credit_above_min"], r["debit_above_min"] = c_above, d_above
-                r["above_min"] = c_above or d_above
+                # Its own book (user 2026-11-02): the debit site's gate is the call book's verdict.
+                r["above_min"] = d_above
                 r["gate_via"] = "both" if (c_above and d_above) else "credit" if c_above else "debit" if d_above else None
                 if getattr(_cfg, "SELECTION_MODE", "ground") != "fable":
                     r["qualified"] = bool(float(r.get("GROUND") or 0) >= _cfg.GROUND_THRESHOLD) and r["above_min"]
                 else:
-                    r["qualified"] = bool(r.get("qualified")) and r["above_min"]
+                    # The scan's debit pick set (ranker qualified_debit), un-qualified if the twin price fell.
+                    _qd = r.get("qualified_debit")
+                    r["qualified"] = bool(r.get("qualified") if _qd is None else _qd) and r["above_min"]
         except (KeyError, TypeError, ValueError):
             pass
     return True
@@ -341,6 +343,10 @@ def _debit_view(d: dict) -> None:
         lst = d.get(key)
         if isinstance(lst, list) and lst and isinstance(lst[0], dict) and "short_strike" in lst[0]:
             d[key] = [r for r in lst if _debit_row(r)]
+            if key == "top_picks" and isinstance(d.get("ticker"), list) and any("qualified_debit" in r for r in d["ticker"]):
+                # The live board's picks are the debit site's OWN qualified rows (ranker qualified_debit),
+                # not the credit book's (user 2026-11-02).
+                d[key] = [r for r in d["ticker"] if r.get("qualified")]
             if not d[key]:
                 # Every pick was a credit-only row (a day from before the debit book): History and
                 # Snap skip it, or its card shows the credit book's totals over an empty table.
@@ -2493,7 +2499,7 @@ def _overlay_stream(payload: dict) -> None:
                     d = other_above if other_above is not None else d_scan
                 c, d = bool(c), bool(d)
                 r["credit_above_min"], r["debit_above_min"] = c, d
-                r["above_min"] = c or d
+                r["above_min"] = d if is_deb else c           # its own book (user 2026-11-02)
                 r["gate_via"] = "both" if (c and d) else "credit" if c else "debit" if d else None
                 if getattr(backtest_config, "SELECTION_MODE", "ground") != "fable":
                     r["qualified"] = bool(r.get("GROUND", 0) >= backtest_config.GROUND_THRESHOLD) and r["above_min"]
