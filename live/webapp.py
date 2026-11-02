@@ -280,8 +280,14 @@ def _debit_row(r: dict) -> bool:
             r["quoted_credit"] = r["net_credit"] = None
             r["credit_source"] = "twin_unquoted"
             r["fill_targets"] = []
-            r["above_min"] = False
-            r["qualified"] = False
+            c_above = r.get("credit_above_min")
+            if c_above is None:
+                c_above = r.get("above_min")
+            r["credit_above_min"], r["debit_above_min"] = bool(c_above), False
+            r["above_min"] = bool(c_above)             # union gate: the put book can still carry it
+            r["gate_via"] = "credit" if c_above else None
+            if not c_above:
+                r["qualified"] = False
             return True
         try:
             mid = max(0.0, min(float(mid), w))
@@ -312,7 +318,14 @@ def _debit_row(r: dict) -> bool:
                                  for a, b in (("short_ask", "short_bid"), ("long_ask", "long_bid")))
                     r["quote_ok"] = bw <= float(_mbw) * w + 1e-9
                     above = above and r["quote_ok"]
-                r["above_min"] = bool(above)
+                # Union gate (user 2026-11-02): either book clearing fair value qualifies the bet.
+                c_above = r.get("credit_above_min")
+                if c_above is None:
+                    c_above = r.get("above_min")       # payload from before the union: above_min was the credit's own
+                c_above, d_above = bool(c_above), bool(above)
+                r["credit_above_min"], r["debit_above_min"] = c_above, d_above
+                r["above_min"] = c_above or d_above
+                r["gate_via"] = "both" if (c_above and d_above) else "credit" if c_above else "debit" if d_above else None
                 if getattr(_cfg, "SELECTION_MODE", "ground") != "fable":
                     r["qualified"] = bool(float(r.get("GROUND") or 0) >= _cfg.GROUND_THRESHOLD) and r["above_min"]
                 else:
@@ -2413,6 +2426,17 @@ def _overlay_stream(payload: dict) -> None:
         if not quotes and not spots:
             return
         n = 0
+        _mbw = getattr(backtest_config, "QUOTE_MAX_BOOK_W", None)   # None = rule off
+        _r2 = lambda v: math.floor(float(v) * 100 + 0.5) / 100
+        def _book_ok(qq, w):
+            # Same credible-book rule as the scan (2026-10-01): a streamed book wider than
+            # QUOTE_MAX_BOOK_W x the spread width is not a price.
+            if _mbw is None or not w:
+                return True
+            try:
+                return abs(float(qq["ask"]) - float(qq["bid"])) <= float(_mbw) * float(w) + 1e-9
+            except (TypeError, ValueError, KeyError):
+                return True
         for lst in (payload.get("ticker") or [], payload.get("top_picks") or []):
             for r in lst:
                 try:
@@ -2422,44 +2446,61 @@ def _overlay_stream(payload: dict) -> None:
                 sp = spots.get(r.get("ticker"))
                 if sp:
                     r["entry_price"] = sp
-                q = quotes.get(k)
-                if not q or q.get("mid") is None:
+                is_deb = k.endswith("|debit")
+                ko = k[:-6] if is_deb else k + "|debit"      # the other book's bag (union gate, 2026-11-02)
+                q, qo = quotes.get(k), quotes.get(ko)
+                if q is not None and q.get("mid") is None:
+                    q = None
+                if qo is not None and qo.get("mid") is None:
+                    qo = None
+                if q is None and qo is None:
                     continue
-                r["combo_bid"], r["combo_ask"] = q["bid"], q["ask"]
-                r["combo_credit_mid"] = q["mid"]
-                r["quoted_credit"] = r["net_credit"] = q["mid"]
-                r["credit_source"] = "stream_mid"
-                r["quote_ts"] = q["ts"]
-                # The table renders fill_targets[0] (mmCredit/mmMaxLoss), written by
-                # _enrich_payload before this overlay runs -- leaving it stale showed the
-                # scan credit next to a live quote clock (HD 1.16 vs 1.09, 2026-09-16).
                 w = r.get("spread_width")
-                if w:
-                    r["max_loss"] = round(float(w) - q["mid"], 4)
-                    r["fill_targets"] = [{"credit": q["mid"], "max_loss": r["max_loss"]}]
-                    r["credit_ratio"] = round(q["mid"] / r["max_loss"], 4) if r["max_loss"] > 0 else None
                 tg = r.get("credit_targets") or {}
                 wa = tg.get("walkaway_credit")
-                if wa is not None:
-                    r["above_min"] = math.floor(q["mid"] * 100 + 0.5) / 100 >= wa
-                    # Same credible-book rule as the scan (2026-10-01): a streamed book wider than
-                    # QUOTE_MAX_BOOK_W x the spread width is not a price.
-                    try:
-                        _bw = abs(float(q["ask"]) - float(q["bid"]))
-                        _mbw = getattr(backtest_config, "QUOTE_MAX_BOOK_W", None)   # None = rule off
-                        if _mbw is not None and w and _bw > float(_mbw) * float(w):
-                            r["above_min"] = False; r["quote_ok"] = False
-                        else:
-                            r["quote_ok"] = True
-                    except (TypeError, ValueError, KeyError):
-                        pass
-                    if getattr(backtest_config, "SELECTION_MODE", "ground") != "fable":
-                        r["qualified"] = bool(r.get("GROUND", 0) >= backtest_config.GROUND_THRESHOLD) and r["above_min"]
-                    else:
-                        # Fable (user 2026-10-01): the scan picks the set, but a pick whose LIVE quote has
-                        # fallen below model is no longer fillable -- un-qualify it until the quote recovers.
-                        r["qualified"] = bool(r.get("qualified")) and bool(r["above_min"])
-                n += 1
+                own_above = other_above = None
+                if q is not None:
+                    r["combo_bid"], r["combo_ask"] = q["bid"], q["ask"]
+                    r["combo_credit_mid"] = q["mid"]
+                    r["quoted_credit"] = r["net_credit"] = q["mid"]
+                    r["credit_source"] = "stream_mid"
+                    r["quote_ts"] = q["ts"]
+                    # The table renders fill_targets[0] (mmCredit/mmMaxLoss), written by
+                    # _enrich_payload before this overlay runs -- leaving it stale showed the
+                    # scan credit next to a live quote clock (HD 1.16 vs 1.09, 2026-09-16).
+                    if w:
+                        r["max_loss"] = round(float(w) - q["mid"], 4)
+                        r["fill_targets"] = [{"credit": q["mid"], "max_loss": r["max_loss"]}]
+                        r["credit_ratio"] = round(q["mid"] / r["max_loss"], 4) if r["max_loss"] > 0 else None
+                    if wa is not None:
+                        r["quote_ok"] = _book_ok(q, w)
+                        own_above = _r2(q["mid"]) >= wa and r["quote_ok"]
+                    n += 1
+                if qo is not None and wa is not None:
+                    other_above = _r2(qo["mid"]) >= wa and _book_ok(qo, w)
+                if wa is None:
+                    continue
+                # Union gate: this book's live verdict, the other book's live verdict when the stream
+                # holds it, else each book's verdict from the scan.
+                c_scan, d_scan = r.get("credit_above_min"), r.get("debit_above_min")
+                if c_scan is None and d_scan is None:
+                    c_scan = r.get("above_min")          # payload from before the union gate
+                if is_deb:
+                    d = own_above if own_above is not None else d_scan
+                    c = other_above if other_above is not None else c_scan
+                else:
+                    c = own_above if own_above is not None else c_scan
+                    d = other_above if other_above is not None else d_scan
+                c, d = bool(c), bool(d)
+                r["credit_above_min"], r["debit_above_min"] = c, d
+                r["above_min"] = c or d
+                r["gate_via"] = "both" if (c and d) else "credit" if c else "debit" if d else None
+                if getattr(backtest_config, "SELECTION_MODE", "ground") != "fable":
+                    r["qualified"] = bool(r.get("GROUND", 0) >= backtest_config.GROUND_THRESHOLD) and r["above_min"]
+                else:
+                    # Fable (user 2026-10-01): the scan picks the set, but a pick whose LIVE quote has
+                    # fallen below model is no longer fillable -- un-qualify it until the quote recovers.
+                    r["qualified"] = bool(r.get("qualified")) and bool(r["above_min"])
         payload["stream_n"] = n
         if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable":
             payload["top_picks"] = [r for r in (payload.get("top_picks") or []) if r.get("qualified") is not False]

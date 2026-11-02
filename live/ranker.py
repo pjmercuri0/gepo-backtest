@@ -619,6 +619,35 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
             print(f"  quote gate: {_nbad} spread(s) at/above model only on a leg book wider than "
                   f"{float(_mbw):g}x the spread width -- not counted", flush=True)
         ranked["above_min"] = ranked["above_min"] & ranked["quote_ok"]
+    # Union gate (user 2026-11-02, 'any way to get them closer match'): the same bet qualifies on both
+    # sites if EITHER book clears fair value -- the put book (credit) or the call book (its parity
+    # twin, the debit). HON 225/222.5 at 09:52: put book 3.05/1.50, no fair fill; call legs a 0.93
+    # debit against a 1.27 max. Same position, one tradeable book. gate_via names the book.
+    ranked["credit_above_min"] = ranked["above_min"].astype(bool) if not ranked.empty else ranked["above_min"]
+    ranked["debit_above_min"] = False
+    if not ranked.empty and "twin_leg_credit" in ranked.columns:
+        _col = lambda c: (pd.to_numeric(ranked[c], errors="coerce") if c in ranked.columns
+                          else pd.Series(np.nan, index=ranked.index))
+        _sw2 = (ranked["short_strike"].astype(float) - ranked["long_strike"].astype(float)).abs()
+        _tc = _col("twin_combo_credit_mid")
+        _tc_ok = _tc.notna() & (_tc > 0) & (_tc < _sw2 - 1e-9)      # a 0/0 twin bag reads as the width: not a quote
+        _tm = _tc.where(_tc_ok, _col("twin_leg_credit"))
+        _ta = _tm.notna() & (_r2(_tm.fillna(-1.0)) >= ranked["tgt_walkaway_credit"].astype(float))
+        if _mbw is not None:
+            _pb, _pa, _lb, _la = _col("par_short_bid"), _col("par_short_ask"), _col("par_long_bid"), _col("par_long_ask")
+            _tleg_ok = ((_pb > 0) & (_lb > 0) & (((_pa - _pb) + (_la - _lb)) <= float(_mbw) * _sw2)).fillna(False)
+            _tcombo_ok = ((_col("twin_combo_ask") - _col("twin_combo_bid")).abs() <= float(_mbw) * _sw2).fillna(False)
+            _ta = _ta & pd.Series(np.where(_tc_ok, _tcombo_ok, _tleg_ok), index=ranked.index).astype(bool)
+        ranked["debit_above_min"] = _ta.fillna(False).astype(bool)
+    if not ranked.empty:
+        _c, _d = ranked["credit_above_min"].astype(bool), ranked["debit_above_min"].astype(bool)
+        ranked["above_min"] = _c | _d
+        ranked["gate_via"] = pd.Series(np.select([_c & _d, _c, _d], ["both", "credit", "debit"], None), index=ranked.index)
+        _nvia = int((_d & ~_c).sum())
+        if _nvia:
+            print(f"  union gate: {_nvia} spread(s) clear fair value on the call book only", flush=True)
+    else:
+        ranked["gate_via"] = None
     # 2026-09-29 canon (§0.66/§0.67): the bull parity veto is OFF (config.PARITY_FILTER False); bears keep theirs.
     bull_gate_on = bool(getattr(backtest_config, "PARITY_FILTER", True))
     bull_parity_ok = (ranked["parity_pct"] > getattr(backtest_config, "PARITY_MIN_PCT", 0.12)) if bull_gate_on \
@@ -925,6 +954,9 @@ def _serialize(ranked: pd.DataFrame, snapshot_path: Path, provenance: dict | Non
             # is latent, but it is a trading gate: it must not fail open.
             "qualified":        _flag(r.get("qualified")),
             "above_min":        (None if r.get("above_min") is None else bool(r.get("above_min"))),
+            "credit_above_min": (None if r.get("credit_above_min") is None else bool(r.get("credit_above_min"))),
+            "debit_above_min":  (None if r.get("debit_above_min") is None else bool(r.get("debit_above_min"))),
+            "gate_via":         (r.get("gate_via") if isinstance(r.get("gate_via"), str) else None),
             # GROUND floor (user 2026-10-13): a below-floor row stays on the table but renders grey --
             # it cannot qualify, so it must not look like a row that can. None = no floor in force.
             "ground_ok":        (None if getattr(backtest_config, "FABLE_GROUND_MIN", None) is None or _num(r.get("GROUND")) is None

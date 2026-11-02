@@ -41,7 +41,7 @@
         <th>DTE</th>
         <th title="IBKR quoted credit (combo mid, else leg mids) — the live selection basis; model credit in the card">{% if is_debit_site %}Debit{% else %}Credit{% endif %} ($/sh)</th>
         <th title="min 1.00× model credit (= execution gate), target 1.04–1.10×">{% if is_debit_site %}Max / Target debit{% else %}Min / Target{% endif %}</th>
-        <th>Max-Loss ($/sh)</th>
+        <th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th>
         <th>Ratio</th>
         <th title="P_real above (realized-move belief, used in G); Q_bs below (market law, D_ent reference)">real: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">bs below</span></th>
         <th>Kelly EV</th>
@@ -213,10 +213,14 @@ function tgtCell(p) {
   const gate = p.above_min == null ? "" : (p.above_min
     ? ` <span class="pos" title="IBKR credit ≥ min">✓</span>`
     : ` <span class="neg" title="IBKR credit below min — not qualified">✗</span>`);
+  // Union gate (2026-11-02): fair value cleared on the other book only -- say so beside the check.
+  const _other = isDebit(p) ? "credit" : "debit";
+  const via = (p.above_min && p.gate_via === _other)
+    ? ` <span style="font-size:10px;opacity:0.7" title="fair value cleared on the ${isDebit(p) ? "put" : "call"} book, not this one">via ${isDebit(p) ? "puts" : "calls"}</span>` : "";
   if (isDebit(p)) {    // max debit = width - min; the target band flips (cheapest debit = richest credit)
-    return `<span style="color:#c9a227" title="max debit = width − min credit">${pxCell(p, t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${pxCell(p, t.target_hi_credit)}–${pxCell(p, t.target_lo_credit)}</span>${gate}`;
+    return `<span style="color:#c9a227" title="max debit = width − min credit">${pxCell(p, t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${pxCell(p, t.target_hi_credit)}–${pxCell(p, t.target_lo_credit)}</span>${gate}${via}`;
   }
-  return `<span style="color:#c9a227">${fmtMoney(t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${fmtMoney(t.target_lo_credit)}–${fmtMoney(t.target_hi_credit)}</span>${gate}`;
+  return `<span style="color:#c9a227">${fmtMoney(t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${fmtMoney(t.target_lo_credit)}–${fmtMoney(t.target_hi_credit)}</span>${gate}${via}`;
 }
 // Midmid credit/max_loss: prefer fill_targets[0] (set by webapp from leg bid/ask),
 // fall back to mid net_credit/max_loss when bid/ask isn't yet available.
@@ -298,7 +302,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <th title="IBKR credit — combo last, else combo mid (narrow book), else leg mids — the live selection basis">quoted ($/sh)</th>
           <th title="smile-fit model credit: what the spread is worth on the fitted surface (basis for min / target)">model ($/sh)</th>
           <th title="min 1.00×model = fair value = execution gate; target 1.04–1.10×model">min / target</th>
-          <th>max-loss ($/sh)</th><th>ratio</th>
+          <th>{% if is_debit_site %}max-win ($/sh){% else %}max-loss ($/sh){% endif %}</th><th>ratio</th>
           <th title="P_real: realized-move belief at the strikes (used in G)">real: p / r₀ / q</th>
           <th title="Q_bs: market law at the fitted IVs (D_ent reference)">bs: p̂ / r̂₀ / q̂</th>
           <th>G</th><th>Kelly EV</th><th title="D_ent = ln3 − H(Q_bs)">D_ent</th><th>exp(k·D_ent)</th><th title="GROUND, in basis points">Γᵢ (bps)</th>
@@ -311,7 +315,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <td>${pxCell(p, p.quoted_credit != null ? p.quoted_credit : p.net_credit)}${p.credit_source ? `<br><span style="opacity:0.6;font-size:10px">${p.credit_source.replace('_',' ')}</span>` : ''}</td>
           <td class="fw">${p.model_credit != null ? pxCell(p, p.model_credit) : "—"}</td>
           <td>${tgtCell(p)}</td>
-          <td>${fmtMoney(mmMaxLoss(p))}</td>
+          <td>${fmtMoney(isDebit(p) ? mmCredit(p) : mmMaxLoss(p))}</td>
           <td>${rd(mmMaxLoss(p) > 0 ? mmCredit(p)/mmMaxLoss(p) : 0, 2).toFixed(2)}</td>
           <td>${fmtNum(p.p, 2)} / ${fmtNum(p.ro, 2)} / ${fmtNum(p.q, 2)}</td>
           <td>${p.p_hat != null ? fmtNum(p.p_hat, 2) : "—"} / ${p.ro_hat != null ? fmtNum(p.ro_hat, 2) : "—"} / ${p.q_hat != null ? fmtNum(p.q_hat, 2) : "—"}</td>
@@ -358,7 +362,7 @@ function renderRanked(rows, maxGround, kVal) {
       <td>${r.DTE ?? "—"}</td>
       <td>${pxCell(r, mmCredit(r))}</td>
       <td>${tgtCell(r)}</td>
-      <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : fmtMoney(mmMaxLoss(r))}</td>
+      <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : fmtMoney(isDebit(r) ? mmCredit(r) : mmMaxLoss(r))}</td>
       <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : rd(mmMaxLoss(r) > 0 ? mmCredit(r)/mmMaxLoss(r) : 0, 2).toFixed(2)}</td>
       <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}<br>
           <span style="opacity:0.7;font-size:11px">${r.p_hat != null ? `bs ${fmtNum(r.p_hat,2)} / ${fmtNum(r.ro_hat,2)} / ${fmtNum(r.q_hat,2)}` : "—"}</span></td>
