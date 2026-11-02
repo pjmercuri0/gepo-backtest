@@ -37,7 +37,7 @@ CLIENT_ID = int(getattr(live_config, "LIVE_STREAM_CLIENT_ID", 111))
 # IBKR caps concurrent market-data lines (error 101 "Max number of tickers has been
 # reached" at 100 on this account). Budget: open positions always get a line, the
 # ranked board fills what is left, and spots are capped separately.
-MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 20))
+MAX_BAGS  = int(getattr(live_config, "LIVE_STREAM_MAX_BAGS", 13))   # credit bags (2026-11-02: 13 / 13 with the debit twins)
 # Parity-twin (debit) bags for gepo-debit-ticker, on top of MAX_BAGS: debit positions first, then the
 # picks. No leg lines for them (the 100-line cap), so a twin with no book has no stream quote.
 TWIN_BAGS = int(getattr(live_config, "LIVE_STREAM_TWIN_BAGS", 8))
@@ -48,7 +48,7 @@ TWIN_LEG_ROWS = int(getattr(live_config, "LIVE_STREAM_TWIN_LEG_ROWS", 4))
 # the debit twins -- DEBIT_PRIORITY_BAGS twin bags, legs on every one of them -- and the credit side
 # keeps only its open positions. ~20 bags + 40 legs + spots + positions stays under IBKR's 100 lines.
 DEBIT_PRIORITY = bool(getattr(live_config, "LIVE_STREAM_DEBIT_PRIORITY", True))
-DEBIT_PRIORITY_BAGS = int(getattr(live_config, "LIVE_STREAM_DEBIT_PRIORITY_BAGS", 20))
+DEBIT_PRIORITY_BAGS = int(getattr(live_config, "LIVE_STREAM_DEBIT_PRIORITY_BAGS", 13))
 # Check both books (user 2026-10-26): SMART returned nothing for PFE 30/29.5 while CBOE quoted
 # -0.27/-0.22, so the page showed leg mids. Order (user 2026-10-27): SMART (best across every
 # exchange's book, legs tagged CBOE -- see combo_quotes._bag_for) first, CBOE's own book as backup,
@@ -56,7 +56,7 @@ DEBIT_PRIORITY_BAGS = int(getattr(live_config, "LIVE_STREAM_DEBIT_PRIORITY_BAGS"
 # one market-data line per spread either way (the account caps lines at 100).
 BAG_EXCHANGES = COMBO_EXCHANGES
 SWAP_S    = float(getattr(live_config, "LIVE_STREAM_SWAP_S", 5.0))
-MAX_SPOTS = int(getattr(live_config, "LIVE_STREAM_MAX_SPOTS", 40))
+MAX_SPOTS = int(getattr(live_config, "LIVE_STREAM_MAX_SPOTS", 20))   # 26 bags + 52 legs + 20 spots = 98 lines
 RELOAD_S  = float(getattr(live_config, "LIVE_STREAM_RELOAD_S", 20))
 WRITE_S   = float(getattr(live_config, "LIVE_STREAM_WRITE_S", 1.0))
 HIST_DIR  = Path(__file__).resolve().parent / "logs"
@@ -381,7 +381,10 @@ def main() -> int:
                 _twins = list(_dpos)
                 _twin_cap, _leg_cap = TWIN_BAGS, TWIN_LEG_ROWS
                 if DEBIT_PRIORITY:
-                    board = [r for r in board if r["_key"] in seen]      # credit side: open positions only
+                    # 13 / 13 split (user 2026-11-02: 'add 6 more, so thats 26 names, and split them between
+                    # debit and credit 13 each'): the credit board keeps its MAX_BAGS (13) rows with legs,
+                    # the debit side gets DEBIT_PRIORITY_BAGS (13) twins with legs. 26 bags + 52 legs +
+                    # spots (capped) stays under the 100 lines.
                     _twin_cap, _leg_cap = DEBIT_PRIORITY_BAGS, DEBIT_PRIORITY_BAGS
                 # The debit site's OWN picks (ranker qualified_debit) take the twin slots first, then the
                 # credit picks, then the rest (2026-11-02: VZ 45/45.5 was a debit pick with no stream
