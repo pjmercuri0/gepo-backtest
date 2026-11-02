@@ -196,7 +196,7 @@ function renderParams(cfg) {
     ["fill",           cfg.FILL_MULT != null ? `${cfg.FILL_MULT}× model, $${cfg.COMMISSION} comm` : `—`],
     ["targets",        cfg.TARGETS || `min 1.00× model credit, target 1.04–1.10×`],
     ["exec gate",      cfg.EXEC_GATE || `qualified only if the IBKR credit ≥ min`],
-    ["regime gate",    cfg.REGIME_GATE || `bull puts only above prior-session SPY 100d SMA; cash otherwise`],
+    ["regime gate",    cfg.REGIME_GATE || `bull puts every day; bear calls only when prior-session SPY close < 100d SMA`],
     ["parity gate",    cfg.PARITY_GATE || `same-strike call-IV minus put-IV percentile > 12%`],
   ];
   return chips.map(([k, v]) =>
@@ -525,7 +525,18 @@ function renderRegime(r) {
     return;
   }
   const cls = r.regime === "bull" ? "dir-bull" : "dir-bear";
-  const dir = r.regime === "bull" ? "BULL regime · bull puts enabled" : "BEAR regime · cash";
+  // Label from the ranker's allowed_direction (live/regime.py), not from the regime alone:
+  // REGIME_BULL_ALWAYS (2026-09-29 canon) opens bull puts every day and ADDS bear calls in a bear
+  // regime. "BEAR regime · cash" was the pre-canon rule (user 2026-11-02). The debit site names
+  // the parity twins (live/debit_mode.py).
+  const deb = {{ 'true' if is_debit_site else 'false' }};
+  const sides = { bull_put: deb ? "bull-call debits" : "bull puts",
+                  bear_call: deb ? "bear-put debits" : "bear calls" };
+  const allowed = (r.allowed_direction || "").split("+").filter(Boolean).map(k => sides[k] || k);
+  const what = allowed.length === 0 ? "cash"
+             : allowed.length === 1 ? `${allowed[0]} only`
+             : allowed.join(" + ");
+  const dir = `${r.regime.toUpperCase()} regime · ${what}`;
   badge.innerHTML = `<span class="badge ${cls === 'dir-bull' ? 'badge-WIN' : 'badge-LOSS'}" `
                   + `style="vertical-align:middle;margin-left:8px;font-size:12px">${dir}</span>`;
   // Trading sessions missed, not calendar days: Friday's close is current on a Monday.
