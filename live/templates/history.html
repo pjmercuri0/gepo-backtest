@@ -142,7 +142,7 @@
               {% endif %}
             </td>
 
-            <td>${{ "%.2f"|format(p.short_strike|rd(2)) }} / ${{ "%.2f"|format(p.long_strike|rd(2)) }}</td>
+            <td>{% if p.structure == 'debit' %}${{ '%.2f' % ([p.short_strike|float, p.long_strike|float]|min) }} / ${{ '%.2f' % ([p.short_strike|float, p.long_strike|float]|max) }}{% else %}${{ "%.2f"|format(p.short_strike|rd(2)) }} / ${{ "%.2f"|format(p.long_strike|rd(2)) }}{% endif %}</td>
             <td style="color:#e8b366;font-weight:600">{{ p.suggested_qty or 1 }}×</td>
             {# Credit + max-loss shown as midmid = (mid + max(0,nat))/2.
                This is the realistic-fill basis and matches the limit price

@@ -159,6 +159,12 @@ function dirLabel(spread_type, structure) {
 // The debit is width minus the credit AT THE 2dp SHOWN, so the gate tie rule reads the same both ways.
 const isDebit = p => p && p.structure === "debit";
 const widthOf = p => Math.abs(Number(p.short_strike) - Number(p.long_strike));
+// Strike pair as printed. Debit rows read low / high, the way the IBKR app labels a vertical
+// (user 2026-11-02: '58/57 here is 57/58 there'); credit rows stay short / long.
+function strikesOf(p) {
+  const a = Number(p.short_strike), b = Number(p.long_strike);
+  return isDebit(p) ? `${fmtMoney(Math.min(a, b))} / ${fmtMoney(Math.max(a, b))}` : `${fmtMoney(a)} / ${fmtMoney(b)}`;
+}
 function pxCell(p, credit) {
   if (credit == null || isNaN(Number(credit))) return "—";
   if (isDebit(p) && p.credit_source === "twin_unquoted") return "—";   // no twin price in this scan
@@ -272,7 +278,7 @@ function renderTopPicks(picks, maxGround, kVal) {
           <div class="week-title">#${i+1} &nbsp; <strong>${p.ticker}</strong>
             <span class="${dirClass(p.spread_type)}">${dirLabel(p.spread_type, p.structure)}</span>
             ${oiWarning(p)}</div>
-          <div class="week-sub">${fmtMoney(p.short_strike)} / ${fmtMoney(p.long_strike)} &nbsp;·&nbsp;
+          <div class="week-sub">${strikesOf(p)} &nbsp;·&nbsp;
             expires ${p.expiry_date} &nbsp;·&nbsp; DTE ${p.DTE} &nbsp;·&nbsp; 1 contract = 100 shares &nbsp;·&nbsp;
             Vol ${p.short_volume != null ? p.short_volume : "—"} / ${p.long_volume != null ? p.long_volume : "—"}</div>
         </div>
@@ -356,7 +362,7 @@ function renderRanked(rows, maxGround, kVal) {
       <td class="rank-cell"><button class="actuals-add${r.held_cmp === "same" ? " held-add" : r.held_cmp === "better" ? " held-better" : r.held_cmp === "worse" ? " held-worse" : ""}" data-url="/api/actuals/from_live/${i}" title="${r.held_cmp === "same" ? "already in Actuals — IBKR will refuse a second order on the same option" : r.held_cmp === "better" ? "same name and side you hold, strike away from the move" : r.held_cmp === "worse" ? "same name and side you hold, strike has followed the stock — selling into the move" : "add this pick to actuals"}">+</button> ${i+1}</td>
       <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type, r.structure)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> ${r.ticker}${oiWarning(r)}</td>
       <td>${r.entry_price != null ? fmtMoney(r.entry_price) : "—"}</td>
-      <td>${fmtMoney(r.short_strike)} / ${fmtMoney(r.long_strike)}</td>
+      <td>${strikesOf(r)}</td>
       <td>${fmtNum(r.short_delta, 2)}</td>
       <td>${r.DTE ?? "—"}</td>
       <td>${pxCell(r, mmCredit(r))}</td>
