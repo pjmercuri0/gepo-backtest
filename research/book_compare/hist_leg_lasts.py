@@ -66,5 +66,5 @@ qv = vdf[vdf.qualified]
 if len(qv): print(f"  qualified only ({len(qv)}): credit-right {qv.c_vol.median():.0f} vs twin-right {qv.d_vol.median():.0f}; credit busier {(qv.c_vol>qv.d_vol).mean()*100:.0f}%")
 print(f"\nby day (debit minus credit on leg lasts, credit scale):")
 for day, g in both.groupby("day"):
-    _v = vdf[vdf.day == day]
-  print(f"  {day}: n {len(g):4d}  diff {(g.d_last-g.c_last).mean():+.3f}  debit higher {(g.d_last>g.c_last).mean()*100:3.0f}%  median vol credit/debit {_v.c_vol.median():.0f}/{_v.d_vol.median():.0f}")
+      _v = vdf[vdf.day == day]
+    print(f"  {day}: n {len(g):4d}  diff {(g.d_last-g.c_last).mean():+.3f}  debit higher {(g.d_last>g.c_last).mean()*100:3.0f}%  median vol credit/debit {_v.c_vol.median():.0f}/{_v.d_vol.median():.0f}")
