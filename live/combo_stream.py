@@ -44,6 +44,11 @@ TWIN_BAGS = int(getattr(live_config, "LIVE_STREAM_TWIN_BAGS", 8))
 # Twins of the debit site's own picks that also get leg lines (2 lines each; the 100-line budget sat
 # at 28 bags + 37 legs + 19 spots = 84 on 2026-11-02 12:04).
 TWIN_LEG_ROWS = int(getattr(live_config, "LIVE_STREAM_TWIN_LEG_ROWS", 4))
+# Debit priority (user 2026-11-02: 'prioritize debit for now. do 100 debit'): the line budget goes to
+# the debit twins -- DEBIT_PRIORITY_BAGS twin bags, legs on every one of them -- and the credit side
+# keeps only its open positions. ~20 bags + 40 legs + spots + positions stays under IBKR's 100 lines.
+DEBIT_PRIORITY = bool(getattr(live_config, "LIVE_STREAM_DEBIT_PRIORITY", True))
+DEBIT_PRIORITY_BAGS = int(getattr(live_config, "LIVE_STREAM_DEBIT_PRIORITY_BAGS", 20))
 # Check both books (user 2026-10-26): SMART returned nothing for PFE 30/29.5 while CBOE quoted
 # -0.27/-0.22, so the page showed leg mids. Order (user 2026-10-27): SMART (best across every
 # exchange's book, legs tagged CBOE -- see combo_quotes._bag_for) first, CBOE's own book as backup,
@@ -365,6 +370,10 @@ def main() -> int:
                 _dpos = [r for r in board if debit_mode.is_debit(r)]
                 board = [r for r in board if not debit_mode.is_debit(r)]
                 _twins = list(_dpos)
+                _twin_cap, _leg_cap = TWIN_BAGS, TWIN_LEG_ROWS
+                if DEBIT_PRIORITY:
+                    board = [r for r in board if r["_key"] in seen]      # credit side: open positions only
+                    _twin_cap, _leg_cap = DEBIT_PRIORITY_BAGS, DEBIT_PRIORITY_BAGS
                 # The debit site's OWN picks (ranker qualified_debit) take the twin slots first, then the
                 # credit picks, then the rest (2026-11-02: VZ 45/45.5 was a debit pick with no stream
                 # slot, so its site showed the 12:47 scan price while the app showed 0.28 live). The
@@ -372,17 +381,17 @@ def main() -> int:
                 # still prices off its legs like the credit bags do.
                 _nleg = 0
                 for r in sorted(_picks + _rest, key=lambda x: not x.get("qualified_debit")):
-                    if len(_twins) >= TWIN_BAGS:
+                    if len(_twins) >= _twin_cap:
                         break
                     if r.get("twin_short_conid") and r.get("twin_long_conid") and not debit_mode.is_debit(r):
                         tw = {**r, "structure": "debit", "short_conid": r["twin_short_conid"],
                               "long_conid": r["twin_long_conid"]}
                         tw["_key"] = _key(tw)
                         if tw["_key"] not in {x["_key"] for x in _twins}:
-                            if r.get("qualified_debit") and _nleg < TWIN_LEG_ROWS:
+                            if (DEBIT_PRIORITY or r.get("qualified_debit")) and _nleg < _leg_cap:
                                 tw["_twin_legs"] = True; _nleg += 1
                             _twins.append(tw)
-                board = board + _twins[:TWIN_BAGS]
+                board = board + _twins[:_twin_cap]
                 want = {r["_key"]: r for r in board}
                 for k in list(subs):
                     if k not in want:

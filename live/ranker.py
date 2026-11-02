@@ -641,8 +641,8 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
             _tl_ok = _tl_ok & ((_pb > 0) & (_lb > 0) & (((_pa - _pb) + (_la - _lb)) <= float(_mbw) * _sw2)).fillna(False)
             _tcombo_ok = ((_col("twin_combo_ask") - _col("twin_combo_bid")).abs() <= float(_mbw) * _sw2).fillna(False)
             _tc_ok = _tc_ok & _tcombo_ok
-        _par = pd.to_numeric(ranked["net_credit"], errors="coerce")
-        _tm = _tc.where(_tc_ok, _tl.where(_tl_ok, _par))
+        # No parity fallback (user 2026-11-02: 'PRICE BY DEBIT THEN'): no usable twin quote, no gate.
+        _tm = _tc.where(_tc_ok, _tl.where(_tl_ok, np.nan))
         _ta = _tm.notna() & (_r2(_tm.fillna(-1.0)) >= ranked["tgt_walkaway_credit"].astype(float))
         ranked["debit_above_min"] = _ta.fillna(False).astype(bool)
     # Each site gates on ITS OWN book (user 2026-11-02, after seeing 'via puts': 'no i just want it to

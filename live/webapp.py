@@ -297,8 +297,7 @@ def _debit_row(r: dict) -> bool:
                     mid = None
         except (TypeError, ValueError):
             pass
-        if mid is None and r.get("net_credit") is not None:
-            mid, src = r.get("net_credit"), "parity"        # width - the credit book's quote
+        # No parity fallback (user 2026-11-02: 'PRICE BY DEBIT THEN'): no usable twin quote = unquoted.
     r["combo_bid"], r["combo_ask"] = r.get("twin_combo_bid"), r.get("twin_combo_ask")
     r["combo_credit_mid"] = r.get("twin_combo_credit_mid")
     r["combo_priced"] = r.get("twin_combo_credit_mid") is not None
@@ -346,8 +345,6 @@ def _debit_row(r: dict) -> bool:
                 if _mbw is not None:
                     if r.get("combo_priced"):
                         bw = abs(float(r["twin_combo_ask"]) - float(r["twin_combo_bid"]))
-                    elif src == "parity":
-                        bw = 0.0                      # judged on the credit book's quote, already gated there
                     else:
                         bw = sum(abs(float(r.get(a) or 0) - float(r.get(b) or 0))
                                  for a, b in (("short_ask", "short_bid"), ("long_ask", "long_bid")))
@@ -2511,7 +2508,7 @@ def _overlay_stream(payload: dict) -> None:
                                     _tw = None
                     except (TypeError, ValueError):
                         _tw = None
-                    return _tw if _tw is not None else r.get("net_credit")      # parity: the debit site shows this
+                    return _tw
                 if not is_deb:
                     r.setdefault("credit_px", r.get("net_credit"))
                     r.setdefault("debit_px", _scan_twin())
@@ -2523,8 +2520,8 @@ def _overlay_stream(payload: dict) -> None:
                 # off the credit bag through parity, width - the live credit, instead of the scan's leg
                 # mids (VZ 45/45.5 showed a 0.37 debit off a 0.33/0.58 scan leg against the app's 0.28).
                 # The gate below still judges the debit book on its own (scan twin verdict).
-                if is_deb and q is None and qo is not None and w:
-                    q = {"bid": qo["bid"], "ask": qo["ask"], "mid": qo["mid"], "ts": qo["ts"], "_parity": True}
+                # (Parity pricing of unstreamed debit rows was removed the same day -- user: 'PRICE BY
+                # DEBIT THEN'. A debit row without a twin stream quote keeps its scan twin price.)
                 tg = r.get("credit_targets") or {}
                 wa = tg.get("walkaway_credit")
                 own_above = other_above = None
@@ -2554,7 +2551,7 @@ def _overlay_stream(payload: dict) -> None:
                     r["credit_px"] = qo["mid"] if qo is not None else r.get("credit_px")
                 else:
                     r["credit_px"] = r.get("net_credit")
-                    r["debit_px"] = qo["mid"] if qo is not None else (q["mid"] if q is not None else r.get("debit_px"))
+                    r["debit_px"] = qo["mid"] if qo is not None else r.get("debit_px")
                 _best_book(r)
                 if qo is not None and wa is not None:
                     other_above = _r2(qo["mid"]) >= wa and _book_ok(qo, w)
