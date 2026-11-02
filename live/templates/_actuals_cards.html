@@ -43,7 +43,7 @@
       <thead><tr>
         <th>Date</th><th>Time</th><th>Ticker</th>
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>{% if is_debit_site %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th>
-        <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">{% if is_debit_site %}Max / Target debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th>
+        <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">{% if is_debit_site %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th>
         <th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th title="credit / spread width; in brackets, your fill / width">Ratio</th><th title="GROUND, in basis points">GROUND (bps)</th>
         <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>
       </tr></thead>
@@ -150,9 +150,9 @@
           {% if tg and tg.min_credit is defined %}
             <td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }}); breakeven ${{ '%.2f'|format(tg.breakeven_credit) }}">
               {% if p.structure == 'debit' %}
-              <span style="color:#c9a227" title="max debit = width − min credit">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span>
-              <span style="opacity:0.6"> / </span>
               <span style="color:#7ec99a">${{ "%.2f"|format(tg.target_hi_credit|px(p)) }}–${{ "%.2f"|format(tg.target_lo_credit|px(p)) }}</span>
+              <span style="opacity:0.6"> / </span>
+              <span style="color:#c9a227" title="max debit = width − min credit">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span>
               {% else %}
               <span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span>
               <span style="opacity:0.6"> / </span>
