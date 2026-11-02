@@ -324,7 +324,7 @@ def _debit_row(r: dict) -> bool:
             mid = max(0.0, min(float(mid), w))
             r["quoted_credit"] = r["net_credit"] = round(mid, 4)
             r["credit_source"] = src
-            r["debit_px"] = round(mid, 4)
+            r["debit_px"] = None if src == "parity" else round(mid, 4)   # the star needs a real debit-book price
             _best_book(r)
             r["max_loss"] = round(w - mid, 4)
             r["fill_targets"] = [{"credit": round(mid, 4), "max_loss": r["max_loss"]}]
@@ -2496,21 +2496,36 @@ def _overlay_stream(payload: dict) -> None:
                 if qo is not None and qo.get("mid") is None:
                     qo = None
                 w = r.get("spread_width")
-                # Best-book marker: each book's price from the scan, replaced by the stream where held.
+                # Best-book marker (user 2026-11-02: 'does the star work properly?'): compare like with
+                # like. Both bags streamed -> live vs live. Neither streamed -> the scan's credit quote vs
+                # the scan's twin price (usable twin combo, else credible twin legs). One live, one not ->
+                # no star: a live credit against a 15-minute-old twin leg is not a comparison (VZ 45/45.5
+                # starred credit off 0.245 live vs a 0.13 scan leg while the row showed 0.25 via parity).
+                _qc, _qd = (qo, q) if is_deb else (q, qo)         # credit bag quote, debit bag quote
                 if not is_deb:
                     r.setdefault("credit_px", r.get("net_credit"))
                     _tw = r.get("twin_combo_credit_mid")
                     try:
                         if _tw is None or float(_tw) <= 0 or (w and float(_tw) >= float(w) - 1e-9):
                             _tw = r.get("twin_leg_credit")
+                            if _tw is not None and _mbw is not None and w:
+                                _bwl = sum(abs(float(r.get(a) or 0) - float(r.get(b) or 0))
+                                           for a, b in (("par_short_ask", "par_short_bid"), ("par_long_ask", "par_long_bid")))
+                                if _bwl > float(_mbw) * float(w) + 1e-9 or not (float(r.get("par_short_bid") or 0) > 0 and float(r.get("par_long_bid") or 0) > 0):
+                                    _tw = None
                     except (TypeError, ValueError):
-                        _tw = r.get("twin_leg_credit")
+                        _tw = None
                     r.setdefault("debit_px", _tw)
-                if q is not None:
-                    r["debit_px" if is_deb else "credit_px"] = q["mid"]
-                if qo is not None:
-                    r["credit_px" if is_deb else "debit_px"] = qo["mid"]
-                _best_book(r)
+                if _qc is not None and _qd is not None:
+                    r["credit_px"], r["debit_px"] = _qc["mid"], _qd["mid"]
+                    r["best_src"] = "live"
+                elif _qc is None and _qd is None:
+                    r["best_src"] = "scan"
+                else:
+                    r["best_src"] = None
+                    r["best_book"] = None
+                if r.get("best_src"):
+                    _best_book(r)
                 if q is None and qo is None:
                     continue
                 # Debit site, same logic as the credit site (user 2026-11-02: 'it has to be the same logic
