@@ -118,7 +118,11 @@ def _board() -> list[dict]:
     # open positions take most of the MAX_BAGS lines, so the picks were falling outside the stream and
     # the live tab showed their 15-minute-old scan mids as if current (MSFT 517.5/515 at 15:40).
     _all = payload.get("ticker") or []
-    rows = ([r for r in _all if r.get("qualified")] + [r for r in _all if not r.get("qualified")])[:MAX_BAGS]   # trimmed again after positions
+    # Debit priority (2026-11-02): read enough rows that DEBIT_PRIORITY_BAGS twins can be formed -- 6 of
+    # the first 20 had no twin contracts, so only 14 of 20 debit slots filled.
+    _nread = MAX_BAGS + (DEBIT_PRIORITY_BAGS * 2 if DEBIT_PRIORITY else 0)
+    rows = ([r for r in _all if r.get("qualified_debit") or r.get("qualified")]
+            + [r for r in _all if not (r.get("qualified_debit") or r.get("qualified"))])[:_nread]   # trimmed again after positions
     snap_path = ROOT / str(payload.get("snapshot_file") or "")
     if not snap_path.exists():
         return []
