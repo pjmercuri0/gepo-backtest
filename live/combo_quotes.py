@@ -216,6 +216,11 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
                 for idx, (bid, ask, last) in zip(chunk, res):
                     if bid is None or ask is None or pd.isna(bid) or pd.isna(ask):
                         continue
+                    # A debit bag is a positive price. 0/0 is an empty book, and subtracting the
+                    # width turned it into a credit equal to the width -- RTX 200/202.5 showed a
+                    # $0.00 debit with a ✓ on 2026-11-02 (user: 'these ones are lighting up').
+                    if float(bid) <= 0 or float(ask) <= 0:
+                        continue
                     _r = rows[idx]
                     _w = _r.get("spread_width")
                     if _w is None or pd.isna(_w):

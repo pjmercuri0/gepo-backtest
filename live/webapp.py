@@ -256,21 +256,67 @@ def _debit_row(r: dict) -> bool:
                  ("long_bid", "par_long_bid"), ("long_ask", "par_long_ask")):
         if r.get(b) is not None:
             r[a] = r[b]
+    try:
+        w = float(r.get("spread_width") or abs(float(r["short_strike"]) - float(r["long_strike"])))
+    except (KeyError, TypeError, ValueError):
+        w = None
     mid = r.get("twin_combo_credit_mid")
     src = "twin_combo_mid"
+    # A twin bag quoted 0/0 came through the scan as a credit equal to the width (debit $0.00,
+    # 2026-11-02 RTX / SBUX). That is an empty book: fall through to the twin leg mids.
+    if mid is not None and w is not None and (float(mid) <= 0 or float(mid) >= w - 1e-9):
+        mid = None
+        r["twin_combo_bid"] = r["twin_combo_ask"] = r["twin_combo_credit_mid"] = None
     if mid is None:
         mid, src = r.get("twin_leg_credit"), "twin_leg_mid"
     r["combo_bid"], r["combo_ask"] = r.get("twin_combo_bid"), r.get("twin_combo_ask")
     r["combo_credit_mid"] = r.get("twin_combo_credit_mid")
-    if mid is not None and r.get("pnl") is None and not r.get("outcome"):
+    r["combo_priced"] = r.get("twin_combo_credit_mid") is not None
+    if r.get("pnl") is None and not r.get("outcome"):
+        if mid is not None and float(mid) <= 0:
+            mid = None      # twin legs implying a debit at or over the width: junk book, same as no quote
+        if mid is None or w is None:
+            # No twin price at all: not tradable as a debit right now. Keep the row, no gate.
+            r["quoted_credit"] = r["net_credit"] = None
+            r["credit_source"] = "twin_unquoted"
+            r["fill_targets"] = []
+            r["above_min"] = False
+            r["qualified"] = False
+            return True
         try:
-            w = float(r.get("spread_width") or abs(float(r["short_strike"]) - float(r["long_strike"])))
             mid = max(0.0, min(float(mid), w))
             r["quoted_credit"] = r["net_credit"] = round(mid, 4)
             r["credit_source"] = src
             r["max_loss"] = round(w - mid, 4)
             r["fill_targets"] = [{"credit": round(mid, 4), "max_loss": r["max_loss"]}]
             r["credit_ratio"] = round(mid / r["max_loss"], 4) if r["max_loss"] > 0 else None
+            # The gate (above_min / qualified) on the row is the CREDIT book's verdict. Re-run it
+            # on the twin price with the ranker's rules: quote >= walkaway at 2dp, on a credible
+            # book (GILD 170/172.5 showed ✓ off the credit quote beside a $2.50 debit, 2026-11-02).
+            import config as _cfg
+            wa = (r.get("credit_targets") or {}).get("walkaway_credit")
+            if wa is None:
+                d = r.get("dfit_short") if r.get("dfit_short") is not None else r.get("short_delta")
+                mc = r.get("model_credit")
+                tg = ec.credit_targets(abs(float(d)) if d is not None else None, r.get("DTE"), width=w,
+                                        model_credit=float(mc) if mc is not None else None)
+                wa = (tg or {}).get("walkaway_credit")
+            if wa is not None:
+                above = math.floor(mid * 100 + 0.5) / 100 >= float(wa)
+                _mbw = getattr(_cfg, "QUOTE_MAX_BOOK_W", None)
+                if _mbw is not None:
+                    if r.get("combo_priced"):
+                        bw = abs(float(r["twin_combo_ask"]) - float(r["twin_combo_bid"]))
+                    else:
+                        bw = sum(abs(float(r.get(a) or 0) - float(r.get(b) or 0))
+                                 for a, b in (("short_ask", "short_bid"), ("long_ask", "long_bid")))
+                    r["quote_ok"] = bw <= float(_mbw) * w + 1e-9
+                    above = above and r["quote_ok"]
+                r["above_min"] = bool(above)
+                if getattr(_cfg, "SELECTION_MODE", "ground") != "fable":
+                    r["qualified"] = bool(float(r.get("GROUND") or 0) >= _cfg.GROUND_THRESHOLD) and r["above_min"]
+                else:
+                    r["qualified"] = bool(r.get("qualified")) and r["above_min"]
         except (KeyError, TypeError, ValueError):
             pass
     return True
@@ -750,7 +796,14 @@ def _enrich_pick(pick: dict, tracking_rows: list = None, credit_frac: float = 1.
     # honest mid from them; frozen files stay immutable, only display changes.
     sb_q = pick.get("short_bid"); sa_q = pick.get("short_ask")
     lb_q = pick.get("long_bid");  la_q = pick.get("long_ask")
-    if pick.get("combo_priced") and mid_c > 0:
+    if pick.get("structure") == "debit" and mid_c > 0:
+        # Debit row (gepo-debit-ticker): the legs on the row are the twin's, so the leg recompute
+        # below (short mid - long mid) is a negative number that clamps to 0 -- 44 of 57 rows
+        # showed debit = width, ratio 0.00 on 2026-11-02. net_credit is the twin's credit
+        # equivalent, set by _debit_row; use it.
+        base_mid = mid_c
+        basis = "TWIN " + ("COMBO MID" if pick.get("combo_priced") else "LEG MID")
+    elif pick.get("combo_priced") and mid_c > 0:
         # Take net_credit as the ranker set it. Do NOT re-derive from
         # combo_credit_mid: on a too-wide book the ranker deliberately prices
         # off the combo's LAST instead, and combo_credit_mid still holds the

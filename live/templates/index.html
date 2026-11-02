@@ -39,8 +39,8 @@
         <th>Strikes</th>
         <th>Δ</th>
         <th>DTE</th>
-        <th title="IBKR quoted credit (combo mid, else leg mids) — the live selection basis; model credit in the card">Credit ($/sh)</th>
-        <th title="min 1.00× model credit (= execution gate), target 1.04–1.10×">Min / Target</th>
+        <th title="IBKR quoted credit (combo mid, else leg mids) — the live selection basis; model credit in the card">{% if is_debit_site %}Debit{% else %}Credit{% endif %} ($/sh)</th>
+        <th title="min 1.00× model credit (= execution gate), target 1.04–1.10×">{% if is_debit_site %}Max / Target debit{% else %}Min / Target{% endif %}</th>
         <th>Max-Loss ($/sh)</th>
         <th>Ratio</th>
         <th title="P_real above (realized-move belief, used in G); Q_bs below (market law, D_ent reference)">real: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">bs below</span></th>
@@ -161,6 +161,7 @@ const isDebit = p => p && p.structure === "debit";
 const widthOf = p => Math.abs(Number(p.short_strike) - Number(p.long_strike));
 function pxCell(p, credit) {
   if (credit == null || isNaN(Number(credit))) return "—";
+  if (isDebit(p) && p.credit_source === "twin_unquoted") return "—";   // no twin price in this scan
   return isDebit(p) ? fmtMoney(widthOf(p) - rd(Number(credit), 2)) : fmtMoney(credit);
 }
 // Both inputs are the stored canonical score (Kelly EV · exp(−k·DKL),
@@ -357,8 +358,8 @@ function renderRanked(rows, maxGround, kVal) {
       <td>${r.DTE ?? "—"}</td>
       <td>${pxCell(r, mmCredit(r))}</td>
       <td>${tgtCell(r)}</td>
-      <td>${fmtMoney(mmMaxLoss(r))}</td>
-      <td>${rd(mmMaxLoss(r) > 0 ? mmCredit(r)/mmMaxLoss(r) : 0, 2).toFixed(2)}</td>
+      <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : fmtMoney(mmMaxLoss(r))}</td>
+      <td>${isDebit(r) && r.credit_source === "twin_unquoted" ? "—" : rd(mmMaxLoss(r) > 0 ? mmCredit(r)/mmMaxLoss(r) : 0, 2).toFixed(2)}</td>
       <td>${fmtNum(r.p, 2)} / ${fmtNum(r.ro, 2)} / ${fmtNum(r.q, 2)}<br>
           <span style="opacity:0.7;font-size:11px">${r.p_hat != null ? `bs ${fmtNum(r.p_hat,2)} / ${fmtNum(r.ro_hat,2)} / ${fmtNum(r.q_hat,2)}` : "—"}</span></td>
       <td>${fmtKellyEV(r.G)}</td>
