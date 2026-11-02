@@ -169,9 +169,7 @@ function bestCell(p) {
   const own = isDebit(p) ? "debit" : "credit";
   if (p.best_book === "tie" || p.best_book === own)
     return ` <span style="font-size:10px;color:#7ec99a" title="this book pays the most right now">★</span>`;
-  const other = Number(isDebit(p) ? p.credit_px : p.debit_px);     // credit-equivalent of the other book
-  const shown = isDebit(p) ? fmtMoney(other) : fmtMoney(widthOf(p) - rd(other, 2));
-  return ` <span style="font-size:10px;color:#e8b366" title="the other book pays more: credit-equivalent ${fmtMoney(other)} vs ${fmtMoney(Number(isDebit(p) ? p.debit_px : p.credit_px))} here">${isDebit(p) ? "puts" : "calls"} ${shown}</span>`;
+  return "";   // the other book pays more: its site shows the star (user 2026-11-02: 'just put star')
 }
 function strikesOf(p) {
   const a = Number(p.short_strike), b = Number(p.long_strike);
