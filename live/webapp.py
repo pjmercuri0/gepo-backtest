@@ -249,7 +249,7 @@ def _best_book(r: dict) -> None:
         if c is None or d is None:
             r["best_book"] = None
             return
-        c2, d2 = math.floor(float(c) * 100 + 0.5) / 100, math.floor(float(d) * 100 + 0.5) / 100
+        c2, d2 = math.floor(float(c) * 100 + 1e-9) / 100, math.floor(float(d) * 100 + 1e-9) / 100
         r["best_book"] = "tie" if c2 == d2 else ("credit" if c2 > d2 else "debit")
     except (TypeError, ValueError):
         r["best_book"] = None
@@ -340,8 +340,10 @@ def _debit_row(r: dict) -> bool:
                                         model_credit=float(mc) if mc is not None else None)
                 wa = (tg or {}).get("walkaway_credit")
             if wa is not None:
-                # Debit scale, rounded as the page shows it: debit at 2dp <= max debit at 2dp (2026-11-02).
-                above = math.floor((w - mid) * 100 + 0.5) / 100 <= math.floor((w - float(wa)) * 100 + 0.5) / 100 + 1e-9
+                # Floor the credit equivalent (user 2026-11-02: 'debit side should ceiling, credit side
+                # should floor'): the debit shown is width - floor(credit), i.e. the debit's ceiling, and it
+                # clears when that is <= max debit, which is the same test as floor(credit) >= walkaway.
+                above = math.floor(mid * 100 + 1e-9) / 100 >= float(wa)
                 _mbw = getattr(_cfg, "QUOTE_MAX_BOOK_W", None)
                 if _mbw is not None:
                     if r.get("combo_priced"):
@@ -1170,7 +1172,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                     if _wa is None and pick.get("model_credit"):
                         _wa = math.floor(float(pick["model_credit"]) * 100 + 0.5) / 100
                     if _wa is not None:
-                        live["gate_ok"] = bool(_gate_book_ok and math.floor(float(_q["mid"]) * 100 + 0.5) / 100 >= float(_wa))
+                        live["gate_ok"] = bool(_gate_book_ok and math.floor(float(_q["mid"]) * 100 + 1e-9) / 100 >= float(_wa))
                 except (TypeError, ValueError):
                     pass
             # The CREDIT CELL shows the stream quote at any width (user 2026-10-07: "still put the quote
@@ -1942,7 +1944,7 @@ def snapshots():
                             _wa = (pk.get("credit_targets") or {}).get("walkaway_credit")
                             _qv = pk.get("cur_quote", pk.get("net_credit"))
                             if _wa is not None and _qv is not None:
-                                _g = math.floor(float(_qv) * 100 + 0.5) / 100 >= float(_wa)
+                                _g = math.floor(float(_qv) * 100 + 1e-9) / 100 >= float(_wa)
                         except (TypeError, ValueError):
                             _g = None
                     if _g is not None:
@@ -2467,7 +2469,7 @@ def _overlay_stream(payload: dict) -> None:
             return
         n = 0
         _mbw = getattr(backtest_config, "QUOTE_MAX_BOOK_W", None)   # None = rule off
-        _r2 = lambda v: math.floor(float(v) * 100 + 0.5) / 100
+        _r2 = lambda v: math.floor(float(v) * 100 + 1e-9) / 100     # floor (user 2026-11-02)
         def _book_ok(qq, w):
             # Same credible-book rule as the scan (2026-10-01): a streamed book wider than
             # QUOTE_MAX_BOOK_W x the spread width is not a price.
@@ -2551,10 +2553,9 @@ def _overlay_stream(payload: dict) -> None:
                         # The check mark judges the price shown (user 2026-11-02). A debit row is judged on
                         # the debit scale, rounded as the page rounds it: debit at 2dp <= max debit at 2dp.
                         r["quote_ok"] = _book_ok(q, w)
-                        if is_deb and w:
-                            own_above = (_r2(float(w) - q["mid"]) <= _r2(float(w) - wa) + 1e-9) and r["quote_ok"]
-                        else:
-                            own_above = _r2(q["mid"]) >= wa and r["quote_ok"]
+                        # One rule both ways: floor(credit equivalent) >= walkaway. On the debit site that is
+                        # ceiling(debit) <= max debit, which is what the page shows.
+                        own_above = _r2(q["mid"]) >= wa and r["quote_ok"]
                     n += 1
                 if r.get("best_src") == "live":
                     r["credit_px"], r["debit_px"] = _qc["mid"], _qd["mid"]
