@@ -83,6 +83,41 @@ document.addEventListener('click', e => {
 </script>
 
 <script>
+// Inline edit of the number of contracts (user 2026-11-02): click the Nx, type, Enter to save.
+// Posts to /api/actuals/<id>/qty; the row P&L and the card total scale by it on reload.
+document.addEventListener('click', e => {
+  const span = e.target.closest('.actual-qty-edit');
+  if (!span || span.dataset.editing === '1') return;
+  span.dataset.editing = '1';
+  const id = span.dataset.id;
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.inputMode = 'numeric'; inp.value = span.dataset.current || '1';
+  inp.style.cssText = 'background:#222;color:#fff;border:1px solid #888;border-radius:3px;padding:1px 4px;width:44px;font:inherit';
+  const parent = span.parentNode; parent.replaceChild(inp, span); inp.focus(); inp.select();
+  let done = false;
+  const restore = () => { if (!done) { done = true; parent.replaceChild(span, inp); span.dataset.editing = ''; } };
+  const submit = async () => {
+    if (done) return;
+    const q = parseInt(inp.value.trim(), 10);
+    if (isNaN(q) || q < 1) { alert('quantity must be a whole number, 1 or more'); restore(); return; }
+    done = true;
+    try {
+      const r = await fetch(`/api/actuals/${encodeURIComponent(id)}/qty`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({qty: q}),
+      });
+      if (!r.ok) { alert('save failed: ' + r.status + ' ' + (await r.text())); done = false; restore(); return; }
+      location.reload();
+    } catch (err) { alert('save failed: ' + err); done = false; restore(); }
+  };
+  inp.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); submit(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+  });
+  inp.addEventListener('blur', submit);
+});
+</script>
+
+<script>
 // Click a column header to sort every card by that column; click again to reverse
 // (user 2026-10-09). Row ORDER only -- every value is still the server's. The choice
 // is kept in the tab and re-applied after each poll swaps the cards in.

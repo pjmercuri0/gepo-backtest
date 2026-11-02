@@ -823,6 +823,12 @@ def _actuals_rows() -> list[dict]:
             pick["actual_credit"] = item["actual_credit"]
             pick["actual_max_loss"] = item.get("actual_max_loss")
         _attach_targets(pick)
+        # Contracts traded (user 2026-11-02: 'edit the quantity in actuals'): stored on the trade, shown in
+        # the Qty cell, and the row P&L and card total scale by it. Default 1.
+        try:
+            pick["suggested_qty"] = max(1, int(item.get("qty") or pick.get("suggested_qty") or 1))
+        except (TypeError, ValueError):
+            pick["suggested_qty"] = 1
 
         rows.append({
             "id": item.get("id"),
@@ -2297,6 +2303,9 @@ def actuals():
         # The card header sums _actuals_row_pnl; give the template the SAME
         # number so a row can never disagree with the total above it.
         r["row_pnl"], r["row_pnl_realized"] = _actuals_row_pnl(r)
+        _q = max(1, int((r.get("pick") or {}).get("suggested_qty") or 1))
+        if r["row_pnl"] is not None and _q != 1:
+            r["row_pnl"] = round(r["row_pnl"] * _q, 2)
 
         # Single source of truth for spot on an OPEN row. assignment_risk
         # quotes each position's own underlying every run; last_track carries
@@ -2370,6 +2379,9 @@ def actuals():
             if _lt1.get("current_mark") is not None:
                 r["last_marked"] = _lt1
             r["row_pnl"], r["row_pnl_realized"] = _actuals_row_pnl(r)
+            _q = max(1, int((r.get("pick") or {}).get("suggested_qty") or 1))
+            if r["row_pnl"] is not None and _q != 1:
+                r["row_pnl"] = round(r["row_pnl"] * _q, 2)
     fill_stats = _fill_stats(rows)
     ctx = dict(fill_stats=fill_stats, rows=rows, weeks=_actuals_weeks(rows),
                assign_ts=risk.get("_ts"),
@@ -2868,6 +2880,29 @@ def delete_actual(trade_id: str):
     store["updated_at"] = datetime.now().isoformat(timespec="seconds")
     _atomic_write_json(_actuals_path(), store)
     return jsonify({"ok": True, "removed": trade_id})
+
+
+@app.route("/api/actuals/<path:trade_id>/qty", methods=["POST"])
+def set_actual_trade_qty(trade_id: str):
+    """Set the number of contracts on an Actuals trade (user 2026-11-02). Body: {"qty": 2}. Stored on
+    the trade (survives the pick being re-read from its source) and carried across the Mac/Mya sync
+    like the fill (upload_to_mya USER_KEYS)."""
+    body = request.get_json(silent=True) or {}
+    try:
+        q = int(body.get("qty"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "qty must be an integer"}), 400
+    if q < 1 or q > 999:
+        return jsonify({"error": "qty must be between 1 and 999"}), 400
+    store = _actuals_store()
+    trade = next((t for t in store.get("trades") or [] if t.get("id") == trade_id), None)
+    if trade is None:
+        abort(404)
+    trade["qty"] = q
+    trade.setdefault("pick", {})["suggested_qty"] = q
+    store["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    _atomic_write_json(_actuals_path(), store)
+    return jsonify({"ok": True, "id": trade_id, "qty": q})
 
 
 @app.route("/api/actuals/<path:trade_id>/actual_credit", methods=["POST"])
