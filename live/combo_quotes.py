@@ -180,29 +180,10 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
         batch = int(live_config.LIVE_COMBO_BATCH)
         wait_s = float(live_config.LIVE_COMBO_WAIT)
         deadline = time.monotonic() + float(live_config.LIVE_COMBO_TIMEOUT)
-        got: dict = {}                    # idx -> (bid, ask, last)
-        for ex in COMBO_EXCHANGES:
-            todo = [idx for idx in rows if idx not in got]
-            n0 = len(got)
-            for i in range(0, len(todo), batch):
-                if time.monotonic() >= deadline:
-                    break
-                chunk = todo[i:i + batch]
-                res = _quote_batch(ib, [_bag_for(rows[idx], ex) for idx in chunk], wait_s)
-                for idx, (bid, ask, last) in zip(chunk, res):
-                    if bid is not None and ask is not None and pd.notna(bid) and pd.notna(ask):
-                        _r = rows[idx]
-                        _w = _r.get("spread_width")
-                        if _w is None or pd.isna(_w):
-                            _w = abs(float(_r["short_strike"]) - float(_r["long_strike"]))
-                        if _r.get("structure") == "debit":
-                            got[idx] = (bid, ask, last)      # debit scale; validated after conversion below
-                        elif usable_combo(bid, ask, _w):
-                            got[idx] = (bid, ask, last)
-            print(f"  [combo] {ex}: +{len(got) - n0} quoted", flush=True)
         # Parity twins (live/stores.py, gepo-debit-ticker): the same spread as a debit bag, SELL the
-        # short strike / BUY the long strike in the other right. Quoted after the credit pass inside
-        # the same budget; stored on the credit scale (debit - width) like every debit row.
+        # short strike / BUY the long strike in the other right. Quoted BEFORE the credit pass (user
+        # 2026-11-02: 'debit priority then credit') inside the same budget; stored on the credit scale
+        # (debit - width) like every debit row.
         twin_rows = [idx for idx in rows if _bag_for(rows[idx], "SMART", twin=True) is not None]
         got_twin: dict = {}
         for ex in COMBO_EXCHANGES:
@@ -231,6 +212,26 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
                         got_twin[idx] = (cb, ca, cl)
             if twin_rows:
                 print(f"  [combo] twin {ex}: +{len(got_twin) - n0} quoted", flush=True)
+        got: dict = {}                    # idx -> (bid, ask, last)
+        for ex in COMBO_EXCHANGES:
+            todo = [idx for idx in rows if idx not in got]
+            n0 = len(got)
+            for i in range(0, len(todo), batch):
+                if time.monotonic() >= deadline:
+                    break
+                chunk = todo[i:i + batch]
+                res = _quote_batch(ib, [_bag_for(rows[idx], ex) for idx in chunk], wait_s)
+                for idx, (bid, ask, last) in zip(chunk, res):
+                    if bid is not None and ask is not None and pd.notna(bid) and pd.notna(ask):
+                        _r = rows[idx]
+                        _w = _r.get("spread_width")
+                        if _w is None or pd.isna(_w):
+                            _w = abs(float(_r["short_strike"]) - float(_r["long_strike"]))
+                        if _r.get("structure") == "debit":
+                            got[idx] = (bid, ask, last)      # debit scale; validated after conversion below
+                        elif usable_combo(bid, ask, _w):
+                            got[idx] = (bid, ask, last)
+            print(f"  [combo] {ex}: +{len(got) - n0} quoted", flush=True)
     except Exception as e:
         print(f"  [combo] quoting failed ({e}); falling back to leg mids", flush=True)
         return df
