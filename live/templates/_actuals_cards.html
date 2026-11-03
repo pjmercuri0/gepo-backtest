@@ -237,7 +237,7 @@
           {% if row.row_pnl is not none %}
             <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}"
                 style="text-align:right"
-                title="{{ 'realized' if row.row_pnl_realized else 'marked' }}{% if is_debit_site and last_marked and last_marked.current_mark is not none and not row.row_pnl_realized %} at quote ${{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }} ({{ last_marked.mark_basis }}){% endif %}{% if p.actual_credit is not none %} against your fill {{ p.actual_credit|px(p) }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
+                title="{{ 'realized' if row.row_pnl_realized else 'marked' }}{% if is_debit_site and last_marked and last_marked.current_mark is not none and not row.row_pnl_realized %} at quote ${{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }} ({{ last_marked.mark_basis }}){% endif %}{% if p.actual_credit is defined and p.actual_credit is not none %} against your fill {{ p.actual_credit|px(p) }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
           {% else %}
             <td style="text-align:right">—</td>
           {% endif %}
