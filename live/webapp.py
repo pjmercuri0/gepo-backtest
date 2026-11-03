@@ -798,8 +798,10 @@ def _actuals_rows() -> list[dict]:
         # prefer_stream (2026-10-01): same mark as History for the same spread -- the live stream
         # quote when the stream holds it on a credible book, else the last scan's own-leg mark.
         # The two tabs showed MSFT 517.5/515 at -$5 and -$9 off two different marks.
+        # quote_mark on the debit site (user 2026-11-03): the row's mark is the quote, not intrinsic.
         last_track, last_marked = _stream_overlay(
-            pick, last_track, last_marked, outcome_row, prefer_stream=True)
+            pick, last_track, last_marked, outcome_row, prefer_stream=True,
+            quote_mark=(_stores.site() == "debit"))
 
         # Actuals display basis = the IBKR credit on the pick (combo last > combo mid >
         # leg mids, i.e. quoted_credit/net_credit), NOT the modelled 0.80x mid /
@@ -1081,7 +1083,8 @@ def _stream_state() -> dict:
         return _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
 
 
-def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=False):
+def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=False,
+                    quote_mark=False):
     """Live spot + mark for ONE open pick, straight off combo_stream.
 
     Extracted 2026-09-21 so History and Actuals cannot diverge again. They
@@ -1344,14 +1347,17 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                 live["unrealized_pnl_per_contract"] = round(
                     (float(_basis_credit) - live["current_mark"]) * 100, 2)
             # PURE INTRINSIC (user 2026-10-07) overrides the mark chosen above and its P&L.
-            _apply_intrinsic(live, pick)
+            # quote_mark=True (the debit site's Actuals, user 2026-11-03) keeps the quote chosen above.
+            if not quote_mark:
+                _apply_intrinsic(live, pick)
             _out_track = live
             if live.get("current_mark") is not None:
                 _out_marked = live
         elif outcome_row is None and isinstance(last_track, dict) and last_track.get("underlying_price"):
             # Nothing live for this spread: still intrinsic, at the last spot the tracker stored.
             live = dict(last_track)
-            _apply_intrinsic(live, pick)
+            if not quote_mark:
+                _apply_intrinsic(live, pick)
             _out_track = _out_marked = live
     except (TypeError, ValueError, KeyError):
         pass
@@ -2373,11 +2379,30 @@ def actuals():
                         and short_itm and long_otm)
         # PURE INTRINSIC (user 2026-10-07), re-applied at the spot this row ends up showing, and the
         # row P&L re-read so the card header still sums exactly what the rows display.
+        #
+        # DEBIT SITE (user 2026-11-03: "i want p&l to be the real quote of the name x N contracts, and
+        # mark to be % of max win"): the open row keeps the QUOTE mark _stream_overlay gave it -- the
+        # streamed debit bag mid (credit-equivalent, width - debit), else mark_actuals' own-leg mark,
+        # else the held last quote -- so P&L = (fill - quote) x 100 x N, i.e. what closing at the
+        # quote would realise. max_win_total = (width - debit paid) x 100 x N feeds the Mark cell.
         _lt1 = r.get("last_track")
         if isinstance(_lt1, dict) and not r.get("outcome_row"):
-            _apply_intrinsic(_lt1, r.get("pick") or {})
-            if _lt1.get("current_mark") is not None:
-                r["last_marked"] = _lt1
+            if _stores.site() == "debit":
+                _pk1 = r.get("pick") or {}
+                _ac1 = _pk1.get("actual_credit")
+                try:
+                    _bc1 = float(_ac1) if _ac1 is not None else credit_basis.entry_credit(_pk1)
+                except (TypeError, ValueError):
+                    _bc1 = None
+                if _lt1.get("current_mark") is not None and _bc1 is not None:
+                    _lt1["unrealized_pnl_per_contract"] = round((_bc1 - float(_lt1["current_mark"])) * 100, 2)
+                    r["last_marked"] = _lt1
+                _q = max(1, int(_pk1.get("suggested_qty") or 1))
+                r["max_win_total"] = round(_bc1 * 100 * _q, 2) if _bc1 else None
+            else:
+                _apply_intrinsic(_lt1, r.get("pick") or {})
+                if _lt1.get("current_mark") is not None:
+                    r["last_marked"] = _lt1
             r["row_pnl"], r["row_pnl_realized"] = _actuals_row_pnl(r)
             _q = max(1, int((r.get("pick") or {}).get("suggested_qty") or 1))
             if r["row_pnl"] is not None and _q != 1:
