@@ -67,7 +67,8 @@ function rd(x, dec=0) {
   if (x == null || isNaN(x)) return x;
   const m = Math.pow(10, dec);
   const f = Number(x);
-  return (f >= 0 ? Math.floor(f * m + 0.5) : -Math.floor(-f * m + 0.5)) / m;
+  // +1e-9: 1 - 0.465 is 0.53499999... in binary and floored to 0.53 (user 2026-11-03).
+  return (f >= 0 ? Math.floor(f * m + 0.5 + 1e-9) : -Math.floor(-f * m + 0.5 + 1e-9)) / m;
 }
 function fmtNum(v, dec=2) {
   if (v == null) return "—";
@@ -83,7 +84,7 @@ function fmtPct(v, dec=1) {
 // Proper rounding, half-up (user 2026-11-02: 'just proper round for both credit and debit sites'): a
 // credit shows rounded, a debit shows width - credit rounded AS A DEBIT (the ticket's number); the risk
 // cell beside it is width minus that shown number, so the pair always sums to the width.
-const floor2 = x => Math.floor(Number(x) * 100 + 0.5) / 100;
+const floor2 = x => Math.floor(Number(x) * 100 + 0.5 + 1e-9) / 100;
 const shownPx = (p, credit) => isDebit(p) ? floor2(widthOf(p) - Number(credit)) : floor2(credit);
 function fmtMoney(v, dec=2) {
   if (v == null) return "—";

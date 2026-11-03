@@ -77,9 +77,11 @@ def _round_half_up(x, digits=0):
         return None
     mult = 10 ** digits
     f = float(x)
+    # +1e-9: binary floats put 1 - 0.465 at 0.53499999..., which floored to 0.53 (user 2026-11-03:
+    # 'mark should be rounding not flooring'). A true x.xx5 now rounds up as intended.
     if f >= 0:
-        return math.floor(f * mult + 0.5) / mult
-    return -math.floor(-f * mult + 0.5) / mult
+        return math.floor(f * mult + 0.5 + 1e-9) / mult
+    return -math.floor(-f * mult + 0.5 + 1e-9) / mult
 
 
 def _short_date(v):
@@ -246,7 +248,7 @@ def _read_json(path: Path) -> dict | None:
 
 def _r2(x) -> float:
     """Proper rounding at 2dp, half-up (user 2026-11-02: 'just proper round for both credit and debit sites')."""
-    return math.floor(float(x) * 100 + 0.5) / 100
+    return math.floor(float(x) * 100 + 0.5 + 1e-9) / 100
 
 
 def _gate_clears(p: dict, mid, wa) -> bool:
@@ -1200,7 +1202,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                 try:
                     _wa = (pick.get("credit_targets") or {}).get("walkaway_credit")
                     if _wa is None and pick.get("model_credit"):
-                        _wa = math.floor(float(pick["model_credit"]) * 100 + 0.5) / 100
+                        _wa = math.floor(float(pick["model_credit"]) * 100 + 0.5 + 1e-9) / 100
                     if _wa is not None:
                         live["gate_ok"] = bool(_gate_book_ok and _gate_clears(pick, _q["mid"], _wa))
                 except (TypeError, ValueError):

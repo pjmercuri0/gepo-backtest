@@ -597,7 +597,7 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # Compare at the precision the page shows (2dp, half-up). 2026-09-14: INTC quoted
     # 0.275 (shown 0.28) against a walk-away of 0.28 (model 0.2805) read as a tie on
     # screen and failed underneath. A tie at 2dp qualifies.
-    _r2 = lambda x: np.floor(x * 100 + 0.5) / 100      # proper rounding, half-up (user 2026-11-02: 'just proper round for both sites')
+    _r2 = lambda x: np.floor(x * 100 + 0.5 + 1e-9) / 100      # proper rounding, half-up (user 2026-11-02: 'just proper round for both sites')
     ranked["above_min"] = _r2(ranked["net_credit"].astype(float)) >= ranked["tgt_walkaway_credit"].astype(float)
     # Credible-book check (2026-10-01): a quote built from leg mids counts only when the legs' combined
     # book is no wider than QUOTE_MAX_BOOK_W x the spread width and both legs are bid. Combo-sourced
