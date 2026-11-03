@@ -140,7 +140,7 @@
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { ...tip, callbacks: { label: c => {
-          const w = weeks[c.dataIndex]; return `${w.n_bull_put} bull put · ${w.n_bear_call} bear call`; } } } },
+          const w = weeks[c.dataIndex]; return `${w.n_bull_put} {{ 'bull call' if is_debit_site else 'bull put' }} · ${w.n_bear_call} {{ 'bear put' if is_debit_site else 'bear call' }}`; } } } },
         scales: {
           x: { ticks: { color: '#888780', maxTicksLimit: 12, maxRotation: 0 }, grid: { display: false } },
           y: { ticks: { color: '#888780', stepSize: 1 }, grid: { color: 'rgba(80,80,80,0.2)' } }
@@ -180,7 +180,7 @@
           <td>{{ t.entry }}</td>
           <td style="color:#888780">{{ t.dow }}</td>
           <td class="fw">{{ t.ticker }}</td>
-          <td><span class="{{ 'dir-bull' if t.type == 'bull_put' else 'dir-bear' }}">{{ '▲ bull put' if t.type == 'bull_put' else '▼ bear call' }}{% if t.structure == 'debit' %} debit{% endif %}</span></td>
+          <td><span class="{{ 'dir-bull' if t.type == 'bull_put' else 'dir-bear' }}">{% if t.structure == 'debit' %}{{ '▲ bull call debit' if t.type == 'bull_put' else '▼ bear put debit' }}{% else %}{{ '▲ bull put' if t.type == 'bull_put' else '▼ bear call' }}{% endif %}</span></td>
           <td>${{ '%.2f'|format(t.k_s) }} / ${{ '%.2f'|format(t.k_l) }}</td>
           <td style="color:#888780">{{ t.expiry[5:] }}</td>
           <td>{% if t.credit is not none %}${{ '%.3f'|format(t.credit) }}{% else %}—{% endif %}</td>
