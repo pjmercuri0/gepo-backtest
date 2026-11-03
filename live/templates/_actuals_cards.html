@@ -200,8 +200,7 @@
               {% set _be = ((p.long_strike|float) + _cd) if p.spread_type == 'bull_put' else ((p.long_strike|float) - _cd) %}
               {% set _dist = ((_cs|float) - _be) if p.spread_type == 'bull_put' else (_be - (_cs|float)) %}
               {% set _cu = (_dist / (_cw - _cd) * 100) if _dist >= 0 else (_dist / _cd * 100) %}
-              <td class="{% if _cu > 0 %}pos{% elif _cu < 0 %}neg{% endif %}"
-                  title="breakeven ${{ '%.2f'|format(_be|rd(2)) }}, spot ${{ '%.2f'|format((_cs|float)|rd(2)) }}, debit {{ '%.2f'|format(_cd) }} on {{ '%.2f'|format(_cw) }} width">{{ "%+.0f"|format(_cu|rd) }}%</td>
+              <td title="breakeven ${{ '%.2f'|format(_be|rd(2)) }}, spot ${{ '%.2f'|format((_cs|float)|rd(2)) }}, debit {{ '%.2f'|format(_cd) }} on {{ '%.2f'|format(_cw) }} width">{{ "%+.0f"|format(_cu|rd) }}%</td>
             {% else %}
               <td>—</td>
             {% endif %}
