@@ -45,7 +45,7 @@
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>{% if is_debit_site %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th>
         <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">{% if is_debit_site %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th>
         <th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th title="credit / spread width; in brackets, your fill / width">Ratio</th><th title="GROUND, in basis points">GROUND (bps)</th>
-        <th>Δ short</th><th>DTE</th><th>Status</th>{% if is_debit_site %}<th style="text-align:right" title="Mark: the quote to sell the spread now, $/sh in debit terms (streamed bag mid, else own-leg mids, else the last held quote). Dollar P&amp;L vs your fill in the tooltip.">Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right" title="Mark as a % of the width: what the spread is worth now over its full value. 100% = full win, 0% = worthless.">pct</th><th style="text-align:right" title="(mark − your debit) × 100 × N; realized on a settled row">P&amp;L</th>{% else %}<th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>{% endif %}
+        <th>Δ short</th><th>DTE</th><th>Status</th>{% if is_debit_site %}<th style="text-align:right" title="Mark: the quote to sell the spread now, $/sh in debit terms (streamed bag mid, else own-leg mids, else the last held quote). Dollar P&amp;L vs your fill in the tooltip.">Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right" title="(mark − your debit) × 100 × N; realized on a settled row">P&amp;L</th><th style="text-align:right" title="Mark as a % of the width: what the spread is worth now over its full value. 100% = full win, 0% = worthless.">pct</th>{% else %}<th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>{% endif %}
       </tr></thead>
       <tbody>
       {% for row in wk.rows %}
@@ -259,7 +259,7 @@
             <td style="text-align:right">—</td>
             {% endif %}
           {% endset %}
-          {% if is_debit_site %}{{ _cell_pnl }}{{ _cell_ext }}{{ _cell_mark }}{{ _cell_dollars }}{% else %}{{ _cell_mark }}{{ _cell_ext }}{{ _cell_pnl }}{% endif %}
+          {% if is_debit_site %}{{ _cell_pnl }}{{ _cell_ext }}{{ _cell_dollars }}{{ _cell_mark }}{% else %}{{ _cell_mark }}{{ _cell_ext }}{{ _cell_pnl }}{% endif %}
         </tr>
       {% endfor %}
       </tbody>
