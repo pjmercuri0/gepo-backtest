@@ -45,7 +45,7 @@
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>{% if is_debit_site %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th>
         <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">{% if is_debit_site %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th>
         <th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th title="credit / spread width; in brackets, your fill / width">Ratio</th><th title="GROUND, in basis points">GROUND (bps)</th>
-        <th>Δ short</th><th>DTE</th><th>Status</th>{% if is_debit_site %}<th style="text-align:right" title="Mark: the quote to sell the spread now, $/sh in debit terms (streamed bag mid, else own-leg mids, else the last held quote). Dollar P&amp;L vs your fill in the tooltip.">Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right" title="P&amp;L as a % of max win: (mark − debit paid) × 100 × N over (width − debit paid) × 100 × N. +100% = quoted at full win.">pct</th>{% else %}<th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>{% endif %}
+        <th>Δ short</th><th>DTE</th><th>Status</th>{% if is_debit_site %}<th style="text-align:right" title="Mark: the quote to sell the spread now, $/sh in debit terms (streamed bag mid, else own-leg mids, else the last held quote). Dollar P&amp;L vs your fill in the tooltip.">Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right" title="Mark as a % of the width: what the spread is worth now over its full value. 100% = full win, 0% = worthless.">pct</th>{% else %}<th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>{% endif %}
       </tr></thead>
       <tbody>
       {% for row in wk.rows %}
@@ -192,11 +192,11 @@
              P&L, Ext, Mark; the credit site keeps Mark, Ext, P&L. Captured once, emitted per site. #}
           {% set _cell_mark %}
           {% if is_debit_site and p.structure == 'debit' %}
-            {# Mark on the debit site = P&L as a % of max win (user 2026-11-03): the row's quote P&L
-               over (width - debit paid) x 100 x N. +100% = the quote is at full win, -100% = full loss
-               (the spread quoted at zero). #}
-            {% if row.row_pnl is not none and row.max_win_total %}
-              <td style="text-align:right" title="P&amp;L ${{ '%+.0f'|format(row.row_pnl|rd) }} of max win ${{ '%.0f'|format(row.max_win_total|rd) }}{% if last_marked and last_marked.mark_basis %}; {{ last_marked.mark_basis }}{% endif %}">{{ "%+.0f"|format((row.row_pnl / row.max_win_total * 100)|rd) }}%</td>
+            {# pct on the debit site (user 2026-11-03: "1.65/2.50 so 66%"): the mark (quote to sell,
+               debit terms) over the width. 100% = full win, 0% = worthless. Fill not involved. #}
+            {% set _pw = ((p.short_strike|float) - (p.long_strike|float))|abs %}
+            {% if not row.row_pnl_realized and last_marked and last_marked.current_mark is not none and _pw > 0 %}
+              <td style="text-align:right" title="mark ${{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }} of width ${{ '%.2f'|format(_pw) }}">{{ "%.0f"|format(((last_marked.current_mark|px(p)|rd(2)) / _pw * 100)|rd) }}%</td>
             {% else %}
               <td style="text-align:right">—</td>
             {% endif %}
