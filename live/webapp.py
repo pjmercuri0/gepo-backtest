@@ -2397,6 +2397,16 @@ def actuals():
                 except (TypeError, ValueError):
                     _bc1 = None
                 if _lt1.get("current_mark") is not None and _bc1 is not None:
+                    # P&L off the mark AS DISPLAYED (user 2026-11-03: "shouldn't it be mark - debit?"): the
+                    # debit rounded to the cent, then back to the credit scale, so (mark - debit) x 100 x N
+                    # on the page's own numbers is exactly the P&L cell. The raw quote 0.435 showed $0.44
+                    # beside a P&L computed off 0.435, a dollar out on every row.
+                    try:
+                        _w1 = abs(float(_pk1["short_strike"]) - float(_pk1["long_strike"]))
+                        _dm1 = _round_half_up(_w1 - float(_lt1["current_mark"]), 2)
+                        _lt1["current_mark"] = round(_w1 - _dm1, 4)
+                    except (KeyError, TypeError, ValueError):
+                        pass
                     _lt1["unrealized_pnl_per_contract"] = round((_bc1 - float(_lt1["current_mark"])) * 100, 2)
                     r["last_marked"] = _lt1
                 _q = max(1, int(_pk1.get("suggested_qty") or 1))
