@@ -45,7 +45,7 @@
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>{% if is_debit_site %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th>
         <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">{% if is_debit_site %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th>
         <th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th title="credit / spread width; in brackets, your fill / width">Ratio</th><th title="GROUND, in basis points">GROUND (bps)</th>
-        <th>Δ short</th><th>DTE</th><th>Status</th>{% if is_debit_site %}<th title="Cushion: distance from the short strike (the full-win line) as a % of the width. 0 = at the short strike, −100% = at the long strike (full loss), positive = past full win.">Mark</th>{% else %}<th>Mark</th>{% endif %}<th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>
+        <th>Δ short</th><th>DTE</th><th>Status</th>{% if is_debit_site %}<th title="Cushion: distance from the long strike as a % of the width. 0 = at the long strike (full loss), +100% = at the short strike (full win), above that = past full win.">Mark</th>{% else %}<th>Mark</th>{% endif %}<th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>
       </tr></thead>
       <tbody>
       {% for row in wk.rows %}
@@ -189,16 +189,16 @@
             <td><span style="color:#888780">open</span></td>
           {% endif %}
           {% if is_debit_site and p.structure == 'debit' %}
-            {# Mark on the debit site = cushion (user 2026-11-03, 'relative to the strike and width'):
-               spot's distance from the SHORT strike (the full-win line) as a % of the width. 0 = at the
-               short strike, -100% = at the long strike (full loss), positive = past full win. Same spot
-               as the Spot cell. #}
+            {# Mark on the debit site = cushion (user 2026-11-03, 'distance from long strike'): spot's
+               distance from the LONG strike as a % of the width. 0 = at the long strike (full loss),
+               +100% = at the short strike (full win), above that = past full win. Same spot as the
+               Spot cell. #}
             {% set _cs = (outcome_row.underlying_price if (outcome_row and outcome_row.underlying_price is defined) else (last_track.underlying_price if (last_track and 'underlying_price' in last_track and last_track.underlying_price) else none)) %}
             {% set _cw = ((p.short_strike|float) - (p.long_strike|float))|abs %}
             {% if _cs is not none and _cw > 0 %}
-              {% set _dist = ((_cs|float) - (p.short_strike|float)) if p.spread_type == 'bull_put' else ((p.short_strike|float) - (_cs|float)) %}
+              {% set _dist = ((_cs|float) - (p.long_strike|float)) if p.spread_type == 'bull_put' else ((p.long_strike|float) - (_cs|float)) %}
               {% set _cu = _dist / _cw * 100 %}
-              <td title="short strike ${{ '%.2f'|format(p.short_strike|float) }}, spot ${{ '%.2f'|format((_cs|float)|rd(2)) }}, width {{ '%.2f'|format(_cw) }}">{{ "%+.0f"|format(_cu|rd) }}%</td>
+              <td title="long strike ${{ '%.2f'|format(p.long_strike|float) }}, spot ${{ '%.2f'|format((_cs|float)|rd(2)) }}, width {{ '%.2f'|format(_cw) }}">{{ "%+.0f"|format(_cu|rd) }}%</td>
             {% else %}
               <td>—</td>
             {% endif %}
