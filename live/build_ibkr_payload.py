@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 STMT_DIR = ROOT / "data" / "ibkr_statements"
 # --site debit (gepo-debit-ticker): only the parity debit spreads (calls with short > long, puts with
-# short < long), written to ibkr_actual_equity_debit.json. Default: the credit spreads.
+# short < long), written to ibkr_actual_equity_debit.json. Default (credit site): every spread in the account.
 SITE = sys.argv[sys.argv.index("--site") + 1] if "--site" in sys.argv else "credit"
 OUT = ROOT / "live" / "data" / ("ibkr_actual_equity_debit.json" if SITE == "debit" else "ibkr_actual_equity.json")
 FIELDS = ["sec", "kind", "disc", "cat", "ccy", "sym", "dt", "qty", "tpx", "cpx", "proceeds", "comm",
@@ -220,7 +220,10 @@ def build():
         ks, kl = s_.get("k_s"), s_.get("k_l")
         s_["structure"] = ("debit" if (ks is not None and kl is not None and
                                        ((s_["pc"] == "C" and ks > kl) or (s_["pc"] == "P" and ks < kl))) else "credit")
-    spreads = [s_ for s_ in spreads if s_["structure"] == SITE]
+    # The credit site's IBKR tab is the whole account (user 2026-11-03: "that's universal ibkr");
+    # the debit site shows only its own debit spreads.
+    if SITE == "debit":
+        spreads = [s_ for s_ in spreads if s_["structure"] == "debit"]
     credits = _actual_credit_lookup()
     spot_pairs = _closes_on([(s["ticker"], s["expiry"]) for s in spreads]
                             + [(s["ticker"], days[-1]) for s in spreads if s.get("phantom")])
