@@ -45,7 +45,7 @@
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>{% if is_debit_site %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th>
         <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">{% if is_debit_site %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th>
         <th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th title="credit / spread width; in brackets, your fill / width">Ratio</th><th title="GROUND, in basis points">GROUND (bps)</th>
-        <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>
+        <th>Δ short</th><th>DTE</th><th>Status</th><th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th>{% if is_debit_site %}<th style="text-align:right" title="Distance from breakeven (long strike ± your debit). Past breakeven: ÷ (width − debit), so +100% = short strike = full win. Short of it: ÷ debit, so −100% = long strike = full loss.">Cushion</th>{% else %}<th style="text-align:right">P&amp;L</th>{% endif %}
       </tr></thead>
       <tbody>
       {% for row in wk.rows %}
@@ -218,7 +218,23 @@
              recorded — so on 2026-09-08 the Sep 11 card read -49 while its
              three rows showed -11 / +2 / +24, and ABT and ISRG rendered as
              winners when both were losses. #}
-          {% if row.row_pnl is not none %}
+          {% if is_debit_site and p.structure == 'debit' %}
+            {# Cushion (user 2026-11-03): distance from breakeven as a % -- past breakeven divided by
+               (width - debit) so +100% is the short strike (full win); short of breakeven divided by
+               the debit so -100% is the long strike (full loss). Same spot as the Spot cell. #}
+            {% set _cs = (outcome_row.underlying_price if (outcome_row and outcome_row.underlying_price is defined) else (last_track.underlying_price if (last_track and 'underlying_price' in last_track and last_track.underlying_price) else none)) %}
+            {% set _cw = ((p.short_strike|float) - (p.long_strike|float))|abs %}
+            {% set _cd = ((p.actual_credit if (p.actual_credit is defined and p.actual_credit is not none) else cr)|px(p))|rd(2) %}
+            {% if _cs is not none and _cd > 0 and _cw > _cd %}
+              {% set _be = ((p.long_strike|float) + _cd) if p.spread_type == 'bull_put' else ((p.long_strike|float) - _cd) %}
+              {% set _dist = ((_cs|float) - _be) if p.spread_type == 'bull_put' else (_be - (_cs|float)) %}
+              {% set _cu = (_dist / (_cw - _cd) * 100) if _dist >= 0 else (_dist / _cd * 100) %}
+              <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if _cu > 0 %}pos{% elif _cu < 0 %}neg{% endif %}" style="text-align:right"
+                  title="breakeven ${{ '%.2f'|format(_be|rd(2)) }}, spot ${{ '%.2f'|format((_cs|float)|rd(2)) }}, debit {{ '%.2f'|format(_cd) }} on {{ '%.2f'|format(_cw) }} width{% if row.row_pnl is not none %}; P&amp;L ${{ '%+.0f'|format(row.row_pnl|rd) }}{% endif %}">{{ "%+.0f"|format(_cu|rd) }}%</td>
+            {% else %}
+              <td style="text-align:right">—</td>
+            {% endif %}
+          {% elif row.row_pnl is not none %}
             <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}"
                 style="text-align:right"
                 title="{{ 'realized' if row.row_pnl_realized else 'marked' }}{% if p.actual_credit is not none %} against your fill {{ p.actual_credit }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
