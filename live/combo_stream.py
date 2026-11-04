@@ -56,6 +56,7 @@ DEBIT_PRIORITY_BAGS = int(getattr(live_config, "LIVE_STREAM_DEBIT_PRIORITY_BAGS"
 # one market-data line per spread either way (the account caps lines at 100).
 BAG_EXCHANGES = COMBO_EXCHANGES
 SWAP_S    = float(getattr(live_config, "LIVE_STREAM_SWAP_S", 5.0))
+LINE_BUDGET = int(getattr(live_config, "LIVE_STREAM_LINE_BUDGET", 98))   # IBKR caps the account at 100 lines
 MAX_SPOTS = int(getattr(live_config, "LIVE_STREAM_MAX_SPOTS", 20))   # 26 bags + 52 legs + 20 spots = 98 lines
 RELOAD_S  = float(getattr(live_config, "LIVE_STREAM_RELOAD_S", 20))
 WRITE_S   = float(getattr(live_config, "LIVE_STREAM_WRITE_S", 1.0))
@@ -414,7 +415,40 @@ def main() -> int:
                             if (DEBIT_PRIORITY or r.get("qualified_debit")) and _nleg < _leg_cap:
                                 tw["_twin_legs"] = True; _nleg += 1
                             _twins.append(tw)
-                board = board + _twins[:_twin_cap]
+                # Line budget (user 2026-11-04: 'if you need spots priority goes: debit bags, holding
+                # actuals names, credit bags'): the debit twins and their legs are counted first, then a
+                # spot for every name held in either Actuals book, then the credit bags with their legs
+                # in priority order until the budget is spent, then spots for the remaining names.
+                _tw = _twins[:_twin_cap]
+                _cnt: set = set()           # leg conIds already paid for (adjacent spreads share strikes)
+                _used = 0
+                for r in _tw:
+                    _used += 1
+                    if r.get("_twin_legs"):
+                        for c in (r.get("short_conid"), r.get("long_conid")):
+                            if c and c not in _cnt:
+                                _cnt.add(c); _used += 1
+                _syms: list = []
+                for sym in dict.fromkeys(r["ticker"] for r in pos):
+                    if _used < LINE_BUDGET and len(_syms) < MAX_SPOTS:
+                        _syms.append(sym); _used += 1
+                _credit = []
+                for r in board:
+                    _cost = 1 + len([c for c in (r.get("short_conid"), r.get("long_conid")) if c and c not in _cnt])
+                    _need_spot = r["ticker"] not in _syms and len(_syms) < MAX_SPOTS
+                    if _used + _cost + (1 if _need_spot else 0) > LINE_BUDGET:
+                        break
+                    _credit.append(r); _used += _cost
+                    _cnt.update(c for c in (r.get("short_conid"), r.get("long_conid")) if c)
+                    if _need_spot:
+                        _syms.append(r["ticker"]); _used += 1
+                for r in _tw + board[len(_credit):]:
+                    if r["ticker"] not in _syms and _used < LINE_BUDGET and len(_syms) < MAX_SPOTS:
+                        _syms.append(r["ticker"]); _used += 1
+                if len(_credit) < len(board):
+                    print(f"[combo_stream] line budget {LINE_BUDGET}: {len(_tw)} debit bags, {len(_syms)} spots, "
+                          f"{len(_credit)} of {len(board)} credit bags", flush=True)
+                board = _credit + _tw
                 want = {r["_key"]: r for r in board}
                 for k in list(subs):
                     if k not in want:
@@ -461,7 +495,7 @@ def main() -> int:
                 # Underlying spot too (2026-09-16): the page colours pin/status and shows
                 # the cushion off spot, so a streaming credit beside a scan-old spot reads
                 # inconsistently. One line per distinct ticker.
-                want_syms = list(dict.fromkeys(r["ticker"] for r in board))[:MAX_SPOTS]
+                want_syms = list(_syms)
                 for sym in list(spots):
                     if sym not in want_syms:
                         c, _t = spots.pop(sym)
