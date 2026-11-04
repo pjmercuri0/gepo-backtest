@@ -48,7 +48,13 @@ TWIN_LEG_ROWS = int(getattr(live_config, "LIVE_STREAM_TWIN_LEG_ROWS", 4))
 # the debit twins -- DEBIT_PRIORITY_BAGS twin bags, legs on every one of them -- and the credit side
 # keeps only its open positions. ~20 bags + 40 legs + spots + positions stays under IBKR's 100 lines.
 DEBIT_PRIORITY = bool(getattr(live_config, "LIVE_STREAM_DEBIT_PRIORITY", True))
-DEBIT_PRIORITY_BAGS = int(getattr(live_config, "LIVE_STREAM_DEBIT_PRIORITY_BAGS", 13))
+# 20 twins (user 2026-11-04: 'many rows on debit live that aren't streaming. Fix it'; 13 left only
+# 4 pick twins once the 9 positions took their slots). 20 x 3 lines + spots leaves the credit bags
+# whatever remains of LINE_BUDGET -- the user's order is debit bags, held names, credit bags.
+DEBIT_PRIORITY_BAGS = int(getattr(live_config, "LIVE_STREAM_DEBIT_PRIORITY_BAGS", 20))
+# Top rows of the debit live tab that always stream (user 2026-11-04: 'top 10 debit is the priority,
+# then all my actuals, then credit whatever left').
+TOP_DEBIT = int(getattr(live_config, "LIVE_STREAM_TOP_DEBIT", 10))
 # Check both books (user 2026-10-26): SMART returned nothing for PFE 30/29.5 while CBOE quoted
 # -0.27/-0.22, so the page showed leg mids. Order (user 2026-10-27): SMART (best across every
 # exchange's book, legs tagged CBOE -- see combo_quotes._bag_for) first, CBOE's own book as backup,
@@ -122,8 +128,14 @@ def _board() -> list[dict]:
     # Debit priority (2026-11-02): read enough rows that DEBIT_PRIORITY_BAGS twins can be formed -- 6 of
     # the first 20 had no twin contracts, so only 14 of 20 debit slots filled.
     _nread = MAX_BAGS + (DEBIT_PRIORITY_BAGS * 2 if DEBIT_PRIORITY else 0)
-    rows = ([r for r in _all if r.get("qualified_debit") or r.get("qualified")]
-            + [r for r in _all if not (r.get("qualified_debit") or r.get("qualified"))])[:_nread]   # trimmed again after positions
+    for i, r in enumerate(_all):
+        r["_rank"] = i                       # table order = the live tab's order (GROUND-sorted)
+    # The debit live tab's top rows (table order, rows that have a twin) always ride, whatever
+    # their qualification (user 2026-11-04: 'top 10 debit is the priority').
+    _top = [r for r in _all if r.get("twin_short_conid") and r.get("twin_long_conid")][:TOP_DEBIT]
+    _tk = {id(r) for r in _top}
+    rows = (_top + [r for r in _all if id(r) not in _tk and (r.get("qualified_debit") or r.get("qualified"))]
+            + [r for r in _all if id(r) not in _tk and not (r.get("qualified_debit") or r.get("qualified"))])[:_nread]
     snap_path = ROOT / str(payload.get("snapshot_file") or "")
     if not snap_path.exists():
         return []
@@ -361,7 +373,7 @@ def main() -> int:
                 # 9 debit ones trimmed to 13 - picks, only 4 of the 9 debit positions streamed and the
                 # rest marked off the last scan's leg mids. They go straight to the twin slots below.
                 _dpos0 = [r for r in pos if debit_mode.is_debit(r)]
-                _keep_pos = [r for r in pos if not debit_mode.is_debit(r)][:max(0, MAX_BAGS - len(_picks))]
+                _keep_pos = [r for r in pos if not debit_mode.is_debit(r)]      # every credit position
                 # Earlier days' open History picks go ahead of the non-pick board rows.
                 try:
                     _have = {r["_key"] for r in _picks} | {r["_key"] for r in _keep_pos}
@@ -379,15 +391,25 @@ def main() -> int:
                 _ek = {r["_key"] for r in _earlier}
                 _rest_all = list(_rest)          # board order, before Snap/History rows are pulled out
                 _rest = [r for r in _rest if r["_key"] not in _ek]
-                board = _picks + _keep_pos + _earlier + _rest[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos) - len(_earlier))]
+                board = _keep_pos + (_picks + _earlier + _rest)[:MAX_BAGS]     # all actuals, then credit picks
                 # Debit twins (gepo-debit-ticker): debit positions already ride in pos with their '|debit'
                 # key; add twin bags for the picks and the board rows that carry twin conIds, up to TWIN_BAGS.
                 _dpos = list(_dpos0) + [r for r in board if debit_mode.is_debit(r)
                                         and r["_key"] not in {x["_key"] for x in _dpos0}]
                 board = [r for r in board if not debit_mode.is_debit(r)]
-                # Positions lead the twin list and carry leg lines, so a twin with an empty complex
-                # book still prices off its own legs instead of falling back to the last scan.
-                _twins = [{**r, "_twin_legs": True} for r in _dpos]
+                # Priority (user 2026-11-04): 'top 10 debit is the priority, then all my actuals, then
+                # credit whatever left'. The twin list is the debit live tab's top TOP_DEBIT rows in
+                # table order, then every debit position; all with leg lines so a twin with an empty
+                # complex book still prices off its own legs.
+                _twins = []
+                for r in sorted([r for r in _picks + _rest_all if r.get("_rank") is not None
+                                 and r.get("twin_short_conid") and r.get("twin_long_conid")],
+                                key=lambda x: x["_rank"])[:TOP_DEBIT]:
+                    tw = {**r, "structure": "debit", "short_conid": r["twin_short_conid"],
+                          "long_conid": r["twin_long_conid"], "_twin_legs": True}
+                    tw["_key"] = _key(tw)
+                    _twins.append(tw)
+                _twins += [{**r, "_twin_legs": True} for r in _dpos if r["_key"] not in {x["_key"] for x in _twins}]
                 _twin_cap, _leg_cap = TWIN_BAGS, TWIN_LEG_ROWS
                 if DEBIT_PRIORITY:
                     # 13 / 13 split (user 2026-11-02: 'add 6 more, so thats 26 names, and split them between
@@ -395,31 +417,13 @@ def main() -> int:
                     # the debit side gets DEBIT_PRIORITY_BAGS (13) twins with legs. 26 bags + 52 legs +
                     # spots (capped) stays under the 100 lines.
                     _twin_cap, _leg_cap = DEBIT_PRIORITY_BAGS, DEBIT_PRIORITY_BAGS
-                # The debit site's OWN picks (ranker qualified_debit) take the twin slots first, then the
-                # credit picks, then the rest (2026-11-02: VZ 45/45.5 was a debit pick with no stream
-                # slot, so its site showed the 12:47 scan price while the app showed 0.28 live). The
-                # first TWIN_LEG_ROWS of them also get leg lines, so a twin with an empty complex book
-                # still prices off its legs like the credit bags do.
-                _nleg = min(len(_twins), _leg_cap)
-                # Twin slots follow the BOARD order (2026-11-02: GM, BMY, BA, JNJ, PM at the top of the
-                # table had no slot because they were also today's Snap picks and had been moved out of
-                # _rest into _earlier, so the slots went to rows further down).
-                for r in sorted(_picks + _rest_all, key=lambda x: not x.get("qualified_debit")):
-                    if len(_twins) >= _twin_cap:
-                        break
-                    if r.get("twin_short_conid") and r.get("twin_long_conid") and not debit_mode.is_debit(r):
-                        tw = {**r, "structure": "debit", "short_conid": r["twin_short_conid"],
-                              "long_conid": r["twin_long_conid"]}
-                        tw["_key"] = _key(tw)
-                        if tw["_key"] not in {x["_key"] for x in _twins}:
-                            if (DEBIT_PRIORITY or r.get("qualified_debit")) and _nleg < _leg_cap:
-                                tw["_twin_legs"] = True; _nleg += 1
-                            _twins.append(tw)
+                # No further pick twins (2026-11-04): after the top TOP_DEBIT rows and the positions,
+                # the remaining lines go to the credit bags.
                 # Line budget (user 2026-11-04: 'if you need spots priority goes: debit bags, holding
                 # actuals names, credit bags'): the debit twins and their legs are counted first, then a
                 # spot for every name held in either Actuals book, then the credit bags with their legs
                 # in priority order until the budget is spent, then spots for the remaining names.
-                _tw = _twins[:_twin_cap]
+                _tw = list(_twins)
                 _cnt: set = set()           # leg conIds already paid for (adjacent spreads share strikes)
                 _used = 0
                 for r in _tw:
@@ -429,7 +433,9 @@ def main() -> int:
                             if c and c not in _cnt:
                                 _cnt.add(c); _used += 1
                 _syms: list = []
-                for sym in dict.fromkeys(r["ticker"] for r in pos):
+                # Spots: names held in either Actuals book first, then the debit twins' names (the debit
+                # live tab colours status and pin off spot), then the credit bags take what is left.
+                for sym in dict.fromkeys([r["ticker"] for r in pos] + [r["ticker"] for r in _tw]):
                     if _used < LINE_BUDGET and len(_syms) < MAX_SPOTS:
                         _syms.append(sym); _used += 1
                 _credit = []
