@@ -355,7 +355,12 @@ def main() -> int:
                 _new = [r for r in board if r["_key"] not in seen]
                 _picks = [r for r in _new if r.get("qualified")]
                 _rest = [r for r in _new if not r.get("qualified")]
-                _keep_pos = pos[:max(0, MAX_BAGS - len(_picks))]
+                # Debit positions (gepo-debit-ticker) do not compete for the credit MAX_BAGS slots
+                # (user 2026-11-04: 'mark should be based on live quote'): with 19 credit positions and
+                # 9 debit ones trimmed to 13 - picks, only 4 of the 9 debit positions streamed and the
+                # rest marked off the last scan's leg mids. They go straight to the twin slots below.
+                _dpos0 = [r for r in pos if debit_mode.is_debit(r)]
+                _keep_pos = [r for r in pos if not debit_mode.is_debit(r)][:max(0, MAX_BAGS - len(_picks))]
                 # Earlier days' open History picks go ahead of the non-pick board rows.
                 try:
                     _have = {r["_key"] for r in _picks} | {r["_key"] for r in _keep_pos}
@@ -376,9 +381,12 @@ def main() -> int:
                 board = _picks + _keep_pos + _earlier + _rest[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos) - len(_earlier))]
                 # Debit twins (gepo-debit-ticker): debit positions already ride in pos with their '|debit'
                 # key; add twin bags for the picks and the board rows that carry twin conIds, up to TWIN_BAGS.
-                _dpos = [r for r in board if debit_mode.is_debit(r)]
+                _dpos = list(_dpos0) + [r for r in board if debit_mode.is_debit(r)
+                                        and r["_key"] not in {x["_key"] for x in _dpos0}]
                 board = [r for r in board if not debit_mode.is_debit(r)]
-                _twins = list(_dpos)
+                # Positions lead the twin list and carry leg lines, so a twin with an empty complex
+                # book still prices off its own legs instead of falling back to the last scan.
+                _twins = [{**r, "_twin_legs": True} for r in _dpos]
                 _twin_cap, _leg_cap = TWIN_BAGS, TWIN_LEG_ROWS
                 if DEBIT_PRIORITY:
                     # 13 / 13 split (user 2026-11-02: 'add 6 more, so thats 26 names, and split them between
@@ -391,7 +399,7 @@ def main() -> int:
                 # slot, so its site showed the 12:47 scan price while the app showed 0.28 live). The
                 # first TWIN_LEG_ROWS of them also get leg lines, so a twin with an empty complex book
                 # still prices off its legs like the credit bags do.
-                _nleg = 0
+                _nleg = min(len(_twins), _leg_cap)
                 # Twin slots follow the BOARD order (2026-11-02: GM, BMY, BA, JNJ, PM at the top of the
                 # table had no slot because they were also today's Snap picks and had been moved out of
                 # _rest into _earlier, so the slots went to rows further down).

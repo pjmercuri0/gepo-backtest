@@ -1345,6 +1345,15 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             # No fill -> book the canon credit, the basis History displays.
             _ac = pick.get("actual_credit")
             _basis_credit = float(_ac) if _ac is not None else credit_basis.entry_credit(pick)
+            # Debit site (2026-11-04): the row is the parity twin, shown at width - this credit
+            # mark, and a vertical cannot trade below its intrinsic. Deep-ITM twins' own leg mids
+            # sat under parity (RTX 205/202.5 put spread 1.65 against 2.50 intrinsic at spot
+            # 195.31, CVX 2.25 vs 2.50, PYPL 0.84 vs 1.00) and the card showed +84 on a position
+            # IBKR carried at +257. Twin intrinsic = width - credit intrinsic, so the floor on the
+            # debit mark is a CAP on the credit-equivalent mark at the credit intrinsic.
+            if quote_mark and _sp and live.get("current_mark") is not None and live["current_mark"] > intr:
+                live["current_mark"] = round(intr, 4)
+                live["mark_basis"] = f"{live.get('mark_basis') or 'mark'}, floored at intrinsic"
             if live.get("current_mark") is not None and _basis_credit is not None:
                 live["unrealized_pnl_per_contract"] = round(
                     (float(_basis_credit) - live["current_mark"]) * 100, 2)
