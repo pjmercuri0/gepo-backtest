@@ -304,7 +304,7 @@ def _settle_live_actuals_file(today, ib, ib_close_cache, fp) -> None:
         # 121/120 left the picks and sat on Actuals as open). Then it settles here.
         if src.get("kind") != "live" and not (src.get("kind") == "frozen" and _orphaned_frozen(src, p)):
             continue
-        if p.get("outcome") is not None:
+        if p.get("outcome") is not None or t.get("closed"):   # closed on the site (2026-11-05): P&L locked
             continue
         expiry = (p.get("expiry_date") or "")[:10]
         if not expiry or expiry > today:

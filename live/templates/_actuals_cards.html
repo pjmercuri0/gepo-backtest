@@ -82,8 +82,9 @@
         {% set _pin_row = (outcome_row is none
                            and last_track and last_track.live_status == 'PARTIAL'
                            and p.expiry_date and (p.expiry_date|string)[:10] == today_iso) %}
-        <tr class="{% if _pin_row %}assign-watch{% endif %}">
-          <td data-sort="{{ (row.date or (p.entry_date or '')[:10]) }} {{ row.source_time or '' }}"><button class="actuals-remove" data-id="{{ row.id }}" title="remove from actuals">x</button>
+        {# Closed on the site (user 2026-11-05): greyed, P&L locked at the click, no live updates. #}
+        <tr class="{% if _pin_row and not row.closed %}assign-watch{% endif %}{% if row.closed %} row-closed{% endif %}">
+          <td data-sort="{{ (row.date or (p.entry_date or '')[:10]) }} {{ row.source_time or '' }}" style="position:relative"><button class="actuals-remove" data-id="{{ row.id }}" data-closed="{{ '1' if row.closed else '0' }}" title="{{ 'closed ' + (row.closed.at|string)[:16] + ' -- remove or reopen' if row.closed else 'remove, or mark closed' }}">x</button>
             {{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>
           <td>{{ row.source_time or '—' }}</td>
           {# Source column dropped 2026-09-03 to save width; row.source_label is
@@ -179,7 +180,9 @@
           <td class="fw">{% if p.GROUND is not none %}{{ "%.2f"|format((p.GROUND * 10000)|rd(2)) }}{% else %}—{% endif %}</td>
           <td>{% if p.short_delta is defined and p.short_delta is not none %}{{ "%.2f"|format(p.short_delta|rd(2)) }}{% else %}—{% endif %}</td>
           <td>{{ p.DTE if p.DTE is not none else '—' }}</td>
-          {% if outcome_row and outcome_row.result %}
+          {% if row.closed %}
+            <td><span class="badge badge-CLOSED" title="closed {{ (row.closed.at|string)[:16] }}; P&amp;L locked">C</span></td>
+          {% elif outcome_row and outcome_row.result %}
             <td><span class="badge {% if outcome_row.result == 'WIN' %}badge-WIN{% elif outcome_row.result == 'LOSS' %}badge-LOSS{% elif outcome_row.result == 'PARTIAL' %}badge-PARTIAL{% else %}badge-FROZEN{% endif %}" title="{{ outcome_row.result }}">{{ outcome_row.result[0] }}</span></td>
           {% elif p.outcome %}
             <td><span class="badge badge-{{ p.outcome }}" title="{{ p.outcome }}">{{ p.outcome[0] }}</span></td>
@@ -195,7 +198,7 @@
             {# pct on the debit site (user 2026-11-03: "1.65/2.50 so 66%"): the mark (quote to sell,
                debit terms) over the width. 100% = full win, 0% = worthless. Fill not involved. #}
             {% set _pw = ((p.short_strike|float) - (p.long_strike|float))|abs %}
-            {% if not row.row_pnl_realized and last_marked and last_marked.current_mark is not none and _pw > 0 %}
+            {% if (not row.row_pnl_realized or row.closed) and last_marked and last_marked.current_mark is not none and _pw > 0 %}
               <td style="text-align:right" title="mark ${{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }} of width ${{ '%.2f'|format(_pw) }}">{{ "%.0f"|format(((last_marked.current_mark|px(p)|rd(2)) / _pw * 100)|rd) }}%</td>
             {% else %}
               <td style="text-align:right">—</td>
@@ -234,7 +237,7 @@
              recorded — so on 2026-09-08 the Sep 11 card read -49 while its
              three rows showed -11 / +2 / +24, and ABT and ISRG rendered as
              winners when both were losses. #}
-          {% if is_debit_site and p.structure == 'debit' and not row.row_pnl_realized and last_marked and last_marked.current_mark is not none %}
+          {% if is_debit_site and p.structure == 'debit' and (not row.row_pnl_realized or row.closed) and last_marked and last_marked.current_mark is not none %}
             {# Debit site, open row (user 2026-11-03: "p&l to actually be mark, and that's just the actual
                quote to sell"): the cell is the quote itself, $/sh in debit terms; the dollar P&L moves
                to the tooltip and still drives the card total. #}
@@ -244,7 +247,7 @@
           {% elif row.row_pnl is not none %}
             <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}"
                 style="text-align:right"
-                title="{{ 'realized' if row.row_pnl_realized else 'marked' }}{% if p.actual_credit is defined and p.actual_credit is not none %} against your fill {{ p.actual_credit }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
+                title="{{ 'closed, locked' if row.closed else ('realized' if row.row_pnl_realized else 'marked') }}{% if p.actual_credit is defined and p.actual_credit is not none %} against your fill {{ p.actual_credit }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
           {% else %}
             <td style="text-align:right">—</td>
           {% endif %}
@@ -254,7 +257,7 @@
                row_pnl the card total sums, in dollars. #}
             {% if row.row_pnl is not none %}
             <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}" style="text-align:right"
-                title="{{ 'realized' if row.row_pnl_realized else 'marked' }}{% if p.actual_credit is defined and p.actual_credit is not none %} against your fill {{ '%.2f'|format((p.actual_credit|px(p))|rd(2)) }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
+                title="{{ 'closed, locked' if row.closed else ('realized' if row.row_pnl_realized else 'marked') }}{% if p.actual_credit is defined and p.actual_credit is not none %} against your fill {{ '%.2f'|format((p.actual_credit|px(p))|rd(2)) }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
             {% else %}
             <td style="text-align:right">—</td>
             {% endif %}

@@ -329,7 +329,7 @@ def _track_live_actuals_file(df: pd.DataFrame, today: date, fp) -> None:
         return
     marked = 0
     for t in store.get("trades") or []:
-        if (t.get("source") or {}).get("kind") != "live":
+        if (t.get("source") or {}).get("kind") != "live" or t.get("closed"):
             continue
         pick = t.get("pick") or {}
         if pick.get("pnl") is not None:

@@ -93,6 +93,18 @@ td.fw { font-weight: 600; }
 .actuals-remove:hover { border-color: rgba(255,255,255,0.34); }
 .actuals-add:disabled,
 .actuals-remove:disabled { opacity: 0.55; cursor: default; }
+/* X menu on an Actuals row (2026-11-05): Remove / Closed (or Reopen) / Cancel. */
+.x-menu { position: absolute; left: 0; top: 100%; z-index: 30; display: flex; gap: 4px; padding: 4px;
+  background: #202020; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; white-space: nowrap; }
+.x-menu button { font: inherit; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.16); background: #2a2a2a; color: #e8e8e8; cursor: pointer; }
+.x-menu button[data-act="remove"] { color: #E24B4A; }
+.x-menu button[data-act="close"] { color: #c9a227; }
+.x-menu button[data-act="reopen"] { color: #7ec99a; }
+/* A row closed on the site: greyed, P&L locked. */
+tr.row-closed td { opacity: 0.45; }
+tr.row-closed td:first-child { opacity: 0.8; }
+.badge-CLOSED { background: rgba(136,135,128,0.18); color: #a8a79f; }
 .actuals-added { color: #7ec99a; border-color: rgba(126,201,154,0.55); }
 /* Friday-of-expiry, short leg ITM → must close to avoid assignment.
    Pulsing red row background draws eye on the history page. */

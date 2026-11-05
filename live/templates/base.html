@@ -181,23 +181,52 @@ document.addEventListener('click', async e => {
     return;
   }
 
+  // X on an Actuals row (user 2026-11-05): a two-option menu. Remove drops the row; Closed greys
+  // it and locks its P&L as it reads now (he closed the trade). A closed row offers Reopen.
+  const act = e.target.closest('.x-menu button');
+  if (act) {
+    e.preventDefault();
+    const menu = act.closest('.x-menu');
+    const btn = menu.previousElementSibling;
+    const id = btn && btn.dataset.id;
+    const a = act.dataset.act;
+    menu.remove();
+    if (a === 'cancel' || !id) return;
+    btn.disabled = true;
+    try {
+      if (a === 'remove') {
+        const resp = await fetch('/api/actuals/' + encodeURIComponent(id), {method: 'DELETE'});
+        if (!resp.ok) throw new Error(await resp.text());
+        const row = btn.closest('tr');
+        if (row) row.remove();
+      } else {
+        const resp = await fetch('/api/actuals/' + encodeURIComponent(id) + '/' + a, {method: 'POST'});
+        if (!resp.ok) throw new Error(await resp.text());
+        location.reload();
+      }
+    } catch (err) {
+      btn.disabled = false;
+      alert('actuals ' + a + ' failed: ' + err);
+    }
+    return;
+  }
   const remove = e.target.closest('.actuals-remove');
   if (remove) {
     e.preventDefault();
     if (remove.disabled) return;
-    const id = remove.dataset.id;
-    if (!id) return;
-    remove.disabled = true;
-    try {
-      const resp = await fetch('/api/actuals/' + encodeURIComponent(id), {method: 'DELETE'});
-      if (!resp.ok) throw new Error(await resp.text());
-      const row = remove.closest('tr');
-      if (row) row.remove();
-    } catch (err) {
-      remove.disabled = false;
-      alert('actuals remove failed: ' + err);
-    }
+    if (!remove.dataset.id) return;
+    document.querySelectorAll('.x-menu').forEach(m => m.remove());
+    const menu = document.createElement('div');
+    menu.className = 'x-menu';
+    const closed = remove.dataset.closed === '1';
+    menu.innerHTML = '<button type="button" data-act="remove">Remove</button>'
+      + (closed ? '<button type="button" data-act="reopen">Reopen</button>'
+                : '<button type="button" data-act="close">Closed</button>')
+      + '<button type="button" data-act="cancel">Cancel</button>';
+    remove.insertAdjacentElement('afterend', menu);
+    return;
   }
+  if (!e.target.closest('.x-menu')) document.querySelectorAll('.x-menu').forEach(m => m.remove());
 });
 </script>
 

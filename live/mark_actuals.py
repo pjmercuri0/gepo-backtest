@@ -65,7 +65,7 @@ def open_positions() -> list[dict]:
     for t in (store.get("trades") or []):
         p = t.get("pick") or {}
         exp = str(p.get("expiry_date") or "")[:10]
-        if not exp or exp < today:
+        if not exp or exp < today or t.get("closed"):     # closed on the site (2026-11-05): P&L locked
             continue
         try:
             k = _key(p)

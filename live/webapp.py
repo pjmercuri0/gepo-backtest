@@ -844,6 +844,8 @@ def _actuals_rows() -> list[dict]:
             "outcome_row": outcome_row,
             "last_track": last_track,
             "last_marked": last_marked,
+            # Closed on the site (user 2026-11-05: X -> "closed" greys the row and locks its P&L as is).
+            "closed": item.get("closed") or None,
         })
 
     return sorted(rows, key=lambda r: (str(r.get("date") or ""), str(r.get("source_time") or ""), str(r.get("added_at") or "")), reverse=True)
@@ -2161,6 +2163,11 @@ def _actuals_row_pnl(row: dict):
     actual = pick.get("actual_credit")
     outcome_row = row.get("outcome_row") or {}
 
+    # Closed on the site (user 2026-11-05): the P&L locked at the click, per contract, realized.
+    _cl = row.get("closed") or {}
+    if _cl.get("pnl_per_contract") is not None:
+        return float(_cl["pnl_per_contract"]), True
+
     # A fill the user typed in wins over the modelled credit everywhere.
     if actual is not None:
         spot = outcome_row.get("underlying_price")
@@ -2282,8 +2289,29 @@ def _fill_stats(rows: list[dict]) -> dict:
             "below_min": below}
 
 
-@app.route("/actuals")
-def actuals():
+def _lock_closed_row(r: dict) -> None:
+    """A row closed on the site (user 2026-11-05): no live spot, status or mark; the P&L, mark and
+    spot are the ones locked at the click, so the row reads exactly as it did when he closed it."""
+    cl = r.get("closed") or {}
+    r["row_pnl"], r["row_pnl_realized"] = _actuals_row_pnl(r)
+    _q = max(1, int((r.get("pick") or {}).get("suggested_qty") or 1))
+    if r["row_pnl"] is not None and _q != 1:
+        r["row_pnl"] = round(r["row_pnl"] * _q, 2)
+    lt = dict(r.get("last_track") or {}) if isinstance(r.get("last_track"), dict) else {}
+    if cl.get("spot") is not None:
+        lt["underlying_price"] = cl["spot"]
+    if cl.get("mark") is not None:
+        lt["current_mark"] = cl["mark"]
+        lt["mark_basis"] = "closed"
+        lt["ts"] = cl.get("at")
+        r["last_marked"] = lt
+    lt.pop("live_status", None)
+    r["last_track"] = lt
+
+
+def _actuals_view():
+    """The Actuals rows exactly as the page renders them (live spot, status, mark, row P&L x qty).
+    Shared by the /actuals route and the close endpoint, so what gets locked is what he sees."""
     rows = _actuals_rows()
     risk = _assignment_lookup()
     _stream = _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
@@ -2308,6 +2336,9 @@ def actuals():
             key = None
         ar = risk.get(key) if key else None
         r["assign_risk"] = ar
+        if r.get("closed"):
+            _lock_closed_row(r)
+            continue
         # The card header sums _actuals_row_pnl; give the template the SAME
         # number so a row can never disagree with the total above it.
         r["row_pnl"], r["row_pnl_realized"] = _actuals_row_pnl(r)
@@ -2419,6 +2450,12 @@ def actuals():
             _q = max(1, int((r.get("pick") or {}).get("suggested_qty") or 1))
             if r["row_pnl"] is not None and _q != 1:
                 r["row_pnl"] = round(r["row_pnl"] * _q, 2)
+    return rows, risk, _stream
+
+
+@app.route("/actuals")
+def actuals():
+    rows, risk, _stream = _actuals_view()
     fill_stats = _fill_stats(rows)
     ctx = dict(fill_stats=fill_stats, rows=rows, weeks=_actuals_weeks(rows),
                assign_ts=risk.get("_ts"),
@@ -2917,6 +2954,51 @@ def delete_actual(trade_id: str):
     store["updated_at"] = datetime.now().isoformat(timespec="seconds")
     _atomic_write_json(_actuals_path(), store)
     return jsonify({"ok": True, "removed": trade_id})
+
+
+@app.route("/api/actuals/<path:trade_id>/close", methods=["POST"])
+def close_actual(trade_id: str):
+    """X -> Closed (user 2026-11-05): grey the row and lock its P&L as is. Stores what the page
+    shows at the click -- P&L per contract, mark, spot -- on the trade; carried across the Mac/Mya
+    sync like the fill (upload_to_mya USER_KEYS). The stream, marker, tracker and settlement skip
+    closed rows."""
+    rows, _, _ = _actuals_view()
+    row = next((r for r in rows if r.get("id") == trade_id), None)
+    if row is None:
+        abort(404)
+    if row.get("closed"):
+        return jsonify({"error": "already closed"}), 400
+    if row.get("row_pnl") is None:
+        return jsonify({"error": "no mark on this row yet, nothing to lock"}), 400
+    q = max(1, int((row.get("pick") or {}).get("suggested_qty") or 1))
+    lm = row.get("last_marked") or {}
+    lt = row.get("last_track") or {}
+    closed = {"at": datetime.now().isoformat(timespec="seconds"),
+              "pnl_per_contract": round(float(row["row_pnl"]) / q, 2), "qty": q,
+              "mark": lm.get("current_mark"), "mark_basis": lm.get("mark_basis"),
+              "spot": lt.get("underlying_price")}
+    store = _actuals_store()
+    trade = next((t for t in store.get("trades") or [] if t.get("id") == trade_id), None)
+    if trade is None:
+        abort(404)
+    trade["closed"] = closed
+    store["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    _atomic_write_json(_actuals_path(), store)
+    return jsonify({"ok": True, "id": trade_id, "closed": closed})
+
+
+@app.route("/api/actuals/<path:trade_id>/reopen", methods=["POST"])
+def reopen_actual(trade_id: str):
+    """Undo a close. The key is set to None, not removed: the Mac/Mya merge copies the key when
+    present, so a removed key would let the Mac's copy bring the close back on the next upload."""
+    store = _actuals_store()
+    trade = next((t for t in store.get("trades") or [] if t.get("id") == trade_id), None)
+    if trade is None:
+        abort(404)
+    trade["closed"] = None
+    store["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    _atomic_write_json(_actuals_path(), store)
+    return jsonify({"ok": True, "id": trade_id, "closed": None})
 
 
 @app.route("/api/actuals/<path:trade_id>/qty", methods=["POST"])

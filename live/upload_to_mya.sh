@@ -151,7 +151,7 @@ for _store_name in ('actuals.json', 'actuals_debit.json'):   # credit book and d
   # pick (track_frozen / snapshot_picks.settle for kind "live"); Mya holds the
   # user's inline fill edits. "Remote wins wholesale" threw the marks away on
   # every upload. Now: local trade as the base, Mya's fill fields on top.
-  USER_KEYS = ('actual_credit', 'actual_max_loss', 'qty')   # qty: contracts typed on the site (2026-11-02)
+  USER_KEYS = ('actual_credit', 'actual_max_loss', 'qty', 'closed')   # qty: contracts typed on the site (2026-11-02); closed: X -> Closed on the site (2026-11-05)
   loc = {t.get('id'): t for t in (local.get('trades') or []) if t.get('id')}
   rem = {t.get('id'): t for t in (remote.get('trades') or []) if t.get('id')}
   by_id = {}

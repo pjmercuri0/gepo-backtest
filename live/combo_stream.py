@@ -100,8 +100,8 @@ def _positions(ib) -> list[dict]:
     for t in trades:
         p = t.get("pick") or {}
         exp = str(p.get("expiry_date") or "")[:10]
-        if not exp or exp < today or p.get("pnl") is not None:
-            continue
+        if not exp or exp < today or p.get("pnl") is not None or t.get("closed"):
+            continue                          # closed on the site (2026-11-05): no line for it
         right = debit_mode.right_for(p)      # a debit row streams its parity twin
         legs = []
         for k in ("short_strike", "long_strike"):
