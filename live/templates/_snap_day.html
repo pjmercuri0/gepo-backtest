@@ -52,7 +52,7 @@
           {# Credit and min / target: the same cells as History (user 2026-10-07) -- the live quote with
              its dot when the stream holds the spread on a credible book, else the quoted mid at the scan. #}
           {% set _open = p.pnl is none and not p.outcome and p.expiry_close is none %}
-          {% if _open and p.live and p.live.live_quote is defined and p.live.live_quote is not none %}<td title="LIVE quote ({{ p.live.live_quote_ts }}); scan quote ${{ '%.2f' % p.net_credit }}; booked at ${{ '%.2f' % (p.entry_credit|px(p)|fl2) }}">${{ "%.2f"|format(p.live.live_quote|px(p)|fl2) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span></td>{% elif _open and p.cur_quote is defined %}<td title="newest scan quote ({{ p.cur_quote_hhmm[:2] }}:{{ p.cur_quote_hhmm[2:] }}, no live quote); this scan quote ${{ '%.2f' % p.net_credit }}; booked at ${{ '%.2f' % (p.entry_credit|px(p)|fl2) }}">${{ "%.2f"|format(p.cur_quote|px(p)|fl2) }}</td>{% else %}<td title="quoted mid at the scan (no live quote); booked at ${{ '%.2f' % (p.entry_credit|px(p)|fl2) }}">${{ "%.2f"|format(p.net_credit|px(p)|fl2) }}</td>{% endif %}
+          {% if _open and p.live and p.live.live_quote is defined and p.live.live_quote is not none %}<td title="LIVE quote ({{ p.live.live_quote_ts }}); scan quote ${{ ('%.2f' % p.net_credit) if p.net_credit is not none else '—' }}; booked at ${{ '%.2f' % (p.entry_credit|px(p)|fl2) }}">${{ "%.2f"|format(p.live.live_quote|px(p)|fl2) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span></td>{% elif _open and p.cur_quote is defined %}<td title="newest scan quote ({{ p.cur_quote_hhmm[:2] }}:{{ p.cur_quote_hhmm[2:] }}, no live quote); this scan quote ${{ ('%.2f' % p.net_credit) if p.net_credit is not none else '—' }}; booked at ${{ '%.2f' % (p.entry_credit|px(p)|fl2) }}">${{ "%.2f"|format(p.cur_quote|px(p)|fl2) }}</td>{% elif p.net_credit is none %}<td title="no debit twin quote at this scan (credit side qualified)">—</td>{% else %}<td title="quoted mid at the scan (no live quote); booked at ${{ '%.2f' % (p.entry_credit|px(p)|fl2) }}">${{ "%.2f"|format(p.net_credit|px(p)|fl2) }}</td>{% endif %}
           {% set tg = p.credit_targets %}
           {% if tg and tg.min_credit is defined %}<td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }})">{% if p.structure == 'debit' %}<span style="color:#7ec99a">${{ "%.2f"|format(tg.target_hi_credit|px(p)) }}–${{ "%.2f"|format(tg.target_lo_credit|px(p)) }}</span><span style="opacity:0.6"> / </span><span style="color:#c9a227" title="max debit = width − min credit">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span>{% else %}<span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>{% endif %}</td>{% else %}<td>—</td>{% endif %}
           {# Max-loss and ratio on the booked basis, as History: width minus the booked credit. On the debit
@@ -64,10 +64,12 @@
           {# Both sites (user 2026-11-02: 'what about the credit too'): the risk cell is width minus the price
              shown beside it -- max loss = width - floored credit, max win = floored credit -- and the ratio
              is max win / max loss on those same two numbers. #}
+          {% if _sc is none %}<td>—</td><td>—</td>{% else %}
           {% set _shown = (_sc|px(p))|rd(2) %}{% set _other = (_w - _shown)|rd(2) %}
           {% set _mw = _shown if p.structure != 'debit' else _other %}{% set _mlx = _other if p.structure != 'debit' else _shown %}
           <td>${{ "%.2f"|format(_other) }}</td>
           <td>{% if _mlx > 0 %}{{ "%.2f"|format((_mw / _mlx)|rd(2)) }}{% else %}—{% endif %}</td>
+          {% endif %}
           <td class="fw">{{ "%.2f"|format((p.GROUND * 10000)|rd(2)) if p.GROUND is not none else '—' }}</td>
           <td>{{ "%.2f"|format(p.short_delta|rd(2)) if p.short_delta is not none else '—' }}</td>
           <td>{{ p.DTE if p.DTE is not none else '—' }}</td>
