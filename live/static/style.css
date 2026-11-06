@@ -337,3 +337,8 @@ details.params-fold .params-row { margin-top: 10px; margin-bottom: 0; }
    red = the strike followed the stock. */
 .actuals-add.held-better { background: #2f8f57 !important; border-color: #2f8f57 !important; color: #fff !important; }
 .actuals-add.held-worse  { background: #c0392b !important; border-color: #c0392b !important; color: #fff !important; }
+
+/* After-hours spot on an expiry-day row (2026-11-06): small AH tag; amber when the spot
+   has crossed a strike since the 16:00 close. */
+.ah-spot sup { font-size: 9px; opacity: 0.7; margin-left: 2px; }
+.ah-spot.ah-flip { color: #e8b366; font-weight: 600; }

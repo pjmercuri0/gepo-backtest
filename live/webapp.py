@@ -2379,6 +2379,23 @@ def _actuals_view():
         # with no assignment-risk row yet had no spot at all and badged a flat "open" (GOOGL 2026-10-01).
         _spot = (_stream_spots.get(pk.get("ticker")) or (ar or {}).get("spot")
                  or _scan_spots.get(pk.get("ticker")))
+        # After-hours spot on an expiry-day row (user 2026-11-06: 'keep streaming spots until 7pm
+        # for after market movement awareness'). Once the settle runs the row shows the 16:00
+        # close; from then until 19:00 ET it also carries the live stream spot, and ah_flip says
+        # the spot has crossed a strike since the close (pinned, or a debit spread now fully ITM),
+        # which is the after-hours assignment case he wants to see. Settled P&L is untouched.
+        _sts = str(_stream.get("ts") or "")
+        if (r.get("outcome_row") and _spot and _sts[:10] == ddate.today().isoformat()
+                and "16:00:00" <= _sts[11:19] < "19:00:00"
+                and str(pk.get("expiry_date") or "")[:10] == ddate.today().isoformat()):
+            try:
+                _cl = float((r.get("outcome_row") or {}).get("underlying_price"))
+                _st0 = pk.get("spread_type"); _ss0 = pk.get("short_strike"); _ls0 = pk.get("long_strike")
+                r["ah_spot"] = float(_spot)
+                r["ah_status"] = _live_status(_st0, float(_spot), _ss0, _ls0)
+                r["ah_flip"] = r["ah_status"] != _live_status(_st0, _cl, _ss0, _ls0)
+            except (TypeError, ValueError):
+                pass
         # A HELD mark (no quote now -- after the bell) keeps the spot it was quoted at, already set by
         # _stream_overlay; a later spot beside it would badge the row off a different moment than
         # its P&L, and Actuals would disagree with History, which has no override here.
