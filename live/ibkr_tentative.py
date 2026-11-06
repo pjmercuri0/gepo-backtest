@@ -8,7 +8,8 @@ spread still OPEN at the last statement forward one session:
                                     is the debit received), a close commission estimated at the
                                     last five sessions' average per contract
   * expiring that day            -> intrinsic at the site's expiry close (settle)
-NAV = last NAV + sum(value change, USD) x the last statement's USD/CAD rate - commissions.
+NAV = last NAV + sum(value change, USD) x the last statement's USD/CAD rate, no commissions
+(user 2026-11-06), or --nav from the IBKR app.
 Everything it adds is labelled tentative in config.source and under payload["tentative"];
 re-running build_ibkr_payload.py with the real statement replaces it entirely.
 
@@ -155,7 +156,7 @@ def main():
             # The site locks the credit-scale mark; the debit received is width - mark.
             debit_recv = width - a["closed_mark"] if t["structure"] == "debit" else a["closed_mark"]
             v6 = (debit_recv if t["structure"] == "debit" else -debit_recv) * 100 * q
-            cc = comm_per * 2 * q
+            cc = 0.0                     # no commission in the tentative (user 2026-11-06); the statement has the real one
             how = f"closed on site {a['at'][11:16]} at mark {a['closed_mark']:.2f}"
             t["close_debit"] = round(-debit_recv if t["structure"] == "debit" else debit_recv, 4)
         elif t["expiry"] == DAY:
@@ -239,11 +240,11 @@ def main():
                                   else "site closes and expiry closes") + ", no statement yet)")
     pay["tentative"] = {
         "date": DAY, "from_nav": round(nav_end, 2), "mtm_usd": round(mtm_usd, 2), "usdcad": fx,
-        "commissions_cad": round(comm_cad, 2), "comm_per_contract_cad": round(comm_per, 4),
+        "commissions_cad": round(comm_cad, 2), "comm_per_contract_cad_recent": round(comm_per, 4),
         "nav": round(nav6, 2), "nav_rolled": round(nav6_est, 2), "nav_from_app": NAV_OVERRIDE,
         "n_rolled": len(rolled), "unresolved": unresolved,
         "basis": "open spreads at the last statement rolled to the site's close marks / expiry closes; "
-                 "last statement's USD/CAD; commissions at the last five sessions' average per contract",
+                 "last statement's USD/CAD; no commissions (the statement carries them)",
     }
     json.dump(pay, open(OUT, "w"), indent=1)
     print(f"{OUT.name}: {stmt_day} NAV {nav_end:.2f} -> {DAY} TENTATIVE {nav6:.2f} "
