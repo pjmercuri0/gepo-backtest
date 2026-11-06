@@ -338,10 +338,13 @@ details.params-fold .params-row { margin-top: 10px; margin-bottom: 0; }
 .actuals-add.held-better { background: #2f8f57 !important; border-color: #2f8f57 !important; color: #fff !important; }
 .actuals-add.held-worse  { background: #c0392b !important; border-color: #c0392b !important; color: #fff !important; }
 
-/* After-hours spot on an expiry-day row (2026-11-06): small line under the settled close; green still losing (expires clean), amber pinned, red through the strikes (assignment). */
+/* After-hours line on an expiry-day row (user 2026-11-06): red below the close, green above,
+   white at it; yellow once past the LONG strike. The whole row goes red once the after-hours
+   spot is through the SHORT strike (assignment). */
 .ah-spot { font-size: 8px; line-height: 1.2; white-space: nowrap; margin-top: 2px; font-weight: 600; }
-/* Swapped (user 2026-11-06): after the close a spread that still reads losing expires clean, so
-   that is GREEN; one that has moved through the strikes gets assigned, so that is RED. */
-.ah-spot.ah-losing  { color: #2ea05a; }   /* still beyond the long: expires worthless, nothing assigned */
-.ah-spot.ah-partial { color: #e8b366; }   /* pinned between the strikes */
-.ah-spot.ah-winning { color: #e05252; }   /* through the short: assignment */
+.ah-spot.ah-down { color: #e05252; }
+.ah-spot.ah-up { color: #2ea05a; }
+.ah-spot.ah-flat { color: #f0f0f0; }
+.ah-spot.ah-past-long { color: #e8b366; }
+tr.ah-assign td { background: rgba(224, 82, 82, 0.16); border-bottom-color: rgba(224, 82, 82, 0.45); }
+tr.ah-assign td:first-child { box-shadow: inset 3px 0 0 #e05252; }

@@ -94,7 +94,7 @@
             {% set _pct_win = true %}
           {% endif %}
         {% endif %}
-        <tr class="{% if _pct_win %}pct-win{% elif (_pin_row or row.ah_flip) and not row.closed %}assign-watch{% endif %}{% if row.closed %} row-closed{% endif %}">
+        <tr class="{% if row.ah_status == 'WINNING' and not row.closed %}ah-assign{% elif _pct_win %}pct-win{% elif _pin_row and not row.closed %}assign-watch{% endif %}{% if row.closed %} row-closed{% endif %}">
           <td data-sort="{{ (row.date or (p.entry_date or '')[:10]) }} {{ row.source_time or '' }}" style="position:relative"><button class="actuals-remove" data-id="{{ row.id }}" data-closed="{{ '1' if row.closed else '0' }}" title="{{ 'closed ' + (row.closed.at|string)[:16] + ' -- remove or reopen' if row.closed else 'remove, or mark closed' }}">x</button>
             {{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>
           <td>{{ row.source_time or '—' }}</td>
@@ -122,7 +122,9 @@
                  close stays on the tooltip. Amber when the spot has crossed a strike since the close. #}
               ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}
               {% if row.ah_spot %}
-              <div class="ah-spot ah-{{ (row.ah_status or '')|lower }}" title="after hours {{ stream_ts[11:16] }} ET, {{ row.ah_status|lower }}{% if row.ah_flip %} -- crossed a strike since the close{% endif %}">AH ${{ "%.2f"|format(row.ah_spot|rd(2)) }}<span class="live-dot" style="margin-left:4px;margin-right:0"></span></div>
+              {# Colour (user 2026-11-06): yellow once the after-hours spot is past the LONG strike (between the
+                 strikes or through both), else red below the close, green above it, white at it. #}
+              <div class="ah-spot {% if row.ah_status in ('PARTIAL', 'WINNING') %}ah-past-long{% else %}ah-{{ row.ah_dir }}{% endif %}" title="after hours {{ stream_ts[11:16] }} ET, {{ row.ah_dir }} vs the close{% if row.ah_status == 'WINNING' %} -- through the SHORT strike, assignment{% elif row.ah_status == 'PARTIAL' %} -- past the long strike, between the strikes{% endif %}">AH ${{ "%.2f"|format(row.ah_spot|rd(2)) }}<span class="live-dot" style="margin-left:4px;margin-right:0"></span></div>
               {% endif %}
             {% elif last_track and 'underlying_price' in last_track and last_track.underlying_price %}
               <span{% if arisk and arisk.spot %} title="quoted {{ assign_ts }}"{% endif %}>${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}</span>

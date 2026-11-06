@@ -2394,6 +2394,10 @@ def _actuals_view():
                 r["ah_spot"] = float(_spot)
                 r["ah_status"] = _live_status(_st0, float(_spot), _ss0, _ls0)
                 r["ah_flip"] = r["ah_status"] != _live_status(_st0, _cl, _ss0, _ls0)
+                # Direction vs the close, on the two decimals the page prints (user 2026-11-06:
+                # 'red if lower than closing, green if higher, white if equal').
+                _d = round(float(_spot), 2) - round(_cl, 2)
+                r["ah_dir"] = "up" if _d > 0 else ("down" if _d < 0 else "flat")
             except (TypeError, ValueError):
                 pass
         # A HELD mark (no quote now -- after the bell) keeps the spot it was quoted at, already set by
