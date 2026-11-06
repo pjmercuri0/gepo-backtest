@@ -12,7 +12,7 @@ NAV = last NAV + sum(value change, USD) x the last statement's USD/CAD rate - co
 Everything it adds is labelled tentative in config.source and under payload["tentative"];
 re-running build_ibkr_payload.py with the real statement replaces it entirely.
 
-Usage: ibkr_tentative.py YYYY-MM-DD [--site debit]
+Usage: ibkr_tentative.py YYYY-MM-DD [--site debit] [--nav <NLV in CAD from the IBKR app>]
 """
 import csv, json, math, sys
 from collections import defaultdict
@@ -25,6 +25,10 @@ STMT_DIR = ROOT / "data" / "ibkr_statements"
 SITE = sys.argv[sys.argv.index("--site") + 1] if "--site" in sys.argv else "credit"
 OUT = ROOT / "live" / "data" / ("ibkr_actual_equity_debit.json" if SITE == "debit" else "ibkr_actual_equity.json")
 DAY = next(a for a in sys.argv[1:] if a[:2] == "20")
+# --nav <CAD>: the Net Liquidation Value he reads off the IBKR app after the close. It beats the
+# roll-forward (his fills are not the site's locked marks: 2026-11-06 the app said 7,032 against a
+# rolled 6,853) and becomes the point; the per-spread estimates stay as they are.
+NAV_OVERRIDE = float(sys.argv[sys.argv.index("--nav") + 1]) if "--nav" in sys.argv else None
 
 
 def _leg(sym):
@@ -174,7 +178,8 @@ def main():
         t.update({"pnl": round(pnl, 2), "outcome": outcome, "closed": DAY, "spot": sp, "tentative": how})
         rolled.append((t["ticker"], t["k_s"], t["k_l"], round(v5, 2), round(v6, 2), round(pnl, 2), outcome, how))
 
-    nav6 = nav_end + mtm_usd * fx - comm_cad
+    nav6_est = nav_end + mtm_usd * fx - comm_cad
+    nav6 = NAV_OVERRIDE if NAV_OVERRIDE is not None else nav6_est
     # Points
     pts = pay["points"]
     spy_prev = pts[-1]["spy"]
@@ -229,17 +234,21 @@ def main():
         "trade_pnl_usd": round(sum(t["pnl"] for t in trades), 2),
     })
     pay["config"]["source"] = (pay["config"]["source"].split(" + ")[0]
-                               + f" + {DAY} TENTATIVE (site closes and expiry closes, no statement yet)")
+                               + f" + {DAY} TENTATIVE ("
+                               + ("NAV from the IBKR app, spreads at site closes" if NAV_OVERRIDE is not None
+                                  else "site closes and expiry closes") + ", no statement yet)")
     pay["tentative"] = {
         "date": DAY, "from_nav": round(nav_end, 2), "mtm_usd": round(mtm_usd, 2), "usdcad": fx,
         "commissions_cad": round(comm_cad, 2), "comm_per_contract_cad": round(comm_per, 4),
-        "nav": round(nav6, 2), "n_rolled": len(rolled), "unresolved": unresolved,
+        "nav": round(nav6, 2), "nav_rolled": round(nav6_est, 2), "nav_from_app": NAV_OVERRIDE,
+        "n_rolled": len(rolled), "unresolved": unresolved,
         "basis": "open spreads at the last statement rolled to the site's close marks / expiry closes; "
                  "last statement's USD/CAD; commissions at the last five sessions' average per contract",
     }
     json.dump(pay, open(OUT, "w"), indent=1)
     print(f"{OUT.name}: {stmt_day} NAV {nav_end:.2f} -> {DAY} TENTATIVE {nav6:.2f} "
-          f"(MTM {mtm_usd:+.2f} USD x {fx} = {mtm_usd * fx:+.2f} CAD, comm -{comm_cad:.2f} CAD)")
+          f"(rolled {nav6_est:.2f}: MTM {mtm_usd:+.2f} USD x {fx} = {mtm_usd * fx:+.2f} CAD, comm -{comm_cad:.2f} CAD"
+          + (f"; app NLV {NAV_OVERRIDE:.2f} used" if NAV_OVERRIDE is not None else "") + ")")
     for r in rolled:
         print("  %-5s %7.1f/%-7.1f v5 %8.2f -> v6 %8.2f  pnl %8.2f  %-7s %s" % r)
     for u in unresolved:
