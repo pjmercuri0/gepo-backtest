@@ -73,6 +73,15 @@ PUBLISH_S = float(getattr(live_config, "LIVE_STREAM_PUBLISH_S", 2.0))
 LOCK  = ROOT / "live" / "logs" / "combo_stream.lock"
 
 
+def _spot_px(entry):
+    """Live spot off a (contract, ticker) spot subscription: last, else close; None when neither quotes."""
+    if not entry:
+        return None
+    t = entry[1]
+    v = t.last if (t.last is not None and t.last == t.last and t.last != 0) else t.close
+    return float(v) if (v is not None and v == v and v != 0) else None
+
+
 def _key(r) -> str:
     # A debit row (parity twin) streams under '|debit' so it cannot collide with the credit bag of
     # the same spread (live/stores.py, gepo-debit-ticker 2026-10-30).
@@ -585,6 +594,16 @@ def main() -> int:
                 mid = s_mid - l_mid
                 _dw = widths.get(k) if debit_k.get(k) else None
                 if _dw:
+                    # Floor each leg's mid at its own intrinsic at the live spot (user 2026-11-06 'ok try
+                    # that': CME 305/307.5 with the stock at 308.39 had the 305 call bid 1.90 / ask 4.20, a
+                    # mid of 3.05 against 3.39 intrinsic, and the spread marked 1.25). A leg quoted below
+                    # what it is worth is not a price; a leg quoted above it is left alone.
+                    _spx = _spot_px(spots.get(k.split("|")[0]))
+                    if _spx:
+                        _kp = k.split("|")
+                        _call = (_kp[1] == "bull_put")       # the twin of a put credit spread is a call debit
+                        _iv = (lambda K: max(0.0, _spx - K)) if _call else (lambda K: max(0.0, K - _spx))
+                        s_mid = max(s_mid, _iv(float(_kp[2]))); l_mid = max(l_mid, _iv(float(_kp[3])))
                     # Parity-twin legs: the long leg is the dear one and the bag is a debit. Same bag
                     # formulas, then shift onto the credit scale (credit equivalent = width - debit).
                     mid = _dw - (l_mid - s_mid)
