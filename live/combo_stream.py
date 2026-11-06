@@ -572,10 +572,16 @@ def main() -> int:
                 st_, lt_ = leg_t.get(lg[0]), leg_t.get(lg[1])
                 if not st_ or not lt_:
                     continue
-                if not (ok(st_.bid) and ok(st_.ask) and ok(lt_.bid) and ok(lt_.ask)):
+                # IB sends -1 on a side with no quote. A missing ASK prices nothing; a missing BID is a
+                # bid of 0, as the broker's own mid reads it (user 2026-11-06, PEP 138/137 with the stock
+                # at 140.65: short 137P bid -1 / ask 0.41 averaged to -0.295 and the spread marked 0.61
+                # against leg mids of 0.11).
+                if not (ok(st_.ask) and float(st_.ask) > 0 and ok(lt_.ask) and float(lt_.ask) > 0):
                     continue
-                s_mid = (float(st_.bid) + float(st_.ask)) / 2.0
-                l_mid = (float(lt_.bid) + float(lt_.ask)) / 2.0
+                _sb = float(st_.bid) if ok(st_.bid) and float(st_.bid) > 0 else 0.0
+                _lb = float(lt_.bid) if ok(lt_.bid) and float(lt_.bid) > 0 else 0.0
+                s_mid = (_sb + float(st_.ask)) / 2.0
+                l_mid = (_lb + float(lt_.ask)) / 2.0
                 mid = s_mid - l_mid
                 _dw = widths.get(k) if debit_k.get(k) else None
                 if _dw:
@@ -586,8 +592,8 @@ def main() -> int:
                         continue
                     if mid > _dw:
                         mid = _dw
-                    quotes[k] = {"bid": round((float(lt_.bid) - float(st_.ask)) - _dw, 4),
-                                 "ask": round((float(lt_.ask) - float(st_.bid)) - _dw, 4),
+                    quotes[k] = {"bid": round((_lb - float(st_.ask)) - _dw, 4),
+                                 "ask": round((float(lt_.ask) - _sb) - _dw, 4),
                                  "mid": round(mid, 4), "last": None, "src": "legs", "ts": ts}
                     continue
                 # Sanity (2026-09-17, after the first evening this ran): leg quotes decay
@@ -605,8 +611,8 @@ def main() -> int:
                     continue
                 if wid is not None and mid > wid:
                     mid = wid
-                quotes[k] = {"bid": round(-(float(st_.ask) - float(lt_.bid)), 4),
-                             "ask": round(-(float(st_.bid) - float(lt_.ask)), 4),
+                quotes[k] = {"bid": round(-(float(st_.ask) - _lb), 4),
+                             "ask": round(-(_sb - float(lt_.ask)), 4),
                              "mid": round(mid, 4),
                              "last": None, "src": "legs", "ts": ts}
             # Raw book record, one line per tick (user 2026-10-28, "where you getting .53"): the
