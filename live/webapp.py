@@ -1362,10 +1362,10 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             if not quote_mark:
                 _apply_intrinsic(live, pick)
             # After-hours spots (user 2026-11-06: 'keep streaming spots until 6pm for after
-            # market movement awareness'). Through 18:00 ET the row shows the LIVE stream spot
+            # market movement awareness'; 19:00 from the same day). Through 19:00 ET the row shows the LIVE stream spot
             # and badges status/pin off it, even beside a held 15:59 mark; the mark and its P&L
-            # are not touched. Outside 09:30-18:00 the held-spot rule above (2026-10-07) stands.
-            if _sp and "09:30:00" <= str(_st.get("ts") or "")[11:19] < "18:00:00":
+            # are not touched. Outside 09:30-19:00 the held-spot rule above (2026-10-07) stands.
+            if _sp and "09:30:00" <= str(_st.get("ts") or "")[11:19] < "19:00:00":
                 live["underlying_price"] = _sp
                 live["live_status"] = _live_status(pick.get("spread_type"), _sp, ks, kl)
             _out_track = live
