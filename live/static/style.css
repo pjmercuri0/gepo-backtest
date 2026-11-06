@@ -169,7 +169,7 @@ tr.assignment-risk td:first-child::before {
      Don't touch table display props — that breaks column widths. */
   /* Let the scrollable table bleed into the card's horizontal padding so
      text isn't cut off 20px before the card edge. */
-  .week-card .table-scroll { margin-left: -20px; margin-right: -20px; }   /* the full card padding (user 2026-11-06: 'push the left side of the table further left') */
+  .week-card .table-scroll { margin-left: -12px; margin-right: -12px; }   /* 8px inside the card edge (user 2026-11-06: 'zero margin, gotta give it some') */
   .actuals-table th, .actuals-table td { padding-left: 4px; padding-right: 4px; }
   /* Ticker strip stays a single line but smaller */
   .ticker-strip { font-size: 11px; padding: 8px 12px; }
