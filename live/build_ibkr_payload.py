@@ -258,11 +258,15 @@ def build():
             outcome, pnl = "OPEN", s["open_upl"] + s["rpl"] + _phantom(s, spot_pairs.get((s["ticker"], days[-1])))
         else:
             pnl = s["rpl"] + _phantom(s, sp)
+            # A debit spread (2026-11-06) wins once spot is THROUGH its short strike -- both legs in
+            # the money, full width -- and loses with spot short of its long; the credit rule reads
+            # the same strikes the other way round.
+            _dbt = s.get("structure") == "debit"
             if sp is None:
                 outcome = "WIN" if pnl > 0 else "LOSS"
-            elif (sp >= s["k_s"]) if bp else (sp <= s["k_s"]):
+            elif ((sp <= s["k_s"]) if bp else (sp >= s["k_s"])) if _dbt else ((sp >= s["k_s"]) if bp else (sp <= s["k_s"])):
                 outcome = "WIN"
-            elif (sp <= s["k_l"]) if bp else (sp >= s["k_l"]):
+            elif ((sp >= s["k_l"]) if bp else (sp <= s["k_l"])) if _dbt else ((sp <= s["k_l"]) if bp else (sp >= s["k_l"])):
                 outcome = "LOSS"
             else:
                 outcome = "PARTIAL"
