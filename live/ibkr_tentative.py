@@ -6,7 +6,7 @@ Takes the payload build_ibkr_payload.py wrote from the statements on hand, and r
 spread still OPEN at the last statement forward one session:
   * closed on the site that day  -> valued at the mark the site locked at the click (width - mark
                                     is the debit received), a close commission estimated at the
-                                    statements' average per contract
+                                    last five sessions' average per contract
   * expiring that day            -> intrinsic at the site's expiry close (settle)
 NAV = last NAV + sum(value change, USD) x the last statement's USD/CAD rate - commissions.
 Everything it adds is labelled tentative in config.source and under payload["tentative"];
@@ -38,11 +38,12 @@ def last_statement():
     day = datetime.strptime(f.stem[-8:], "%Y%m%d").date().isoformat()
     legs, fx, nav_end = {}, None, None
     comm_cad = n_contracts = 0.0
-    for g in files:
+    recent = files[-5:]          # per-contract rate from the last five sessions: the all-time average
+    for g in files:              # is twice the current rate (user 2026-11-06: 'no way commission was that much')
         for r in csv.reader(open(g, encoding="utf-8-sig")):
-            if r[:2] == ["Change in NAV", "Data"] and r[2] == "Commissions":
+            if g in recent and r[:2] == ["Change in NAV", "Data"] and r[2] == "Commissions":
                 comm_cad += float(r[3])
-            elif r[:3] == ["Trades", "Data", "Order"] and r[3] == "Equity and Index Options":
+            elif g in recent and r[:3] == ["Trades", "Data", "Order"] and r[3] == "Equity and Index Options":
                 n_contracts += abs(float(r[7]))
             if g != f:
                 continue
@@ -234,7 +235,7 @@ def main():
         "commissions_cad": round(comm_cad, 2), "comm_per_contract_cad": round(comm_per, 4),
         "nav": round(nav6, 2), "n_rolled": len(rolled), "unresolved": unresolved,
         "basis": "open spreads at the last statement rolled to the site's close marks / expiry closes; "
-                 "last statement's USD/CAD; commissions at the statements' average per contract",
+                 "last statement's USD/CAD; commissions at the last five sessions' average per contract",
     }
     json.dump(pay, open(OUT, "w"), indent=1)
     print(f"{OUT.name}: {stmt_day} NAV {nav_end:.2f} -> {DAY} TENTATIVE {nav6:.2f} "
