@@ -346,5 +346,10 @@ details.params-fold .params-row { margin-top: 10px; margin-bottom: 0; }
 .ah-spot.ah-up { color: #2ea05a; }
 .ah-spot.ah-flat { color: #f0f0f0; }
 .ah-spot.ah-past-long { color: #e8b366; }
+/* The pulsing dot beside the close after hours (user 2026-11-06): green safe, yellow pinned,
+   red past the short strike (assignment risk). */
+.live-dot.ah-dot-safe   { background: #1D9E75; }
+.live-dot.ah-dot-pin    { background: #E5B947; }
+.live-dot.ah-dot-assign { background: #e05252; }
 tr.ah-assign td { background: rgba(224, 82, 82, 0.16); border-bottom-color: rgba(224, 82, 82, 0.45); }
 tr.ah-assign td:first-child { box-shadow: inset 3px 0 0 #e05252; }

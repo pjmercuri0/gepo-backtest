@@ -120,7 +120,7 @@
             {% if outcome_row and outcome_row.underlying_price is defined %}
               {# After-hours spot through 19:00 ET on expiry day (user 2026-11-06); the settled
                  close stays on the tooltip. Amber when the spot has crossed a strike since the close. #}
-              ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}{% if row.ah_spot %}<span class="live-dot" style="margin-left:6px;margin-right:0"></span>{% endif %}
+              ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}{% if row.ah_spot %}<span class="live-dot {% if row.ah_status == 'WINNING' %}ah-dot-assign{% elif row.ah_status == 'PARTIAL' %}ah-dot-pin{% else %}ah-dot-safe{% endif %}" style="margin-left:6px;margin-right:0" title="after hours: {% if row.ah_status == 'WINNING' %}past the short strike, assignment risk{% elif row.ah_status == 'PARTIAL' %}pinned between the strikes{% else %}safe, expires clean{% endif %}"></span>{% endif %}
               {% if row.ah_spot %}
               {# Colour (user 2026-11-06): yellow once the after-hours spot is past the LONG strike (between the
                  strikes or through both), else red below the close, green above it, white at it. #}
