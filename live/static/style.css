@@ -25,7 +25,7 @@ body { color: #e8e8e8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI
 @media (max-width: 700px) {
   /* Mobile: horizontal margin around the card stack. Reduced 2026-05-25
      by ~2% of viewport (8px each side) for more card width. */
-  #page-content { padding: 20px 8px calc(20px + env(safe-area-inset-bottom, 0px)); }   /* 12 -> 8 (user 2026-11-06: 'too much margin in that table') */
+  #page-content { padding: 20px 12px calc(20px + env(safe-area-inset-bottom, 0px)); }   /* card 12px from the screen edge (user 2026-11-06) */
 }
 h1 { font-size: 24px; font-weight: 600; margin: 0 0 4px; }
 a { color: #378ADD; text-decoration: none; }
@@ -169,7 +169,7 @@ tr.assignment-risk td:first-child::before {
      Don't touch table display props — that breaks column widths. */
   /* Let the scrollable table bleed into the card's horizontal padding so
      text isn't cut off 20px before the card edge. */
-  .week-card .table-scroll { margin-left: -12px; margin-right: -12px; }   /* 8px inside the card edge (user 2026-11-06: 'zero margin, gotta give it some') */
+  .week-card .table-scroll { margin-left: -8px; margin-right: -8px; }   /* table 12px inside the card edge (user 2026-11-06: '12px inside and 12 from the edge') */
   .actuals-table th, .actuals-table td { padding-left: 4px; padding-right: 4px; }
   /* Ticker strip stays a single line but smaller */
   .ticker-strip { font-size: 11px; padding: 8px 12px; }
