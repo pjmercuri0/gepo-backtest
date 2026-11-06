@@ -122,7 +122,7 @@
                  close stays on the tooltip. Amber when the spot has crossed a strike since the close. #}
               ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}
               {% if row.ah_spot %}
-              <div class="ah-spot{% if row.ah_flip %} ah-flip{% endif %}" title="after hours {{ stream_ts[11:16] }} ET{% if row.ah_flip %} -- now {{ row.ah_status }} after the close{% endif %}">AH ${{ "%.2f"|format(row.ah_spot|rd(2)) }}</div>
+              <div class="ah-spot ah-{{ (row.ah_status or '')|lower }}" title="after hours {{ stream_ts[11:16] }} ET, {{ row.ah_status|lower }}{% if row.ah_flip %} -- crossed a strike since the close{% endif %}">AH ${{ "%.2f"|format(row.ah_spot|rd(2)) }}</div>
               {% endif %}
             {% elif last_track and 'underlying_price' in last_track and last_track.underlying_price %}
               <span{% if arisk and arisk.spot %} title="quoted {{ assign_ts }}"{% endif %}>${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}</span>
