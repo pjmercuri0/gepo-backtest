@@ -1196,6 +1196,13 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                     _wide = _bw > 1.0 * w + 1e-9
                     if not _wide:
                         _live_mid = float(_q["mid"])
+                    elif IS_DEBIT_SITE:
+                        # Debit site (user 2026-11-06, BA 177.5/175 and GM 90/89 at the open: 'the site
+                        # shouldn't fall to the model, use the leg mids'): a book wider than the spread
+                        # still marks off the stream's own-leg mids (short_mid - long_mid, credit scale,
+                        # what IBKR values the legs at), not the model at own-leg IV, which printed the
+                        # full width (2.50 / 1.00) against IBKR's 2.35 / 0.77.
+                        _live_mid = float(_q["mid"])
                 except (TypeError, ValueError, KeyError):
                     _live_mid = None
             # Quote gate on the live quote, same rule as the live tab: quote >= model at the 2dp shown
@@ -1219,7 +1226,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                 except (TypeError, ValueError):
                     pass
             if _live_mid is not None:
-                _px, _basis = _live_mid, "live quote"
+                _px, _basis = _live_mid, ("own leg mids (book wider than the spread)" if _wide else "live quote")
                 live["live_quote"] = round(_live_mid, 4); live["live_quote_ts"] = _q.get("ts")
                 _am = {"ts": _q.get("ts")}
             elif _am:
