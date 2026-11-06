@@ -120,11 +120,11 @@
             {% if outcome_row and outcome_row.underlying_price is defined %}
               {# After-hours spot through 19:00 ET on expiry day (user 2026-11-06); the settled
                  close stays on the tooltip. Amber when the spot has crossed a strike since the close. #}
-              ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}
+              ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}{% if row.ah_spot %}<span class="live-dot" style="margin-left:6px;margin-right:0"></span>{% endif %}
               {% if row.ah_spot %}
               {# Colour (user 2026-11-06): yellow once the after-hours spot is past the LONG strike (between the
                  strikes or through both), else red below the close, green above it, white at it. #}
-              <div class="ah-spot {% if row.ah_status in ('PARTIAL', 'WINNING') %}ah-past-long{% else %}ah-{{ row.ah_dir }}{% endif %}" title="after hours {{ stream_ts[11:16] }} ET, {{ row.ah_dir }} vs the close{% if row.ah_status == 'WINNING' %} -- through the SHORT strike, assignment{% elif row.ah_status == 'PARTIAL' %} -- past the long strike, between the strikes{% endif %}">AH ${{ "%.2f"|format(row.ah_spot|rd(2)) }}<span class="live-dot" style="margin-left:4px;margin-right:0"></span></div>
+              <div class="ah-spot {% if row.ah_status in ('PARTIAL', 'WINNING') %}ah-past-long{% else %}ah-{{ row.ah_dir }}{% endif %}" title="after hours {{ stream_ts[11:16] }} ET, {{ row.ah_dir }} vs the close{% if row.ah_status == 'WINNING' %} -- through the SHORT strike, assignment{% elif row.ah_status == 'PARTIAL' %} -- past the long strike, between the strikes{% endif %}">AH ${{ "%.2f"|format(row.ah_spot|rd(2)) }}</div>
               {% endif %}
             {% elif last_track and 'underlying_price' in last_track and last_track.underlying_price %}
               <span{% if arisk and arisk.spot %} title="quoted {{ assign_ts }}"{% endif %}>${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}</span>
