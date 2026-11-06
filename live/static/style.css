@@ -279,6 +279,12 @@ tr.assign-watch td { background: rgba(214, 158, 46, 0.14);
 tr.assign-watch td:first-child { box-shadow: inset 3px 0 0 #d69e2e; }
 .assign-tag-watch { background: #6b4c15; color: #ffe9bf; }
 
+/* WIN: debit Actuals row whose pct (mark / width) is 90% or more (user 2026-11-06). Same
+   treatment as the amber P row, in green. */
+tr.pct-win td { background: rgba(46, 160, 90, 0.14);
+                border-bottom-color: rgba(46, 160, 90, 0.40); }
+tr.pct-win td:first-child { box-shadow: inset 3px 0 0 #2ea05a; }
+
 /* Fill-sensitivity table — collapsed reference on the backtest and OOT pages.
    Styled as a chip so the closed state sits in the chip row without competing
    with it; opens to a scrollable table. */
