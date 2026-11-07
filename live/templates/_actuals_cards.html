@@ -218,6 +218,9 @@
             {% set _pw = ((p.short_strike|float) - (p.long_strike|float))|abs %}
             {% if (not row.row_pnl_realized or row.closed) and last_marked and last_marked.current_mark is not none and _pw > 0 %}
               <td style="text-align:right" title="mark ${{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }} of width ${{ '%.2f'|format(_pw) }}">{{ "%.0f"|format(((last_marked.current_mark|px(p)|rd(2)) / _pw * 100)|rd) }}%</td>
+            {% elif outcome_row and row.row_pnl is not none and p.actual_credit is defined and p.actual_credit is not none and _pw > 0 %}
+              {% set _sm2 = ((p.actual_credit|px(p))|float) + (row.row_pnl|float) / 100 / (p.suggested_qty or 1) %}
+              <td style="text-align:right" title="settled at ${{ '%.2f'|format(_sm2|rd(2)) }} of width ${{ '%.2f'|format(_pw) }}">{{ "%.0f"|format(((_sm2|rd(2)) / _pw * 100)|rd) }}%</td>
             {% else %}
               <td style="text-align:right">—</td>
             {% endif %}
@@ -262,6 +265,14 @@
             <td class="{% if row.row_pnl is not none and row.row_pnl > 0 %}pos{% elif row.row_pnl is not none and row.row_pnl < 0 %}neg{% endif %}"
                 style="text-align:right"
                 title="{{ last_marked.mark_basis }}{% if last_marked.ts %} {{ (last_marked.ts|string)[11:16] }}{% endif %}{% if p.actual_credit is defined and p.actual_credit is not none %}; your fill {{ '%.2f'|format((p.actual_credit|px(p))|rd(2)) }}{% endif %}{% if row.row_pnl is not none %}; P&amp;L ${{ '%+.0f'|format(row.row_pnl|rd) }}{% endif %}">${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</td>
+          {% elif is_debit_site and p.structure == 'debit' and outcome_row and row.row_pnl is not none and p.actual_credit is defined and p.actual_credit is not none %}
+            {# Settled debit row (user 2026-11-07: "how come these marks are $-240"): the Mark cell is what the
+               spread settled at, $/sh in debit terms = your fill + the realized P&L per contract, so Mark - fill
+               is the P&L column. A worthless expiry reads $0.00, a full win reads the width. #}
+            {% set _sm = ((p.actual_credit|px(p))|float) + (row.row_pnl|float) / 100 / (p.suggested_qty or 1) %}
+            <td class="fw {% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}"
+                style="text-align:right"
+                title="settled at ${{ '%.2f'|format(_sm|rd(2)) }} on the {{ (outcome_row.underlying_price|rd(2)) if outcome_row.underlying_price is not none else '' }} close; your fill {{ '%.2f'|format((p.actual_credit|px(p))|rd(2)) }}; P&amp;L ${{ '%+.0f'|format(row.row_pnl|rd) }}">${{ "%.2f"|format(_sm|rd(2)) }}</td>
           {% elif row.row_pnl is not none %}
             <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}"
                 style="text-align:right"
