@@ -174,6 +174,12 @@ def main():
             unresolved.append(f"{t['ticker']} {t['k_s']}/{t['k_l']}: still open, no site action"); continue
         mtm_usd += v6 - v5
         comm_cad += cc
+        # Entry at the fill price (the payload's credit is from IBKR's proceeds, commission-free), not
+        # IBKR's cost basis, which has the opening commission in it: at the same locked marks the
+        # tentative row then equals the Actuals row (user 2026-11-06: 'even at the locked marks you
+        # should match'). The statement's cost basis would read 2-5 USD lower per spread.
+        if t.get("credit") is not None:
+            basis = ((width - t["credit"]) if t["structure"] == "debit" else -t["credit"]) * 100 * q
         pnl = v6 - basis - cc / fx
         outcome = _outcome(t, pc, sp, pnl)
         t.update({"pnl": round(pnl, 2), "outcome": outcome, "closed": DAY, "spot": sp, "tentative": how})
