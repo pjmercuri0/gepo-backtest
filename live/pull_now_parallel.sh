@@ -53,6 +53,25 @@ mkdir -p "$DATE_DIR"
 
 echo "=== Parallel pull at $(date '+%Y-%m-%d %H:%M:%S') ==="
 
+# "scanning" badge on the live tab (user 2026-11-09): a status file flagged at start and
+# cleared at exit (the trap also fires on a failed scan), pushed to Mya each time. Epoch
+# seconds so the webapp can age it out if a push ever fails to clear.
+_scan_status() {
+    printf '{"scanning": %s, "started": "%s", "started_epoch": %s, "hhmm": "%s", "updated_epoch": %s}\n' \
+        "$1" "$_SCAN_START_ISO" "$_SCAN_T0" "$HHMM" "$(date +%s)" > live/ranked/scan_status.json
+    if [ -n "${MYA_SSH_HOST:-}" ]; then
+        rsync -az --timeout=10 -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+            live/ranked/scan_status.json \
+            "$MYA_SSH_HOST:${MYA_REMOTE_BASE:-/opt/vito/gepo-backtest/live}/ranked/scan_status.json" \
+            >/dev/null 2>&1 || true
+    fi
+}
+_SCAN_T0="$(date +%s)"
+_SCAN_START_ISO="$(date '+%Y-%m-%dT%H:%M:%S')"
+mkdir -p live/ranked
+_scan_status true &
+trap '_scan_status false' EXIT
+
 # Pull Mya-side edits while the option fetchers run. The SPY IBKR connection
 # also runs concurrently (launched below, after the fetcher stagger window).
 (

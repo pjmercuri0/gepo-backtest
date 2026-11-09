@@ -720,7 +720,7 @@ async function refresh() {
     if (data.snapshot_ts && data.snapshot_ts.includes("T")) {
       tickStr = new Intl.DateTimeFormat("en-US", {
         timeZone: "America/New_York",
-        hour: "numeric", minute: "2-digit", hour12: true,
+        hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true,
       }).format(new Date(data.snapshot_ts.slice(0, 19)));
     }
     // Same tick on the ranked-table label (user 2026-09-14), so the table and the
@@ -773,6 +773,12 @@ async function refresh() {
       txt.textContent = "GEPO Live Tracker";
       (document.getElementById("top-label")||{}).textContent =
         `Fable picks · pooled top 6 by Γᵢ${tickStr ? ` · stale tick ${tickStr} ET` : ""}`;
+    }
+    // Green "scanning" badge while the cron scan is running (user 2026-11-09). The scan
+    // script flags scan_status.json at start and clears it at exit; the webapp ages it out.
+    if (data.scan_status && data.scan_status.scanning) {
+      txt.insertAdjacentHTML("beforeend",
+        ` <span class="badge badge-LIVE" style="vertical-align:middle" title="scan started ${String(data.scan_status.started || "").slice(11, 19)}">scanning</span>`);
     }
   } catch (e) {
     document.getElementById("snapshot-meta").textContent = "error: " + e.message;

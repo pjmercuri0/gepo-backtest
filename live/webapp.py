@@ -18,6 +18,7 @@ import math
 import os
 import sys
 import tempfile
+import time
 from datetime import datetime, time as dtime, date as ddate
 from pathlib import Path
 
@@ -2792,6 +2793,19 @@ def _server_now_et() -> str:
     return datetime.now(ZoneInfo("America/New_York")).replace(tzinfo=None).isoformat(timespec="seconds")
 
 
+def _scan_status() -> dict:
+    """live/ranked/scan_status.json, written by pull_now_parallel.sh at scan start (scanning
+    true) and exit (false) and pushed to Mya each time. A true flag older than 10 minutes is
+    reported false: the clearing push failed, and no scan runs that long."""
+    st = _read_json(Path(live_config.RANKED_DIR) / "scan_status.json") or {}
+    try:
+        if st.get("scanning") and time.time() - float(st.get("started_epoch") or 0) > 600:
+            st = dict(st, scanning=False, aged_out=True)
+    except (TypeError, ValueError):
+        st = dict(st, scanning=False)
+    return st
+
+
 @app.route("/api/latest.json")
 def latest_json():
     """Return the latest ranked snapshot.
@@ -2836,6 +2850,7 @@ def latest_json():
     _enrich_payload(payload)
     _overlay_stream(payload)
     _mark_held(payload)
+    payload["scan_status"] = _scan_status()
     payload["server_now"] = _server_now_et()
     return jsonify(payload)
 
