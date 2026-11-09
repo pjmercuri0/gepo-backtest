@@ -1088,6 +1088,12 @@ def _stream_state() -> dict:
         return _read_json(Path(live_config.RANKED_DIR) / "combo_stream.json") or {}
 
 
+def _in_session_ts(ts) -> bool:
+    """True when a naive local timestamp falls inside the regular session (09:30-16:00 ET)."""
+    t = str(ts or "")[11:19]
+    return "09:30:00" <= t < "16:00:00"
+
+
 def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=False,
                     quote_mark=None):
     """Live spot + mark for ONE open pick, straight off combo_stream.
@@ -1237,7 +1243,12 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                 _px, _basis = _live_mid, ("own leg mids (book wider than the spread)" if _wide else "live quote")
                 live["live_quote"] = round(_live_mid, 4); live["live_quote_ts"] = _q.get("ts")
                 _am = {"ts": _q.get("ts")}
-            elif _am:
+            elif _am and not (_lq and _lq.get("mid") is not None
+                              and not _in_session_ts(_am.get("ts"))):
+                # A mark_actuals mark taken OUTSIDE the session (the 16:00 scan marks at 16:01, the
+                # leg books have decayed) loses to the held last in-session quote below (2026-11-09:
+                # NVDA 180/177.5 showed 2.43 / +$236 at 16:15 off own leg mids 16:01, credit 0.075,
+                # against a 15:59 quote of 0.98).
                 # Wide book: the scan's own-leg mid came off the same wide legs, so the model goes
                 # first -- repriced at the LIVE spot from the scan's own-leg IVs, so the mark and
                 # the badge beside it are the same moment.
@@ -1274,7 +1285,8 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             # tracked it, that wins: GS 902.5/900 sat on the 15:59 hold (spot 897.81, +$29) at 10:01
             # the next morning with the stock at 870.65.
             _lt_ts = str((last_track or {}).get("ts") or "")
-            _lq_new = bool(_lq) and str(_lq.get("ts") or "") >= _lt_ts
+            # ...a later tracker sample taken outside the session does not count as newer (same rule).
+            _lq_new = bool(_lq) and (str(_lq.get("ts") or "") >= _lt_ts or not _in_session_ts(_lt_ts))
             if _px is None and prefer_stream and _lq_ok and _lq_new and not _q and _lq.get("mid") is not None:
                 try:
                     _px, _basis = float(_lq["mid"]), f"last live quote {str(_lq.get('ts'))[11:16]} (held)"
