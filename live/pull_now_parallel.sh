@@ -53,9 +53,8 @@ mkdir -p "$DATE_DIR"
 
 echo "=== Parallel pull at $(date '+%Y-%m-%d %H:%M:%S') ==="
 
-# Pull Mya-side edits while the option fetchers run. The separate SPY IBKR
-# connection runs after all option clients disconnect so it cannot overload
-# Gateway during its connection handshake.
+# Pull Mya-side edits while the option fetchers run. The SPY IBKR connection
+# also runs concurrently (launched below, after the fetcher stagger window).
 (
     if [ -n "${MYA_SSH_HOST:-}" ]; then
         bash live/pull_from_mya.sh 2>&1 | sed "s/^/  [Pull] /"
@@ -89,17 +88,13 @@ for g in $(seq 0 $((NUM_GROUPS - 1))); do
     PIDS+=($!)
 done
 
-# Wait for all fetchers
-for pid in "${PIDS[@]}"; do
-    wait "$pid" || echo "  ✗ fetcher pid $pid exited non-zero (continuing)"
-done
-echo "✓ All fetchers completed"
-
-# Mya-side actual-credit edits must land before the upload at the end of run.
-wait "$PRELUDE_PID" || echo "  ✗ Mya pull exited non-zero (continuing)"
-
-# This uses its own IBKR connection. Run it only after the option sessions
-# exit, rather than competing with their Gateway initialization.
+# SPY intraday tick: its own IBKR connection (clientId 12). Until 2026-11-09 it
+# started only after every option fetcher had exited, which put its ~18s
+# (python start + connect + snapshot) serially on the critical path of every
+# scan. It now launches once the last fetcher's stagger has passed plus a few
+# seconds, so it never collides with the eight client handshakes but runs
+# while the fetchers are in their quote phase; it is joined below, before the
+# merge. The ranker only reads spy_intraday.json after the merge.
 #
 # HARD WATCHDOG: a wedged SPY connection (Gateway accepts the socket but never
 # delivers a quote — seen 2026-07-16 and 2026-07-22) has no internal timeout on
@@ -110,11 +105,13 @@ wait "$PRELUDE_PID" || echo "  ✗ Mya pull exited non-zero (continuing)"
 # proceed with the last valid tick (fetch_spy_intraday preserves it on failure).
 SPY_TIMEOUT="${SPY_FETCH_TIMEOUT:-90}"
 SPY_LOG="$(mktemp -t gepo_spy)"
-echo "Refreshing SPY intraday tick (hard timeout ${SPY_TIMEOUT}s)..."
-"${GEPO_PYTHON:-python3}" -m live.fetch_spy_intraday > "$SPY_LOG" 2>&1 &
+SPY_DELAY="$("${GEPO_PYTHON:-python3}" -c "print(($NUM_GROUPS - 1) * 1.5 + 5)")"
+echo "Refreshing SPY intraday tick concurrently (starts in ${SPY_DELAY}s, hard timeout ${SPY_TIMEOUT}s)..."
+# exec so $SPY_PID is the python process itself (the watchdog kills that pid).
+( sleep "$SPY_DELAY"; exec "${GEPO_PYTHON:-python3}" -m live.fetch_spy_intraday ) > "$SPY_LOG" 2>&1 &
 SPY_PID=$!
 (
-    sleep "$SPY_TIMEOUT"
+    sleep "$(python3 -c "print($SPY_DELAY + $SPY_TIMEOUT)")"
     if kill -0 "$SPY_PID" 2>/dev/null; then
         echo "watchdog: SPY fetch exceeded ${SPY_TIMEOUT}s — killing pid $SPY_PID" >> "$SPY_LOG"
         kill -TERM "$SPY_PID" 2>/dev/null || true
@@ -123,6 +120,17 @@ SPY_PID=$!
     fi
 ) &
 SPY_WATCH_PID=$!
+
+# Wait for all fetchers
+for pid in "${PIDS[@]}"; do
+    wait "$pid" || echo "  ✗ fetcher pid $pid exited non-zero (continuing)"
+done
+echo "✓ All fetchers completed ($(date +%H:%M:%S))"
+
+# Mya-side actual-credit edits must land before the upload at the end of run.
+wait "$PRELUDE_PID" || echo "  ✗ Mya pull exited non-zero (continuing)"
+
+# Join the SPY tick (normally already done by now).
 wait "$SPY_PID" 2>/dev/null || echo "  ✗ SPY refresh failed or timed out (continuing with last valid tick)"
 # Stop the watchdog early if the fetch already returned, then reap it.
 kill -TERM "$SPY_WATCH_PID" 2>/dev/null || true
@@ -154,7 +162,7 @@ else:
 
 # Merge all per-group parquets into the canonical HHMM.parquet for the ranker.
 FINAL_OUT="$DATE_DIR/${HHMM}.parquet"
-echo "Merging group parquets into $FINAL_OUT..."
+echo "Merging group parquets into $FINAL_OUT... ($(date +%H:%M:%S))"
 if ! "${GEPO_PYTHON:-python3}" - <<PYEOF
 import sys
 from pathlib import Path
@@ -209,7 +217,7 @@ then
     exit 0
 fi
 
-echo "Running ranker..."
+echo "Running ranker... ($(date +%H:%M:%S))"
 "${GEPO_PYTHON:-python3}" -m live.ranker 2>&1 | sed "s/^/  [Ranker] /"
 echo "✓ Snapshot, merge, and rankings complete"
 
@@ -239,7 +247,7 @@ echo "Running MTM tracker on active frozen files..."
 # Push to Mya if SSH host configured. Soft-fail so a network blip
 # doesn't kill the cron exit code.
 if [ -n "${MYA_SSH_HOST:-}" ]; then
-    echo "Uploading to Mya..."
+    echo "Uploading to Mya... ($(date +%H:%M:%S))"
     bash live/upload_to_mya.sh 2>&1 | sed "s/^/  [Upload] /" || echo "  ✗ upload failed (non-fatal)"
 else
     echo "  (skip Mya upload — MYA_SSH_HOST not set)"
@@ -256,7 +264,7 @@ fi
 # 1.80 market, XOM marked at zero (2026-09-24).
 #
 # Soft-fail: a marking problem must never fail the scan.
-echo "Marking open Actuals positions..."
+echo "Marking open Actuals positions... ($(date +%H:%M:%S))"
 "${GEPO_PYTHON:-python3}" -m live.mark_actuals 2>&1 | sed "s/^/  [Marks] /" \
     || echo "  ✗ mark_actuals failed (non-fatal)"
 # The debit book (gepo-debit-ticker, live/stores.py): same marks, its own store and file.

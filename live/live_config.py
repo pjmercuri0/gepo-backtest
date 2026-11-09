@@ -238,10 +238,16 @@ LIVE_COMBO_ENABLED   = True    # verified live 2026-09-01
 # Debit execution (user 2026-10-15, live/debit_mode.py). True: each canon pick is quoted and traded as its
 # parity debit spread (bull put -> bull call debit, bear call -> bear put debit), same strikes. Selection,
 # gate, P&L and books are unchanged -- credits stay credit equivalents inside, the pages show the debit.
-DEBIT_MODE           = False
+DEBIT_MODE           = True    # 2026-11-09 (user: "i want the debit side to be the selector ... turn off credit side
+                               # for now"): rank, gate and quote the parity DEBIT twin itself. Credit site stopped
+                               # on Mya (pm2 stop app-gepo-ticker) the same day; set False + pm2 start to go back.
 # Both sides (user 2026-10-30): the scan also carries each pick's parity debit twin (conIds, legs,
 # combo quote) so gepo-debit-ticker (GEPO_SITE=debit) shows the same picks as debit spreads.
 DEBIT_TWIN           = True
+# Stream line split while DEBIT_MODE is on (2026-11-09, user: "give all those extra slots to the debit"):
+# every board row is a debit bag, so the whole budget goes to them: 26 bags x 3 lines + 20 spots = 98.
+LIVE_STREAM_MAX_BAGS            = 26
+LIVE_STREAM_DEBIT_PRIORITY_BAGS = 26
 LIVE_COMBO_CLIENT_ID = 110     # avoid 100-109 (fetchers), 11 (default), 12 (SPY)
 LIVE_COMBO_TIMEOUT   = 60      # wall-clock budget for the whole combo pass
 LIVE_COMBO_EXCHANGE  = "SMART" # 2026-09-16: SMART is the aggregated book and is what TWS shows.
@@ -261,10 +267,18 @@ LIVE_COMBO_MAX_WIDTH = float("inf")
 # Coverage is limited by which spreads have a resting two-sided complex-order
 # book, NOT by how long we wait: batch 25 / wait 12 took 72.9s and returned 56
 # of 130, batch 50 / wait 8 took 24.4s and returned 57. Take the fast one.
-LIVE_COMBO_BATCH     = 50      # bags streamed at once (market-data line budget)
+LIVE_COMBO_BATCH     = 50      # (unused since 2026-11-09; rounds are sized by LIVE_COMBO_LINES)
+LIVE_COMBO_LINES     = 90      # streaming lines one combo round may hold. Probe 2026-11-09 10:35: Error 101
+                               # at the 100th streaming subscription account-wide (two clients ramping at once
+                               # hit it at 73+28) while combo_stream held its 98. 90 leaves margin.
 LIVE_COMBO_WAIT      = 8       # hard ceiling per batch
 LIVE_COMBO_MIN_WAIT  = 3.0     # always wait at least this long (first quotes land ~1.0s)
 LIVE_COMBO_STALL     = 1.5     # then stop once no new quote has arrived for this long
+LIVE_COMBO_SETTLE    = 1.0     # pause after cancelling a round so the gateway frees the lines before the next
+LIVE_COMBO_MODE      = "rounds" # "window": one sliding window of LIVE_COMBO_LINES over every bag (2026-11-09);
+                               # "rounds": batches of LIVE_COMBO_LINES bags, stall-exit, settle, next batch
+LIVE_COMBO_HOLD      = 5.0     # window mode: a bag that has not quoted gives up its line after this long
+                               # (2026-11-09 10:30: every arrival landed within 4.0s of subscribing)
 # Which combo price becomes net_credit:
 #   "mid"   - midpoint of the combo book; direct analogue of today's leg mid
 #   "touch" - -ask, what you actually collect buying the combo at market

@@ -142,11 +142,62 @@ def _quote_batch(ib: IB, bags: list, wait_s: float) -> list:
             # rest simply have no complex-order book.
             break
     out = [(t.bid, t.ask, t.last) for t in tickers]
+    print(f"  [combo]     batch {'+'.join(sorted({b.exchange for b in bags}))} n={len(tickers)} quoted={max(best, 0)} "
+          f"exit={time.monotonic() - t0:.1f}s last_arrival={last_change - t0:.1f}s", flush=True)
     for b in bags:
         try:
             ib.cancelMktData(b)
         except Exception:
             pass
+    # The gateway releases cancelled lines asynchronously. Measured 2026-11-09 10:40: three
+    # 90-bag rounds back to back quoted 85 / 0 / 0 with no Error 101 (the starved rounds just
+    # never got a book); with a 1s pause after the cancels they quoted 85 / 79 / 83. The old
+    # 50-bag rounds never showed it because two overlapping rounds still fit in the budget.
+    ib.sleep(float(getattr(live_config, "LIVE_COMBO_SETTLE", 1.0)))
+    return out
+
+
+def _quote_window(ib: IB, keyed: list, lines: int, hold_s: float, deadline: float,
+                  settle_s: float, idle_s: float = 0.25) -> dict:
+    """Stream-quote every bag in `keyed` ([(key, bag), ...]) through a sliding window of at
+    most `lines` concurrent subscriptions. A bag leaves the window as soon as it has a
+    two-sided quote or has held its line for `hold_s`; its line counts as busy for a further
+    `settle_s` after the cancel (the gateway frees lines asynchronously -- see _quote_batch).
+    Returns {key: (bid, ask, last)} for every bag that was subscribed.
+
+    Why not rounds: in a round every line waits for the round's slowest bag plus the stall
+    window, and 70% of bags never quote at all (46/146 on 2026-11-09 10:30), so most lines
+    sit idle on dead books while the next bags queue. Here a dead book costs exactly hold_s
+    of one line and a live one leaves the moment it quotes.
+    """
+    pending = list(keyed)          # consumed from the front
+    active: dict = {}              # key -> (bag, ticker, t_subscribed)
+    releasing: list = []           # cancel timestamps still inside settle_s
+    out: dict = {}
+    while pending or active:
+        now = time.monotonic()
+        releasing = [t for t in releasing if now - t < settle_s]
+        while pending and len(active) + len(releasing) < lines and now < deadline:
+            key, bag = pending.pop(0)
+            active[key] = (bag, ib.reqMktData(bag, "", False, False), now)
+        if not active:
+            if now >= deadline:
+                break
+            ib.sleep(idle_s)
+            continue
+        ib.sleep(idle_s)
+        now = time.monotonic()
+        for key, (bag, t, t0) in list(active.items()):
+            if _has_quote(t) or now - t0 >= hold_s or now >= deadline:
+                out[key] = (t.bid, t.ask, t.last)
+                try:
+                    ib.cancelMktData(bag)
+                except Exception:
+                    pass
+                releasing.append(now)
+                del active[key]
+        if now >= deadline and not active:
+            break
     return out
 
 
@@ -186,52 +237,126 @@ def attach_combo_quotes(candidates: pd.DataFrame) -> pd.DataFrame:
         # (debit - width) like every debit row.
         twin_rows = [idx for idx in rows if _bag_for(rows[idx], "SMART", twin=True) is not None]
         got_twin: dict = {}
-        for ex in COMBO_EXCHANGES:
-            todo = [idx for idx in twin_rows if idx not in got_twin]
-            n0 = len(got_twin)
-            for i in range(0, len(todo), batch):
-                if time.monotonic() >= deadline:
-                    break
-                chunk = todo[i:i + batch]
-                res = _quote_batch(ib, [_bag_for(rows[idx], ex, twin=True) for idx in chunk], wait_s)
-                for idx, (bid, ask, last) in zip(chunk, res):
-                    if bid is None or ask is None or pd.isna(bid) or pd.isna(ask):
-                        continue
-                    # A debit bag is a positive price. 0/0 is an empty book, and subtracting the
-                    # width turned it into a credit equal to the width -- RTX 200/202.5 showed a
-                    # $0.00 debit with a ✓ on 2026-11-02 (user: 'these ones are lighting up').
-                    if float(bid) <= 0 or float(ask) <= 0:
-                        continue
-                    _r = rows[idx]
-                    _w = _r.get("spread_width")
-                    if _w is None or pd.isna(_w):
-                        _w = abs(float(_r["short_strike"]) - float(_r["long_strike"]))
-                    from live import debit_mode
-                    cb, ca, cl = debit_mode.to_credit_bag(bid, ask, last, float(_w))
-                    if usable_combo(cb, ca, _w):
-                        got_twin[idx] = (cb, ca, cl)
-            if twin_rows:
-                print(f"  [combo] twin {ex}: +{len(got_twin) - n0} quoted", flush=True)
         got: dict = {}                    # idx -> (bid, ask, last)
-        for ex in COMBO_EXCHANGES:
-            todo = [idx for idx in rows if idx not in got]
-            n0 = len(got)
-            for i in range(0, len(todo), batch):
+
+        # 2026-11-09: one batch carries EVERY exchange's bag for a row (SMART and CBOE side by
+        # side) instead of a full SMART pass followed by a CBOE pass over the leftovers. The
+        # exchange preference is unchanged -- for each row the first exchange in COMBO_EXCHANGES
+        # with a usable book wins, exactly what the sequential passes produced -- but the rows
+        # are covered in half the rounds. Measured 10:30 that day: 12 rounds x 3.5-5.5s = 55s of
+        # the scan's 124s; arrivals stop 2-4s after subscribing, so round count is the whole cost.
+        # Lines: a probe at 10:35 that day hit Error 101 at the 100th streaming subscription
+        # (account-wide, with combo_stream holding its 98), so a round uses LIVE_COMBO_LINES.
+        lines = int(getattr(live_config, "LIVE_COMBO_LINES", 90))
+        rows_per_round = max(1, lines // len(COMBO_EXCHANGES))
+
+        def _round(idx_list, twin: bool, accept):
+            """Quote idx_list in rounds of rows_per_round rows x all exchanges; accept(idx, ex, bid, ask, last)
+            returns the stored tuple or None. Returns {idx: (ex, tuple)}."""
+            out = {}
+            for i in range(0, len(idx_list), rows_per_round):
                 if time.monotonic() >= deadline:
                     break
-                chunk = todo[i:i + batch]
-                res = _quote_batch(ib, [_bag_for(rows[idx], ex) for idx in chunk], wait_s)
-                for idx, (bid, ask, last) in zip(chunk, res):
-                    if bid is not None and ask is not None and pd.notna(bid) and pd.notna(ask):
-                        _r = rows[idx]
-                        _w = _r.get("spread_width")
-                        if _w is None or pd.isna(_w):
-                            _w = abs(float(_r["short_strike"]) - float(_r["long_strike"]))
-                        if _r.get("structure") == "debit":
-                            got[idx] = (bid, ask, last)      # debit scale; validated after conversion below
-                        elif usable_combo(bid, ask, _w):
-                            got[idx] = (bid, ask, last)
-            print(f"  [combo] {ex}: +{len(got) - n0} quoted", flush=True)
+                chunk = idx_list[i:i + rows_per_round]
+                keyed = []
+                for idx in chunk:
+                    for ex in COMBO_EXCHANGES:
+                        b = _bag_for(rows[idx], ex, twin=twin)
+                        if b is not None:
+                            keyed.append((idx, ex, b))
+                if not keyed:
+                    continue
+                res = _quote_batch(ib, [b for _, _, b in keyed], wait_s)
+                per_idx: dict = {}
+                for (idx, ex, _), (bid, ask, last) in zip(keyed, res):
+                    val = accept(idx, ex, bid, ask, last)
+                    if val is not None:
+                        per_idx.setdefault(idx, {})[ex] = val
+                for idx, by_ex in per_idx.items():
+                    for ex in COMBO_EXCHANGES:          # preference order, as before
+                        if ex in by_ex:
+                            out[idx] = (ex, by_ex[ex])
+                            break
+            return out
+
+        def _accept_twin(idx, ex, bid, ask, last):
+            if bid is None or ask is None or pd.isna(bid) or pd.isna(ask):
+                return None
+            # A debit bag is a positive price. 0/0 is an empty book, and subtracting the
+            # width turned it into a credit equal to the width -- RTX 200/202.5 showed a
+            # $0.00 debit with a check mark on 2026-11-02 (user: 'these ones are lighting up').
+            if float(bid) <= 0 or float(ask) <= 0:
+                return None
+            _r = rows[idx]
+            _w = _r.get("spread_width")
+            if _w is None or pd.isna(_w):
+                _w = abs(float(_r["short_strike"]) - float(_r["long_strike"]))
+            from live import debit_mode
+            cb, ca, cl = debit_mode.to_credit_bag(bid, ask, last, float(_w))
+            return (cb, ca, cl) if usable_combo(cb, ca, _w) else None
+
+        def _accept_main(idx, ex, bid, ask, last):
+            if bid is None or ask is None or pd.isna(bid) or pd.isna(ask):
+                return None
+            _r = rows[idx]
+            _w = _r.get("spread_width")
+            if _w is None or pd.isna(_w):
+                _w = abs(float(_r["short_strike"]) - float(_r["long_strike"]))
+            if _r.get("structure") == "debit":
+                return (bid, ask, last)      # debit scale; validated after conversion below
+            return (bid, ask, last) if usable_combo(bid, ask, _w) else None
+
+        mode = str(getattr(live_config, "LIVE_COMBO_MODE", "window"))
+        if mode == "window":
+            # One sliding window over every bag: twin bags queued first (user 2026-11-02:
+            # 'debit priority then credit'), then the credit bags; both exchanges per row.
+            keyed = []
+            for idx in twin_rows:
+                for ex in COMBO_EXCHANGES:
+                    b = _bag_for(rows[idx], ex, twin=True)
+                    if b is not None:
+                        keyed.append((("twin", idx, ex), b))
+            for idx in rows:
+                for ex in COMBO_EXCHANGES:
+                    b = _bag_for(rows[idx], ex)
+                    if b is not None:
+                        keyed.append((("main", idx, ex), b))
+            res = _quote_window(ib, keyed, lines,
+                                float(getattr(live_config, "LIVE_COMBO_HOLD", 5.0)), deadline,
+                                float(getattr(live_config, "LIVE_COMBO_SETTLE", 1.0)))
+            by: dict = {"twin": {}, "main": {}}
+            for (side, idx, ex), (bid, ask, last) in res.items():
+                val = (_accept_twin if side == "twin" else _accept_main)(idx, ex, bid, ask, last)
+                if val is not None:
+                    by[side].setdefault(idx, {})[ex] = val
+            won = {"twin": {}, "main": {}}
+            for side in ("twin", "main"):
+                for idx, by_ex in by[side].items():
+                    for ex in COMBO_EXCHANGES:          # preference order, as before
+                        if ex in by_ex:
+                            won[side][idx] = (ex, by_ex[ex])
+                            break
+            got_twin = {idx: v for idx, (ex, v) in won["twin"].items()}
+            got = {idx: v for idx, (ex, v) in won["main"].items()}
+            for side, label, n_rows in (("twin", "twin: ", len(twin_rows)), ("main", "", len(rows))):
+                if n_rows:
+                    print(f"  [combo] {label}" + ", ".join(
+                        f"{ex} +{sum(1 for e, _ in won[side].values() if e == ex)}" for ex in COMBO_EXCHANGES)
+                        + f" quoted (window of {lines} lines, {len(keyed)} bags, "
+                        f"{len(res)} subscribed, {time.monotonic() - t0:.1f}s)", flush=True)
+        else:
+            # Parity twins first (user 2026-11-02: 'debit priority then credit'), same budget.
+            if twin_rows:
+                r = _round(twin_rows, True, _accept_twin)
+                got_twin = {idx: v for idx, (ex, v) in r.items()}
+                print("  [combo] twin: " + ", ".join(
+                    f"{ex} +{sum(1 for e, _ in r.values() if e == ex)}" for ex in COMBO_EXCHANGES)
+                    + f" quoted ({(len(twin_rows) + rows_per_round - 1) // rows_per_round} rounds)", flush=True)
+            r = _round(list(rows), False, _accept_main)
+            got = {idx: v for idx, (ex, v) in r.items()}
+            print("  [combo] " + ", ".join(
+                f"{ex} +{sum(1 for e, _ in r.values() if e == ex)}" for ex in COMBO_EXCHANGES)
+                + f" quoted ({(len(rows) + rows_per_round - 1) // rows_per_round} rounds)", flush=True)
     except Exception as e:
         print(f"  [combo] quoting failed ({e}); falling back to leg mids", flush=True)
         return df

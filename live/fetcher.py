@@ -31,6 +31,7 @@ import math
 import os
 import sys
 import time
+_PROC_T0 = time.monotonic()  # process start (instrumentation)
 import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -513,12 +514,24 @@ async def _fetch_one_ticker(
     can run concurrently on a single IB connection.
     """
     t_start = time.monotonic()
+    _ph = {}  # phase timings (2026-11-09 instrumentation: where the fetch wall-clock goes)
     idx = _index_spec(sym)
     stock = (Index(idx["underlying"], idx["exchange"], "USD") if idx
              else Stock(sym, "SMART", "USD"))
     try:
-        await ib.qualifyContractsAsync(stock)
+        # Stock conIds never change: qualify once per day and cache it. Measured 2026-11-09
+        # 10:30 under the 8-group load: median 1.9s, max 6.9s per ticker, on the critical path.
+        _sp = _cache_path("stock", sym)
+        _sc = _read_json(_sp) or {}
+        if _sc.get("conId"):
+            stock.conId = int(_sc["conId"])
+        else:
+            await ib.qualifyContractsAsync(stock)
+            if stock.conId:
+                _write_json(_sp, {"conId": int(stock.conId), "symbol": sym})
+        _ph["qstk"] = time.monotonic() - t_start
         [stock_ticker] = await ib.reqTickersAsync(stock)
+        _ph["spot"] = time.monotonic() - t_start - _ph["qstk"]
         spot = stock_ticker.marketPrice()
         if pd.isna(spot) or spot <= 0:
             spot = stock_ticker.close
@@ -536,7 +549,9 @@ async def _fetch_one_ticker(
             pass
     strike_lo, strike_hi = _strike_window(spot, symbol=sym,
                                           dte=(max(_dtes) if _dtes else None))
+    _t = time.monotonic()
     contracts = await _qualify_options_for(ib, stock, expiry_strs, strike_lo, strike_hi, rights=rights, spot=spot)
+    _ph["qual"] = time.monotonic() - _t
     if not contracts:
         return [], f"  [{sym}] spot=${spot:.2f}  no qualified options"
 
@@ -561,7 +576,9 @@ async def _fetch_one_ticker(
         return rows, f"  [{sym}] reqTickers failed mid-fetch: {e} ({elapsed:.1f}s, {len(rows)} rows kept)"
 
     elapsed = time.monotonic() - t_start
-    return rows, f"  [{sym}] spot=${spot:.2f}  rows={len(rows)}/{len(contracts)} ({elapsed:.1f}s)"
+    _ph["snap"] = elapsed - sum(_ph.values())
+    _phs = " ".join(f"{k}={v:.1f}" for k, v in _ph.items())
+    return rows, f"  [{sym}] spot=${spot:.2f}  rows={len(rows)}/{len(contracts)} ({elapsed:.1f}s: {_phs})"
 
 
 async def _fetch_all_tickers(
@@ -728,8 +745,11 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = N
           "(both required for parity)", flush=True)
 
     ib = IB()
+    _t_conn = time.monotonic()
     _connect_with_retry(ib, client_id)
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
+    print(f"  connected in {time.monotonic() - _t_conn:.1f}s at {datetime.now():%H:%M:%S} "
+          f"(process started {time.monotonic() - _PROC_T0:.1f}s ago)", flush=True)
 
     t_start = time.monotonic()
     try:
@@ -744,7 +764,7 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = N
     # Feed observed IV back so the next scan can size its strike band.
     _update_iv_cache(rows)
     print(f"\nfetched {len(rows)} option rows over {len(tickers)} tickers "
-          f"in {total_elapsed:.1f}s", flush=True)
+          f"in {total_elapsed:.1f}s (done {datetime.now():%H:%M:%S})", flush=True)
     return pd.DataFrame(rows)
 
 

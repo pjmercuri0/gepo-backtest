@@ -96,8 +96,14 @@ def _sma_context_from_ib(ib, stock) -> dict:
 
 def fetch() -> dict:
     ib = IB()
+    # +1 to avoid colliding with the option fetcher. Pass the shared connect
+    # timeout: ib_insync's default is 4s, which this client alone still used,
+    # and it timed out twice on 2026-11-09 09:45 the first time it ran
+    # concurrently with the eight fetchers (every other IB client here already
+    # uses IB_CONNECT_TIMEOUT for exactly that load).
     ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-               clientId=live_config.IB_CLIENT_ID + 1, readonly=True)  # +1 to avoid colliding with the option fetcher
+               clientId=live_config.IB_CLIENT_ID + 1, readonly=True,
+               timeout=live_config.IB_CONNECT_TIMEOUT)
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
 
     try:

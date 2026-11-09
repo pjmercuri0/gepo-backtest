@@ -396,6 +396,15 @@ def main() -> int:
                     _earlier += [r for r in _snap_today(ib) if r["_key"] not in _have]
                 except Exception as e:
                     print(f"[combo_stream] snap picks read failed: {e}", flush=True)
+                # DEBIT_MODE (2026-11-09, user: 'turn off credit side for now. give all those extra slots to
+                # the debit'): the credit site is stopped, so credit-structure rows -- this morning's
+                # credit-mode Snap/frozen picks included -- take no lines. Credit POSITIONS still stream
+                # (their Actuals marks need a quote). At the first debit-mode reload 21 of 25 lines were
+                # still credit rows from the earlier snaps.
+                if debit_mode.enabled():
+                    _picks = [r for r in _picks if debit_mode.is_debit(r)]
+                    _rest = [r for r in _rest if debit_mode.is_debit(r)]
+                    _earlier = [r for r in _earlier if debit_mode.is_debit(r)]
                 _earlier = _earlier[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos))]
                 _ek = {r["_key"] for r in _earlier}
                 _rest_all = list(_rest)          # board order, before Snap/History rows are pulled out
