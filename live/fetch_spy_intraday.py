@@ -27,6 +27,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -94,16 +95,16 @@ def _sma_context_from_ib(ib, stock) -> dict:
     }
 
 
-def fetch() -> dict:
-    ib = IB()
-    # +1 to avoid colliding with the option fetcher. Pass the shared connect
-    # timeout: ib_insync's default is 4s, which this client alone still used,
-    # and it timed out twice on 2026-11-09 09:45 the first time it ran
-    # concurrently with the eight fetchers (every other IB client here already
-    # uses IB_CONNECT_TIMEOUT for exactly that load).
-    ib.connect(live_config.IB_HOST, live_config.IB_PORT,
-               clientId=live_config.IB_CLIENT_ID + 1, readonly=True,
-               timeout=live_config.IB_CONNECT_TIMEOUT)
+def fetch(ib: "IB | None" = None) -> dict:
+    # serve() hands in its held connection; a one-shot logs in here. A fresh login
+    # during the eight daemons' snapshot burst timed out (15s) on both attempts on
+    # 2026-11-09 12:30, 12:45, 13:30, 14:00 and 14:27 -- hence the daemon.
+    own = ib is None
+    if own:
+        ib = IB()
+        ib.connect(live_config.IB_HOST, live_config.IB_PORT,
+                   clientId=live_config.IB_CLIENT_ID + 1, readonly=True,
+                   timeout=live_config.IB_CONNECT_TIMEOUT)
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
 
     try:
@@ -123,7 +124,8 @@ def fetch() -> dict:
         # fresh from IBKR data (no more stale Stooq CSV dependency).
         ctx = _sma_context_from_ib(ib, stock)
     finally:
-        ib.disconnect()
+        if own:
+            ib.disconnect()
 
     snap = {
         "snapshot_ts": datetime.now().isoformat(timespec="seconds"),
@@ -161,21 +163,16 @@ def _atomic_write_json(path: Path, payload: dict) -> None:
         raise
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--print", action="store_true",
-                        help="Pretty-print the snapshot to stdout (in addition to writing)")
-    args = parser.parse_args()
-
+def _run_once(ib: "IB | None" = None, do_print: bool = False) -> int:
+    """One tick: fetch (two attempts), validate, write. ib=None logs in for the call."""
     snap = None
     for attempt in (1, 2):
         try:
-            snap = fetch()
+            snap = fetch(ib)
             break
         except Exception as e:
             print(f"  ✗ fetch attempt {attempt} failed: {e}", flush=True)
             if attempt == 1:
-                import time
                 time.sleep(5)  # brief pause before retry; IBKR usually recovers
     if snap is None:
         print(f"  ✗ both attempts failed; preserving previous snapshot", flush=True)
@@ -198,10 +195,104 @@ def main() -> int:
     print(f"  ✓ {snap['snapshot_ts']}  {summary}", flush=True)
     print(f"  ✓ wrote {OUT_PATH}", flush=True)
 
-    if args.print:
+    if do_print:
         print()
         print(json.dumps(snap, indent=2))
     return 0
+
+
+# Persistent mode (2026-11-09), same protocol as live/fetcher.py serve():
+#   live/logs/fetchd/spy.pid      daemon pid
+#   live/logs/fetchd/spy.trigger  JSON {log, hhmm}
+#   live/logs/fetchd/spy.done     JSON {status, elapsed}
+# The connection is held between scans, so the tick never logs in during the fetch burst.
+def _fetchd_dir() -> Path:
+    d = Path(live_config.LOGS_DIR) / "fetchd"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _connect(ib: "IB", client_id: int) -> None:
+    attempts = int(live_config.IB_CONNECT_ATTEMPTS)
+    for attempt in range(1, attempts + 1):
+        try:
+            ib.connect(live_config.IB_HOST, live_config.IB_PORT, clientId=client_id,
+                       readonly=True, timeout=float(live_config.IB_CONNECT_TIMEOUT))
+            return
+        except Exception as e:
+            try:
+                ib.disconnect()
+            except Exception:
+                pass
+            if attempt == attempts:
+                raise
+            print(f"[spyd] connect attempt {attempt}/{attempts} failed ({e}); retrying", flush=True)
+            time.sleep(2.0 * attempt)
+
+
+def serve(client_id: int) -> int:
+    import contextlib
+    d = _fetchd_dir()
+    (d / "spy.pid").write_text(str(os.getpid()))
+    trig, done = d / "spy.trigger", d / "spy.done"
+    ib = IB()
+    try:
+        _connect(ib, client_id)
+        print(f"[spyd] connected, client {client_id}, pid {os.getpid()}", flush=True)
+    except Exception as e:
+        print(f"[spyd] not connected yet ({e}); retrying on the first trigger", flush=True)
+    while True:
+        try:
+            if not trig.exists():
+                ib.sleep(0.2)
+                continue
+            try:
+                job = json.loads(trig.read_text())
+            except Exception as e:
+                print(f"[spyd] bad trigger ({e}); ignored", flush=True)
+                trig.unlink(missing_ok=True)
+                continue
+            trig.unlink(missing_ok=True)
+            done.unlink(missing_ok=True)
+            log_path = Path(job.get("log") or (d / "spy.job.log"))
+            t0 = time.monotonic()
+            status = 1
+            with open(log_path, "a") as fh, contextlib.redirect_stdout(fh):
+                try:
+                    if not ib.isConnected():
+                        print("  [spyd] reconnecting", flush=True)
+                        _connect(ib, client_id)
+                    status = _run_once(ib)
+                except Exception as e:
+                    print(f"  ✗ spy daemon job failed: {e!r}", flush=True)
+                    try:
+                        ib.disconnect()      # a broken session reconnects on the next trigger
+                    except Exception:
+                        pass
+            result = {"status": int(status), "elapsed": round(time.monotonic() - t0, 1)}
+            tmp = done.with_suffix(".tmp")
+            tmp.write_text(json.dumps(result))
+            os.replace(tmp, done)
+            print(f"[spyd] job {job.get('hhmm')} -> {result}", flush=True)
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            print(f"[spyd] loop error: {e!r}", flush=True)
+            ib.sleep(1.0)
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--print", action="store_true",
+                        help="Pretty-print the snapshot to stdout (in addition to writing)")
+    parser.add_argument("--serve", action="store_true",
+                        help="Hold the IB connection and refresh the tick on trigger files (see serve())")
+    parser.add_argument("--client-id", type=int, default=live_config.IB_CLIENT_ID + 1)
+    args = parser.parse_args()
+    if args.serve:
+        return serve(args.client_id)
+    return _run_once(None, do_print=args.print)
 
 
 if __name__ == "__main__":

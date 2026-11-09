@@ -117,7 +117,9 @@ def _check_paths(mode: str) -> list[Check]:
     for path in output_dirs:
         try:
             path.mkdir(parents=True, exist_ok=True)
-            probe = path / ".preflight-write-test"
+            # Per-process name: the eight fetch daemons run this at the same instant
+            # (2026-11-09 14:15, five of eight unlinked each other's probe -> ENOENT).
+            probe = path / f".preflight-write-test.{os.getpid()}"
             probe.write_text("ok")
             probe.unlink()
             try:

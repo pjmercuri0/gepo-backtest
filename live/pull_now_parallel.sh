@@ -108,6 +108,21 @@ for g in range(n):
                          stdout=open(d / f"g{g}.daemon.log", "a"), stderr=subprocess.STDOUT,
                          stdin=subprocess.DEVNULL, start_new_session=True, cwd=os.getcwd())
         print(f"  [G{g+1}] started fetch daemon (clientId={100 + g})", flush=True)
+# SPY tick daemon (live/fetch_spy_intraday.py serve()): its fresh login during the fetch
+# burst timed out on both attempts on 5 scans of 2026-11-09, leaving a stale tick.
+pidf = d / "spy.pid"; alive = False
+if pidf.exists():
+    try:
+        os.kill(int(pidf.read_text().strip()), 0); alive = True
+    except Exception:
+        pidf.unlink(missing_ok=True)
+if not alive:
+    for f in (d / "spy.trigger", d / "spy.done"):
+        f.unlink(missing_ok=True)
+    subprocess.Popen([py, "-m", "live.fetch_spy_intraday", "--serve"],
+                     stdout=open(d / "spy.daemon.log", "a"), stderr=subprocess.STDOUT,
+                     stdin=subprocess.DEVNULL, start_new_session=True, cwd=os.getcwd())
+    print("  [SPY] started spy tick daemon (clientId=12)", flush=True)
 PYEOF
 FETCH_WAIT_HALFSECS="$("${GEPO_PYTHON:-python3}" -c 'from live import live_config; print(2 * (int(live_config.FETCH_PER_TICKER_TIMEOUT) + 45))')"
 
@@ -167,10 +182,28 @@ done
 # proceed with the last valid tick (fetch_spy_intraday preserves it on failure).
 SPY_TIMEOUT="${SPY_FETCH_TIMEOUT:-90}"
 SPY_LOG="$(mktemp -t gepo_spy)"
-SPY_DELAY=3   # the fetch daemons are already logged in; nothing to dodge (was 15.5s of stagger)
-echo "Refreshing SPY intraday tick concurrently (starts in ${SPY_DELAY}s, hard timeout ${SPY_TIMEOUT}s)..."
-# exec so $SPY_PID is the python process itself (the watchdog kills that pid).
-( sleep "$SPY_DELAY"; exec "${GEPO_PYTHON:-python3}" -m live.fetch_spy_intraday ) > "$SPY_LOG" 2>&1 &
+SPY_DELAY=0
+# 2026-11-09: the tick runs on the spy daemon's held connection (trigger/done files, as the
+# fetch groups). A dead or late daemon falls back to the one-shot (fresh login).
+SPY_TRIG="$FETCHD_DIR/spy.trigger"; SPY_DONE="$FETCHD_DIR/spy.done"
+rm -f "$SPY_DONE"
+printf '{"log": "%s", "hhmm": "%s"}\n' "$SPY_LOG" "$HHMM" > "$SPY_TRIG.tmp" && mv "$SPY_TRIG.tmp" "$SPY_TRIG"
+echo "Refreshing SPY intraday tick via spy daemon (clientId=12, hard timeout ${SPY_TIMEOUT}s)..."
+(
+    waited=0
+    while [ "$waited" -lt $((SPY_TIMEOUT * 2)) ]; do
+        if [ -f "$SPY_DONE" ]; then
+            exit "$("${GEPO_PYTHON:-python3}" -c 'import json,sys; print(json.load(open(sys.argv[1])).get("status", 1))' "$SPY_DONE" 2>/dev/null || echo 1)"
+        fi
+        if ! kill -0 "$(cat "$FETCHD_DIR/spy.pid" 2>/dev/null || echo 0)" 2>/dev/null; then break; fi
+        sleep 0.5; waited=$((waited + 1))
+    done
+    echo "  ✗ spy daemon dead or late ($((waited / 2))s) — one-shot fallback (clientId=12)" >> "$SPY_LOG"
+    rm -f "$SPY_TRIG"
+    kill "$(cat "$FETCHD_DIR/spy.pid" 2>/dev/null || echo 0)" 2>/dev/null || true
+    rm -f "$FETCHD_DIR/spy.pid"
+    exec "${GEPO_PYTHON:-python3}" -m live.fetch_spy_intraday >> "$SPY_LOG" 2>&1
+) &
 SPY_PID=$!
 (
     sleep "$(python3 -c "print($SPY_DELAY + $SPY_TIMEOUT)")"
