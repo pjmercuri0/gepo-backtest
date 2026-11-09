@@ -31,6 +31,7 @@ import math
 import os
 import sys
 import time
+import contextlib
 _PROC_T0 = time.monotonic()  # process start (instrumentation)
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -722,9 +723,100 @@ def _row_from_ticker(c: Option, t, spot: float, today: datetime.date) -> dict | 
     }
 
 
+
+# ── Persistent fetcher (--serve) ─────────────────────────────────────────────
+# 2026-11-09: the eight one-shot fetchers paid the Gateway's serialised API
+# login on every scan -- G5-G8 sat 15-18s before their first request (11:00
+# scan: connected at +15.2, +15.8, +17.2, +17.9s). A daemon per group holds
+# its connection between scans, like combo_stream does, and runs a fetch when
+# pull_now_parallel.sh drops a trigger file. Protocol (live/logs/fetchd/):
+#   g{N}.pid      daemon pid (the script starts a daemon when it is not alive)
+#   g{N}.trigger  JSON {tickers, out, hhmm, log, dry_run?, allow_out_of_hours?}
+#   g{N}.done     JSON {status, rows, out, elapsed} -- written when the job ends
+#   <log>         the job's stdout (the same lines the one-shot printed)
+# The script falls back to a one-shot fetcher if a daemon is dead or late.
+
+def _fetchd_dir() -> Path:
+    d = Path(live_config.LOGS_DIR) / "fetchd"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _run_job(ib: IB, client_id: int, job: dict) -> dict:
+    """One fetch for the daemon: the same steps as main(), on the held connection."""
+    try:
+        run_preflight("fetch", allow_out_of_hours=bool(job.get("allow_out_of_hours")))
+    except PreflightError as exc:
+        print(exc, flush=True)
+        return {"status": 1, "error": str(exc)[:200]}
+    tickers = list(job["tickers"])
+    dte_min, dte_max = live_config.live_dte_window(datetime.now().date())
+    print(f"Live fetch: {len(tickers)} tickers, DTE [{dte_min}, {dte_max}]", flush=True)
+    df = fetch_snapshot(tickers, dry_run=bool(job.get("dry_run")), client_id=client_id, ib=ib)
+    if df.empty:
+        print("no rows fetched; nothing to write", flush=True)
+        return {"status": 1, "rows": 0}
+    out = Path(job["out"])
+    out.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(out, index=False)
+    manifest = snapshot_manifest(df, out, source="IBKR")
+    manifest_path = write_manifest(manifest, out)
+    print(f"wrote {len(df)} rows → {out}", flush=True)
+    print(f"wrote provenance → {manifest_path}", flush=True)
+    return {"status": 0, "rows": int(len(df)), "out": str(out)}
+
+
+def serve(group: int, client_id: int) -> int:
+    d = _fetchd_dir()
+    (d / f"g{group}.pid").write_text(str(os.getpid()))
+    trig, done = d / f"g{group}.trigger", d / f"g{group}.done"
+    ib = IB()
+    try:
+        _connect_with_retry(ib, client_id)
+        print(f"[fetchd g{group}] connected, client {client_id}, pid {os.getpid()}", flush=True)
+    except Exception as e:
+        print(f"[fetchd g{group}] not connected yet ({e}); retrying on the first trigger", flush=True)
+    while True:
+        try:
+            if not trig.exists():
+                ib.sleep(0.2)          # keeps the ib_insync loop (heartbeats) running while idle
+                continue
+            try:
+                job = json.loads(trig.read_text())
+            except Exception as e:
+                print(f"[fetchd g{group}] bad trigger ({e}); ignored", flush=True)
+                trig.unlink(missing_ok=True)
+                continue
+            trig.unlink(missing_ok=True)
+            done.unlink(missing_ok=True)
+            log_path = Path(job.get("log") or (d / f"g{group}.job.log"))
+            result = {"status": 1, "error": "unhandled"}
+            t0 = time.monotonic()
+            with open(log_path, "w") as fh, contextlib.redirect_stdout(fh):
+                try:
+                    result = _run_job(ib, client_id, job)
+                except Exception as e:
+                    print(f"  fetch job failed: {e!r}", flush=True)
+                    result = {"status": 1, "error": repr(e)[:200]}
+            result["elapsed"] = round(time.monotonic() - t0, 1)
+            tmp = done.with_suffix(".tmp")
+            tmp.write_text(json.dumps(result))
+            os.replace(tmp, done)
+            print(f"[fetchd g{group}] job {job.get('hhmm')} -> {result}", flush=True)
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            print(f"[fetchd g{group}] loop error: {e!r}", flush=True)
+            ib.sleep(1.0)
+    return 0
+
+
 # ── Main entry point ────────────────────────────────────────────────────────
 
-def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = None) -> pd.DataFrame:
+def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = None,
+                   ib: IB | None = None) -> pd.DataFrame:
+    """`ib`: an already-connected session to reuse (the --serve daemon). None = connect, fetch,
+    disconnect, as the one-shot CLI always did."""
     if client_id is None:
         client_id = live_config.IB_CLIENT_ID
 
@@ -744,12 +836,18 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = N
     print(f"  prior-session regime={regime.get('regime')} → fetching rights={rights} "
           "(both required for parity)", flush=True)
 
-    ib = IB()
+    own = ib is None
+    if own:
+        ib = IB()
     _t_conn = time.monotonic()
-    _connect_with_retry(ib, client_id)
+    if not ib.isConnected():
+        _connect_with_retry(ib, client_id)
+        print(f"  connected in {time.monotonic() - _t_conn:.1f}s at {datetime.now():%H:%M:%S}"
+              + (f" (process started {time.monotonic() - _PROC_T0:.1f}s ago)" if own else " (daemon reconnect)"),
+              flush=True)
+    else:
+        print(f"  reusing open connection (client {client_id}) at {datetime.now():%H:%M:%S}", flush=True)
     ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
-    print(f"  connected in {time.monotonic() - _t_conn:.1f}s at {datetime.now():%H:%M:%S} "
-          f"(process started {time.monotonic() - _PROC_T0:.1f}s ago)", flush=True)
 
     t_start = time.monotonic()
     try:
@@ -758,7 +856,8 @@ def fetch_snapshot(tickers: list[str], dry_run: bool = False, client_id: int = N
             live_config.FETCH_BATCH_SIZE, dry_run,
         ))
     finally:
-        ib.disconnect()
+        if own:
+            ib.disconnect()
 
     total_elapsed = time.monotonic() - t_start
     # Feed observed IV back so the next scan can size its strike band.
@@ -790,7 +889,13 @@ def main() -> int:
                              "would otherwise collide on HHMM.parquet)")
     parser.add_argument("--allow-out-of-hours", action="store_true",
                         help="Explicitly bypass the production market-hours check")
+    parser.add_argument("--serve", action="store_true",
+                        help="Hold the IB connection and run fetches on trigger files (see serve())")
+    parser.add_argument("--group", type=int, default=0, help="--serve: group index (trigger file name)")
     args = parser.parse_args()
+
+    if args.serve:
+        return serve(args.group, args.client_id if args.client_id is not None else live_config.IB_CLIENT_ID)
 
     try:
         run_preflight("fetch", allow_out_of_hours=args.allow_out_of_hours)

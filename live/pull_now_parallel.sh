@@ -65,6 +65,33 @@ PRELUDE_PID=$!
 FETCH_BATCH_SIZE="$("${GEPO_PYTHON:-python3}" -c 'from live import live_config; print(live_config.FETCH_BATCH_SIZE)')"
 echo "Starting $NUM_GROUPS parallel fetchers (batch size $FETCH_BATCH_SIZE)..."
 
+# Persistent fetchers (2026-11-09): one daemon per group holds its Gateway connection between
+# scans (live/fetcher.py serve()); the login that cost G5-G8 15-18s per scan happens once. Start
+# any daemon that is not alive, then hand each group its job through a trigger file and wait for
+# the done file. A dead or late daemon falls back to the one-shot fetcher (clientId 120+g).
+FETCHD_DIR=live/logs/fetchd
+mkdir -p "$FETCHD_DIR"
+"${GEPO_PYTHON:-python3}" - "$NUM_GROUPS" "$FETCHD_DIR" "${GEPO_PYTHON:-python3}" <<'PYEOF'
+import os, sys, subprocess
+from pathlib import Path
+n, d, py = int(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
+for g in range(n):
+    pidf = d / f"g{g}.pid"; alive = False
+    if pidf.exists():
+        try:
+            os.kill(int(pidf.read_text().strip()), 0); alive = True
+        except Exception:
+            pidf.unlink(missing_ok=True)
+    if not alive:
+        for f in (d / f"g{g}.trigger", d / f"g{g}.done"):
+            f.unlink(missing_ok=True)
+        subprocess.Popen([py, "-m", "live.fetcher", "--serve", "--group", str(g), "--client-id", str(100 + g)],
+                         stdout=open(d / f"g{g}.daemon.log", "a"), stderr=subprocess.STDOUT,
+                         stdin=subprocess.DEVNULL, start_new_session=True, cwd=os.getcwd())
+        print(f"  [G{g+1}] started fetch daemon (clientId={100 + g})", flush=True)
+PYEOF
+FETCH_WAIT_HALFSECS="$("${GEPO_PYTHON:-python3}" -c 'from live import live_config; print(2 * (int(live_config.FETCH_PER_TICKER_TIMEOUT) + 45))')"
+
 PIDS=()
 GROUP_FILES=()
 for g in $(seq 0 $((NUM_GROUPS - 1))); do
@@ -75,14 +102,30 @@ for g in $(seq 0 $((NUM_GROUPS - 1))); do
     GROUP_FILES+=("$GROUP_OUT")
 
     (
-        # Gateway has repeatedly timed out during bursty client initialization.
-        # Stagger eight sessions enough to avoid synchronized account/execution
-        # syncs while keeping the run materially faster than the 6-client mode.
-        STAGGER="$("${GEPO_PYTHON:-python3}" -c "print($g * 1.5)")"
-        sleep "$STAGGER"
-        echo "  [G$((g+1))] Fetching ${#GROUP_TICKERS[@]} tickers (clientId=$CLIENT_ID)..."
+        TRIG="$FETCHD_DIR/g${g}.trigger"; DONE="$FETCHD_DIR/g${g}.done"; JLOG="$FETCHD_DIR/g${g}.${HHMM}.log"
+        rm -f "$DONE" "$JLOG"
+        printf '%s\n' "${GROUP_TICKERS[@]}" | "${GEPO_PYTHON:-python3}" -c \
+            'import json,sys; print(json.dumps({"tickers": sys.stdin.read().split(), "out": sys.argv[1], "hhmm": sys.argv[2], "log": sys.argv[3]}))' \
+            "$GROUP_OUT" "$HHMM" "$JLOG" > "$TRIG.tmp" && mv "$TRIG.tmp" "$TRIG"
+        echo "  [G$((g+1))] Fetching ${#GROUP_TICKERS[@]} tickers via fetch daemon (clientId=$CLIENT_ID)..."
+        waited=0; ok=0
+        while [ "$waited" -lt "$FETCH_WAIT_HALFSECS" ]; do
+            if [ -f "$DONE" ]; then ok=1; break; fi
+            if ! kill -0 "$(cat "$FETCHD_DIR/g${g}.pid" 2>/dev/null || echo 0)" 2>/dev/null; then break; fi
+            sleep 0.5; waited=$((waited + 1))
+        done
+        if [ "$ok" = 1 ]; then
+            sed "s/^/  [G$((g+1))] /" "$JLOG" 2>/dev/null || true
+            STATUS="$("${GEPO_PYTHON:-python3}" -c 'import json,sys; print(json.load(open(sys.argv[1])).get("status", 1))' "$DONE" 2>/dev/null || echo 1)"
+            rm -f "$JLOG" "$DONE"
+            exit "$STATUS"
+        fi
+        echo "  [G$((g+1))] ✗ fetch daemon dead or late ($((waited / 2))s) — one-shot fallback (clientId=$((120 + g)))"
+        rm -f "$TRIG"
+        kill "$(cat "$FETCHD_DIR/g${g}.pid" 2>/dev/null || echo 0)" 2>/dev/null || true
+        rm -f "$FETCHD_DIR/g${g}.pid"
         "${GEPO_PYTHON:-python3}" -m live.fetcher --tickers "${GROUP_TICKERS[@]}" \
-                                --client-id "$CLIENT_ID" \
+                                --client-id "$((120 + g))" \
                                 --out "$GROUP_OUT" 2>&1 | sed "s/^/  [G$((g+1))] /"
     ) &
     PIDS+=($!)
@@ -105,7 +148,7 @@ done
 # proceed with the last valid tick (fetch_spy_intraday preserves it on failure).
 SPY_TIMEOUT="${SPY_FETCH_TIMEOUT:-90}"
 SPY_LOG="$(mktemp -t gepo_spy)"
-SPY_DELAY="$("${GEPO_PYTHON:-python3}" -c "print(($NUM_GROUPS - 1) * 1.5 + 5)")"
+SPY_DELAY=3   # the fetch daemons are already logged in; nothing to dodge (was 15.5s of stagger)
 echo "Refreshing SPY intraday tick concurrently (starts in ${SPY_DELAY}s, hard timeout ${SPY_TIMEOUT}s)..."
 # exec so $SPY_PID is the python process itself (the watchdog kills that pid).
 ( sleep "$SPY_DELAY"; exec "${GEPO_PYTHON:-python3}" -m live.fetch_spy_intraday ) > "$SPY_LOG" 2>&1 &
@@ -246,9 +289,16 @@ echo "Running MTM tracker on active frozen files..."
 
 # Push to Mya if SSH host configured. Soft-fail so a network blip
 # doesn't kill the cron exit code.
+UPLOAD_PID=""
 if [ -n "${MYA_SSH_HOST:-}" ]; then
     echo "Uploading to Mya... ($(date +%H:%M:%S))"
-    bash live/upload_to_mya.sh 2>&1 | sed "s/^/  [Upload] /" || echo "  ✗ upload failed (non-fatal)"
+    # Merge Mya-side edits first (the marks read the merged actuals.json), then push files and
+    # mark positions side by side (2026-11-09; they ran one after the other, ~20s).
+    UPLOAD_PHASE=merge bash live/upload_to_mya.sh 2>&1 | sed "s/^/  [Upload] /" || echo "  ✗ upload merge failed (non-fatal)"
+    (
+        UPLOAD_PHASE=rsync bash live/upload_to_mya.sh 2>&1 | sed "s/^/  [Upload] /" || echo "  ✗ upload failed (non-fatal)"
+    ) &
+    UPLOAD_PID=$!
 else
     echo "  (skip Mya upload — MYA_SSH_HOST not set)"
 fi
@@ -272,6 +322,9 @@ if [ -f live/actuals_debit.json ]; then
     "${GEPO_PYTHON:-python3}" -m live.mark_actuals --store actuals_debit.json 2>&1 | sed "s|^|  [Marks/debit] |" \
         || echo "  ✗ mark_actuals (debit) failed (non-fatal)"
 fi
+# The rsync phase also pushes the marks files (stale copies); wait for it, then push the fresh ones.
+if [ -n "$UPLOAD_PID" ]; then wait "$UPLOAD_PID" || true; fi
+echo "✓ scan complete ($(date +%H:%M:%S))"
 for _mf in actuals_marks.json actuals_marks_debit.json; do
   if [ -n "${MYA_SSH_HOST:-}" ] && [ -f "live/ranked/$_mf" ]; then
     rsync -az --timeout=20 -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \

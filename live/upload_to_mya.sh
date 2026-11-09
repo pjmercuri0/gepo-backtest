@@ -49,6 +49,10 @@ fi
 # Always merge Mya-side actual_credit edits into Mac's frozen files BEFORE
 # uploading. Otherwise any edit user made between our last pull and this
 # upload gets clobbered. Race destroys real fill records. See error #59+.
+# UPLOAD_PHASE (2026-11-09): "merge" runs only the Mya-side preserve/merge steps below and exits;
+# "rsync" skips them and only pushes files. pull_now_parallel.sh runs the merge, then the rsync
+# phase and mark_actuals side by side (the marks read the merged actuals.json).
+if [ "${UPLOAD_PHASE:-all}" != "rsync" ]; then
 echo "  → preserving Mya-side actual_credit edits..."
 python3 - <<'PYEOF'
 import json, os, subprocess, sys, tempfile
@@ -182,6 +186,11 @@ for _store_name in ('actuals.json', 'actuals_debit.json'):   # credit book and d
       tmp.replace(local_path)
   print(f"  → preserved/merged {len(merged['trades'])} actual trade(s) in {_store_name}")
 PYEOF
+fi
+if [ "${UPLOAD_PHASE:-all}" = "merge" ]; then
+  echo "  (merge phase done)"
+  exit 0
+fi
 
 # rsync flags:
 #   -a : archive (preserves timestamps, perms)
