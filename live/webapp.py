@@ -1089,8 +1089,13 @@ def _stream_state() -> dict:
 
 
 def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=False,
-                    quote_mark=False):
+                    quote_mark=None):
     """Live spot + mark for ONE open pick, straight off combo_stream.
+
+    quote_mark: the mark is the live quote, never floored to intrinsic. None = the debit
+    site (2026-11-09, user: 'Snap quote actuals they're all different'): only the Actuals
+    caller passed it, so the Snap tab marked NVDA 180/177.5 at intrinsic 1.27 beside its own
+    live quote of 1.20 and Actuals showed a third number.
 
     Extracted 2026-09-21 so History and Actuals cannot diverge again. They
     had three different answers for the same spread in one afternoon: the
@@ -1101,6 +1106,8 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
     Returns (last_track, last_marked) -- unchanged when there is nothing to
     overlay, so callers can assign unconditionally.
     """
+    if quote_mark is None:
+        quote_mark = (_stores.site() == "debit")
     _out_track, _out_marked = last_track, last_marked
     try:
         _st = _stream_state()
