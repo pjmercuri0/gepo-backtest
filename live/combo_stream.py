@@ -731,6 +731,22 @@ def main() -> int:
                         continue
                     last_q[k] = {"mid": q["mid"], "bid": q["bid"], "ask": q["ask"], "src": q["src"],
                                  "ts": q["ts"], "spot": sp.get(k.split("|")[0])}
+                    # Own-leg mids on the credit scale, for the after-bell hold (user 2026-11-09, 'do it'):
+                    # the last complex-book tick can be a blown-out book -- NVDA 180/177.5 at 15:59:59
+                    # printed 0.65/1.30 (mid 0.975) while its legs said 1.175 -- and IBKR values the
+                    # position at the leg mids anyway.
+                    try:
+                        lg = legs.get(k) or (None, None)
+                        st_, lt_ = leg_t.get(lg[0]), leg_t.get(lg[1])
+                        if st_ and lt_ and all(v is not None and v == v and float(v) > 0
+                                               for v in (st_.bid, st_.ask, lt_.bid, lt_.ask)):
+                            s_m = (float(st_.bid) + float(st_.ask)) / 2.0
+                            l_m = (float(lt_.bid) + float(lt_.ask)) / 2.0
+                            lm = (_w - (l_m - s_m)) if (debit_k.get(k) and _w) else (s_m - l_m)
+                            if lm > 0 and (not _w or lm <= _w + 1e-9):
+                                last_q[k]["legs_mid"] = round(lm, 4)
+                    except Exception:
+                        pass
             _today = _now.date().isoformat()
             for k in [k for k in last_q if k.rsplit("|", 1)[-1] < _today]:      # expired spreads
                 del last_q[k]

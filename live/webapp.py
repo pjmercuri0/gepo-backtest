@@ -1289,7 +1289,13 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             _lq_new = bool(_lq) and (str(_lq.get("ts") or "") >= _lt_ts or not _in_session_ts(_lt_ts))
             if _px is None and prefer_stream and _lq_ok and _lq_new and not _q and _lq.get("mid") is not None:
                 try:
-                    _px, _basis = float(_lq["mid"]), f"last live quote {str(_lq.get('ts'))[11:16]} (held)"
+                    # Hold the last in-session LEG mids when the stream recorded them (user 2026-11-09):
+                    # the last complex-book tick can be a blown-out book (NVDA 180/177.5 0.65/1.30 at
+                    # 15:59:59, legs 1.175), and IBKR values the position at the leg mids.
+                    if _lq.get("legs_mid") is not None:
+                        _px, _basis = float(_lq["legs_mid"]), f"last in-session leg mids {str(_lq.get('ts'))[11:16]} (held)"
+                    else:
+                        _px, _basis = float(_lq["mid"]), f"last live quote {str(_lq.get('ts'))[11:16]} (held)"
                     _am = {"ts": _lq.get("ts")}
                     # A held mark keeps the spot it was quoted at. The spot feed runs on after the
                     # bell, so a held mark beside a later spot is two moments on one row: AVGO
