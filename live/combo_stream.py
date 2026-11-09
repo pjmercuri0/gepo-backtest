@@ -236,8 +236,19 @@ def _snap_today(ib) -> list[dict]:
                     _CONID_CACHE[ck] = o.conId
                 legs.append(_CONID_CACHE[ck])
             if len(legs) == 2:
-                out.append({**r, "short_conid": legs[0], "long_conid": legs[1], "_key": k})
+                out.append({**r, "short_conid": legs[0], "long_conid": legs[1], "_key": k,
+                            "_snap_hhmm": str(scan.get("hhmm") or "")})
     return out
+
+
+def _current_snap_hhmm() -> str:
+    """hhmm of today's newest scan in intraday_picks (the Snap tab's current scan)."""
+    fp = Path(live_config.ROOT_DIR) / "intraday_picks" / f"{datetime.now().date().isoformat()}.json"
+    try:
+        scans = json.loads(fp.read_text()).get("scans") or []
+        return str(scans[-1].get("hhmm") or "") if scans else ""
+    except (OSError, json.JSONDecodeError, AttributeError, IndexError):
+        return ""
 
 
 def _frozen_today() -> list[dict]:
@@ -405,7 +416,8 @@ def main() -> int:
                     _picks = [r for r in _picks if debit_mode.is_debit(r)]
                     _rest = [r for r in _rest if debit_mode.is_debit(r)]
                     _earlier = [r for r in _earlier if debit_mode.is_debit(r)]
-                _earlier = _earlier[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos))]
+                if not debit_mode.enabled():
+                    _earlier = _earlier[:max(0, MAX_BAGS - len(_picks) - len(_keep_pos))]
                 _ek = {r["_key"] for r in _earlier}
                 _rest_all = list(_rest)          # board order, before Snap/History rows are pulled out
                 _rest = [r for r in _rest if r["_key"] not in _ek]
@@ -420,14 +432,37 @@ def main() -> int:
                 # table order, then every debit position; all with leg lines so a twin with an empty
                 # complex book still prices off its own legs.
                 _twins = []
+                _ranked_tw = []
                 for r in sorted([r for r in _picks + _rest_all if r.get("_rank") is not None
                                  and r.get("twin_short_conid") and r.get("twin_long_conid")],
-                                key=lambda x: x["_rank"])[:TOP_DEBIT]:
+                                key=lambda x: x["_rank"]):
                     tw = {**r, "structure": "debit", "short_conid": r["twin_short_conid"],
                           "long_conid": r["twin_long_conid"], "_twin_legs": True}
                     tw["_key"] = _key(tw)
-                    _twins.append(tw)
-                _twins += [{**r, "_twin_legs": True} for r in _dpos if r["_key"] not in {x["_key"] for x in _twins}]
+                    _ranked_tw.append(tw)
+                if debit_mode.enabled():
+                    # DEBIT_MODE order (user 2026-11-09: 'First is actuals then current snap then live'):
+                    # 1. every debit position, 2. the CURRENT scan's Snap picks, 3. the live board in
+                    # table order, 4. earlier scans' Snap picks and earlier days' frozen picks with
+                    # whatever lines are left. Before this, every Snap pick of the day went ahead of
+                    # the board: at 14:30 16 of 26 lines were picks from the 11:01-13:46 scans.
+                    _cur = _current_snap_hhmm()
+                    _snap_now = [r for r in _earlier if r.get("_snap_hhmm") == _cur]
+                    _snap_old = [r for r in _earlier if r.get("_snap_hhmm") != _cur]
+                    # In DEBIT_MODE the board rows are already the debit structure with their own
+                    # (parity) legs resolved by _board(); twin_*_conid is null on them.
+                    _ranked_dm = sorted([r for r in _picks + _rest_all if r.get("_rank") is not None
+                                         and debit_mode.is_debit(r)], key=lambda x: x["_rank"])
+                    _tk: set = set()
+                    for grp in (_dpos0, _snap_now, _ranked_dm + _ranked_tw, _snap_old):
+                        for r in grp:
+                            if r["_key"] in _tk:
+                                continue
+                            _tk.add(r["_key"])
+                            _twins.append({**r, "_twin_legs": True})
+                else:
+                    _twins = _ranked_tw[:TOP_DEBIT]
+                    _twins += [{**r, "_twin_legs": True} for r in _dpos if r["_key"] not in {x["_key"] for x in _twins}]
                 _twin_cap, _leg_cap = TWIN_BAGS, TWIN_LEG_ROWS
                 if DEBIT_PRIORITY:
                     # 13 / 13 split (user 2026-11-02: 'add 6 more, so thats 26 names, and split them between
@@ -441,15 +476,19 @@ def main() -> int:
                 # actuals names, credit bags'): the debit twins and their legs are counted first, then a
                 # spot for every name held in either Actuals book, then the credit bags with their legs
                 # in priority order until the budget is spent, then spots for the remaining names.
-                _tw = list(_twins)
+                # Cut the twin list at _twin_cap bags AND the line budget (2026-11-09: the list now
+                # carries the whole board behind the positions and the current Snap, not a top-10).
+                _tw = []
                 _cnt: set = set()           # leg conIds already paid for (adjacent spreads share strikes)
                 _used = 0
-                for r in _tw:
-                    _used += 1
-                    if r.get("_twin_legs"):
-                        for c in (r.get("short_conid"), r.get("long_conid")):
-                            if c and c not in _cnt:
-                                _cnt.add(c); _used += 1
+                for r in _twins:
+                    if len(_tw) >= _twin_cap:
+                        break
+                    _newc = [c for c in (r.get("short_conid"), r.get("long_conid"))
+                             if c and c not in _cnt] if r.get("_twin_legs") else []
+                    if _used + 1 + len(_newc) > LINE_BUDGET:
+                        break
+                    _tw.append(r); _used += 1 + len(_newc); _cnt.update(_newc)
                 _syms: list = []
                 # Spots: names held in either Actuals book first, then the debit twins' names (the debit
                 # live tab colours status and pin off spot), then the credit bags take what is left.
