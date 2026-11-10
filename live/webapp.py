@@ -1277,11 +1277,26 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             # intrinsic at the spot the row shows (the spot streams to 19:00, then its last value).
             # Beats a mark_actuals mark taken at 16:01 and the held last in-session quote below.
             if not _in_session_ts(_server_now_et()):
-                _spot_ah = live.get("underlying_price") or (last_track or {}).get("underlying_price")
+                _now_et = _server_now_et()
+                if str(pick.get("expiry_date"))[:10] <= _now_et[:10]:
+                    # Expiry day (user 2026-11-10: "not friday ... make sure they settle 4pm friday"):
+                    # the mark freezes at intrinsic on the last in-session spot, not the after-hours
+                    # tick; the settler then writes the official close.
+                    _lt_in = _in_session_ts((last_track or {}).get("ts"))
+                    _spot_ah = ((_lq or {}).get("spot")
+                                or ((last_track or {}).get("underlying_price") if _lt_in else None)
+                                or live.get("underlying_price"))      # nothing in-session known: the spot shown
+                    _basis_ah = "intrinsic at the 16:00 close (expiry day, awaiting settlement)"
+                    _ts_ah = (_lq or {}).get("ts") or (last_track or {}).get("ts")
+                else:
+                    _spot_ah = live.get("underlying_price") or (last_track or {}).get("underlying_price")
+                    _basis_ah = "intrinsic at spot (after hours, no option quotes)"
+                    _ts_ah = _now_et
                 _m_ah = _intrinsic_mark(pick.get("spread_type"), _spot_ah, ks, kl, w) if _spot_ah else None
                 if _m_ah is not None:
-                    _px, _basis = float(_m_ah), "intrinsic at spot (after hours, no option quotes)"
-                    _am = {"ts": _server_now_et()}
+                    _px, _basis = float(_m_ah), _basis_ah
+                    _am = {"ts": _ts_ah}
+                    live["underlying_price"] = float(_spot_ah)
                     live["live_status"] = _live_status(pick.get("spread_type"), float(_spot_ah), ks, kl) or live.get("live_status")
             # HOLD the last live quote (user 2026-10-06) when nothing is quoting the spread now and the
             # last scan priced neither leg -- after the close, mostly. It used to fall to a model
