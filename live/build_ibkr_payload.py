@@ -31,7 +31,7 @@ def _codes(r):
 
 
 def read_statements():
-    nav, fills, open_pos = {}, [], []
+    nav, fills, open_pos, marks = {}, [], [], {}
     files = sorted(STMT_DIR.glob("U*_????????.csv"))
     for f in files:
         day = datetime.strptime(f.stem[-8:], "%Y%m%d").date().isoformat()
@@ -41,11 +41,15 @@ def read_statements():
                 nav.setdefault(day, {})["start" if r[2] == "Starting Value" else "end"] = float(r[3])
             elif r[:3] == ["Trades", "Data", "Order"] and r[3] in ("Equity and Index Options", "Stocks"):
                 fills.append(dict(zip(FIELDS, r), day=day))
+                # the statement's close price of every contract traded that day: the mark of a
+                # netted leg no position is left for (NVDA 177.5P 2026-11-09)
+                if last and r[3] == "Equity and Index Options" and float(r[9] or 0) > 0:
+                    marks[r[5]] = float(r[9])
             elif last and r[:2] == ["Open Positions", "Data"] and r[3] == "Equity and Index Options":
                 # Symbol, Quantity, Mult, Cost Price, Cost Basis, Close Price, Value, Unrealized P/L
                 open_pos.append({"sym": r[5], "qty": float(r[6]), "upl": float(r[12])})
     fills.sort(key=lambda r: r["dt"])
-    return nav, fills, open_pos, (files[-1].stem[-8:] if files else None)
+    return nav, fills, open_pos, marks, (files[-1].stem[-8:] if files else None)
 
 
 def _leg(sym):
@@ -102,9 +106,9 @@ def pair_spreads(fills, open_pos):
                     xk, xpc = _leg(x["sym"])[2], _leg(x["sym"])[3]
                     old = held[x["sym"]].pop(0) if held.get(x["sym"]) else None
                     if old is not None:
-                        old.setdefault("phantom", []).append({"k": xk, "pc": xpc, "sign": 1 if float(x["qty"]) < 0 else -1,
+                        old.setdefault("phantom", []).append({"sym": x["sym"], "k": xk, "pc": xpc, "sign": 1 if float(x["qty"]) < 0 else -1,
                                                              "cash": old.get("leg_cash", {}).get(x["sym"], 0.0)})
-                    s["phantom"].append({"k": xk, "pc": xpc, "sign": -1 if float(x["qty"]) < 0 else 1,
+                    s["phantom"].append({"sym": x["sym"], "k": xk, "pc": xpc, "sign": -1 if float(x["qty"]) < 0 else 1,
                                          "cash": float(x["proceeds"]) + float(x["comm"])})
                 else:
                     held[x["sym"]].append(s)
@@ -202,7 +206,7 @@ def _max_dd(vals):
 
 
 def build():
-    nav, fills, open_pos, last_stmt = read_statements()
+    nav, fills, open_pos, marks, last_stmt = read_statements()
     days = sorted(nav)
     if not days:
         sys.exit(f"no statements in {STMT_DIR}")
@@ -226,16 +230,21 @@ def build():
     spot_pairs = _closes_on([(s["ticker"], s["expiry"]) for s in spreads]
                             + [(s["ticker"], days[-1]) for s in spreads if s.get("phantom")])
 
-    def _phantom(s, spot):
-        """P&L of the netted leg(s): the cash paid or received for it, plus its intrinsic value
-        against the close (+ for a long leg, - for a short one). Sums to IBKR's own P&L across the
-        two spreads."""
+    def _phantom(s, spot, mk=None):
+        """P&L of the netted leg(s): the cash paid or received for it, plus its value (+ for a long
+        leg, - for a short one): while the spreads are open, the statement's close price of the
+        contract (2026-11-09: NVDA 177.5P marked 4.45, so 180/177.5 and 177.5/175 read -15 / -24
+        like IBKR's leg marks instead of +875 / -914 at intrinsic 0); once expired, its intrinsic
+        against the close. Sums to IBKR's own P&L across the two spreads either way."""
         if not s.get("phantom"):
             return 0.0
         v = 0.0
         for ph in s["phantom"]:
-            intr = 0.0 if spot is None else (max(ph["k"] - spot, 0.0) if ph["pc"] == "P" else max(spot - ph["k"], 0.0))
-            v += ph["cash"] + ph["sign"] * intr * 100 * max(int(s["qty"] or 1), 1)
+            if mk is not None and ph.get("sym") in mk:
+                val = mk[ph["sym"]]
+            else:
+                val = 0.0 if spot is None else (max(ph["k"] - spot, 0.0) if ph["pc"] == "P" else max(spot - ph["k"], 0.0))
+            v += ph["cash"] + ph["sign"] * val * 100 * max(int(s["qty"] or 1), 1)
         return v
     trades = []
     for s in spreads:
@@ -255,7 +264,7 @@ def build():
         sp = spot_pairs.get((s["ticker"], s["expiry"])) if s["expiry"] <= days[-1] else None
         bp = s["pc"] == "P"
         if is_open:
-            outcome, pnl = "OPEN", s["open_upl"] + s["rpl"] + _phantom(s, spot_pairs.get((s["ticker"], days[-1])))
+            outcome, pnl = "OPEN", s["open_upl"] + s["rpl"] + _phantom(s, spot_pairs.get((s["ticker"], days[-1])), marks)
         else:
             pnl = s["rpl"] + _phantom(s, sp)
             # A debit spread (2026-11-06) wins once spot is THROUGH its short strike -- both legs in
