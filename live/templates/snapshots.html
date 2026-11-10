@@ -126,9 +126,10 @@ nothing captured yet</div></div>
     if (busy || document.hidden) return;
     busy = true;
     try {
-      const r = await fetch('{{ url_for("snapshots") }}?fragment=1&_=' + Date.now(), { credentials: 'same-origin' });
+      const r = await gepoFetch('{{ url_for("snapshots") }}?fragment=1&_=' + Date.now(), { credentials: 'same-origin' });
       if (!r.ok) return;
       const html = await r.text();
+      gepoPolled();
       if (!html.trim()) return;
       const saved = [...host.querySelectorAll('.table-scroll')].map(el => el.scrollLeft);
       const pageY = window.scrollY;
@@ -142,6 +143,7 @@ nothing captured yet</div></div>
     }
   }
   setInterval(tick, POLL_MS);
+  document.addEventListener('gepo:refresh', tick);
 })();
 </script>
 

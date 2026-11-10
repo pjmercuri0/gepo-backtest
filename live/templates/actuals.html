@@ -190,10 +190,11 @@ document.addEventListener('click', e => {
     if (busy || document.hidden || editing()) return;
     busy = true;
     try {
-      const r = await fetch('{{ url_for("actuals") }}?fragment=1&_=' + Date.now(),
-                            { credentials: 'same-origin' });
+      const r = await gepoFetch('{{ url_for("actuals") }}?fragment=1&_=' + Date.now(),
+                                { credentials: 'same-origin' });
       if (!r.ok) return;
       const html = await r.text();
+      gepoPolled();
       // Re-check: the fetch is async; the user may have started typing during it.
       if (editing()) return;
       if (!html.trim()) return;
@@ -230,6 +231,7 @@ document.addEventListener('click', e => {
     }
   }
   setInterval(tick, POLL_MS);
+  document.addEventListener('gepo:refresh', tick);
 })();
 </script>
 {% endblock %}

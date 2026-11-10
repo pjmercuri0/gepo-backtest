@@ -2135,9 +2135,17 @@ def history():
                 _tot = (_tot or 0.0) + float(_v) * max(1, int(_p.get("suggested_qty") or 1))
         if _tot is not None:
             _e["day_total_pnl_per_contract"] = round(_tot, 2)
+    # ?fragment=1 (2026-11-10): the open day cards alone, rendered by the SAME template without the
+    # page chrome (_bare.html), for the poll above. Settled days do not move, so they stay out.
+    _frag = bool(request.args.get("fragment"))
+    if _frag:
+        entries = [e for e in entries
+                   if not ((e.get("outcome") or {}).get("results")) and not e.get("mock")]
     return render_template("history.html",
                            entries=entries,
-                           close_alert=close_alert)
+                           close_alert=close_alert,
+                           fragment=_frag,
+                           poll_seconds=live_config.WEBAPP_POLL_SECONDS)
 
 
 # How stale an assignment payload may be before the page ignores it.

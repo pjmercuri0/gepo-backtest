@@ -408,7 +408,7 @@ function renderRanked(rows, maxGround, kVal) {
 
 async function refreshSpyLive() {
   try {
-    const r = await fetch("{{ url_for('spy_latest') }}?_=" + Date.now());
+    const r = await gepoFetch("{{ url_for('spy_latest') }}?_=" + Date.now());
     if (!r.ok) { document.getElementById("spy-live").innerHTML = ""; return; }
     const d = await r.json();
     const chgCls = (d.change_pct >= 0) ? "pos" : "neg";
@@ -609,9 +609,10 @@ function renderTickerStrip(rows) {
 
 async function refresh() {
   try {
-    const r = await fetch("{{ url_for('latest_json') }}?_=" + Date.now());
+    const r = await gepoFetch("{{ url_for('latest_json') }}?_=" + Date.now());
     if (!r.ok) throw new Error("HTTP " + r.status);
     const data = await r.json();
+    gepoPolled();
     noteServerNow(data);
 
     // Bars scale on GROUND, max over the table.
@@ -789,5 +790,6 @@ refresh();
 refreshSpyLive();
 setInterval(refresh, POLL_MS);
 setInterval(refreshSpyLive, POLL_MS);
+document.addEventListener('gepo:refresh', () => { refresh(); refreshSpyLive(); });
 </script>
 {% endblock %}

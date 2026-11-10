@@ -40,7 +40,40 @@
   <a href="{{ url_for('oot') }}"      class="{% if request.endpoint == 'oot'          %}active{% endif %}">oot</a>
   <a href="{{ url_for('backtest') }}" class="{% if request.endpoint == 'backtest'     %}active{% endif %}">backtest</a>
   {# qr and api are off the bar (user 2026-10-23); /qr and /api/latest.json still answer by URL. #}
+  <span id="poll-health" style="display:none;margin-left:auto;align-self:center;font-size:11px;color:#e05d5d" title="seconds since this page last got fresh numbers from the server"></span>
 </div>
+<script>
+// Every tab polls the SERVER for its numbers (user 2026-11-10: "update the quotes and p&l at the
+// server level, not local on my browser"). This bus makes that poll reliable on a phone:
+//  - gepoFetch: a fetch that gives up after 8s, so a request left hanging when the phone slept
+//    cannot wedge a tab's poller behind its busy flag for good;
+//  - gepo:refresh: fired the moment the page comes back to the foreground (visibilitychange,
+//    pageshow from the back-forward cache, window focus), so the first numbers you see are
+//    fresh instead of up to POLL_MS old;
+//  - poll-health: a red "stale Ns" on the nav bar once 30s pass without a successful poll, so a
+//    phone showing old prices says so instead of disagreeing silently with the desktop.
+window.gepoFetch = (url, opts, ms) => {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms || 8000);
+  return fetch(url, Object.assign({ cache: 'no-store' }, opts || {}, { signal: ctl.signal }))
+    .finally(() => clearTimeout(t));
+};
+window.gepoLastOk = 0;
+window.gepoPolled = () => { window.gepoLastOk = Date.now(); };
+(() => {
+  const fire = () => { if (!document.hidden) document.dispatchEvent(new Event('gepo:refresh')); };
+  document.addEventListener('visibilitychange', fire);
+  window.addEventListener('pageshow', fire);
+  window.addEventListener('focus', fire);
+  const el = document.getElementById('poll-health');
+  setInterval(() => {
+    if (!el || !window.gepoLastOk || document.hidden) return;
+    const age = Math.round((Date.now() - window.gepoLastOk) / 1000);
+    if (age > 30) { el.textContent = 'stale ' + age + 's'; el.style.display = ''; }
+    else el.style.display = 'none';
+  }, 1000);
+})();
+</script>
 
 <div id="page-content">
 {% block content %}{% endblock %}

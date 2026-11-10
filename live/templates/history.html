@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "_bare.html" if fragment else "base.html" %}
 {% block title %}{% if is_debit_site %}GEPO Debit{% else %}GEPO Live{% endif %} — History{% endblock %}
 
 {% block content %}
@@ -233,6 +233,45 @@
 {% endif %}
 
 <script>
+// Live quotes (user 2026-11-10: "update the quotes and p&l at the server level, not local on my
+// browser"): every POLL_MS the UNSETTLED day cards are re-rendered server-side (?fragment=1, the
+// same template) and swapped in whole, as Actuals and Snap do. Nothing is recomputed in the browser.
+(() => {
+  const POLL_MS = {{ (poll_seconds or 5) * 1000 }};
+  let busy = false;
+  const editing = () =>
+    !!document.querySelector('.week-card input') ||
+    (document.activeElement && document.activeElement.closest && document.activeElement.closest('.week-card'));
+  async function tick() {
+    if (busy || document.hidden || editing()) return;
+    busy = true;
+    try {
+      const r = await gepoFetch(window.location.pathname + '?fragment=1&_=' + Date.now(), { credentials: 'same-origin' });
+      if (!r.ok) return;
+      const html = await r.text();
+      gepoPolled();
+      if (editing() || !html.trim()) return;
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const pageY = window.scrollY;
+      doc.querySelectorAll('.week-card[data-date]').forEach(fresh => {
+        const cur = document.querySelector(`.week-card[data-date="${fresh.dataset.date}"]`);
+        if (!cur) return;
+        const saved = [...cur.querySelectorAll('.table-scroll')].map(el => el.scrollLeft);
+        cur.replaceWith(fresh);
+        fresh.querySelectorAll('.table-scroll').forEach((el, i) => { if (saved[i]) el.scrollLeft = saved[i]; });
+      });
+      if (window.scrollY !== pageY) window.scrollTo(0, pageY);
+      document.querySelectorAll('span[data-ts]').forEach(el => { if (window.fmtUpdated) window.fmtUpdated(el); });
+    } catch (e) {
+      // a dropped poll is not worth an alert; the next tick retries
+    } finally {
+      busy = false;
+    }
+  }
+  setInterval(tick, POLL_MS);
+  document.addEventListener('gepo:refresh', tick);
+})();
+
 // After an actual-credit edit, we swap the one day card in-place instead
 // of reloading. This avoids iOS Safari's scroll-to-top on reload entirely.
 async function refreshDayCard(date) {
@@ -247,7 +286,7 @@ async function refreshDayCard(date) {
 }
 
 // Format each "updated …" span's data-ts (naive local-time ISO) to ET 12-hour.
-document.querySelectorAll('span[data-ts]').forEach(el => {
+window.fmtUpdated = el => {
   const ts = el.dataset.ts;
   if (!ts || !ts.includes('T')) return;
   const dt = new Date(ts.slice(0, 19));   // naive local time
@@ -256,7 +295,8 @@ document.querySelectorAll('span[data-ts]').forEach(el => {
     timeZone: 'America/New_York',
     month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true,
   }).format(dt);
-});
+};
+document.querySelectorAll('span[data-ts]').forEach(window.fmtUpdated);
 
 // Inline edit of actual_credit per pick. Click the (X.XX) or (+) span,
 // type the new fill, Enter to save (Esc to cancel). Server recomputes
