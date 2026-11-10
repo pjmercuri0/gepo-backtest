@@ -1274,7 +1274,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                             break
             # AFTER HOURS (user 2026-11-10: "mark to change to intrinsic after market when no options
             # quotes are available"): outside 09:30-16:00 ET no option quotes exist, so the mark is
-            # intrinsic at the spot the row shows (the spot streams to 19:00, then its last value).
+            # intrinsic at the spot the row shows (the spot streams to 18:00, then its last value).
             # Beats a mark_actuals mark taken at 16:01 and the held last in-session quote below.
             if not _in_session_ts(_server_now_et()):
                 _now_et = _server_now_et()
@@ -1414,10 +1414,10 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             if not quote_mark:
                 _apply_intrinsic(live, pick)
             # After-hours spots (user 2026-11-06: 'keep streaming spots until 6pm for after
-            # market movement awareness'; 19:00 from the same day). Through 19:00 ET the row shows the LIVE stream spot
-            # and badges status/pin off it, even beside a held 15:59 mark; the mark and its P&L
-            # are not touched. Outside 09:30-19:00 the held-spot rule above (2026-10-07) stands.
-            if _sp and "09:30:00" <= str(_st.get("ts") or "")[11:19] < "19:00:00":
+            # market movement awareness'; 19:00 from the same day; 18:00 since 2026-11-10, user: 'lets just tick
+            # until 18:00 instead'). Through 18:00 ET the row shows the LIVE stream spot and badges status/pin off
+            # it, even beside a held 15:59 mark. Outside 09:30-18:00 the held-spot rule above (2026-10-07) stands.
+            if _sp and "09:30:00" <= str(_st.get("ts") or "")[11:19] < "18:00:00":
                 live["underlying_price"] = _sp
                 live["live_status"] = _live_status(pick.get("spread_type"), _sp, ks, kl)
             _out_track = live
@@ -2446,12 +2446,12 @@ def _actuals_view():
                  or _scan_spots.get(pk.get("ticker")))
         # After-hours spot on an expiry-day row (user 2026-11-06: 'keep streaming spots until 7pm
         # for after market movement awareness'). Once the settle runs the row shows the 16:00
-        # close; from then until 19:00 ET it also carries the live stream spot, and ah_flip says
+        # close; from then until 18:00 ET it also carries the live stream spot, and ah_flip says
         # the spot has crossed a strike since the close (pinned, or a debit spread now fully ITM),
         # which is the after-hours assignment case he wants to see. Settled P&L is untouched.
         _sts = str(_stream.get("ts") or "")
         if (r.get("outcome_row") and _spot and _sts[:10] == ddate.today().isoformat()
-                and "16:00:00" <= _sts[11:19] < "19:00:00"
+                and "16:00:00" <= _sts[11:19] < "18:00:00"
                 and str(pk.get("expiry_date") or "")[:10] == ddate.today().isoformat()):
             try:
                 _cl = float((r.get("outcome_row") or {}).get("underlying_price"))
