@@ -91,20 +91,6 @@ def _with_added_marker(pick: dict, hhmm: str) -> dict:
     return out
 
 
-def _top_by_ground(latest: dict, cap: int) -> list:
-    """2026-11-10 (user: "the snap should just show the top 6 from live ... same with history"): the
-    frozen day is the live table's first `cap` rows at the freeze scan -- GROUND order, at or above
-    FABLE_GROUND_MIN -- each with its own `qualified` flag, whether or not it cleared the quote gate.
-    Earlier that day the freeze filled a short day with "fillers" under the qualified picks; the
-    15:15 freeze wrote PNC/RTX/SO + LOW/BMY/CL while the live table read PNC/LOW/BMY/CL/PEP/RTX."""
-    import config as backtest_config
-    _gm = getattr(backtest_config, "FABLE_GROUND_MIN", None)
-    _g = lambda r: float(r["GROUND"]) if r.get("GROUND") is not None else float("-inf")
-    rows = [r for r in (latest.get("ticker") or []) if r.get("GROUND") is not None
-            and (_gm is None or float(r["GROUND"]) >= float(_gm))]
-    return [dict(r) for r in sorted(rows, key=_g, reverse=True)[:cap]]
-
-
 def _latest_hhmm(latest: dict, fallback: datetime) -> str:
     snap_file = str(latest.get("snapshot_file") or "")
     stem = Path(snap_file).stem
@@ -171,10 +157,8 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
             payload = dict(latest)
             payload["frozen_at"] = want
             payload["mock"] = False
-            payload["top_picks"] = _top_by_ground(latest, cap)
             _atomic_write(dst, payload)
-            print(f"[freeze] fable: wrote {dst} from the {latest_hhmm} scan (top {len(payload['top_picks'])} by GROUND, "
-                  f"{sum(1 for r in payload['top_picks'] if r.get('qualified'))} qualified)", flush=True)
+            print(f"[freeze] fable: wrote {dst} from the {latest_hhmm} scan ({len(latest_picks)} picks)", flush=True)
             return 0
         if topup is not None:
             # Top the day up to `cap` from this scan, in its GROUND order, with names the day
@@ -185,7 +169,6 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
             if existing is None or not (existing.get("top_picks") or []):
                 payload = dict(latest); payload["frozen_at"] = topup; payload["mock"] = False
                 payload["freeze_fallback_at"] = topup
-                payload["top_picks"] = _top_by_ground(latest, cap)
                 _atomic_write(dst, payload)
                 print(f"[freeze] fable: no {want} picks; wrote {dst} from the {latest_hhmm} scan ({len(latest_picks)} picks)", flush=True)
                 return 0
