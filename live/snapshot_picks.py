@@ -86,11 +86,14 @@ def capture(latest_path: Path) -> None:
     _gm = getattr(backtest_config, "FABLE_GROUND_MIN", None)
     if _gm is not None:
         _all = [r for r in _all if r.get("GROUND") is not None and float(r["GROUND"]) >= float(_gm)]
-    # The debit site's own picks (ranker qualified_debit) are captured too, so a debit pick ranked below
-    # the top 6 by GROUND still reaches Snap and settles under its own key (2026-11-02).
-    _qual = [r for r in _all if r.get("qualified") or r.get("qualified_debit")][:live_config.TOP_N_DISPLAY * 2]
+    # 2026-11-10 (user: "i only want to snap 6 picks at any given snap"): FABLE_TOP_N rows per scan,
+    # never more. The scan's picks (ranker qualified / qualified_debit) come first in GROUND order;
+    # whatever room is left goes to the best rows that pass the GROUND floor but not the quote gate,
+    # each carrying its own `qualified` flag. A scan at 11:46 carried 9 (the top 6 by GROUND plus
+    # 3 picks ranked below them).
     _topn = int(getattr(backtest_config, "FABLE_TOP_N", 6))
-    rows = _all[:_topn] + [r for r in _qual if not any(r is t for t in _all[:_topn])]
+    _qual = [r for r in _all if r.get("qualified") or r.get("qualified_debit")]
+    rows = (_qual + [r for r in _all if not any(r is q for q in _qual)])[:_topn]
 
     PICKS_DIR.mkdir(exist_ok=True)
     day_path = PICKS_DIR / f"{day}.json"

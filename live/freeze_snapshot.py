@@ -91,6 +91,35 @@ def _with_added_marker(pick: dict, hhmm: str) -> dict:
     return out
 
 
+def _fill_to_cap(picks: list, latest: dict, cap: int, hhmm: str) -> list:
+    """2026-11-10 (user: "history should have minimum 6 picks as well (as long as they pass the
+    GROUND gate)"): a frozen day short of `cap` picks is filled from the scan's rows that clear
+    FABLE_GROUND_MIN but not the quote gate, best GROUND first, one name per ticker. Fillers carry
+    qualified=False and freeze_filler=True (History dims them like any ungated row), and a qualified
+    top-up replaces a filler, lowest GROUND first, so the day stays at `cap` rows. 2026-11-09 froze
+    with 1 pick and ended the day with 2."""
+    import config as backtest_config
+    real = [p for p in picks if not p.get("freeze_filler")]
+    seen = {_dedupe_key(p) for p in real}
+    fill = [p for p in picks if p.get("freeze_filler") and _dedupe_key(p) not in seen]
+    _g = lambda r: float(r["GROUND"]) if r.get("GROUND") is not None else float("-inf")
+    fill.sort(key=_g, reverse=True)
+    fill = fill[:max(cap - len(real), 0)]
+    seen |= {_dedupe_key(p) for p in fill}
+    _gm = getattr(backtest_config, "FABLE_GROUND_MIN", None)
+    if len(real) + len(fill) < cap and _gm is not None:
+        for r in sorted(latest.get("ticker") or [], key=_g, reverse=True):
+            if len(real) + len(fill) >= cap:
+                break
+            if r.get("GROUND") is None or float(r["GROUND"]) < float(_gm) or _dedupe_key(r) in seen:
+                continue
+            f = _with_added_marker(r, hhmm)
+            f["qualified"] = False
+            f["freeze_filler"] = True
+            fill.append(f); seen.add(_dedupe_key(r))
+    return real + fill
+
+
 def _latest_hhmm(latest: dict, fallback: datetime) -> str:
     snap_file = str(latest.get("snapshot_file") or "")
     stem = Path(snap_file).stem
@@ -157,8 +186,11 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
             payload = dict(latest)
             payload["frozen_at"] = want
             payload["mock"] = False
+            payload["top_picks"] = _fill_to_cap(list(latest_picks), latest, cap, want)
+            _nf = len(payload["top_picks"]) - len(latest_picks)
             _atomic_write(dst, payload)
-            print(f"[freeze] fable: wrote {dst} from the {latest_hhmm} scan ({len(latest_picks)} picks)", flush=True)
+            print(f"[freeze] fable: wrote {dst} from the {latest_hhmm} scan ({len(latest_picks)} picks"
+                  + (f" + {_nf} GROUND-floor fillers" if _nf else "") + ")", flush=True)
             return 0
         if topup is not None:
             # Top the day up to `cap` from this scan, in its GROUND order, with names the day
@@ -169,6 +201,7 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
             if existing is None or not (existing.get("top_picks") or []):
                 payload = dict(latest); payload["frozen_at"] = topup; payload["mock"] = False
                 payload["freeze_fallback_at"] = topup
+                payload["top_picks"] = _fill_to_cap(list(latest_picks), latest, cap, topup)
                 _atomic_write(dst, payload)
                 print(f"[freeze] fable: no {want} picks; wrote {dst} from the {latest_hhmm} scan ({len(latest_picks)} picks)", flush=True)
                 return 0
@@ -176,6 +209,9 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
                 print(f"[freeze] keep existing {dst} ({ex_at}); {topup} top-up already applied or not a fable freeze", flush=True)
                 return 0
             existing_picks = existing.get("top_picks") or []
+            # GROUND-floor fillers (_fill_to_cap) hold no room: a qualified pick replaces one.
+            _fillers = [p for p in existing_picks if p.get("freeze_filler")]
+            existing_picks = [p for p in existing_picks if not p.get("freeze_filler")]
             seen = {_dedupe_key(p) for p in existing_picks}
             per_side = {"bull_put": 0, "bear_call": 0}
             for p in existing_picks:
@@ -204,7 +240,7 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
                 additions.append(_with_added_marker(pick, latest_hhmm)); seen.add(_dedupe_key(pick))
                 per_side[side] = per_side.get(side, 0) + 1
             payload = dict(existing)
-            payload["top_picks"] = existing_picks + additions
+            payload["top_picks"] = _fill_to_cap(existing_picks + additions + _fillers, latest, cap, topup)
             payload["frozen_at"] = f"{ex_at}+{topup}"
             # Counts span every top-up of the day; the per-pick freeze_added_at says which scan.
             _prev_added = int(existing.get("freeze_topup_added_count") or 0)

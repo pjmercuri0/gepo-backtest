@@ -1962,6 +1962,14 @@ def snapshots():
                     sc["picks"] = [p for p in (sc.get("picks") or [])
                                    if p.get("qualified") is not False
                                    or (p.get("GROUND") is not None and float(p["GROUND"]) >= float(_gm))]
+                    # 2026-11-10 (user): 6 rows per scan. Scans captured before that day hold up to 9
+                    # (top 6 by GROUND plus picks ranked below them): picks first, then by GROUND.
+                    _cap6 = int(getattr(__import__("config"), "FABLE_TOP_N", 6))
+                    if len(sc["picks"]) > _cap6:
+                        _gk = lambda p: float(p["GROUND"]) if p.get("GROUND") is not None else float("-inf")
+                        _q6 = sorted([p for p in sc["picks"] if p.get("qualified")], key=_gk, reverse=True)
+                        _r6 = sorted([p for p in sc["picks"] if not p.get("qualified")], key=_gk, reverse=True)
+                        sc["picks"] = (_q6 + _r6)[:_cap6]
             d["scans"] = kept
             for scan in kept:
                 hhmm = scan.get("hhmm", "")
@@ -2754,7 +2762,8 @@ def _overlay_stream(payload: dict) -> None:
                     r["qualified"] = bool(r.get("qualified")) and bool(r["above_min"])
         payload["stream_n"] = n
         if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable":
-            payload["top_picks"] = [r for r in (payload.get("top_picks") or []) if r.get("qualified") is not False]
+            payload["top_picks"] = [r for r in (payload.get("top_picks") or [])
+                                    if r.get("qualified") is not False or r.get("freeze_filler")]
     except Exception as e:
         print(f"[overlay_stream] {e}", flush=True)
         return
