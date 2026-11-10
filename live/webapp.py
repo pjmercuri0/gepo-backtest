@@ -1272,6 +1272,17 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                         if _am.get(_k) is not None:
                             _px, _basis = float(_am[_k]), _b
                             break
+            # AFTER HOURS (user 2026-11-10: "mark to change to intrinsic after market when no options
+            # quotes are available"): outside 09:30-16:00 ET no option quotes exist, so the mark is
+            # intrinsic at the spot the row shows (the spot streams to 19:00, then its last value).
+            # Beats a mark_actuals mark taken at 16:01 and the held last in-session quote below.
+            if not _in_session_ts(_server_now_et()):
+                _spot_ah = live.get("underlying_price") or (last_track or {}).get("underlying_price")
+                _m_ah = _intrinsic_mark(pick.get("spread_type"), _spot_ah, ks, kl, w) if _spot_ah else None
+                if _m_ah is not None:
+                    _px, _basis = float(_m_ah), "intrinsic at spot (after hours, no option quotes)"
+                    _am = {"ts": _server_now_et()}
+                    live["live_status"] = _live_status(pick.get("spread_type"), float(_spot_ah), ks, kl) or live.get("live_status")
             # HOLD the last live quote (user 2026-10-06) when nothing is quoting the spread now and the
             # last scan priced neither leg -- after the close, mostly. It used to fall to a model
             # floored at intrinsic, which is the full width once spot is under both strikes: TMO
