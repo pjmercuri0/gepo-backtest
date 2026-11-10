@@ -59,6 +59,9 @@ def _held_today(day: str) -> list[dict] | None:
     fresh as the last scan's upload (a + clicked since then is missing from it). Read Mya's
     first, fall back to the local file."""
     import subprocess
+    from live import stores as _stores
+    # The debit book while DEBIT_MODE is on (user 2026-11-10: 'direct all her jobs to the new debit site').
+    _an = _stores.actuals_name("debit" if getattr(live_config, "DEBIT_MODE", False) else "credit")
     store = None
     host = os.environ.get("MYA_SSH_HOST")
     if host:
@@ -68,13 +71,13 @@ def _held_today(day: str) -> list[dict] | None:
         if key:
             cmd += ["-i", key]
         try:
-            out = subprocess.check_output(cmd + [host, f"cat '{base}/actuals.json'"],
+            out = subprocess.check_output(cmd + [host, f"cat '{base}/{_an}'"],
                                           stderr=subprocess.DEVNULL, timeout=15).decode()
             store = json.loads(out)
         except Exception as exc:
             print(f"[freeze] Mya actuals unreadable ({type(exc).__name__}); using the local copy", flush=True)
     if store is None:
-        store = _read_json(Path(live_config.ROOT_DIR) / "actuals.json")
+        store = _read_json(Path(live_config.ROOT_DIR) / _an)
     if store is None:
         return None
     held = []

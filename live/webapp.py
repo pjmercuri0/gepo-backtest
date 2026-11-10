@@ -143,6 +143,29 @@ def _px(v, p):
 
 
 app.jinja_env.filters['px'] = _px
+
+# The green Actuals row (user 2026-11-06: 'any rows with 90+% pct light up green'): an open debit
+# row whose mark AS SHOWN is this much of its width or more. live/win_alert.py on Mya turns a row
+# crossing it into a Telegram alert (user 2026-11-10).
+ACTUALS_GREEN_PCT = 90
+
+
+def _pct_of_width(r: dict):
+    """The Pct cell at the whole percent it prints: the debit mark over the width on an OPEN debit row
+    of the debit site; None otherwise. Computed once so the cell, the green row and
+    /api/actuals/wins.json cannot disagree."""
+    p = r.get("pick") or {}
+    lm = r.get("last_marked") or {}
+    if not (IS_DEBIT_SITE and p.get("structure") == "debit" and not r.get("closed")
+            and not r.get("row_pnl_realized") and lm.get("current_mark") is not None):
+        return None
+    try:
+        w = abs(float(p["short_strike"]) - float(p["long_strike"]))
+        if w <= 0:
+            return None
+        return _round_half_up(float(_px(lm["current_mark"], p)) / w * 100)
+    except (KeyError, TypeError, ValueError):
+        return None
 # Max win on a debit row = width - the debit AS SHOWN = the floored credit equivalent (user 2026-11-02:
 # 'some of them add up to more than the width. you have to do width - the rounded debit').
 app.jinja_env.filters['fl2'] = lambda v: _round_half_up(float(v), 2) if v is not None else v   # proper rounding (user 2026-11-02)
@@ -1876,6 +1899,7 @@ def ibkr():
 def qr():
     default_site = ("https://gepo-euro-backtest.peter.cloudmallinc.com/"
                     if IS_EURO_PROFILE
+                    else "https://gepo-debit-ticker.peter.cloudmallinc.com/" if IS_DEBIT_SITE
                     else "https://gepo-ticker.peter.cloudmallinc.com/")
     return render_template(
         "qr.html",
@@ -2550,6 +2574,9 @@ def _actuals_view():
             _q = max(1, int((r.get("pick") or {}).get("suggested_qty") or 1))
             if r["row_pnl"] is not None and _q != 1:
                 r["row_pnl"] = round(r["row_pnl"] * _q, 2)
+    for r in rows:
+        r["pct"] = _pct_of_width(r)
+        r["pct_green"] = r["pct"] is not None and r["pct"] >= ACTUALS_GREEN_PCT
     return rows, risk, _stream
 
 
@@ -2931,6 +2958,39 @@ def spy_latest():
             "error": "no SPY intraday snapshot yet — run `python3 -m live.fetch_spy_intraday`",
         }), 404
     return jsonify(payload)
+
+
+@app.route("/api/actuals/wins.json")
+def actuals_wins_json():
+    """The Actuals rows the page paints GREEN right now (pct >= ACTUALS_GREEN_PCT), for
+    live/win_alert.py on Mya (user 2026-11-10: 'add an alert for the green highlights in actuals ...
+    90% or whatever we had it light up green'). Built from the SAME _actuals_view the page renders,
+    so an alert can only fire on a row he would see green."""
+    rows, _risk, _stream = _actuals_view()
+    out = []
+    for r in rows:
+        if not r.get("pct_green"):
+            continue
+        p = r.get("pick") or {}
+        lm = r.get("last_marked") or {}
+        st = p.get("spread_type") or ""
+        is_deb = p.get("structure") == "debit"
+        label = (("bull call" if st == "bull_put" else "bear put") if is_deb else st.replace("_", " "))
+        try:
+            w = abs(float(p["short_strike"]) - float(p["long_strike"]))
+        except (KeyError, TypeError, ValueError):
+            w = None
+        out.append({
+            "id": r.get("id"), "ticker": p.get("ticker"), "spread_type": st, "label": label,
+            "short_strike": p.get("short_strike"), "long_strike": p.get("long_strike"),
+            "expiry_date": str(p.get("expiry_date") or "")[:10], "width": w,
+            "pct": r.get("pct"), "mark": _px(lm.get("current_mark"), p), "mark_ts": lm.get("ts"),
+            "fill": _px(p.get("actual_credit"), p) if p.get("actual_credit") is not None else None,
+            "qty": p.get("suggested_qty") or 1, "row_pnl": r.get("row_pnl"),
+        })
+    return jsonify({"ts": datetime.now().isoformat(timespec="seconds"),
+                    "stream_ts": str(_stream.get("ts") or ""), "site": _stores.site(),
+                    "green_pct": ACTUALS_GREEN_PCT, "wins": out})
 
 
 @app.route("/api/notifications/latest")

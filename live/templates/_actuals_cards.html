@@ -84,16 +84,10 @@
                            and p.expiry_date and (p.expiry_date|string)[:10] == today_iso) %}
         {# Closed on the site (user 2026-11-05): greyed, P&L locked at the click, no live updates. #}
         {# Green row (user 2026-11-06: 'any rows with 90+% pct light up green, similar to how the P lights up
-           yellow'): the debit site's pct cell, the mark over the width, at 90% or more on an open row. Same
-           arithmetic as the cell below so the two cannot disagree. Green wins over amber. #}
-        {% set _pct_win = false %}
-        {% if is_debit_site and p.structure == 'debit' and not row.closed and not row.row_pnl_realized
-              and last_marked and last_marked.current_mark is not none %}
-          {% set _pw0 = ((p.short_strike|float) - (p.long_strike|float))|abs %}
-          {% if _pw0 > 0 and (((last_marked.current_mark|px(p)|rd(2)) / _pw0 * 100)|rd) >= 90 %}
-            {% set _pct_win = true %}
-          {% endif %}
-        {% endif %}
+           yellow'): the debit site's pct cell, the mark over the width, at ACTUALS_GREEN_PCT (90) or more on
+           an open row. webapp._pct_of_width computes it once for this row, the cell below and
+           /api/actuals/wins.json (the Telegram alert, 2026-11-10), so none of them can disagree. #}
+        {% set _pct_win = row.pct_green %}
         <tr class="{% if row.ah_status == 'WINNING' and not row.closed %}ah-assign{% elif _pct_win %}pct-win{% elif _pin_row and not row.closed %}assign-watch{% endif %}{% if row.closed %} row-closed{% endif %}">
           <td data-sort="{{ (row.date or (p.entry_date or '')[:10]) }} {{ row.source_time or '' }}" style="position:relative"><button class="actuals-remove" data-id="{{ row.id }}" data-closed="{{ '1' if row.closed else '0' }}" title="{{ 'closed ' + (row.closed.at|string)[:16] + ' -- remove or reopen' if row.closed else 'remove, or mark closed' }}">x</button>
             {{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>

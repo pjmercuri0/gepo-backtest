@@ -41,7 +41,7 @@ from pathlib import Path
 
 from ib_insync import IB, Option, Stock
 
-from live import debit_mode, live_config
+from live import debit_mode, live_config, stores as _stores
 from live.fetcher import _connect_with_retry
 
 ALERT_DIR = Path(live_config.NOTIFICATIONS_DIR)
@@ -77,7 +77,9 @@ def _open_positions(include_frozen: bool = False) -> list[dict]:
             "structure": pick.get("structure") or "credit",
         })
 
-    store = Path(live_config.ROOT_DIR) / "actuals.json"
+    # The book of the site he trades on (user 2026-11-10: 'direct all her jobs to the new debit site'):
+    # actuals_debit.json while live_config.DEBIT_MODE is on, actuals.json otherwise (live/stores.py).
+    store = Path(live_config.ROOT_DIR) / _stores.actuals_name("debit" if debit_mode.enabled() else "credit")
     try:
         for t in (json.loads(store.read_text()).get("trades") or []):
             add(t.get("pick") or {}, "actuals")
