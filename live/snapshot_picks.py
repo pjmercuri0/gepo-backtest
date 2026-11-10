@@ -86,15 +86,12 @@ def capture(latest_path: Path) -> None:
     _gm = getattr(backtest_config, "FABLE_GROUND_MIN", None)
     if _gm is not None:
         _all = [r for r in _all if r.get("GROUND") is not None and float(r["GROUND"]) >= float(_gm)]
-    # 2026-11-10 (user: "i only want to snap 6 picks at any given snap"): FABLE_TOP_N rows per scan,
-    # never more. The scan's picks (ranker qualified / qualified_debit) come first in GROUND order;
-    # whatever room is left goes to the best rows that pass the GROUND floor but not the quote gate,
-    # each carrying its own `qualified` flag. A scan at 11:46 carried 9 (the top 6 by GROUND plus
-    # 3 picks ranked below them).
+    # 2026-11-10 (user: "the snap should just show the top 6 from live"): the live table's first
+    # FABLE_TOP_N rows -- GROUND order, at or above the floor -- each with its own `qualified` flag.
+    # Nothing is added below them (the 2026-11-02 "debit picks ranked lower are captured too" and the
+    # picks-first cut of earlier today both put rows on Snap that the live table's top 6 do not show).
     _topn = int(getattr(backtest_config, "FABLE_TOP_N", 6))
-    _qual = [r for r in _all if r.get("qualified") or r.get("qualified_debit")]
-    rows = (_qual + [r for r in _all if not any(r is q for q in _qual)])[:_topn]
-    rows.sort(key=_key, reverse=True)      # membership picks-first; display order is GROUND, as always
+    rows = _all[:_topn]
 
     PICKS_DIR.mkdir(exist_ok=True)
     day_path = PICKS_DIR / f"{day}.json"

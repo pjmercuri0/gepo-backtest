@@ -1962,15 +1962,11 @@ def snapshots():
                     sc["picks"] = [p for p in (sc.get("picks") or [])
                                    if p.get("qualified") is not False
                                    or (p.get("GROUND") is not None and float(p["GROUND"]) >= float(_gm))]
-                    # 2026-11-10 (user): 6 rows per scan. Scans captured before that day hold up to 9
-                    # (top 6 by GROUND plus picks ranked below them): picks first, then by GROUND.
+                    # 2026-11-10 (user: "the snap should just show the top 6 from live"): the top FABLE_TOP_N
+                    # by GROUND, in GROUND order. Scans captured before that day hold up to 9.
                     _cap6 = int(getattr(__import__("config"), "FABLE_TOP_N", 6))
                     _gk = lambda p: float(p["GROUND"]) if p.get("GROUND") is not None else float("-inf")
-                    if len(sc["picks"]) > _cap6:
-                        _q6 = sorted([p for p in sc["picks"] if p.get("qualified")], key=_gk, reverse=True)
-                        _r6 = sorted([p for p in sc["picks"] if not p.get("qualified")], key=_gk, reverse=True)
-                        sc["picks"] = (_q6 + _r6)[:_cap6]
-                    sc["picks"].sort(key=_gk, reverse=True)      # rows read in GROUND order, picks and fillers alike
+                    sc["picks"] = sorted(sc["picks"], key=_gk, reverse=True)[:_cap6]
             d["scans"] = kept
             for scan in kept:
                 hhmm = scan.get("hhmm", "")
