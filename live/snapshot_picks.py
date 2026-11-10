@@ -94,6 +94,7 @@ def capture(latest_path: Path) -> None:
     _topn = int(getattr(backtest_config, "FABLE_TOP_N", 6))
     _qual = [r for r in _all if r.get("qualified") or r.get("qualified_debit")]
     rows = (_qual + [r for r in _all if not any(r is q for q in _qual)])[:_topn]
+    rows.sort(key=_key, reverse=True)      # membership picks-first; display order is GROUND, as always
 
     PICKS_DIR.mkdir(exist_ok=True)
     day_path = PICKS_DIR / f"{day}.json"
