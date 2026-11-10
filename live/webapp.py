@@ -1895,7 +1895,7 @@ def _round_hhmm(hhmm: str) -> str:
     return f"{total // 60:02d}{total % 60:02d}"
 
 
-SNAPSHOT_DAYS_DEFAULT = 7    # day cards rendered by default (15 -> 7, user 2026-09-14); aggregate is unaffected
+SNAPSHOT_DAYS_DEFAULT = 1    # day cards rendered by default (15 -> 7 user 2026-09-14; 7 -> 1 user 2026-11-10: 1.38 MB/0.94 s -> 0.14 MB/0.26 s); "show 7 more" / "show all" links stay; aggregate is unaffected
 
 
 @app.route("/snapshots")
