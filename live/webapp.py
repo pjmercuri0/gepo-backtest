@@ -151,19 +151,30 @@ ACTUALS_GREEN_PCT = 90
 
 
 def _pct_of_width(r: dict):
-    """The Pct cell at the whole percent it prints: the debit mark over the width on an OPEN debit row
-    of the debit site; None otherwise. Computed once so the cell, the green row and
-    /api/actuals/wins.json cannot disagree."""
+    """The Pct cell (user 2026-11-11: 'pct to reflect the spot price not the mark ... at the high strike
+    it's 100%, past it beyond 100%'): the debit spread's value AT THE SPOT SHOWN, unclamped, over the
+    width, at the whole percent. Bull call (bull_put twin): (spot - low strike) / width; bear put
+    (bear_call twin): (high strike - spot) / width. 100% = spot at the far strike, 0% = at the near
+    strike, past either end it runs beyond. Settled rows use the settlement close, closed rows the spot
+    locked at the click. Debit rows of the debit site only; None otherwise. Computed once so the cell,
+    the green row and /api/actuals/wins.json cannot disagree. Sets r['pct_spot'] to the spot used."""
     p = r.get("pick") or {}
-    lm = r.get("last_marked") or {}
-    if not (IS_DEBIT_SITE and p.get("structure") == "debit" and not r.get("closed")
-            and not r.get("row_pnl_realized") and lm.get("current_mark") is not None):
+    if not (IS_DEBIT_SITE and p.get("structure") == "debit"):
+        return None
+    orow = r.get("outcome_row") or {}
+    lt = r.get("last_track") or {}
+    spot = orow.get("underlying_price") if orow.get("underlying_price") is not None else lt.get("underlying_price")
+    if spot is None:
         return None
     try:
-        w = abs(float(p["short_strike"]) - float(p["long_strike"]))
+        ks, kl = float(p["short_strike"]), float(p["long_strike"])
+        w = abs(ks - kl)
         if w <= 0:
             return None
-        return _round_half_up(float(_px(lm["current_mark"], p)) / w * 100)
+        spot = _round_half_up(float(spot), 2)
+        raw = (ks - spot) if p.get("spread_type") == "bull_put" else (spot - ks)   # the credit twin's value
+        r["pct_spot"] = spot
+        return _round_half_up((w - raw) / w * 100)
     except (KeyError, TypeError, ValueError):
         return None
 # Max win on a debit row = width - the debit AS SHOWN = the floored credit equivalent (user 2026-11-02:
@@ -2605,7 +2616,9 @@ def _actuals_view():
                 r["row_pnl"] = round(r["row_pnl"] * _q, 2)
     for r in rows:
         r["pct"] = _pct_of_width(r)
-        r["pct_green"] = r["pct"] is not None and r["pct"] >= ACTUALS_GREEN_PCT
+        # Green (and the Telegram alert) only on a row still OPEN: not closed on the site, not settled.
+        r["pct_green"] = (r["pct"] is not None and r["pct"] >= ACTUALS_GREEN_PCT
+                          and not r.get("closed") and not (r.get("outcome_row") or {}).get("result"))
     return rows, risk, _stream
 
 

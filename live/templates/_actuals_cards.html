@@ -54,7 +54,7 @@
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>{% if _dsite %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th>
         <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">{% if _dsite %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th>
         <th>{% if _dsite %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th title="credit / spread width; in brackets, your fill / width">Ratio</th><th title="GROUND, in basis points">GROUND (bps)</th>
-        <th>Δ short</th><th>DTE</th><th>Status</th>{% if _dsite %}<th style="text-align:right" title="Mark: the quote to sell the spread now, $/sh in debit terms (streamed bag mid, else own-leg mids, else the last held quote). Dollar P&amp;L vs your fill in the tooltip.">Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right" title="(mark − your debit) × 100 × N; realized on a settled row">P&amp;L</th><th style="text-align:right" title="Mark as a % of the width: what the spread is worth now over its full value. 100% = full win, 0% = worthless; a quote outside the width prints above 100% or below 0%.">pct</th>{% else %}<th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>{% endif %}
+        <th>Δ short</th><th>DTE</th><th>Status</th>{% if _dsite %}<th style="text-align:right" title="Mark: the quote to sell the spread now, $/sh in debit terms (streamed bag mid, else own-leg mids, else the last held quote). Dollar P&amp;L vs your fill in the tooltip.">Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right" title="(mark − your debit) × 100 × N; realized on a settled row">P&amp;L</th><th style="text-align:right" title="Spot against the strikes: the spread's value at the spot shown over the width. 100% = spot at the far strike (full value), 0% = at the near strike; past either end it runs beyond 100% or below 0%.">pct</th>{% else %}<th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>{% endif %}
       </tr></thead>
       <tbody>
       {% for row in wk.rows %}
@@ -216,14 +216,10 @@
              P&L, Ext, Mark; the credit site keeps Mark, Ext, P&L. Captured once, emitted per site. #}
           {% set _cell_mark %}
           {% if is_debit_site and p.structure == 'debit' %}
-            {# pct on the debit site (user 2026-11-03: "1.65/2.50 so 66%"): the mark (quote to sell,
-               debit terms) over the width. 100% = full win, 0% = worthless. Fill not involved. #}
-            {% set _pw = ((p.short_strike|float) - (p.long_strike|float))|abs %}
-            {% if (not row.row_pnl_realized or row.closed) and last_marked and last_marked.current_mark is not none and _pw > 0 %}
-              <td style="text-align:right" title="mark ${{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }} of width ${{ '%.2f'|format(_pw) }}">{{ "%.0f"|format(((last_marked.current_mark|px(p)|rd(2)) / _pw * 100)|rd) }}%</td>
-            {% elif outcome_row and row.row_pnl is not none and p.actual_credit is defined and p.actual_credit is not none and _pw > 0 %}
-              {% set _sm2 = ((p.actual_credit|px(p))|float) + (row.row_pnl|float) / 100 / (p.suggested_qty or 1) %}
-              <td style="text-align:right" title="settled at ${{ '%.2f'|format(_sm2|rd(2)) }} of width ${{ '%.2f'|format(_pw) }}">{{ "%.0f"|format(((_sm2|rd(2)) / _pw * 100)|rd) }}%</td>
+            {# pct on the debit site (user 2026-11-11: 'pct to reflect the spot price not the mark'): the
+               spread's value at the spot shown over the width, unclamped (webapp._pct_of_width). #}
+            {% if row.pct is not none %}
+              <td style="text-align:right" title="spot ${{ '%.2f'|format(row.pct_spot) }} against strikes ${{ p.long_strike|strike }} / ${{ p.short_strike|strike }}: value at this spot over the width ${{ '%.2f'|format(((p.short_strike|float) - (p.long_strike|float))|abs) }}; 100% = spot at the far strike">{{ "%.0f"|format(row.pct) }}%</td>
             {% else %}
               <td style="text-align:right">—</td>
             {% endif %}
