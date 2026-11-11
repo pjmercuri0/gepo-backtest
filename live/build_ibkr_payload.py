@@ -159,20 +159,26 @@ def pair_spreads(fills, open_pos):
 
 
 def _actual_credit_lookup():
-    """Fill credits typed on Actuals, for spreads opened before the first statement."""
-    try:
-        store = json.loads((ROOT / "live" / ("actuals_debit.json" if SITE == "debit" else "actuals.json")).read_text())
-    except (OSError, ValueError):
-        return {}
+    """Fill credits typed on Actuals, for spreads opened before the first statement.
+    The debit site reads its own book first, then the credit book behind it (user 2026-11-11:
+    'backfill the ibkr entries from credit site and put them on the ibkr debit site'): the Sep 29/30
+    fills were booked on the credit site only, and showed as 'before 2026-10-01' with no credit here."""
+    names = ["actuals.json"] if SITE != "debit" else ["actuals_debit.json", "actuals.json"]
+    trades = []
+    for n in names:
+        try:
+            trades += json.loads((ROOT / "live" / n).read_text()).get("trades") or []
+        except (OSError, ValueError):
+            pass
     out = {}
-    for t in store.get("trades") or []:
+    for t in trades:
         p = t.get("pick") or {}
         try:
             key = (p["ticker"], str(p["expiry_date"])[:10], float(p["short_strike"]), float(p["long_strike"]))
         except (KeyError, TypeError, ValueError):
             continue
         c = t.get("actual_credit") if t.get("actual_credit") is not None else p.get("actual_credit")
-        if c is not None:
+        if c is not None and key not in out:                 # first book wins
             out[key] = (float(c), str((t.get("source") or {}).get("date") or "")[:10] or None)
     return out
 
