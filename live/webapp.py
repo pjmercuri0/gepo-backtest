@@ -229,6 +229,15 @@ _GZ_CACHE: dict = {}
 
 
 @app.after_request
+def _no_store(resp):
+    """Pages and JSON are live numbers (user 2026-11-11: 'should just be up to date any time I look'):
+    tell the phone's browser and anything in between never to serve them from a cache."""
+    if (resp.mimetype or "").startswith(("text/html", "application/json")):
+        resp.headers["Cache-Control"] = "no-store, max-age=0"
+    return resp
+
+
+@app.after_request
 def _gzip_response(resp):
     """Compress HTML/JSON pages (user 2026-10-01: tabs slow to open). The pages went out
     uncompressed -- History 545 KB, Backtest 6.9 MB. Compressed bodies are kept by content hash

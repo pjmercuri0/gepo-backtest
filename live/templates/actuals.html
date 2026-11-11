@@ -184,17 +184,20 @@ document.addEventListener('click', e => {
   const editing = () =>
     !!host.querySelector('input') ||
     !!host.querySelector('[data-editing="1"]') ||
-    (document.activeElement && host.contains(document.activeElement));
+    (document.activeElement && host.contains(document.activeElement)
+     && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));   // a tapped button or header is not an edit
 
-  async function tick() {
-    if (busy || document.hidden || editing()) return;
-    busy = true;
+  let lastOk = Date.now(), startedAt = 0;
+  async function tick(force) {
+    if (busy && force && Date.now() - startedAt > 20000) busy = false;   // a request frozen while the phone slept
+    if (busy || (document.hidden && !force) || editing()) return;
+    busy = true; startedAt = Date.now();
     try {
       const r = await gepoFetch('{{ url_for("actuals") }}?fragment=1&_=' + Date.now(),
                                 { credentials: 'same-origin' });
       if (!r.ok) return;
       const html = await r.text();
-      gepoPolled();
+      gepoPolled(); lastOk = Date.now();
       // Re-check: the fetch is async; the user may have started typing during it.
       if (editing()) return;
       if (!html.trim()) return;
@@ -230,8 +233,13 @@ document.addEventListener('click', e => {
       busy = false;
     }
   }
-  setInterval(tick, POLL_MS);
-  document.addEventListener('gepo:refresh', tick);
+  setInterval(() => tick(false), POLL_MS);
+  document.addEventListener('gepo:refresh', () => tick(true));
+  // Watchdog (user 2026-11-11: 'should just be up to date any time I look'): on a phone the timers
+  // stop while the screen is locked or Safari is swapped out, and the visibility events that
+  // should refresh on return do not always arrive. Every second: if the last good poll is older
+  // than three intervals, poll now, hidden or not, clearing a busy flag a frozen request left.
+  setInterval(() => { if (Date.now() - lastOk > POLL_MS * 3) tick(true); }, 1000);
 })();
 </script>
 {% endblock %}
