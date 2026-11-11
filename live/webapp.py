@@ -2405,13 +2405,18 @@ def _fill_stats(rows: list[dict]) -> dict:
         except (TypeError, ValueError):
             continue
         mc = p.get("model_credit"); qc = p.get("quoted_credit") or p.get("net_credit")
-        if mc: fm.append(a / float(mc))
-        if qc: fq.append(a / float(qc))
+        if mc: fm.append((a, float(mc)))
+        if qc: fq.append((a, float(qc)))
         tg = p.get("credit_targets") or {}
         if tg.get("min_credit") is not None and a < float(tg["min_credit"]): below += 1
+    # Ratio of sums at 1x (user 2026-11-11: 'max win actual divided by max win model 1x'): every fill
+    # moves it. The median it replaced sat at 1.005 through the last rows he entered. Each pair is
+    # (actual max win, model max win) per share, one contract per row.
+    _ratio = lambda pairs: round(sum(x for x, _ in pairs) / sum(m for _, m in pairs), 3) \
+        if pairs and sum(m for _, m in pairs) > 0 else None
     return {"n_fills": len(fq), "n_model": len(fm),
-            "fill_over_model": round(statistics.median(fm), 3) if fm else None,
-            "fill_over_quoted": round(statistics.median(fq), 3) if fq else None,
+            "fill_over_model": _ratio(fm),
+            "fill_over_quoted": _ratio(fq),
             "below_min": below}
 
 
