@@ -98,6 +98,32 @@ def pair_spreads(fills, open_pos):
                  "open_proceeds": sum(float(x["proceeds"]) for x in legs),
                  "close_proceeds": 0.0, "rpl": 0.0, "closed_legs": 0, "assigned": False, "close_day": None,
                  "phantom": [], "leg_cash": {x["sym"]: float(x["proceeds"]) + float(x["comm"]) for x in legs}}
+            # Same-day roll into ONE position (2026-11-11, user: "fix the ibkr tab"): NVDA 2026-11-09 bought
+            # 175/177.5 at 15:01, then 177.5/180 at 15:25; the 177.5P sale closed the first spread's long
+            # leg and IBKR held one 180/175 x2 from then on, which he closed 2026-11-10 at 4.00. When the
+            # netted spread is untouched, from the same day and the same size, the new legs fold into it
+            # (its netted leg swaps for the new spread's matching leg; cash and the netted leg's realized
+            # P&L carry over), so the tab shows the position IBKR showed: one row, +321.74, not two rows
+            # split -1,957 / +2,279 around a phantom 177.5. Netting across days (EOG 2026-10-27) keeps
+            # the phantom treatment: those were two picks on two days and settled as such.
+            _nets = [x for x in legs if x.get("_net")]
+            if len(_nets) == 1 and len(legs) == 2 and held.get(_nets[0]["sym"]):
+                x = _nets[0]; old = held[x["sym"]][0]
+                if (old["closed_legs"] == 0 and not old.get("phantom") and old["entry"] == r["day"]
+                        and old["qty"] == s["qty"]):
+                    held[x["sym"]].pop(0)
+                    xk = _leg(x["sym"])[2]
+                    other = next(y for y in legs if y is not x)
+                    if old["k_l"] == xk:
+                        old["k_l"] = _leg(other["sym"])[2]
+                    else:
+                        old["k_s"] = _leg(other["sym"])[2]
+                    old["open_proceeds"] += s["open_proceeds"]
+                    old["leg_cash"].update(s["leg_cash"])
+                    old["rpl"] += float(x["rpl"])
+                    old["rolled_at"] = r["dt"]
+                    held[other["sym"]].append(old)
+                    continue
             spreads.append(s)
             for x in legs:
                 if x.get("_net"):
