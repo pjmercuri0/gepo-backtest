@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Disk alert (user 2026-11-11: "make sure mya alerts me when we get over like 75%").
+"""Disk alert (user 2026-11-11: "make sure mya alerts me when we get over like 90%").
 
 Writes ONE notification file per day into live/notifications/ while the disk holding --path is at
---pct or more; Mya's notify_watcher.sh forwards any file with a "message" to Telegram. Runs on both
+--pct (90) or more; Mya's notify_watcher.sh forwards any file with a "message" to Telegram. Runs on both
 machines: Mya calls it from notify_watcher.sh (her own disk), the Mac mini from pull_now_parallel.sh
 (its disk; the file rides the next upload). Stdlib only (Mya is python3.10, no venv).
 
-  python3 live/disk_alert.py --host "Mac mini" [--path /] [--pct 75] [--notif-dir DIR]
+  python3 live/disk_alert.py --host "Mac mini" [--path /] [--pct 90] [--notif-dir DIR]
 """
 import argparse
 import datetime as dt
@@ -23,7 +23,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", required=True, help="name in the alert, e.g. 'Mya' or 'Mac mini'")
     ap.add_argument("--path", default="/", help="a path on the disk to measure")
-    ap.add_argument("--pct", type=float, default=float(os.environ.get("GEPO_DISK_ALERT_PCT", 75)))
+    ap.add_argument("--pct", type=float, default=float(os.environ.get("GEPO_DISK_ALERT_PCT", 90)))
     ap.add_argument("--notif-dir", default=os.environ.get("GEPO_NOTIF_DIR", os.path.join(HERE, "notifications")))
     a = ap.parse_args()
 
