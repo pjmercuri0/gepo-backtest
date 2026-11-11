@@ -1,12 +1,13 @@
 """Telegram alert for the GREEN Actuals rows (user 2026-11-10: "add an alert for the green highlights
-in actuals ... 90% or whatever we had it light up green").
+in actuals ... 90% or whatever we had it light up green"). Since 2026-11-11 pct is measured from the mid of
+the strikes in halves of the width (0% = worth half, +100% = full value), so the green line is 80 there.
 
 Runs on Mya, once a minute in market hours from live/notify_watcher.sh, with the Python she has
 (3.10, stdlib only). It asks the DEBIT site itself which rows it paints green right now
 (/api/actuals/wins.json, built from the same _actuals_view the page renders) and writes one
 notification file per NEW green row to live/notifications/, which notify_watcher.sh forwards to
 Telegram in the same run. A row alerts once: the ledger .win_alerted.json remembers it by trade id
-until its expiry passes, so a mark wobbling around 90% cannot spam.
+until its expiry passes, so a mark wobbling around the line cannot spam.
 
   python3 live/win_alert.py            # 09:30-16:00 ET weekdays only
   python3 live/win_alert.py --force    # ignore the clock (test)
@@ -41,7 +42,7 @@ def _fmt(w) -> str:
     except ValueError:
         pass
     mark = w.get("mark"); width = w.get("width"); pnl = w.get("row_pnl"); fill = w.get("fill")
-    s = f"- {k} {ss:g}/{ls:g} {w.get('label') or ''} {exp}: {w.get('pct'):.0f}% of width"
+    s = f"- {k} {ss:g}/{ls:g} {w.get('label') or ''} {exp}: pct {w.get('pct'):+.0f}%"
     if mark is not None and width is not None:
         s += f" (mark {float(mark):.2f} of {float(width):.2f}"
         s += f", fill {float(fill):.2f})" if fill is not None else ")"
@@ -96,7 +97,7 @@ def main() -> int:
         "green_pct": data.get("green_pct"),
         "stream_ts": data.get("stream_ts"),
         "positions": fresh,
-        "message": (f"✅ gepo {data.get('green_pct', 90)}%+ of width (green on Actuals)\n"
+        "message": (f"✅ gepo pct {data.get('green_pct', 80)}%+ (green on Actuals)\n"
                     + "\n".join(_fmt(w) for w in fresh)),
     }
     _atomic_write(out, payload)
