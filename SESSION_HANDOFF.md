@@ -104,6 +104,39 @@ This block and the two safety/workflow blocks immediately below it are the autho
 
 For detailed evidence of the completed 2026-09-01 integration, see §0.14. For the current web-app addition, see §0.15. **§0.16/§0.17 (European index options) are NOT an active work item** — that lane is parked; the strategy is equities. Everything after the **HISTORICAL ARCHIVE** divider is background, not an active checklist.
 
+## 0.74 PAPER 4 REBUILT on the floor canon (2026-11-11): `paper/gepo_fcm_2026.tex`, new title, 28 pp
+
+**Title (user):** *Intrinsic Relative-Entropy Risk Discounting for Growth-Optimal Options Selection*. Date November 2026.
+Two-paper plan (user): this one = theory + backtest/OOT; a second, empirical paper = production and the IBKR-tab live results.
+
+**Why rebuilt.** The Oct 5 draft was on the no-floor book (5,779 / $73,391 / 1.26 / -30.3%; OOT 814 to 09-25) and its
+section "Why there is no threshold" argued against the floor that became canon four days later (§0.71). Every table is now
+recomputed on `FABLE_GROUND_MIN = 1e-4`, k=24, pooled top 6, 1.00x model, frame through 2026-10-22, from a scratchpad rebuild
+that reproduces the deployed payloads to the dollar: **IS 3,045 / $51,304 profit ($61,304 final) / $-Sh 1.52 / DD -17.73%;
+OOT 599 / $14,215 ($24,215) / 2.81 / -12.72% (2026-01-05..10-23)**. Live replay now = `live/data/ibkr_replay_equity.json`:
+110 trades 08-20..11-06, +$4,095 qty2, $-Sh 3.47, DD -8.46%.
+
+**The finding that changes the paper's story (new §8.3, "What the ranking contributes").** Under the floor the rank key is
+noise: the floored pool is 4.13 candidates/day, 747 of 1,019 days have < 6 survivors, the cap binds on 192 days. Sort-key
+ablation with the floor on: GROUND $51,304 / 1.52; GROUND **ascending** $52,876 / 1.51; random $49,628 / 1.43; EV $44,765 /
+1.31. On the 192 binding days: top-6 $14,002 vs bottom-6 $14,926 qty1. Per-trade: pre-floor pool $3.21, floored pool $8.82,
+selected $8.99. **GROUND is a gate, not a ranker** (consistent with §0.73 live: order never binds). Without the floor the old
+ranker table still holds (Γ asc destroys the book), and both panels are printed.
+
+Other corrections made: the E<=0 remark (Props 3-4 need E>0; for E<0 the discount inverts the order; sign Γ = sign E, so the
+floor is also the theory's domain condition); k-sweep text ("within 3%" was 5%; k=24 is now the IS peak because the floor was
+chosen at k=24, stated); decile text (OOT decile 1 is 30.0%, not "low forties"); quote-gate counts net of overlap
+(15,479 of 115,887; the four counts sum to 16,281); break-even fill 0.892 IS / 0.8495 OOT / 0.885 pooled; no negative year
+(2022 is +$4,642 with 338 bear picks); n_eff 2.79 at rho 0.109; settlement-day SPY corr +0.209 (was +0.444); abbreviations
+trimmed to the ones used; the one em-dash removed (**user 2026-11-11: no em-dashes ever**). Geometry/quintile/concordance
+tables stay on the pre-floor pool (n=25,459) because they describe the instrument; the within-floor concordance is also
+reported (GROUND vs $: 0.488 IS, at chance).
+
+**Honest limits carried from §0.70, still true:** OOT is an extended sample, not a holdout; the floor's Sharpe gain is
+in-sample only (OOT 3.11 -> 2.81 at the same end date); bear IV<0.35 cut still disagrees between windows; corporate-action
+and quote gates cost dollars and are kept. Rebuild scripts: session scratchpad only (`stage1_pool.py`, `stage2_tables.py`,
+`stage3_extra.py`); nothing under `live/data` was written.
+
 ## 0.73 MINI WORK ORDER 2026-10-14: measure the IBKR historical-news depth — a news gate is UNTESTED, not rejected
 
 **Why this came up.** NFLX announced a 1,000-job layoff (6% of staff) on 2026-10-14 and the stock fell. Two open canon

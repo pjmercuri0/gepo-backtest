@@ -14,10 +14,10 @@
 \newcommand{\Preal}{P_{\mathrm{real}}}
 \newcommand{\Qbs}{Q_{\mathrm{bs}}}
 
-\title{Relative-Entropy Risk Discounting in Growth-Optimal Selection:\\
-Weekly Vertical Credit Spreads on the S\&P~100}
+\title{Intrinsic Relative-Entropy Risk Discounting for Growth-Optimal\\
+Options Selection}
 \author{Peter~J.~Mercurio,~PhD}
-\date{October 2026}
+\date{November 2026}
 
 \begin{document}
 \maketitle
@@ -36,7 +36,7 @@ exactly the risk measure of the second paper applied per candidate. Two facts
 make it the right quantity to charge. First, on this instrument
 family $\dent$ is an almost exact monotone transform of the market's
 partial-zone probability, hence of the market's expected move measured in
-strike widths (Spearman $-0.999$ on $25{,}228$ eligible candidates): the
+strike widths (Spearman $-0.999$ on $25{,}459$ eligible candidates): the
 entropy factor is a measurable statement about whether the spread is a genuine
 three-state wager or a disguised binary one. Second, $\dent$ is a function of
 quoted prices alone and is reproducible across independent data vendors at a
@@ -46,9 +46,14 @@ the growth factor from the fragile half. We give the exact algebra of the
 criterion, prove the monotonicity and second-order results, document the price
 basis and the quote-reality gates that make a vendor backtest comparable to
 live quotes, and report the configuration we call the fair credit model (FCM)
-on $5{,}779$ in-sample
-and $814$ out-of-time trades, together with a $146$-trade replay on live
-brokerage quotes. We also report, and do not hide, the criterion's principal
+on $3{,}045$ in-sample and $599$ out-of-time trades, together with a
+$110$-trade replay on live brokerage quotes. The selection rule is a floor of
+one basis point on the intrinsic GROUND ratio followed by a daily cap of six,
+and the ablations show that the floor is the selection: it nearly triples
+the per-trade profit of the eligible pool and cuts its in-sample drawdown
+from $30\%$ to $18\%$, while the
+ordering of candidates above the floor contributes nothing that survives a
+reversal test. We also report, and do not hide, the criterion's principal
 measured limitation: GROUND orders the probability of \emph{losing} and does
 not order dollars.
 \end{abstract}
@@ -136,8 +141,8 @@ small. Section~\ref{sec:basis} describes the price basis FCM uses -- a
 per-chain smile fit, capped at the short leg's own risk-neutral exercise
 probability and again at the best credit the quoted book ever showed -- and
 the four quote-reality gates that remove candidates whose quoted books cannot
-transact at all. Those gates cost the in-sample book $15\%$ of its profit and
-$0.17$ of its Sharpe ratio, and we keep them, because a backtest that books
+transact at all. Those gates cost the in-sample book $8\%$ of its profit and
+$0.02$ of its Sharpe ratio, and we keep them, because a backtest that books
 untransactable spreads is measuring its own data errors.
 
 Section~\ref{sec:lit} reviews the related literature.
@@ -145,10 +150,10 @@ Section~\ref{sec:growth} develops the growth factor and the empirical belief
 measure $\Preal$. Section~\ref{sec:entropy} develops $\dent$, its geometry and
 its theory. Section~\ref{sec:criterion} assembles the criterion and states its
 properties. Section~\ref{sec:basis} gives the price basis and the execution
-model. Section~\ref{sec:design} gives the empirical design and
-Section~\ref{sec:results} the results, including the ablations that isolate
-each component's contribution, the fill ladder that locates the break-even
-execution price, and the live-quote replay. Sections~\ref{sec:discussion}
+model. Section~\ref{sec:design} gives the empirical design, including the GROUND
+floor that is the selection rule, and Section~\ref{sec:results} the results,
+including the ablations that isolate each component's contribution, the fill
+ladder that locates the break-even execution price, and the live-quote replay. Sections~\ref{sec:discussion}
 and~\ref{sec:conclusions} discuss and conclude.
 
 All logarithms are natural; entropies and divergences are in nats.
@@ -285,10 +290,12 @@ $w = 0.01$ rather than returned as undefined. This matters more than it
 appears: in an earlier revision of the system these rows were silently dropped
 by the backtest while the live ranker retained them, which removed between
 $38\%$ and $59\%$ of bull candidates per year from the backtest universe and
-made the two environments incomparable. Under FCM, $60.6\%$ of the eligible
-pool is growth-negative at the model credit and $15.9\%$ of selected picks
-are; a criterion with no growth threshold must therefore be able to score
-them.
+made the two environments incomparable. Under FCM, $60.7\%$ of the eligible
+pool is growth-negative at the model credit. The GROUND floor of
+Section~\ref{sec:floor} excludes every such candidate from selection, and the
+no-floor configuration that preceded it took them on $15.9\%$ of its picks; a
+criterion must in either case be able to score them, because the floor is
+applied to the score.
 
 \subsection{\texorpdfstring{$\Preal$}{P-real}: the empirical belief measure}
 \label{sec:preal}
@@ -328,8 +335,8 @@ is baked into $p$, and the selection tilts mechanically toward the previous
 year's winners. Under the raw-return version the median trailing one-year
 return of selected names was $+31\%$ against $+3\%$ after demeaning. The cost
 of removing it is that the surviving per-candidate edges are roughly an order
-of magnitude smaller, which is why FCM operates with no growth threshold at
-all (Section~\ref{sec:selection}).
+of magnitude smaller, which is why the FCM floor is set at one basis point of
+growth rather than at a conventional edge (Section~\ref{sec:floor}).
 
 \subsection{The own-gap drift}
 \label{sec:drift}
@@ -507,7 +514,10 @@ With $\pi_s \in [0.50, 0.60]$ the turning point $\pi_s/2$ lies in
 $[0.25, 0.30]$, and on the FCM eligible pool only $1.8\%$ of candidates have
 $m \geq 0.25$. Over the remaining $98.2\%$, $\dent$ is strictly decreasing in
 the market's partial-zone mass. The measured relationship is almost perfectly
-monotone: Spearman$(\dent, m) = -0.999$ on $25{,}228$ eligible candidates.
+monotone: Spearman$(\dent, m) = -0.999$ on the $25{,}459$ candidates that
+clear every gate and the credit floor of Section~\ref{sec:selection}. All
+statements in this section are made on that pool, before the GROUND floor,
+because they describe the instrument rather than the selection.
 
 The partial-zone mass, in turn, is a statement about the market's expected
 move relative to the strike ladder. Measuring that move in dollars as
@@ -533,25 +543,25 @@ cushion between the strikes.
 \begin{table}[h]
 \centering
 \caption{The market measure $\Qbs$ by $\dent$ quintile on the FCM eligible
-pool ($n = 25{,}228$); medians.}
+pool before the GROUND floor ($n = 25{,}459$); medians.}
 \label{tab:dentquint}
 \begin{tabular}{lrrrr}
 \toprule
 $\dent$ quintile & $\dent$ & $\Qbs$ full win & $\Qbs$ full loss & $\Qbs$ partial \\
 \midrule
-1 (lowest) & 0.0532 & 0.4157 & 0.3881 & 0.1897 \\
-2          & 0.0950 & 0.4261 & 0.4294 & 0.1434 \\
+1 (lowest) & 0.0531 & 0.4158 & 0.3878 & 0.1897 \\
+2          & 0.0950 & 0.4260 & 0.4294 & 0.1434 \\
 3          & 0.1309 & 0.4322 & 0.4540 & 0.1144 \\
-4          & 0.1688 & 0.4345 & 0.4775 & 0.0892 \\
-5 (highest)& 0.2334 & 0.4366 & 0.5120 & 0.0553 \\
+4          & 0.1688 & 0.4345 & 0.4776 & 0.0892 \\
+5 (highest)& 0.2335 & 0.4364 & 0.5120 & 0.0552 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 A corollary is that $\dent$ carries a term-structure tilt. Longer holding
 periods mean larger expected moves against the same ladder, so the median
-$\dent$ rises with DTE: $0.1033$ at one day, $0.1190$ at two, $0.1327$ at
-three, $0.1428$ at four. At a fixed $k$ the criterion therefore prefers short
+$\dent$ rises with DTE: $0.1033$ at one day, $0.1191$ at two, $0.1327$ at
+three, $0.1427$ at four. At a fixed $k$ the criterion therefore prefers short
 holding periods, which it should: the same credit over fewer days is a higher
 rate.
 
@@ -592,8 +602,11 @@ narrower but still wide: on the eligible pool $\dent$ runs from $0.0069$ to
 $0.3684$ with median $0.1309$, and the discount $e^{-24\dent}$ runs from
 $0.0019$ at the fifth percentile to $0.409$ at the ninety-fifth, median
 $0.043$. The entropy factor is not a tiebreaker; at $k = 24$ it is the
-dominant term in the ordering, and Section~\ref{sec:ksweep} shows what
-happens as $k$ varies. Note also that within the $[0.50, 0.60]$ delta band
+dominant term in the score, and Section~\ref{sec:ksweep} shows what
+happens as $k$ varies. The GROUND floor of Section~\ref{sec:floor} acts
+largely through this factor: the candidates it keeps have median $\dent$ of
+$0.078$ and a ninety-fifth percentile of $0.153$, against $0.131$ and $0.262$
+for the pool it is applied to. Note also that within the $[0.50, 0.60]$ delta band
 $\dent$ cannot reach zero: the best attainable value, at $\pi_s = 0.60$ and
 $m = 0.30$, is $\dent = 0.0097$, close to the observed minimum $0.0069$.
 
@@ -614,11 +627,16 @@ FCM score of a candidate is
 The first factor is the variance-adjusted per-trade geometric expected return
 at Kelly-optimal sizing under $\Preal$; the second is an entropic discount in
 $(0, 1]$ computed from quoted prices. The product is dimensionless and reads
-as an entropy-discounted per-trade geometric expected return. FCM applies
-\emph{no threshold} to $\Gamma$:
-selection is a credit floor followed by a daily cap on $\Gamma$-rank
-(Section~\ref{sec:selection}). Section~\ref{sec:nothreshold} explains why,
-and quantifies the consequence.
+as an entropy-discounted per-trade geometric expected return. Selection is a
+credit floor, a floor of one basis point on $\Gamma$ itself,
+\begin{equation}
+\Gamma \;\geq\; \theta \;=\; 10^{-4},
+\label{eq:floor-gamma}
+\end{equation}
+and a daily cap of six on $\Gamma$-rank (Section~\ref{sec:selection}).
+Section~\ref{sec:floor} explains the floor and quantifies its consequence,
+which is the central empirical result of the paper: the floor is the
+selection, and the rank above it is not.
 
 \subsection{Properties}
 
@@ -641,6 +659,21 @@ a line of slope $k$ and intercept $\ln\theta$.
 $g = \ln E$; rule equivalence follows from strict monotonicity of the
 exponential. (ii) Take logarithms of $\Gamma \geq \theta$ and rearrange.
 \end{proof}
+
+\paragraph{The sign of $E$ and why the floor is positive.} Both propositions in
+this section require $E > 0$, because $g = \ln E$ is undefined otherwise. The
+product form $\Gamma = E\,e^{-k\dent}$ is defined for every candidate, but for
+$E < 0$ it inverts the intended ordering: the discount pulls a negative $E$
+\emph{toward zero}, so of two growth-negative candidates the one the market has
+priced as more nearly binary (higher $\dent$) receives the \emph{higher} score.
+Since $e^{-k\dent} > 0$, $\operatorname{sign}\Gamma = \operatorname{sign} E$,
+and any floor $\theta > 0$ on $\Gamma$ restricts selection to the region
+$E > 0$ on which Propositions~\ref{prop:halfplane} and~\ref{prop:additive}
+hold. The floor of (\ref{eq:floor-gamma}) is therefore not only a selection
+rule but the condition under which the score has the exponential form the
+theory describes. Under the no-floor configuration that preceded FCM,
+$60.7\%$ of the eligible pool and $15.9\%$ of the selected book sat in the
+inverted region.
 
 The boundary of (\ref{eq:halfplane}) is the level set of the Lagrangian of
 entropy-budgeted growth selection -- maximize $g$ subject to
@@ -721,8 +754,8 @@ short leg's own risk-neutral exercise probability times the width, so
 c_1 \;=\; \min\bigl(c_0,\ |\delta_s|\, w_d\bigr),
 \label{eq:deltacap}
 \end{equation}
-with $\delta_s$ the fitted short-leg delta. This ceiling binds on $5{,}190$ of
-$99{,}587$ scored candidates. It exists because the fitted surface can
+with $\delta_s$ the fitted short-leg delta. This ceiling binds on $5{,}261$ of
+$100{,}408$ scored candidates. It exists because the fitted surface can
 extrapolate above the arbitrage bound on illiquid strikes: one documented case
 booked $0.857$ of a one-dollar width on a book quoted $0.45/2.45$ against
 $0.05/0.45$, whose immediately transactable credit was zero.
@@ -734,7 +767,8 @@ c \;=\; \min\bigl(c_1,\ a_s - \beta_\ell\bigr),
 \label{eq:bestcap}
 \end{equation}
 where $a_s$ is the short leg's ask and $\beta_\ell$ the long leg's bid. This
-binds on $2.3\%$ of survivors with a median haircut of $\$0.014$. Both
+binds on $2{,}356$ of $100{,}408$ survivors ($2.3\%$) with a median haircut of
+$\$0.014$. Both
 (\ref{eq:deltacap}) and (\ref{eq:bestcap}) are applied before scoring, so
 $\Gamma$ and the daily ordering are computed on the capped credit, not merely
 booked on it.
@@ -749,16 +783,18 @@ is dropped if any of the following holds.
 
 \begin{enumerate}
 \item $\mathrm{touch} \leq 0$: the quoted book cannot pay anything at all.
-      $14{,}768$ candidates.
+      $15{,}122$ candidates.
 \item $\mu_s < \mu_\ell$: inverted midpoints, the nearer strike quoted below
-      the farther one. $625$ candidates.
+      the farther one. $632$ candidates.
 \item either strike is not a multiple of \$0.50: off-ladder series.
       $499$ candidates.
 \item $a_s < \beta_\ell$: quotes crossed across the two strikes.
       $28$ candidates.
 \end{enumerate}
 
-Together these remove $15{,}125$ of $114{,}712$ candidates. Gate 3 deserves a
+The four counts sum to $16{,}281$; net of the $802$ candidates that fail more
+than one test, the gates remove $15{,}479$ of $115{,}887$ candidates, or
+$13.4\%$ of the frame. Gate 3 deserves a
 word because its cause is not obvious. A split-adjusted price series keeps
 trading on an odd ladder for years after the corporate action -- strikes at
 $32.17/32.00$, $196.88/196.25$, $1.67$ increments -- long past the window any
@@ -767,11 +803,12 @@ on an ordinary grid, by contrast, are real listings and are kept.
 
 The gates are applied at candidate level, before the daily cap, so the daily
 selection backfills from the surviving pool rather than thinning. Candidates
-per day fall from $99$ to $84$ and no day falls below the cap of six. Their
-cost to the reported book is real and is reported: the in-sample book gives up
-$15\%$ of its profit and $0.17$ of its dollar Sharpe ratio. We keep them
-because the alternative is a backtest that books spreads no participant could
-have transacted.
+per day fall from $99$ to $81$. Their cost to the reported book is real and is
+reported in Table~\ref{tab:gates}: under FCM the in-sample book gives up
+$\$4{,}355$, or $8\%$ of its profit, and $0.02$ of its dollar Sharpe ratio;
+under the no-floor configuration that preceded FCM the same gates cost $15\%$
+and $0.17$. We keep them because the alternative is a backtest that books
+spreads no participant could have transacted.
 
 \subsection{The execution model and the break-even fill}
 \label{sec:execution}
@@ -791,12 +828,12 @@ The sensitivity of the book to $f$ is the single most important fragility in
 the system, and Section~\ref{sec:fill} reports the full ladder. By bisection
 on realized settlement, total profit crosses zero at
 \begin{equation}
-f^\ast \;=\; 0.9197 \ \ (\text{in sample}), \qquad
-0.8612 \ \ (\text{out of time}), \qquad
-0.9123 \ \ (\text{pooled}).
+f^\ast \;=\; 0.8920 \ \ (\text{in sample}), \qquad
+0.8495 \ \ (\text{out of time}), \qquad
+0.8849 \ \ (\text{pooled}).
 \label{eq:breakeven}
 \end{equation}
-The strategy requires fills no worse than about $0.92 \times$ the fitted fair
+The strategy requires fills no worse than about $0.89 \times$ the fitted fair
 credit. Three independent measurements bear on whether that is met. A sample
 of $52$ live trades with a recorded fill price achieved a median of
 $1.037 \times$ the model credit, with $47$ of $52$ at or above $1.00\times$.
@@ -812,9 +849,9 @@ the paper and we say so again in Section~\ref{sec:discussion}.
 \subsection{Universe, instrument and candidate construction}
 
 The frame is built from vendor end-of-day option chains on S\&P~100
-underlyings plus SPY, QQQ and IWM, January 2020 through September 2026,
-$131{,}570$ candidate rows on $93$ names over $1{,}346$ entry days, split
-$65{,}255$ bull puts and $66{,}315$ bear calls. On each entry day, Monday
+underlyings plus SPY, QQQ and IWM, August 2020 through October 2026,
+$115{,}887$ candidate rows on $93$ names over $1{,}198$ entry days, split
+$57{,}470$ bull puts and $58{,}417$ bear calls. On each entry day, Monday
 through Thursday, for each name and each side, the system takes the single
 vertical expiring the coming Friday -- one to four days to expiry -- whose
 short leg has fitted delta nearest $0.55$ within the band $[0.50, 0.60]$, with
@@ -824,8 +861,8 @@ at least one contract on both legs.
 The $0.55$ delta target deserves emphasis, because it determines the character
 of the trade and distinguishes it from the out-of-the-money premium sale the
 term ``credit spread'' usually denotes. A $0.55$-delta short leg is at or slightly inside the money. The
-median selected spread collects $0.497$ of its width, giving payoff odds
-$b = 0.989$, and wins outright $47.4\%$ of the time. This is a near-even-money
+median selected spread collects $0.493$ of its width, giving payoff odds
+$b = 0.972$, and wins outright $47.3\%$ of the time. This is a near-even-money
 bet at near-even odds, with the partial zone and the credit cushion supplying
 the edge, not a high-probability out-of-the-money sale. The win rate is not a
 performance statistic here; it is a design consequence.
@@ -838,7 +875,7 @@ one session: scheduled earnings releases, ex-dividend dates, corporate actions
 whose $252$-session $\Preal$ window contains an unadjusted corporate action.
 A fifth requirement is historical: a name is not traded until its own close
 history holds $252$ completed sessions, which moves the first entry to
-2020-09-29.
+2020-10-06.
 
 The earnings calendar is the union of a vendor calendar and dates extracted
 from SEC Item 2.02 filings, vetted so that every name-year from 2020 to 2025
@@ -876,36 +913,85 @@ Both sleeves pass a credit floor,
 c / w_d \;\geq\; 0.45 ,
 \label{eq:floor}
 \end{equation}
-and then compete in a single pooled ranking: the six highest-$\Gamma$
-candidates per entry day are taken, both sides together. There is no
-$\Gamma$ threshold.
+then the GROUND floor (\ref{eq:floor-gamma}), $\Gamma \geq 10^{-4}$, and then
+compete in a single pooled ranking: the six highest-$\Gamma$ survivors per
+entry day are taken, both sides together. On days with fewer than six
+survivors, every survivor is taken.
 
-The funnel is as follows. Of $131{,}570$ frame rows, $93{,}450$ survive the
-regime assignment, the four gates, the four quote-reality gates and the
-$252$-session requirement. Of those, $59{,}819$ clear the credit floor, and
-$25{,}228$ are eligible once the bear sleeve's regime and volatility
-conditions are imposed -- $22{,}857$ bull puts and $2{,}371$ bear calls, on
-$92$ names across $1{,}120$ entry days, a mean of $22.5$ eligible candidates
-per day. The daily cap of six selects $6{,}593$ of them.
+The funnel is as follows. Of $115{,}887$ frame rows, $100{,}408$ survive the
+four quote-reality gates, $94{,}271$ of those the $252$-session requirement,
+and $80{,}038$ of those the four exclusions. Of these, $49{,}941$ clear the
+credit floor, and $25{,}459$ remain eligible once the bear sleeve's regime and
+volatility conditions are imposed: $23{,}088$ bull puts and $2{,}371$ bear
+calls, a mean of $22.5$ candidates per entry day. The GROUND floor removes
+$21{,}255$ of them, leaving $4{,}204$ ($3{,}386$ bull puts, $818$ bear calls)
+on $89$ names across $1{,}019$ entry days, a mean of $4.13$ per day. The daily
+cap of six then binds on $192$ days, is met exactly on $80$, and is slack on
+the remaining $747$; it selects $3{,}644$ trades, $3{,}013$ bull puts and
+$631$ bear calls, $3.58$ per entry day.
 
-\subsection{Why there is no threshold}
-\label{sec:nothreshold}
+\subsection{The GROUND floor}
+\label{sec:floor}
 
 Proposition~\ref{prop:halfplane} invites an acceptance threshold
-$\Gamma \geq \theta$, and earlier configurations of this system carried one.
-FCM has none, and the reason is the drift-free $\Preal$ of
-Section~\ref{sec:preal}. Removing the window drift shrank per-candidate edges by
-roughly an order of magnitude -- the median selected $\Gamma$ is
-$1.21\times10^{-4}$ in sample -- so a threshold calibrated on raw-drift edges
-admits almost nothing, and one recalibrated downward admits almost everything.
-With a cap of six against a pool of $22.5$, the cap is the binding constraint
-and the threshold is redundant.
+$\Gamma \geq \theta$. Earlier configurations of this system carried one
+calibrated on raw-drift edges; the drift-free $\Preal$ of
+Section~\ref{sec:preal} shrank per-candidate edges by roughly an order of
+magnitude, and for a period the system ran with no threshold at all, taking
+the six highest-$\Gamma$ candidates each day whatever their sign. That
+configuration selected growth-negative candidates on $15.9\%$ of its picks and
+held positions in about seventeen distinct names a week.
 
-The consequence is stated plainly: negative-$\Gamma$ candidates are selected
-when fewer than six positive ones clear the floor. In sample this happens on
-$992$ of $5{,}779$ picks ($17.2\%$), which together earned $+\$5{,}502$ per
-contract; out of time it happens on $54$ of $814$, earning $+\$1{,}262$.
-A threshold would have excluded profitable trades.
+FCM sets $\theta = 10^{-4}$: one basis point of entropy-discounted Kelly
+expected value. The value was chosen on the in-sample window from the sweep in
+Table~\ref{tab:grid}, which varies the floor and the daily cap together.
+
+\begin{table}[h]
+\centering
+\caption{Floor $\times$ cap sweep, in-sample dollar Sharpe ratio. Rows are the
+GROUND floor $\theta$, columns the daily cap $n$. The last three columns are
+the maximum drawdown, distinct names per week and out-of-time Sharpe ratio at
+$n = 6$.}
+\label{tab:grid}
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+$\theta$ & $n{=}1$ & $2$ & $3$ & $4$ & $5$ & $6$ & DD at 6 & Names/wk & OOT Sharpe \\
+\midrule
+$0$ (none)      & 0.97 & 0.65 & 1.09 & 1.22 & 1.20 & 1.26 & $-30.3\%$ & 17.2 & 3.11 \\
+$\mathbf{10^{-4}}$ & 1.07 & 0.80 & 1.31 & 1.32 & 1.40 & $\mathbf{1.52}$ & $\mathbf{-17.7\%}$ & $\mathbf{10.0}$ & $\mathbf{2.81}$ \\
+$2\times10^{-4}$ & 1.06 & 0.86 & 1.22 & 1.21 & 1.29 & 1.43 & $-13.7\%$ & 8.1 & 2.35 \\
+$3\times10^{-4}$ & 1.10 & 0.81 & 1.17 & 1.17 & 1.26 & 1.36 & $-14.7\%$ & 7.0 & 2.46 \\
+$5\times10^{-4}$ & 1.24 & 1.00 & 1.27 & 1.26 & 1.32 & 1.32 & $-16.9\%$ & 5.6 & 2.14 \\
+$10^{-3}$        & 1.20 & 1.08 & 1.10 & 1.13 & 1.10 & 1.06 & $-18.6\%$ & 3.9 & 2.29 \\
+$2\times10^{-3}$ & 1.26 & 1.04 & 0.98 & 0.95 & 0.94 & 0.93 & $-18.4\%$ & 2.5 & 2.39 \\
+$3\times10^{-3}$ & 1.17 & 1.02 & 0.99 & 1.00 & 1.00 & 1.00 & $-14.4\%$ & 1.9 & 2.51 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three features of the surface decide the configuration. At every floor up to
+$5\times10^{-4}$ the Sharpe ratio rises with the cap, so cutting the cap below
+six loses both Sharpe and money, and a cap of two is the worst column at every
+floor. The ridge runs along $\theta \in [10^{-4}, 2\times10^{-4}]$ at $n = 6$.
+And the floor, not the cap, is what buys drawdown: at $n = 6$ the maximum
+drawdown falls from $-30.3\%$ with no floor to $-17.7\%$ at one basis point
+and $-13.7\%$ at two, while the number of distinct names held per week falls
+from $17.2$ to $10.0$ and $8.1$.
+
+The floor sits at the $83.5$th percentile of the eligible $\Gamma$
+distribution: $60.7\%$ of eligible candidates are growth-negative and a further
+$22.8\%$ are growth-positive by less than one basis point. It is therefore a
+severe cut, and it is an in-sample choice. The out-of-time column of
+Table~\ref{tab:grid} does not reward it: at $n = 6$ the out-of-time Sharpe
+ratio falls from $3.11$ with no floor to $2.81$ at one basis point, and the
+out-of-time drawdown improves only from $-15.2\%$ to $-12.7\%$. The defensible
+arguments for the floor are the two that do not depend on the in-sample
+Sharpe ratio: it confines selection to the region $E > 0$ on which the
+criterion has the exponential form of Proposition~\ref{prop:halfplane}, and it
+halves the number of names the book holds at a time. Section~\ref{sec:ranker}
+reports the consequence that matters most for how the criterion should be
+understood: once the floor is applied, the order of the survivors carries no
+measurable information.
 
 \subsection{Settlement and sizing}
 \label{sec:sizing}
@@ -920,12 +1006,12 @@ The reporting arm is a flat two contracts per pick on a \$10{,}000 starting
 bankroll. Three alternative arms are reported: flat one contract, and
 fractional-Kelly sizing at one quarter and one half of
 $w^\ast_\kappa$ from (\ref{eq:kellycarry}), each capped at five contracts, in
-the tradition of \cite{maclean2011}. Candidates for which carry-adjusted Kelly
-declines to size -- exactly the growth-negative rows -- are sized at one
-contract, not at the floor stake; an earlier version fell back to the
-uncarried $w^\ast$ for those rows, which clipped to $0.01$ and, on a small
-maximum loss, sized \emph{above} one contract, resurrecting trades Kelly had
-rejected.
+the tradition of \cite{maclean2011}. Under the GROUND floor no selected candidate is
+growth-negative, so the case in which carry-adjusted Kelly declines to size
+does not arise in the reported book; in the no-floor configuration it did, and
+an earlier version fell back to the uncarried $w^\ast$ for those rows, which
+clipped to $0.01$ and, on a small maximum loss, sized \emph{above} one
+contract, resurrecting trades Kelly had rejected.
 
 \section{Results}
 \label{sec:results}
@@ -941,48 +1027,48 @@ base.
 
 \begin{table}[h]
 \centering
-\caption{FCM configuration, $k = 24$, pooled top six per day, $f = 1.00\times$
-model credit, \$10{,}000 starting bankroll.}
+\caption{FCM configuration, $k = 24$, $\Gamma \geq 10^{-4}$, pooled top six per
+day, $f = 1.00\times$ model credit, \$10{,}000 starting bankroll.}
 \label{tab:headline}
 \begin{tabular}{lrr}
 \toprule
  & In sample & Out of time \\
- & 2020-09-29 to 2026-01-02 & 2026-01-05 to 2026-09-25 \\
+ & 2020-10-06 to 2026-01-02 & 2026-01-05 to 2026-10-23 \\
 \midrule
-Trades & 5{,}779 & 814 \\
-Trading days & 1{,}322 & 183 \\
-Entry days used & 984 & 136 \\
-Names traded & 90 & 73 \\
-Final equity, 2 contracts & \$83{,}391 & \$28{,}198 \\
-Total return & $+733.9\%$ & $+182.0\%$ \\
-CAGR & $49.7\%$ & --- \\
-Sharpe (daily \$, annualized) & $+1.26$ & $+2.86$ \\
-Sharpe (weekly, annualized) & $+1.29$ & $+3.19$ \\
-Maximum drawdown & $-30.3\%$ & $-15.2\%$ \\
-Yield on dollars risked & $7.8\%$ & $13.6\%$ \\
-Final equity, 1 contract & \$46{,}695 & \$19{,}099 \\
-Final equity, $\tfrac14$ Kelly (cap 5) & \$91{,}828 & \$31{,}502 \\
-Final equity, $\tfrac12$ Kelly (cap 5) & \$128{,}198 & \$42{,}180 \\
-SPY over the same window & \$22{,}113 & \$11{,}276 \\
-SPY Sharpe / drawdown & $+0.97$ / $-24.5\%$ & $+1.39$ / $-8.9\%$ \\
+Trades & 3{,}045 & 599 \\
+Trading days & 1{,}317 & 198 \\
+Entry days used & 876 & 143 \\
+Names traded & 89 & 65 \\
+Final equity, 2 contracts & \$61{,}304 & \$24{,}215 \\
+Total return & $+513.0\%$ & $+142.2\%$ \\
+CAGR & $41.3\%$ & --- \\
+Sharpe (daily \$, annualized) & $+1.52$ & $+2.81$ \\
+Sharpe (weekly, annualized) & $+1.60$ & $+3.04$ \\
+Maximum drawdown & $-17.7\%$ & $-12.7\%$ \\
+Yield on dollars risked & $10.2\%$ & $14.5\%$ \\
+Final equity, 1 contract & \$35{,}652 & \$17{,}108 \\
+Final equity, $\tfrac14$ Kelly (cap 5) & \$77{,}281 & \$29{,}149 \\
+Final equity, $\tfrac12$ Kelly (cap 5) & \$109{,}197 & \$38{,}933 \\
+SPY over the same window & \$21{,}944 & \$11{,}109 \\
+SPY Sharpe / drawdown & $+0.96$ / $-24.5\%$ & $+1.11$ / $-8.9\%$ \\
 \midrule
-Win / partial / loss & 2{,}741 / 851 / 2{,}187 & 391 / 143 / 280 \\
-Win rate & $47.4\%$ & $48.0\%$ \\
-Mean profit per contract & \$6.35 & \$11.18 \\
-Median payoff odds $b$ & 0.989 & 1.017 \\
-Median credit / width & 0.497 & 0.504 \\
-Median $\dent$ & 0.1001 & 0.0962 \\
-Median $E$ & 0.00151 & 0.00332 \\
-Median $\Gamma$ & $1.21\times10^{-4}$ & $2.75\times10^{-4}$ \\
-Median $|\delta_s|$ & 0.558 & 0.553 \\
+Win / partial / loss & 1{,}439 / 563 / 1{,}043 & 279 / 122 / 198 \\
+Win rate & $47.3\%$ & $46.6\%$ \\
+Mean profit per contract & \$8.42 & \$11.87 \\
+Median payoff odds $b$ & 0.972 & 1.011 \\
+Median credit / width & 0.493 & 0.503 \\
+Median $\dent$ & 0.0726 & 0.0773 \\
+Median $E$ & 0.00399 & 0.00524 \\
+Median $\Gamma$ & $5.32\times10^{-4}$ & $5.95\times10^{-4}$ \\
+Median $|\delta_s|$ & 0.566 & 0.558 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 The gross flows are worth recording because they set the scale of everything
-that follows. In sample, at one contract, full wins paid $+\$223{,}949$, full
-losses cost $-\$178{,}288$, and partial outcomes cost $-\$8{,}965$, netting
-$+\$36{,}695$ on $\$411{,}202$ of gross settlement. The book is a $9\%$
+that follows. In sample, at one contract, full wins paid $+\$117{,}598$, full
+losses cost $-\$85{,}687$, and partial outcomes cost $-\$6{,}259$, netting
+$+\$25{,}652$ on $\$220{,}469$ of gross settlement. The book is a $12\%$
 residual of two large opposing flows. Nothing in this system is a large per
 trade effect, and any statement about it that cannot survive a few percent of
 error in the credit basis is not a statement about the strategy.
@@ -998,186 +1084,242 @@ error in the credit basis is not a statement about the strategy.
 \toprule
 Year & Trades & Profit & Per trade & Win & Loss & Yield & Bull / bear \\
 \midrule
-2020 (part) & 16    & \$275      & \$17.18  & $50.0\%$ & $37.5\%$ & $13.6\%$ & 16 / 0 \\
-2021        & 1{,}142 & \$11{,}359 & \$9.95   & $51.1\%$ & $35.6\%$ & $12.6\%$ & 1{,}133 / 9 \\
-2022        & 1{,}172 & $-\$749$   & $-\$0.64$& $41.2\%$ & $44.8\%$ & $-0.8\%$ & 775 / 397 \\
-2023        & 1{,}151 & \$6{,}361  & \$5.53   & $48.1\%$ & $38.8\%$ & $6.8\%$  & 980 / 171 \\
-2024        & 1{,}151 & \$10{,}901 & \$9.47   & $49.0\%$ & $34.8\%$ & $11.4\%$ & 1{,}143 / 8 \\
-2025        & 1{,}147 & \$8{,}549  & \$7.45   & $48.0\%$ & $35.1\%$ & $8.8\%$  & 1{,}057 / 90 \\
-2026 (OOT)  & 814     & \$9{,}099  & \$11.18  & $48.0\%$ & $34.4\%$ & $13.6\%$ & 770 / 44 \\
+2020 (part) & 10  & \$148     & \$14.78 & $50.0\%$ & $40.0\%$ & $11.9\%$ & 10 / 0 \\
+2021        & 497 & \$7{,}376 & \$14.84 & $50.9\%$ & $31.4\%$ & $17.8\%$ & 489 / 8 \\
+2022        & 754 & \$4{,}642 & \$6.16  & $45.0\%$ & $39.0\%$ & $7.5\%$  & 416 / 338 \\
+2023        & 460 & \$2{,}169 & \$4.71  & $46.1\%$ & $37.2\%$ & $6.1\%$  & 308 / 152 \\
+2024        & 558 & \$3{,}101 & \$5.56  & $46.8\%$ & $32.4\%$ & $6.9\%$  & 550 / 8 \\
+2025        & 766 & \$8{,}216 & \$10.73 & $48.2\%$ & $30.9\%$ & $12.6\%$ & 683 / 83 \\
+2026 (OOT)  & 599 & \$7{,}108 & \$11.87 & $46.6\%$ & $33.1\%$ & $14.5\%$ & 557 / 42 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-One year is negative: 2022, at $-\$749$ on $1{,}172$ trades, essentially flat.
-It is also the only year in which the bear sleeve was large, $397$ of
-$1{,}172$ picks, because it is the only year SPY spent substantial time below
-its $100$-session average. The sleeve did not save 2022, but
-Section~\ref{sec:gates} shows what the book looks like without it.
+No year is negative. The weakest is 2023, at \$4.71 per trade, and the highest
+full-loss rate is 2022 at $39.0\%$, the only sustained bear market in the
+sample and the only year in which the bear sleeve was large, $338$ of $754$
+picks, because it is the only year SPY spent substantial time below its
+$100$-session average. Under the no-floor configuration 2022 lost $\$749$ on
+$1{,}172$ trades; the floor turns it into $+\$4{,}642$ on $754$.
+Section~\ref{sec:gates} shows what the book looks like without the bear
+sleeve.
 
 \subsection{What the ranking contributes}
 \label{sec:ranker}
 
 As in the first three papers of this series, the benchmark is the Kelly
-criterion. Because FCM applies no threshold, the question is not whether a gate
-earns its place but whether the entropy-discounted ordering beats the pure
-growth ordering. The comparison that isolates it holds the eligible pool, every
-gate, the cap and the fill identical and varies only the sort key; ranking on
-$E$ alone is precisely Kelly criterion selection under the trader's measure.
+criterion: ranking on $E$ alone is precisely Kelly criterion selection under
+the trader's measure. The comparison that isolates the ranking holds the
+eligible pool, every gate, the cap and the fill identical and varies only the
+sort key. Because FCM applies a floor to $\Gamma$, the question has two parts:
+what the ordering contributes when there is no floor, and what it contributes
+once the floor has been applied. Table~\ref{tab:ranker} answers both.
 
 \begin{table}[h]
 \centering
-\caption{Ranker ablation. Identical eligible pool ($25{,}228$ candidates),
-identical gates, pooled top six per day, $f = 1.00\times$ model.}
+\caption{Ranker ablation. Identical gates, pooled top six per day,
+$f = 1.00\times$ model. Upper panel: no GROUND floor, $25{,}459$ eligible
+candidates, $5{,}779$ in-sample and $880$ out-of-time trades in every row.
+Lower panel: FCM, $\Gamma \geq 10^{-4}$, $4{,}204$ eligible candidates,
+$3{,}045$ and $599$ trades in every row.}
 \label{tab:ranker}
+\small
 \begin{tabular}{lrrrrrr}
 \toprule
  & \multicolumn{3}{c}{In sample} & \multicolumn{3}{c}{Out of time} \\
 \cmidrule(lr){2-4}\cmidrule(lr){5-7}
 Sort key & Profit & Sharpe & Max DD & Profit & Sharpe & Max DD \\
 \midrule
-$\Gamma = E\,e^{-24\dent}$ (FCM) & \$73{,}391 & $+1.26$ & $-30.3\%$ & \$18{,}198 & $+2.86$ & $-15.2\%$ \\
-$E$ alone (Kelly growth, $k=0$)  & \$69{,}401 & $+1.13$ & $-50.1\%$ & \$16{,}464 & $+2.73$ & $-10.2\%$ \\
-$-\dent$ alone (max market entropy) & \$51{,}569 & $+0.90$ & $-72.4\%$ & \$9{,}669 & $+1.44$ & $-17.2\%$ \\
-Credit / width                    & \$67{,}035 & $+1.06$ & $-54.9\%$ & \$8{,}668 & $+1.31$ & $-35.4\%$ \\
-Random                            & \$48{,}973 & $+0.77$ & $-122.9\%$ & \$917 & $+0.14$ & $-64.0\%$ \\
-$\Gamma$ ascending (worst six)    & \$8{,}105 & $+0.13$ & $-149.5\%$ & $-\$8{,}362$ & $-1.05$ & $-128.9\%$ \\
+\multicolumn{7}{l}{\emph{No GROUND floor}} \\
+$\Gamma = E\,e^{-24\dent}$        & \$73{,}391 & $+1.26$ & $-30.3\%$ & \$21{,}745 & $+3.11$ & $-15.2\%$ \\
+$E$ alone (Kelly growth, $k=0$)   & \$69{,}401 & $+1.13$ & $-50.1\%$ & \$20{,}959 & $+3.16$ & $-10.1\%$ \\
+$-\dent$ alone (max market entropy) & \$51{,}569 & $+0.90$ & $-72.4\%$ & \$13{,}320 & $+1.80$ & $-17.2\%$ \\
+Credit / width                     & \$67{,}035 & $+1.06$ & $-54.9\%$ & \$9{,}764  & $+1.38$ & $-35.4\%$ \\
+Random                             & \$48{,}973 & $+0.77$ & $-122.9\%$ & \$9{,}586 & $+1.26$ & $-58.8\%$ \\
+$\Gamma$ ascending (worst six)     & \$8{,}105  & $+0.13$ & $-149.5\%$ & $-\$6{,}773$ & $-0.80$ & $-128.9\%$ \\
+\midrule
+\multicolumn{7}{l}{\emph{FCM: $\Gamma \geq 10^{-4}$}} \\
+$\Gamma = E\,e^{-24\dent}$        & \$51{,}304 & $+1.52$ & $-17.7\%$ & \$14{,}215 & $+2.81$ & $-12.7\%$ \\
+$E$ alone                          & \$44{,}765 & $+1.31$ & $-20.7\%$ & \$12{,}498 & $+2.64$ & $-13.6\%$ \\
+$-\dent$ alone                     & \$47{,}170 & $+1.42$ & $-15.9\%$ & \$14{,}746 & $+2.60$ & $-12.5\%$ \\
+Credit / width                     & \$47{,}369 & $+1.37$ & $-21.6\%$ & \$14{,}109 & $+3.13$ & $-13.0\%$ \\
+Random                             & \$49{,}628 & $+1.43$ & $-17.7\%$ & \$13{,}892 & $+3.07$ & $-13.9\%$ \\
+$\Gamma$ ascending (worst six)     & \$52{,}876 & $+1.51$ & $-14.4\%$ & \$14{,}492 & $+3.23$ & $-12.6\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Three readings. First, the ordering is correct in both windows and in the
-right direction at both ends: $\Gamma$ beats each of its own factors taken
-alone, each factor beats random, and reversing $\Gamma$ nearly destroys the
-book and turns the out-of-time window negative. The score carries information.
+Without the floor, the ordering is correct in both windows and in the right
+direction at both ends: $\Gamma$ beats each of its own factors taken alone,
+each factor beats random, and reversing $\Gamma$ nearly destroys the book and
+turns the out-of-time window negative. The score carries information, and its
+advantage over the growth factor alone is modest in dollars and large in path:
+maximum drawdown falls from $-50.1\%$ to $-30.3\%$ in sample.
 
-Second, $\Gamma$'s advantage over the growth factor alone is modest in dollars
--- $+6\%$ in sample, $+11\%$ out of time -- and large in path: maximum
-drawdown falls from $-50.1\%$ to $-30.3\%$ in sample. The entropy factor's
-contribution is risk control, not return. This is a more modest claim than a
-reader of the first three papers might expect, and it is the claim the data
-support.
+With the floor, the ordering carries nothing that survives a reversal test.
+Taking the six \emph{lowest}-$\Gamma$ survivors each day earns $\$52{,}876$ in
+sample against $\$51{,}304$ for the six highest, at a Sharpe ratio of $1.51$
+against $1.52$; random order earns $\$49{,}628$ at $1.43$. The reason is
+arithmetic. The floored pool averages $4.13$ candidates per day against a cap
+of six, so on $747$ of $1{,}019$ entry days every survivor is taken and the
+sort key is never consulted. The cap binds on $192$ days carrying $1{,}152$ of
+the $3{,}644$ picks, and on those days the six highest-$\Gamma$ picks earned
+$\$14{,}002$ at one contract, the six lowest $\$14{,}926$, and a random six
+$\$13{,}002$. Whatever $\Gamma$ knows about a candidate is spent at the floor.
 
-Third, the eligible pool is profitable before any ranking: taking all
-$25{,}228$ eligible candidates at one contract would have earned
-$+\$80{,}396$, or \$3.19 per trade, against the selected book's \$6.94 per
-trade on $6{,}593$ trades. The ranker roughly doubles the per-trade rate. The
-gates and the credit floor, not the score, are what make the pool positive in
-the first place, and Section~\ref{sec:gates} measures them.
+The floor itself is where the per-trade rate is made. Taking every one of the
+$25{,}459$ pre-floor eligible candidates at one contract would have earned
+$+\$81{,}674$, or \$3.21 per trade; taking every one of the $4{,}204$ survivors
+of the floor earns $+\$37{,}097$, or \$8.82 per trade; the selected book of
+$3{,}644$ earns \$8.99 per trade. The floor nearly triples the per-trade rate
+of the pool it is applied to, and the daily cap on $\Gamma$-rank adds
+seventeen cents. The gates and the credit floor are what make the pool
+positive in the first place, and Section~\ref{sec:gates} measures them.
+
+The conclusion for the use of the criterion is the one the first three papers
+reached for the comparative GROUND ratio in a different form: the intrinsic
+GROUND ratio is a \emph{gate}, not a ranker. It separates candidates whose
+entropy-discounted growth is positive from those whose growth is negative or
+whose market measure is near-binary, and above that separation its fine
+ordering is noise on this instrument.
 
 \subsection{The entropy strength \texorpdfstring{$k$}{k}}
 \label{sec:ksweep}
 
+Because the floor is applied to $\Gamma_k = E\,e^{-k\dent}$, changing $k$
+changes which candidates survive as well as how they are ordered.
+Table~\ref{tab:ksweep} sweeps the configuration: at each $k$ the floor
+$\Gamma_k \geq 10^{-4}$ and the cap of six are applied to the same pre-floor
+pool.
+
 \begin{table}[h]
 \centering
-\caption{$k$ sweep on $\Gamma$-rank. Same pool and cap; only the exponent
-changes. $f = 1.00\times$ model.}
+\caption{$k$ sweep. Floor $\Gamma_k \geq 10^{-4}$ and pooled top six at each
+$k$; same pre-floor pool, $f = 1.00\times$ model.}
 \label{tab:ksweep}
-\begin{tabular}{rrrrrrr}
+\footnotesize
+\begin{tabular}{rrrrrrrrr}
 \toprule
- & \multicolumn{3}{c}{In sample} & \multicolumn{3}{c}{Out of time} \\
-\cmidrule(lr){2-4}\cmidrule(lr){5-7}
-$k$ & Profit & Sharpe & Max DD & Profit & Sharpe & Max DD \\
+ & \multicolumn{4}{c}{In sample} & \multicolumn{4}{c}{Out of time} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+$k$ & Trades & Profit & Sharpe & Max DD & Trades & Profit & Sharpe & Max DD \\
 \midrule
-0  & \$69{,}401 & $+1.13$ & $-50.1\%$ & \$16{,}464 & $+2.73$ & $-10.2\%$ \\
-2  & \$65{,}398 & $+1.06$ & $-52.7\%$ & \$16{,}698 & $+2.81$ & $-10.1\%$ \\
-4  & \$65{,}443 & $+1.06$ & $-49.5\%$ & \$17{,}396 & $+2.98$ & $-9.4\%$ \\
-8  & \$69{,}484 & $+1.14$ & $-39.3\%$ & \$16{,}472 & $+2.68$ & $-13.4\%$ \\
-12 & \$70{,}021 & $+1.17$ & $-39.4\%$ & \$16{,}422 & $+2.65$ & $-14.5\%$ \\
-16 & \$70{,}867 & $+1.20$ & $-37.7\%$ & \$17{,}317 & $+2.67$ & $-15.3\%$ \\
-20 & \$71{,}815 & $+1.23$ & $-32.7\%$ & \$18{,}118 & $+2.88$ & $-14.9\%$ \\
-\textbf{24} & \textbf{\$73{,}391} & $\mathbf{+1.26}$ & $\mathbf{-30.3\%}$ & \textbf{\$18{,}198} & $\mathbf{+2.86}$ & $\mathbf{-15.2\%}$ \\
-28 & \$75{,}570 & $+1.30$ & $-29.8\%$ & \$18{,}548 & $+2.96$ & $-14.8\%$ \\
-32 & \$71{,}819 & $+1.24$ & $-31.7\%$ & \$18{,}588 & $+3.02$ & $-14.6\%$ \\
-48 & \$65{,}001 & $+1.12$ & $-32.4\%$ & \$16{,}844 & $+2.62$ & $-15.7\%$ \\
-64 & \$67{,}546 & $+1.16$ & $-33.2\%$ & \$17{,}600 & $+2.79$ & $-14.1\%$ \\
+0  & 4{,}556 & \$51{,}947 & $+1.02$ & $-42.5\%$ & 791 & \$16{,}683 & $+2.72$ & $-10.2\%$ \\
+2  & 4{,}511 & \$49{,}085 & $+0.98$ & $-44.7\%$ & 788 & \$17{,}472 & $+2.81$ & $-9.6\%$ \\
+4  & 4{,}425 & \$53{,}280 & $+1.09$ & $-36.6\%$ & 784 & \$16{,}696 & $+2.74$ & $-10.1\%$ \\
+8  & 4{,}262 & \$57{,}275 & $+1.21$ & $-35.6\%$ & 763 & \$15{,}956 & $+2.45$ & $-15.0\%$ \\
+12 & 4{,}047 & \$55{,}377 & $+1.25$ & $-32.1\%$ & 740 & \$14{,}690 & $+2.24$ & $-15.7\%$ \\
+16 & 3{,}742 & \$52{,}616 & $+1.30$ & $-20.7\%$ & 706 & \$15{,}589 & $+2.48$ & $-14.7\%$ \\
+20 & 3{,}372 & \$50{,}285 & $+1.38$ & $-18.7\%$ & 666 & \$14{,}129 & $+2.44$ & $-13.3\%$ \\
+\textbf{24} & \textbf{3{,}045} & \textbf{\$51{,}304} & $\mathbf{+1.52}$ & $\mathbf{-17.7\%}$ & \textbf{599} & \textbf{\$14{,}215} & $\mathbf{+2.81}$ & $\mathbf{-12.7\%}$ \\
+28 & 2{,}713 & \$46{,}751 & $+1.50$ & $-13.4\%$ & 531 & \$12{,}009 & $+2.66$ & $-12.4\%$ \\
+32 & 2{,}394 & \$43{,}129 & $+1.48$ & $-11.7\%$ & 470 & \$10{,}314 & $+2.31$ & $-13.3\%$ \\
+48 & 1{,}481 & \$22{,}060 & $+1.16$ & $-15.1\%$ & 290 & \$6{,}540  & $+2.15$ & $-10.3\%$ \\
+64 & 978     & \$14{,}092 & $+1.00$ & $-20.3\%$ & 211 & \$5{,}411  & $+1.97$ & $-14.3\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The surface has a clear shape and one honest wrinkle. In sample the Sharpe
-ratio is $1.13$ at $k = 0$, dips slightly to $1.06$ near $k = 2$--$4$, then
-rises monotonically to a peak of $1.30$ at $k = 28$ before falling away by
-$k = 48$; maximum drawdown improves almost monotonically from $-50\%$ to
-$-30\%$ over the same range. Out of time the surface is nearly flat, $2.6$ to
-$3.0$ throughout, with no interior peak worth naming. The plateau
-$k \in [20, 32]$ is within $3\%$ of the in-sample peak.
+The surface has a clear shape. In sample the Sharpe ratio rises, apart from a
+dip to $0.98$ at $k = 2$, from $1.02$ at $k = 0$, where the floor is a floor on
+$E$ alone, to $1.52$ at $k = 24$, holds
+within $0.04$ of that over $k \in [24, 32]$, and falls away by $k = 48$ as the
+book thins to a third of its size; maximum drawdown improves almost
+monotonically from $-42.5\%$ to $-11.7\%$ at $k = 32$. Dollars peak earlier,
+at $k = 8$, because a weaker discount admits more trades. Out of time the
+surface is flat, $2.2$ to $2.8$ throughout, with no interior structure worth
+naming.
 
-The wrinkle: the canonical $k = 24$ is \emph{not} the in-sample maximum.
-$k = 28$ is better on both windows on this pool. The value $24$ was fixed on
-an earlier sweep run before the quote-reality gates of
-Section~\ref{sec:qualitygates} and the earnings-source correction were
-applied, and we have not moved it, because moving a parameter onto the peak of
-whichever pool was most recently rebuilt is how a configuration becomes
-fitted. What the sweep supports is the plateau, not the point: the claim this
-paper makes is that $k$ in the low twenties to low thirties is right, and that
-the quantity it buys is drawdown.
+Two honest qualifications. The canonical $k = 24$ is now the in-sample Sharpe
+maximum, but the floor value $10^{-4}$ was chosen on this same window at
+$k = 24$ (Table~\ref{tab:grid}), so the peak is in part a construction of that
+choice. And a second sweep that holds the pool fixed at the $k = 24$ floor and
+varies only the ranking exponent gives in-sample Sharpe ratios between $1.25$
+and $1.56$ for every $k$ from $0$ to $64$, which is the result of
+Section~\ref{sec:ranker} seen from another side: $k$ matters through the
+floor, and barely at all through the rank. What the sweep supports is that $k$
+in the low twenties to low thirties is right for the floor, and that the
+quantity it buys is drawdown.
 
 \subsection{What each gate is worth}
 \label{sec:gates}
 
 \begin{table}[h]
 \centering
-\caption{Gate ablation. $\Gamma$-rank, pooled top six per day,
-$f = 1.00\times$ model. One condition changed per row.}
+\caption{Gate ablation. $\Gamma \geq 10^{-4}$, $\Gamma$-rank, pooled top six
+per day, $f = 1.00\times$ model. One condition changed per row.}
 \label{tab:gates}
+\small
 \begin{tabular}{lrrrrrr}
 \toprule
  & \multicolumn{3}{c}{In sample} & \multicolumn{3}{c}{Out of time} \\
 \cmidrule(lr){2-4}\cmidrule(lr){5-7}
 Configuration & Profit & Sharpe & Max DD & Profit & Sharpe & Max DD \\
 \midrule
-FCM as specified              & \$73{,}391 & $+1.26$ & $-30.3\%$ & \$18{,}198 & $+2.86$ & $-15.2\%$ \\
+FCM as specified              & \$51{,}304 & $+1.52$ & $-17.7\%$ & \$14{,}215 & $+2.81$ & $-12.7\%$ \\
 \midrule
-No credit floor               & \$68{,}890 & $+1.20$ & $-32.5\%$ & \$17{,}112 & $+2.62$ & $-17.2\%$ \\
-Floor $0.40$ not $0.45$       & \$65{,}519 & $+1.10$ & $-39.8\%$ & \$17{,}848 & $+2.70$ & $-16.9\%$ \\
-Floor $0.50$ not $0.45$       & \$48{,}151 & $+0.86$ & $-59.2\%$ & \$15{,}657 & $+2.52$ & $-12.9\%$ \\
+No GROUND floor               & \$73{,}391 & $+1.26$ & $-30.3\%$ & \$21{,}745 & $+3.11$ & $-15.2\%$ \\
 \midrule
-No ex-dividend gate           & \$42{,}185 & $+0.76$ & $-42.9\%$ & \$14{,}256 & $+2.23$ & $-18.5\%$ \\
-No earnings gate              & \$61{,}568 & $+1.09$ & $-31.8\%$ & \$17{,}741 & $+2.95$ & $-11.4\%$ \\
-No corporate-action gates     & \$75{,}004 & $+1.30$ & $-33.7\%$ & \$19{,}936 & $+3.13$ & $-14.8\%$ \\
+No credit floor               & \$53{,}637 & $+1.36$ & $-22.6\%$ & \$16{,}982 & $+2.66$ & $-16.5\%$ \\
+Floor $0.40$ not $0.45$       & \$50{,}143 & $+1.27$ & $-23.8\%$ & \$16{,}138 & $+2.54$ & $-16.2\%$ \\
+Floor $0.50$ not $0.45$       & \$21{,}827 & $+1.08$ & $-16.0\%$ & \$9{,}236  & $+2.92$ & $-10.8\%$ \\
 \midrule
-Bears every day (no regime)   & \$22{,}170 & $+0.55$ & $-86.0\%$ & \$9{,}475  & $+2.16$ & $-28.0\%$ \\
-No bear sleeve at all         & \$57{,}654 & $+0.86$ & $-58.9\%$ & \$9{,}255  & $+1.37$ & $-45.4\%$ \\
-Bears without the IV $<0.35$ cut & \$65{,}315 & $+1.08$ & $-40.1\%$ & \$22{,}712 & $+3.42$ & $-12.5\%$ \\
+No ex-dividend gate           & \$30{,}102 & $+0.78$ & $-36.6\%$ & \$12{,}207 & $+2.09$ & $-16.7\%$ \\
+No earnings gate              & \$48{,}835 & $+1.43$ & $-23.4\%$ & \$14{,}876 & $+2.87$ & $-14.3\%$ \\
+No corporate-action gates     & \$53{,}970 & $+1.56$ & $-16.1\%$ & \$15{,}188 & $+3.01$ & $-12.6\%$ \\
+No quote-reality gates        & \$55{,}659 & $+1.54$ & $-16.9\%$ & \$15{,}591 & $+2.71$ & $-13.6\%$ \\
+\midrule
+Bears every day (no regime)   & \$17{,}535 & $+0.47$ & $-89.9\%$ & \$7{,}574  & $+1.52$ & $-32.3\%$ \\
+No bear sleeve at all         & \$39{,}078 & $+1.15$ & $-23.1\%$ & \$7{,}680  & $+1.59$ & $-33.3\%$ \\
+Bears without the IV $<0.35$ cut & \$45{,}695 & $+1.17$ & $-24.1\%$ & \$18{,}529 & $+3.34$ & $-10.4\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The credit floor is a genuine optimum rather than a convenience: $0.45$ beats
-no floor, beats $0.40$, and beats $0.50$ decisively. The economic content is
-that credit over width is the market's own full-loss odds, so a floor on it is
-a floor on the compensation per unit of tail exposure, and raising it too far
-selects only the spreads the market has already marked as likely to lose.
+The GROUND floor is the row that defines FCM, and it is discussed in
+Section~\ref{sec:floor}: it gives up $\$22{,}087$ of in-sample profit and
+$0.30$ of out-of-time Sharpe ratio to buy $0.26$ of in-sample Sharpe ratio,
+thirteen points of in-sample drawdown and a book of ten names a week instead of
+seventeen.
+
+The credit floor at $0.45$ is a risk-adjusted optimum rather than a dollar one:
+removing it earns more in sample (\$53{,}637) at a lower Sharpe ratio ($1.36$)
+and a deeper drawdown ($-22.6\%$); $0.40$ is worse on every column, and $0.50$
+halves the book. The economic content is that credit over width is the
+market's own full-loss odds, so a floor on it is a floor on the compensation
+per unit of tail exposure, and raising it too far selects only the spreads the
+market has already marked as likely to lose.
 
 The ex-dividend gate is the single most valuable exclusion in the system,
-worth $\$31{,}206$ and $0.50$ of Sharpe ratio in sample. The earnings gate is
-worth $\$11{,}823$ and $0.17$. The corporate-action gates \emph{cost}
-$\$1{,}613$ and $0.04$ in sample and more out of time, and we keep them
-anyway, which is the clearest instance in this paper of a correctness choice
-taken against performance: a book that holds a position across a spinoff is
-booking a price that did not exist.
+worth $\$21{,}202$ and $0.74$ of Sharpe ratio in sample. The earnings gate is
+worth $\$2{,}469$ and $0.09$. The corporate-action gates \emph{cost}
+$\$2{,}666$ and $0.04$ in sample and $\$973$ out of time, and the quote-reality
+gates cost $\$4{,}355$ and $0.02$ in sample; we keep both, which are the
+clearest instances in this paper of a correctness choice taken against
+performance: a book that holds a position across a spinoff, or that books a
+spread whose quoted legs could not be transacted together, is booking a price
+that did not exist.
 
 The bear sleeve is the result that most changes how the system should be
-understood. It is small -- $2{,}371$ of $25{,}228$ eligible candidates, $719$
-of $6{,}593$ picks, $10.9\%$ -- and removing it costs far more than its size:
-in sample $\$73{,}391 \to \$57{,}654$ with drawdown deepening from $-30.3\%$
-to $-58.9\%$, and out of time $\$18{,}198 \to \$9{,}255$ with drawdown from
-$-15.2\%$ to $-45.4\%$. The sleeve is the book's hedge, concentrated in the
+understood. It is small, $818$ of $4{,}204$ eligible candidates and $631$ of
+$3{,}644$ picks ($17.3\%$), and removing it costs far more than its size: in
+sample $\$51{,}304 \to \$39{,}078$ with drawdown deepening from $-17.7\%$ to
+$-23.1\%$, and out of time $\$14{,}215 \to \$7{,}680$ with drawdown from
+$-12.7\%$ to $-33.3\%$. The sleeve is the book's hedge, concentrated in the
 periods when the bull sleeve is being punished. Removing its regime
-restriction, on the other hand, is catastrophic in sample
-($\$22{,}170$, Sharpe $0.55$, drawdown $-86\%$): bear calls sold
-indiscriminately in a rising market are the wrong side of the same variance
-premium. The volatility cut on the sleeve is the one component with a genuine
-in-sample / out-of-time disagreement -- removing it costs $\$8{,}076$ in
-sample but gains $\$4{,}514$ out of time -- and is flagged as unresolved.
+restriction, on the other hand, is catastrophic in sample ($\$17{,}535$,
+Sharpe $0.47$, drawdown $-90\%$): bear calls sold indiscriminately in a rising
+market are the wrong side of the same variance premium. The volatility cut on
+the sleeve remains the one component with a genuine in-sample / out-of-time
+disagreement, costing $\$5{,}609$ in sample and gaining $\$4{,}314$ out of
+time, and is flagged as unresolved.
 
 \subsection{The daily cap}
 \label{sec:cap}
 
 \begin{table}[h]
 \centering
-\caption{Daily cap on $\Gamma$-rank, $f = 1.00\times$ model.}
+\caption{Daily cap on $\Gamma$-rank above the floor, $f = 1.00\times$ model.}
 \label{tab:cap}
 \begin{tabular}{rrrrrrrr}
 \toprule
@@ -1185,24 +1327,26 @@ sample but gains $\$4{,}514$ out of time -- and is flagged as unresolved.
 \cmidrule(lr){2-4}\cmidrule(lr){5-8}
 Cap & Trades & Profit & Sharpe & Trades & Profit & Sharpe & Max DD \\
 \midrule
-1  & 984     & \$13{,}439  & $+0.97$ & 136     & \$7{,}533  & $+5.29$ & $-2.3\%$ \\
-2  & 1{,}958 & \$14{,}997  & $+0.65$ & 272     & \$8{,}430  & $+3.14$ & $-8.8\%$ \\
-3  & 2{,}927 & \$34{,}259  & $+1.09$ & 408     & \$10{,}723 & $+2.85$ & $-12.2\%$ \\
-4  & 3{,}892 & \$50{,}273  & $+1.22$ & 544     & \$13{,}490 & $+2.70$ & $-12.7\%$ \\
-\textbf{6} & \textbf{5{,}779} & \textbf{\$73{,}391} & $\mathbf{+1.26}$ & \textbf{814} & \textbf{\$18{,}198} & $\mathbf{+2.86}$ & $\mathbf{-15.2\%}$ \\
-8  & 7{,}562 & \$82{,}444  & $+1.06$ & 1{,}084 & \$19{,}828 & $+2.74$ & $-10.4\%$ \\
-10 & 9{,}251 & \$102{,}410 & $+1.07$ & 1{,}346 & \$26{,}995 & $+3.14$ & $-8.5\%$ \\
-15 & 12{,}970& \$127{,}076 & $+0.95$ & 1{,}948 & \$24{,}811 & $+1.97$ & $-33.3\%$ \\
+1  & 876     & \$13{,}487 & $+1.07$ & 143 & \$7{,}519  & $+4.49$ & $-4.9\%$ \\
+2  & 1{,}576 & \$15{,}822 & $+0.80$ & 275 & \$8{,}556  & $+2.89$ & $-8.8\%$ \\
+3  & 2{,}103 & \$32{,}029 & $+1.31$ & 392 & \$11{,}609 & $+3.23$ & $-11.6\%$ \\
+4  & 2{,}516 & \$37{,}699 & $+1.32$ & 488 & \$12{,}369 & $+2.57$ & $-14.9\%$ \\
+\textbf{6} & \textbf{3{,}045} & \textbf{\$51{,}304} & $\mathbf{+1.52}$ & \textbf{599} & \textbf{\$14{,}215} & $\mathbf{+2.81}$ & $\mathbf{-12.7\%}$ \\
+8  & 3{,}308 & \$54{,}044 & $+1.47$ & 655 & \$15{,}851 & $+3.01$ & $-12.5\%$ \\
+10 & 3{,}425 & \$55{,}906 & $+1.46$ & 680 & \$16{,}900 & $+3.25$ & $-12.1\%$ \\
+15 & 3{,}503 & \$57{,}501 & $+1.43$ & 696 & \$17{,}089 & $+3.32$ & $-12.0\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Six is the in-sample Sharpe maximum and the cap in production. Dollars keep
-rising to a cap of fifteen, so the choice of six is a risk-adjusted choice
-and nothing else. The small-cap rows carry a warning about reading
+Six is the in-sample Sharpe maximum and the cap in production. Because the
+floored pool averages only $4.13$ candidates per day, raising the cap above six
+adds few trades: a cap of fifteen takes $3{,}503$ in sample against $3{,}045$,
+and dollars keep rising to that point, so the choice of six is a risk-adjusted
+choice and nothing else. The small-cap rows carry a warning about reading
 out-of-time Sharpe ratios on this instrument: a cap of one produces an
-out-of-time Sharpe ratio of $5.29$ on $136$ trades and $7{,}533$ dollars, which
-is a statement about $136$ Friday closes and not about a strategy.
+out-of-time Sharpe ratio of $4.49$ on $143$ trades and $7{,}519$ dollars,
+which is a statement about $143$ Friday closes and not about a strategy.
 
 \subsection{The fill ladder}
 \label{sec:fill}
@@ -1218,26 +1362,26 @@ booked fraction of the model credit changes.}
 \cmidrule(lr){2-3}\cmidrule(lr){4-6}
 Fill $f$ & Profit & Sharpe & Profit & Sharpe & Max DD \\
 \midrule
-$0.80\times$ model & $-\$109{,}731$ & $-1.88$ & $-\$8{,}050$ & $-1.26$ & $-82.1\%$ \\
-$0.85\times$       & $-\$63{,}823$  & $-1.10$ & $-\$1{,}471$ & $-0.23$ & $-41.0\%$ \\
-$0.90\times$       & $-\$17{,}998$  & $-0.31$ & \$5{,}094    & $+0.80$ & $-23.3\%$ \\
-$0.95\times$       & \$27{,}724     & $+0.48$ & \$11{,}651   & $+1.84$ & $-18.6\%$ \\
-$\mathbf{1.00\times}$ & \textbf{\$73{,}391} & $\mathbf{+1.26}$ & \textbf{\$18{,}198} & $\mathbf{+2.86}$ & $\mathbf{-15.2\%}$ \\
-$1.04\times$       & \$109{,}849    & $+1.89$ & \$23{,}424   & $+3.68$ & $-13.1\%$ \\
-$1.10\times$       & \$164{,}430    & $+2.81$ & \$31{,}244   & $+4.87$ & $-10.5\%$ \\
+$0.80\times$ model & $-\$43{,}912$ & $-1.32$ & $-\$4{,}706$ & $-0.93$ & $-58.0\%$ \\
+$0.85\times$       & $-\$20{,}018$ & $-0.60$ & \$44         & $+0.01$ & $-28.8\%$ \\
+$0.90\times$       & \$3{,}815     & $+0.11$ & \$4{,}782    & $+0.95$ & $-20.0\%$ \\
+$0.95\times$       & \$27{,}579    & $+0.82$ & \$9{,}507    & $+1.89$ & $-15.3\%$ \\
+$\mathbf{1.00\times}$ & \textbf{\$51{,}304} & $\mathbf{+1.52}$ & \textbf{\$14{,}215} & $\mathbf{+2.81}$ & $\mathbf{-12.7\%}$ \\
+$1.04\times$       & \$70{,}221    & $+2.06$ & \$17{,}976   & $+3.53$ & $-11.1\%$ \\
+$1.10\times$       & \$98{,}519    & $+2.83$ & \$23{,}604   & $+4.57$ & $-9.0\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Each five percentage points of fill quality is worth roughly \$45{,}000 of
+Each five percentage points of fill quality is worth roughly \$24{,}000 of
 in-sample profit at two contracts, and the sign of the whole enterprise turns
-between $0.90$ and $0.95$. The exact crossings are at (\ref{eq:breakeven}):
-$0.9197\times$ in sample, $0.8612\times$ out of time. The reported case sits
-$8$ points above the in-sample crossing and the measured fills sit $12$ points
-above it, which is a margin but not a comfortable one. Readers should treat
-every other number in this paper as conditional on execution at or above the
-fitted fair value, and Section~\ref{sec:live} reports what happened when the
-criterion was run against live quotes.
+between $0.85$ and $0.90$. The exact crossings are at (\ref{eq:breakeven}):
+$0.8920\times$ in sample, $0.8495\times$ out of time. The reported case sits
+$11$ points above the in-sample crossing and the measured fills sit $14$
+points above it, which is a margin but not a comfortable one. Readers should
+treat every other number in this paper as conditional on execution at or above
+the fitted fair value, and Section~\ref{sec:live} reports what happened when
+the criterion was run against live quotes.
 
 \subsection{A worked example}
 \label{sec:example}
@@ -1282,14 +1426,16 @@ so $E = e^{0.00947} - 1 = +0.952\%$ and
 \Gamma \;=\; 0.009518 \times e^{-24 \times 0.020728}
 \;=\; 0.009518 \times 0.6081 \;=\; 0.005788 ,
 \end{equation*}
-which is in the top decile of its day and the spread was selected. USB closed
+the highest of the $19$ eligible candidates that day, and the spread was
+selected. USB closed
 on the Friday at \$56.11, above the short strike, and the spread settled a
 full win paying the credit, $+\$46.67$ per contract.
 
 The example also illustrates the scale of the edge. The Kelly expected value
 is under one percent, the entropy discount multiplies it by $0.61$, and the
-resulting score is $5.8 \times 10^{-3}$ — a strong candidate in a pool whose
-median is $1.2\times10^{-4}$. These are small numbers by construction.
+resulting score is $5.8 \times 10^{-3}$, a strong candidate against a floor of
+$10^{-4}$ and a selected-book median of $5.3\times10^{-4}$. These are small
+numbers by construction.
 
 \subsection{What \texorpdfstring{$\Gamma$}{Gamma} ranks, and what it does not}
 \label{sec:concordance}
@@ -1304,32 +1450,35 @@ $f = 1.00\times$ model, one contract. Decile 1 is lowest $\Gamma$.}
 \label{tab:decile}
 \begin{tabular}{rrrrrrr}
 \toprule
- & \multicolumn{3}{c}{In sample ($n=5{,}779$)} & \multicolumn{3}{c}{Out of time ($n=814$)} \\
+ & \multicolumn{3}{c}{In sample ($n=3{,}045$)} & \multicolumn{3}{c}{Out of time ($n=599$)} \\
 \cmidrule(lr){2-4}\cmidrule(lr){5-7}
 Decile & Full-loss rate & \$ / trade & median $\dent$ & Full-loss rate & \$ / trade & median $\dent$ \\
 \midrule
-1  & $39.6\%$ & \$6.14  & 0.134 & $31.7\%$ & \$22.90  & 0.211 \\
-2  & $42.6\%$ & \$5.22  & 0.218 & $45.7\%$ & \$1.08   & 0.146 \\
-3  & $43.8\%$ & $-\$2.21$ & 0.144 & $38.3\%$ & \$2.85  & 0.119 \\
-4  & $42.0\%$ & \$8.30  & 0.134 & $28.0\%$ & \$21.40  & 0.118 \\
-5  & $39.8\%$ & \$3.11  & 0.109 & $33.3\%$ & \$11.22  & 0.110 \\
-6  & $35.5\%$ & \$9.00  & 0.100 & $45.7\%$ & $-\$0.99$ & 0.097 \\
-7  & $37.4\%$ & \$6.49  & 0.091 & $39.0\%$ & \$11.25  & 0.098 \\
-8  & $35.5\%$ & \$11.39 & 0.076 & $30.9\%$ & \$11.49  & 0.069 \\
-9  & $32.4\%$ & \$8.18  & 0.061 & $28.4\%$ & \$13.11  & 0.052 \\
-10 & $29.9\%$ & \$7.89  & 0.038 & $23.2\%$ & \$17.13  & 0.036 \\
+1  & $33.8\%$ & \$8.20  & 0.107 & $30.0\%$ & \$16.46 & 0.108 \\
+2  & $37.5\%$ & \$7.86  & 0.103 & $33.3\%$ & \$14.50 & 0.112 \\
+3  & $35.4\%$ & \$9.06  & 0.094 & $40.0\%$ & \$5.54  & 0.107 \\
+4  & $38.8\%$ & \$7.21  & 0.089 & $40.0\%$ & \$5.75  & 0.095 \\
+5  & $35.1\%$ & \$9.54  & 0.085 & $33.3\%$ & \$26.87 & 0.094 \\
+6  & $35.9\%$ & \$10.10 & 0.074 & $44.1\%$ & \$0.51  & 0.081 \\
+7  & $33.2\%$ & \$8.58  & 0.064 & $31.7\%$ & \$5.46  & 0.066 \\
+8  & $34.4\%$ & \$5.99  & 0.058 & $31.7\%$ & \$9.93  & 0.058 \\
+9  & $31.9\%$ & \$7.17  & 0.046 & $23.3\%$ & \$19.24 & 0.043 \\
+10 & $26.6\%$ & \$10.54 & 0.031 & $23.3\%$ & \$14.21 & 0.031 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The full-loss rate falls across deciles, from $39.6\%$ to $29.9\%$ in sample
-and from the low forties to $23.2\%$ out of time, and the Spearman correlation
-between $\Gamma$ and a full-loss indicator is $-0.079$ in sample and $-0.070$
-out of time. Dollars per trade show no such pattern: the Spearman correlation
-between $\Gamma$ and realized profit is $+0.013$ in sample and $-0.008$ out of
-time, statistically indistinguishable from zero in both.
+Within the selected book the full-loss rate drifts down with $\Gamma$, from
+$33.8\%$ in the lowest decile to $26.6\%$ in the highest in sample and from
+$30.0\%$ to $23.3\%$ out of time, with noisy middle deciles in both windows;
+the Spearman correlation between $\Gamma$ and a full-loss indicator is
+$-0.049$ in sample and $-0.073$ out of time. Dollars per trade show no pattern
+at all: the Spearman correlation between $\Gamma$ and realized profit is
+$-0.004$ in sample and $-0.006$ out of time, with $p$-values of $0.81$ and
+$0.88$.
 
-$\Gamma$ orders the probability of losing. It does not order dollars.
+$\Gamma$ orders the probability of losing, weakly once the floor has removed
+the worst of the distribution. It does not order dollars.
 
 The mechanism is visible in Table~\ref{tab:decile}'s third column and in the
 geometry of Section~\ref{sec:geometry}. High $\Gamma$ means low $\dent$ means
@@ -1339,16 +1488,17 @@ is small relative to the width, which means a smaller credit for the same
 width. The criterion buys a lower loss rate and pays for it in credit size,
 and on this instrument family the two effects very nearly cancel in dollars.
 
-Table~\ref{tab:conc} measures the same thing on the whole eligible pool with a
-cleaner statistic: within-day pairwise concordance, the probability that of two
-candidates seen on the same day the higher-scored one realizes the better
-outcome. Chance is $0.500$.
+Table~\ref{tab:conc} measures the same thing on the whole eligible pool, before
+the floor, with a cleaner statistic: within-day pairwise concordance, the
+probability that of two candidates seen on the same day the higher-scored one
+realizes the better outcome. Chance is $0.500$.
 
 \begin{table}[h]
 \centering
-\caption{Within-day pairwise concordance on the eligible pool.
-``\$'' target is realized profit; ``not a loss'' target is avoidance of the
-full-loss state. $307{,}389$ in-sample and $49{,}331$ out-of-time pairs.}
+\caption{Within-day pairwise concordance on the eligible pool before the GROUND
+floor. ``\$'' target is realized profit; ``not a loss'' target is avoidance of
+the full-loss state. $307{,}284$ in-sample and $51{,}846$ out-of-time pairs
+with distinct profit.}
 \label{tab:conc}
 \begin{tabular}{lrrrr}
 \toprule
@@ -1356,10 +1506,10 @@ full-loss state. $307{,}389$ in-sample and $49{,}331$ out-of-time pairs.}
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
 Score & \$ target & not a loss & \$ target & not a loss \\
 \midrule
-$\Gamma = E\,e^{-24\dent}$ & $0.5225$ & $0.5163$ & $0.5348$ & $0.5497$ \\
-$E$ alone                  & $0.5123$ & $0.5255$ & $0.5248$ & $0.5541$ \\
-$-\dent$ alone             & $\mathit{0.4801}$ & $\mathbf{0.5596}$ & $\mathit{0.4921}$ & $0.5560$ \\
-Credit / width             & $\mathbf{0.5821}$ & $\mathit{0.4509}$ & $\mathbf{0.5947}$ & $\mathit{0.4872}$ \\
+$\Gamma = E\,e^{-24\dent}$ & $0.5225$ & $0.5163$ & $0.5354$ & $0.5526$ \\
+$E$ alone                  & $0.5123$ & $0.5255$ & $0.5284$ & $0.5618$ \\
+$-\dent$ alone             & $\mathit{0.4801}$ & $\mathbf{0.5596}$ & $\mathit{0.4956}$ & $\mathbf{0.5642}$ \\
+Credit / width             & $\mathbf{0.5821}$ & $\mathit{0.4509}$ & $\mathbf{0.5930}$ & $\mathit{0.4869}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1367,8 +1517,8 @@ Credit / width             & $\mathbf{0.5821}$ & $\mathit{0.4509}$ & $\mathbf{0.
 The pattern is the paper's cleanest theoretical result, measured. The entropy
 factor alone is the best of the four at predicting which spreads avoid a full
 loss ($0.560$ in sample) and is \emph{below chance} at predicting dollars
-($0.480$). Credit over width is the best at predicting dollars ($0.582$) --
-mechanically so, since for a given settlement a richer credit books more -- and
+($0.480$). Credit over width is the best at predicting dollars ($0.582$),
+mechanically so, since for a given settlement a richer credit books more, and
 is \emph{below chance} at predicting loss avoidance ($0.451$), again
 mechanically, since a richer credit on a fixed width is the market's own
 statement that a loss is more likely. The two targets are in direct tension,
@@ -1378,37 +1528,47 @@ both windows. That is what the two-factor form is for, and it is also precisely
 why $\Gamma$ cannot be expected to maximize dollars: it is buying a position on
 both axes rather than a corner on one.
 
+The same statistic computed \emph{within} the floored pool of $4{,}204$
+candidates confirms Section~\ref{sec:ranker} from a third direction: there
+$\Gamma$'s concordance with dollars is $0.488$ in sample and $0.495$ out of
+time, at or below chance, and with loss avoidance $0.534$ and $0.529$. The
+information the score carries about the pool is spent at the floor; what
+remains above it is a weak ordering on loss rate and none on dollars.
+
 The practical consequence, which Section~\ref{sec:discussion} returns to, is
 that per-trade discrimination is thin everywhere. A concordance of $0.52$ is a
-genuine but small effect. The book's advantage over random selection
-(Table~\ref{tab:ranker}: Sharpe $1.26$ against $0.77$) is produced at the
-extremes of the distribution and by the credit floor, not by a strong
-per-trade classifier.
+genuine but small effect. The book's advantage over random selection without
+the floor (Table~\ref{tab:ranker}: Sharpe $1.26$ against $0.77$) is produced at
+the extremes of the distribution, which is exactly the region the floor
+removes, and by the credit floor, not by a strong per-trade classifier.
 
 \subsection{Diversification within the day}
 \label{sec:diversification}
 
-The six daily positions are not independent. Pooling within-day demeaned
-cross-products over $1{,}110$ entry days gives an average pairwise correlation
-of realized profit of $0.161$, so at the realized mean cap of $5.93$
-positions the book behaves like
+The daily positions are not independent. Standardizing realized profit over the
+book and pooling within-day cross-products over the $832$ entry days with at
+least two picks gives an average pairwise correlation of $0.109$, so at the
+realized mean of $3.58$ positions per entry day the book behaves like
 \begin{equation}
 n_{\mathrm{eff}} \;=\; \frac{n}{1 + (n-1)\bar\rho} \;=\;
-\frac{5.93}{1 + 4.93 \times 0.161} \;=\; 3.30
+\frac{3.58}{1 + 2.58 \times 0.109} \;=\; 2.79
 \label{eq:neff}
 \end{equation}
-independent bets per day rather than six. The cause is concentration on one
-side: $88.6\%$ of picks are bull puts, so the daily book is a partly
-undiversified long-equity position.
+independent bets per day. The cause is concentration on one side: $82.7\%$ of
+picks are bull puts, so the daily book is a partly undiversified long-equity
+position.
 
 That exposure is measurable and asymmetric in time. Correlation between the
-book's entry-day profit and the same day's SPY return is $-0.011$ on
-$1{,}120$ days -- the entry decision carries no same-day market bet.
+book's entry-day profit and the same day's SPY return is $-0.010$ on
+$1{,}019$ days: the entry decision carries no same-day market bet.
 Correlation between settlement-day profit and the same day's SPY return is
-$+0.444$ on $299$ settlement days. The strategy is market-neutral at entry and
+$+0.209$ on $298$ settlement days. The strategy is market-neutral at entry and
 long beta at expiry, which is the correct description of a book of mostly
 short puts, and it is the reason the regime-gated bear sleeve does as much work
-in Table~\ref{tab:gates} as its small size would not suggest.
+in Table~\ref{tab:gates} as its small size would not suggest. Under the
+no-floor configuration the settlement-day correlation was $+0.444$ on a book
+that was $88.6\%$ bull puts; the floor's larger bear share and smaller daily
+book roughly halve the expiry-day beta.
 
 \subsection{Reproducibility across data sources}
 \label{sec:reproducibility}
@@ -1447,29 +1607,33 @@ informative ones.
 
 The criterion has been run against archived live brokerage snapshots, which is
 the only evaluation in this paper that uses neither vendor quotes nor
-end-of-day timing. Every 15:30 and 15:45 snapshot from 2026-08-20 to
-2026-10-02 -- $29$ scan days, $84$ names, $1{,}893$ candidate rows -- was
-rescored under the configuration of Section~\ref{sec:design}: credit floor
-$0.45$, quoted midpoint at least $1.00\times$ model credit, pooled top six by
-$\Gamma$ at $k = 24$, with the 15:45 scan topping the day up to six. SPY sat
-above its $100$-session average throughout the window, so the book is bull
-puts only.
+end-of-day timing. The replay follows the production schedule exactly: a
+15:15 Eastern freeze of the scan's picks, topped up at 15:30 and 15:45 to six
+positions, on every scan day in the archive from 2026-08-20 to 2026-11-06,
+$36$ entry days and $42$ names. Each candidate must clear the credit floor
+$c/w_d \geq 0.45$, show a quoted combination midpoint (or, failing one, the
+difference of leg midpoints) at least $1.00\times$ the model credit, and clear
+$\Gamma \geq 10^{-4}$ at $k = 24$; the six highest-$\Gamma$ survivors are
+taken. Bear calls fire under the same SPY regime rule as the backtest and did
+so on a handful of days, contributing six of the trades.
 
-The result is $146$ trades: $66$ full wins, $22$ partials, $58$ full losses, a
-$45.2\%$ win rate, $+\$2{,}515$ at two contracts and $+\$1{,}258$ at one
-(\$8.61 per contract), an annualized dollar Sharpe ratio of $+3.54$, a maximum
-drawdown of $-6.0\%$ and a yield on dollars risked of $9.5\%$. Booking is at
-$1.00\times$ model credit, the same assumption as the vendor book.
+The result is $110$ trades: $52$ full wins, $24$ partials, $34$ full losses,
+a $47.3\%$ win rate, $+\$4{,}095$ at two contracts and $+\$2{,}048$ at one
+(\$18.62 per contract), an annualized dollar Sharpe ratio of $+3.47$, a
+maximum drawdown of $-8.5\%$ and a yield on dollars risked of $20.8\%$.
+Booking is at $1.00\times$ model credit, the same assumption as the vendor
+book.
 
-Two caveats are necessary and neither is small. Six weeks and $146$ trades
+Two caveats are necessary and neither is small. Eleven weeks and $110$ trades
 cannot distinguish a Sharpe ratio of $3.5$ from one of $1.0$; the window's
 value is that it shows the criterion is computable and positive on quotes a
 participant could actually see, not that it confirms the level. And the vendor
-book and the live replay disagree on \emph{which} names to take over these
-same weeks, sharing roughly $30\%$ of picks, for the reasons decomposed in
+book and the live replay disagree on \emph{which} names to take over the
+weeks they share, for the reasons decomposed in
 Section~\ref{sec:reproducibility}: a quote gate on a different quote source,
-and a candidate universe built from a 15:30 chain rather than a closing one.
-Both books are positive over the window; they are not the same book.
+and a candidate universe built from a mid-afternoon chain rather than a closing
+one. Both books are positive over the window; they are not the same book. The
+second paper of this pair reports the account as actually traded.
 
 \section{Discussion}
 \label{sec:discussion}
@@ -1478,8 +1642,8 @@ Both books are positive over the window; they are not the same book.
 
 Taking the penalty as $\dkl(\Qbs \| U_3)$ gives the construction three
 properties. The entropy factor is a measurable property of the instrument
-rather than of a forecast (Section~\ref{sec:geometry}), with an interpretation
--- is this a genuine three-state wager or a disguised binary one -- that can be
+rather than of a forecast (Section~\ref{sec:geometry}), with an interpretation,
+is this a genuine three-state wager or a disguised binary one, that can be
 checked on any chain without estimating anything. It reproduces across
 independent data sources at a rank correlation of $0.98$, so the score's only
 fragile input is the growth factor and the fragility is confined there
@@ -1489,12 +1653,16 @@ of that paper applies to the penalty as stated rather than by analogy. What it
 does not give is a robust-control reading: the penalty is a state of the market,
 not a charge on the agent's own beliefs (Section~\ref{sec:hs}).
 
-Against that, the entropy factor's contribution to the book is smaller than the
-emphasis this paper places on it might suggest. Growth selection alone earns
-$\$69{,}401$ against $\Gamma$'s $\$73{,}391$, and the entropy factor's real
-contribution is to cut maximum drawdown from $-50\%$ to $-30\%$. That is a
-worthwhile contribution and a modest claim, and the modest claim is the one the
-data support.
+Where the entropy factor acts is the finding of Section~\ref{sec:ranker}, and
+it should govern how the criterion is read. The intrinsic GROUND ratio works as
+a gate. The floor $\Gamma \geq 10^{-4}$ removes $83.5\%$ of the eligible pool,
+nearly triples the pool's per-trade profit, and cuts the in-sample drawdown
+from $-30\%$ to $-18\%$; the sweep of Table~\ref{tab:ksweep} shows that the
+entropy exponent does its work through that floor, lifting the in-sample
+Sharpe ratio from $1.02$ at $k = 0$ to $1.52$ at $k = 24$. Above the floor the
+ordering is noise: the six lowest-$\Gamma$ survivors do as well as the six
+highest. A reader of the first three papers might have expected the ratio to
+rank; on this instrument it separates, and the separation is worth having.
 
 \subsection{The criterion ranks loss rate, not dollars}
 
@@ -1515,21 +1683,22 @@ open problem the configuration raises.
 
 \subsection{Execution dominates everything}
 
-The break-even fill of $0.92\times$ fitted fair value against measured fills
-of $1.04\times$ is a $12$-point margin on a quantity estimated from $52$
+The break-even fill of $0.89\times$ fitted fair value against measured fills
+of $1.04\times$ is a $14$-point margin on a quantity estimated from $52$
 trades in one account. Every headline number in Section~\ref{sec:results} is
 conditional on it. Two structural facts make the margin more fragile than the
 arithmetic suggests. The book trades near-the-money verticals at a $47\%$ win
-rate and payoff odds near unity, so its profit is a $9\%$ residual of two
-flows each twenty times its size; and selection is a within-day ranking on a
-score whose own inputs move by five to seven percent between two chains of the
-same session (Section~\ref{sec:reproducibility}). A systematic execution bias
-of a few percent would not degrade the strategy, it would invert it.
+rate and payoff odds near unity, so its profit is a $12\%$ residual of two
+opposing flows, one four and a half times and the other three times its
+size; and selection is a floor on a score whose own
+inputs move by five to seven percent between two chains of the same session
+(Section~\ref{sec:reproducibility}). A systematic execution bias of a few
+percent would not degrade the strategy, it would invert it.
 
 The quote-reality gates of Section~\ref{sec:qualitygates} are the operational
 response and should be read as a methodological point rather than an
-implementation detail. Of $114{,}712$ candidates in a standard vendor frame,
-$12.9\%$ had books that could not transact at all -- $14{,}768$ with a
+implementation detail. Of $115{,}887$ candidates in a standard vendor frame,
+$13.0\%$ had books that could not transact at all: $15{,}122$ with a
 non-positive immediate credit. A backtest of multi-leg option strategies that
 does not test for this is pricing a substantial fraction of its book off
 quotes that were never simultaneously available, and it will report an edge it
@@ -1548,7 +1717,8 @@ nats of log-growth per nat of entropy.
 
 Taking the entropy factor at the published uniform reference, with the
 \emph{market's} measure as its argument rather than the trader's, makes it a
-measurable property of the instrument. On this family it is an almost exact
+measurable property of the instrument, and the selection rule is a floor on
+the resulting score. On this family it is an almost exact
 monotone transform of the market's partial-zone probability, equivalently of
 the market's expected move in strike widths, so the penalty asks a concrete
 question about each candidate: is this a genuine three-state wager, or has the
@@ -1557,16 +1727,24 @@ answerable from quoted prices alone, which is why the factor reproduces across
 independent data sources at a rank correlation of $0.98$ where the estimated
 win probability reproduces at $0.54$.
 
-On $5{,}779$ in-sample and $814$ out-of-time trades the configuration returns
-$+\$73{,}391$ and $+\$18{,}198$ from a \$10{,}000 bankroll at two contracts
-per pick, with dollar Sharpe ratios of $1.26$ and $2.86$ and maximum drawdowns
-of $-30.3\%$ and $-15.2\%$, booked at exactly the fitted fair credit and with
-no assumed execution edge; a $146$-trade replay on live brokerage quotes is
-positive on the same assumption. Ablation shows the composite score beating
-each of its factors alone and beating random selection decisively, with its
-own contribution concentrated in drawdown rather than return, and shows the
-regime-gated bear sleeve -- eleven percent of the book -- carrying a
-disproportionate share of its risk-adjusted performance.
+On $3{,}045$ in-sample and $599$ out-of-time trades the configuration returns
+$+\$51{,}304$ and $+\$14{,}215$ from a \$10{,}000 bankroll at two contracts
+per pick, with dollar Sharpe ratios of $1.52$ and $2.81$ and maximum drawdowns
+of $-17.7\%$ and $-12.7\%$, booked at exactly the fitted fair credit and with
+no assumed execution edge; a $110$-trade replay on live brokerage quotes is
+positive on the same assumption. Ablation shows that the selection is the
+floor: a floor of one basis point on the intrinsic GROUND ratio nearly triples
+the per-trade profit of the eligible pool and cuts its in-sample drawdown from
+$30\%$ to $18\%$, while the
+ordering of survivors above the floor does no better than its own reversal.
+Without the floor the composite score beats each of its factors alone and
+beats random selection decisively, with its contribution concentrated in
+drawdown rather than return. The regime-gated bear sleeve, seventeen percent of
+the book, carries a disproportionate share of its risk-adjusted performance.
+The floor is an in-sample choice and the out-of-time window does not reward it
+in Sharpe ratio; the arguments for it are that it confines the criterion to
+the region where its exponential form holds and that it halves the number of
+names held.
 
 The criterion's limitation is as clear as its mechanism. It ranks the
 probability of losing and not the realized dollars, because on this instrument
@@ -1577,8 +1755,8 @@ that follows it.
 
 \section*{Materials and Methods}
 
-Backtests use vendor end-of-day option chains, 2020 through September 2026, on
-S\&P~100 underlyings plus SPY, QQQ and IWM. Underlying close histories are
+Backtests use vendor end-of-day option chains, August 2020 through October
+2026, on S\&P~100 underlyings plus SPY, QQQ and IWM. Underlying close histories are
 split-adjusted with per-event verification against the observed session
 return. The realized-outcome measure $\Preal$ is counted on $252$ completed
 DTE-matched windows per candidate against that candidate's own strikes, with
@@ -1588,9 +1766,9 @@ Black--Scholes $N(d_2)$ at the per-chain robust weighted quadratic implied
 volatility fit. Earnings dates are the vetted union of a vendor calendar and
 SEC Item 2.02 filings; ex-dividend dates and corporate actions come from a
 public market-data endpoint. Live operation runs the same scoring code path on
-brokerage snapshots at half-hour intervals, and the live replay of
-Section~\ref{sec:live} rescores archived snapshots with the production
-configuration. All computations are in Python with NumPy and pandas. Every
+brokerage snapshots at quarter-hour intervals in the last trading hour, and
+the live replay of Section~\ref{sec:live} rescores archived snapshots with the
+production configuration, floor included. All computations are in Python with NumPy and pandas. Every
 ablation in Section~\ref{sec:results} is evaluated from a single cached
 scoring of the candidate pool, so all configurations share identical inputs,
 identical settlements and identical fills.
@@ -1598,17 +1776,12 @@ identical settlements and identical fills.
 \section*{Abbreviations}
 
 \begin{tabular}{ll}
+FCM & fair credit model \\
 GEPO & generalized entropic portfolio optimization \\
 REPO & return-entropy portfolio optimization \\
-DEPO & discrete entropic portfolio optimization \\
 GROUND & growth rate over uniform divergence \\
-MVPO & mean-variance portfolio optimization \\
-ATR & average true range \\
 DTE & days to expiry \\
-EV & expected value \\
 IV & implied volatility \\
-RV & realized volatility \\
-SMA & simple moving average \\
 \end{tabular}
 
 \begin{thebibliography}{99}
