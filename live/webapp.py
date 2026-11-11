@@ -1436,11 +1436,11 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             # quote_mark=True (the debit site's Actuals, user 2026-11-03) keeps the quote chosen above.
             if not quote_mark:
                 _apply_intrinsic(live, pick)
-            # After-hours spots (user 2026-11-06: 'keep streaming spots until 6pm for after
-            # market movement awareness'; 19:00 from the same day; 18:00 since 2026-11-10, user: 'lets just tick
-            # until 18:00 instead'). Through 18:00 ET the row shows the LIVE stream spot and badges status/pin off
-            # it, even beside a held 15:59 mark. Outside 09:30-18:00 the held-spot rule above (2026-10-07) stands.
-            if _sp and "09:30:00" <= str(_st.get("ts") or "")[11:19] < "18:00:00":
+            # The streamed spot is the row's spot WHENEVER the stream has one (user 2026-11-11: "No more 930 to
+            # 1800 rule. If the stream is open the live spots"): pre-market, in session and after the bell alike,
+            # and status/pin badge off it, even beside a held 15:59 mark. (History: 18:00 on 2026-11-06, 19:00,
+            # 18:00 again 2026-11-10; the held-spot rule of 2026-10-07 now applies only when nothing streams.)
+            if _sp:
                 live["underlying_price"] = _sp
                 live["live_status"] = _live_status(pick.get("spread_type"), _sp, ks, kl)
             _out_track = live
@@ -2469,13 +2469,14 @@ def _actuals_view():
         _spot = (_stream_spots.get(pk.get("ticker")) or (ar or {}).get("spot")
                  or _scan_spots.get(pk.get("ticker")))
         # After-hours spot on an expiry-day row (user 2026-11-06: 'keep streaming spots until 7pm
-        # for after market movement awareness'). Once the settle runs the row shows the 16:00
-        # close; from then until 18:00 ET it also carries the live stream spot, and ah_flip says
+        # for after market movement awareness'; no cutoff since 2026-11-11: "If the stream is open the live
+        # spots"). Once the settle runs the row shows the 16:00
+        # close; from then on it also carries the live stream spot, and ah_flip says
         # the spot has crossed a strike since the close (pinned, or a debit spread now fully ITM),
         # which is the after-hours assignment case he wants to see. Settled P&L is untouched.
         _sts = str(_stream.get("ts") or "")
         if (r.get("outcome_row") and _spot and _sts[:10] == ddate.today().isoformat()
-                and "16:00:00" <= _sts[11:19] < "18:00:00"
+                and "16:00:00" <= _sts[11:19]
                 and str(pk.get("expiry_date") or "")[:10] == ddate.today().isoformat()):
             try:
                 _cl = float((r.get("outcome_row") or {}).get("underlying_price"))
