@@ -22,6 +22,12 @@ touch "$STATE"
 python3 /opt/vito-managed/data/user/apps/gepo-backtest/live/win_alert.py \
   >> /opt/vito-managed/data/user/apps/gepo-backtest/live/logs/win_alert.log 2>&1 || true
 
+# Disk alert (user 2026-11-11: "make sure mya alerts me when we get over like 75%"): Mya's own disk, one
+# Telegram message a day while it is at 75% or more (live/disk_alert.py; the Mac mini checks its own disk
+# from pull_now_parallel.sh and its file arrives with the upload). Soft-fail like the WIN alert.
+python3 /opt/vito-managed/data/user/apps/gepo-backtest/live/disk_alert.py --host "Mya" --path / \
+  >> /opt/vito-managed/data/user/apps/gepo-backtest/live/logs/disk_alert.log 2>&1 || true
+
 for f in "$DIR"/*.json; do
   [ -f "$f" ] || continue
   fname=$(basename "$f")
