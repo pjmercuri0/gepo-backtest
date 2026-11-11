@@ -1356,7 +1356,10 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                 except (TypeError, ValueError):
                     _px = None
             if _px is not None:
-                live["current_mark"] = round(min(max(_px, 0.0), w), 4)
+                # Debit site (user 2026-11-11: 'pct on actuals [should] go above 100 and below 0'): the
+                # quote is the mark as quoted, not clamped to [0, width], so a bag mid outside the
+                # width prints a pct past 100% or under 0% and a P&L to match. Credit site unchanged.
+                live["current_mark"] = round(_px, 4) if IS_DEBIT_SITE else round(min(max(_px, 0.0), w), 4)
                 live["mark_basis"] = _basis
                 live["ts"] = _am.get("ts")
             elif last_track and last_track.get("current_mark") is not None:
