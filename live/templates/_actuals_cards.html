@@ -19,10 +19,10 @@
        counts are the badges added up (user 2026-10-09). Open rows count at their live badge. #}
     {% set wlp = namespace(W=0, L=0, P=0, Pp=0, C=0, Cp=0) %}
     {% for row in wk.rows %}
-      {# Closed on the site before settlement (badge C): not a W/L/P, but a closed row with P&L above $0
-         counts in the rate (user 2026-11-11: "there's 2 closed positive"). Once the week settles the row
-         counts by its settled badge as before. #}
-      {% if row.closed and not (row.outcome_row and row.outcome_row.result) %}{% set wlp.C = wlp.C + 1 %}{% if row.row_pnl is not none and (row.row_pnl|rd) > 0 %}{% set wlp.Cp = wlp.Cp + 1 %}{% endif %}
+      {# The rate below is simply rows whose P&L cell reads above $0 (user 2026-11-11: "it should just be
+         counting positive p&l percent"), whatever the badge. Closed-before-settlement rows show as C. #}
+      {% if row.row_pnl is not none and (row.row_pnl|rd) > 0 %}{% set wlp.Cp = wlp.Cp + 1 %}{% endif %}
+      {% if row.closed and not (row.outcome_row and row.outcome_row.result) %}{% set wlp.C = wlp.C + 1 %}
       {% elif row.outcome_row and row.outcome_row.result %}{% set _b = row.outcome_row.result[0] %}
       {% elif row.pick.outcome %}{% set _b = row.pick.outcome[0] %}
       {% elif row.last_track and row.last_track.live_status %}{% set _b = row.last_track.live_status[0] %}
@@ -32,9 +32,9 @@
     <div class="week-sub">
       {{ wk.n }} trade{{ '' if wk.n == 1 else 's' }}
       &middot; <span class="wlp-count" title="count of the Status badges below; open rows at their live badge"><span class="pos">{{ wlp.W }} W</span> / <span class="neg">{{ wlp.L }} L</span> / {{ wlp.P }} P{% if wlp.C %} / {{ wlp.C }} C{% endif %}</span>
-      {# Wins plus partials and closed rows whose P&L cell reads above $0, over every trade in the card
-         (user 2026-10-09; closed rows added 2026-11-11). #}
-      {% if wk.n %}&middot; <span class="wlp-rate" title="wins + partials with P&amp;L above $0 + closed with P&amp;L above $0 ({{ wlp.W }} + {{ wlp.Pp }} + {{ wlp.Cp }}), over {{ wk.n }} trades">W + positive P/C {{ '%.1f'|format((wlp.W + wlp.Pp + wlp.Cp) / wk.n * 100) }}%</span>{% endif %}
+      {# Rows whose P&L cell reads above $0, over every trade in the card (user 2026-11-11; replaces the
+         2026-10-09 "W + positive P"). #}
+      {% if wk.n %}&middot; <span class="wlp-rate" title="rows with P&amp;L above $0 ({{ wlp.Cp }}), over {{ wk.n }} trades">positive P&amp;L {{ '%.1f'|format(wlp.Cp / wk.n * 100) }}%</span>{% endif %}
       &middot; {{ wk.settled }} settled, {{ wk.open }} open
       &middot; credit ${{ '%.0f'|format(wk.credit) }}
       &middot; risk ${{ '%.0f'|format(wk.max_loss) }}
