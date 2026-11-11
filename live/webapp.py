@@ -151,29 +151,43 @@ ACTUALS_GREEN_PCT = 90
 
 
 def _pct_of_width(r: dict):
-    """The Pct cell (user 2026-11-11: 'pct to reflect the spot price not the mark ... at the high strike
-    it's 100%, past it beyond 100%'): the debit spread's value AT THE SPOT SHOWN, unclamped, over the
-    width, at the whole percent. Bull call (bull_put twin): (spot - low strike) / width; bear put
-    (bear_call twin): (high strike - spot) / width. 100% = spot at the far strike, 0% = at the near
-    strike, past either end it runs beyond. Settled rows use the settlement close, closed rows the spot
-    locked at the click. Debit rows of the debit site only; None otherwise. Computed once so the cell,
-    the green row and /api/actuals/wins.json cannot disagree. Sets r['pct_spot'] to the spot used."""
+    """The Pct cell of a debit row on the debit site, at the whole percent; None otherwise. Computed once
+    so the cell, the green row and /api/actuals/wins.json cannot disagree. Sets r['pct_basis'] ('mark'
+    or 'spot') and r['pct_spot'].
+
+    IN SESSION (user 2026-11-11: 'during market hours pct based on mark'): the debit mark as quoted over
+    the width, unclamped, so a quote outside the width prints past 100% or under 0%. A row closed on the
+    site keeps its locked mark.
+    AFTER HOURS and settled rows (user 2026-11-11: 'pct to reflect the spot price not the mark ... past
+    the high strike beyond 100%'): the spread's value AT THE SPOT SHOWN over the width, unclamped. Bull
+    call (bull_put twin): (spot - low strike) / width; bear put (bear_call twin): (high strike - spot) /
+    width. Settled rows use the settlement close."""
     p = r.get("pick") or {}
     if not (IS_DEBIT_SITE and p.get("structure") == "debit"):
-        return None
-    orow = r.get("outcome_row") or {}
-    lt = r.get("last_track") or {}
-    spot = orow.get("underlying_price") if orow.get("underlying_price") is not None else lt.get("underlying_price")
-    if spot is None:
         return None
     try:
         ks, kl = float(p["short_strike"]), float(p["long_strike"])
         w = abs(ks - kl)
         if w <= 0:
             return None
+    except (KeyError, TypeError, ValueError):
+        return None
+    orow = r.get("outcome_row") or {}
+    lm = r.get("last_marked") or {}
+    settled = orow.get("underlying_price") is not None
+    use_mark = (not settled and lm.get("current_mark") is not None
+                and (r.get("closed") or _in_session_ts(_server_now_et())))
+    try:
+        if use_mark:
+            r["pct_basis"] = "mark"
+            return _round_half_up(float(_px(lm["current_mark"], p)) / w * 100)
+        lt = r.get("last_track") or {}
+        spot = orow.get("underlying_price") if settled else lt.get("underlying_price")
+        if spot is None:
+            return None
         spot = _round_half_up(float(spot), 2)
         raw = (ks - spot) if p.get("spread_type") == "bull_put" else (spot - ks)   # the credit twin's value
-        r["pct_spot"] = spot
+        r["pct_basis"], r["pct_spot"] = "spot", spot
         return _round_half_up((w - raw) / w * 100)
     except (KeyError, TypeError, ValueError):
         return None
