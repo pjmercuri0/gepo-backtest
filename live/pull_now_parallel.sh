@@ -340,7 +340,7 @@ echo "Running MTM tracker on active frozen files..."
 "${GEPO_PYTHON:-python3}" -m live.assignment_risk --quiet 2>&1 | sed "s/^/  [Assign] /" || echo "  ✗ assignment check failed (non-fatal)"
 
 # Disk alert (user 2026-11-11: "alert me when we get over like 90%"): this Mac's disk. Writes one
-# notification a day while at 90%+; the upload below carries it to Mya, whose watcher sends the Telegram.
+# notification a day while over the 75% line, then the 90%; the upload below carries it to Mya, whose watcher sends the Telegram.
 python3 live/disk_alert.py --host "Mac mini" --path / 2>&1 | sed "s/^/  [Disk] /" || echo "  ✗ disk check failed (non-fatal)"
 
 # Push to Mya if SSH host configured. Soft-fail so a network blip

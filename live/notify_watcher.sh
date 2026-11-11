@@ -23,7 +23,7 @@ python3 /opt/vito-managed/data/user/apps/gepo-backtest/live/win_alert.py \
   >> /opt/vito-managed/data/user/apps/gepo-backtest/live/logs/win_alert.log 2>&1 || true
 
 # Disk alert (user 2026-11-11: "make sure mya alerts me when we get over like 90%"): Mya's own disk, one
-# Telegram message a day while it is at 90% or more (live/disk_alert.py; the Mac mini checks its own disk
+# Telegram message a day while it is over the 75% line, then the 90% line (live/disk_alert.py; the Mac mini checks its own disk
 # from pull_now_parallel.sh and its file arrives with the upload). Soft-fail like the WIN alert.
 python3 /opt/vito-managed/data/user/apps/gepo-backtest/live/disk_alert.py --host "Mya" --path / \
   >> /opt/vito-managed/data/user/apps/gepo-backtest/live/logs/disk_alert.log 2>&1 || true
