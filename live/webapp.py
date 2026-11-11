@@ -266,7 +266,11 @@ def _gzip_response(resp):
     return resp
 
 
-def _read_json(path: Path) -> dict | None:
+def _read_json(path: Path, raw: bool = False) -> dict | None:
+    """raw=True (2026-11-11): the file as written, no debit twinning, for the credit book's rows carried
+    on the debit site's Actuals (user: 'backfill ... same for actuals tab'). A credit row that merged
+    its source's TWIN took the twin's structure and priced as a debit (AXP 325/322.5 settled L showed
+    -$2 for -$127)."""
     if not path.exists():
         return None
     try:
@@ -274,7 +278,7 @@ def _read_json(path: Path) -> dict | None:
             d = json.load(f)
     except (json.JSONDecodeError, OSError):
         return None
-    if IS_DEBIT_SITE and isinstance(d, dict):
+    if IS_DEBIT_SITE and isinstance(d, dict) and not raw:
         _debit_view(d)
     return d
 
@@ -646,8 +650,8 @@ def _source_time_from_frozen(payload: dict, pick: dict) -> str | None:
     return None
 
 
-def _find_snapshot_scan(date: str, hhmm: str) -> tuple[dict, dict] | tuple[None, None]:
-    payload = _read_json(Path(live_config.ROOT_DIR) / "intraday_picks" / f"{date}.json")
+def _find_snapshot_scan(date: str, hhmm: str, raw: bool = False) -> tuple[dict, dict] | tuple[None, None]:
+    payload = _read_json(Path(live_config.ROOT_DIR) / "intraday_picks" / f"{date}.json", raw=raw)
     if payload is None:
         return None, None
     for scan in payload.get("scans", []):
@@ -698,9 +702,16 @@ def _actuals_rows() -> list[dict]:
     store = _actuals_store()
     rows = []
     history_by_date = {d.get("date"): d for d in _frozen_history(limit=500)}
+    # Debit site: the credit book's rows (structure not 'debit', the Sep-Oct history backfilled 2026-11-11)
+    # read their frozen day and snapshot scan RAW, so the merge below keeps them credit spreads
+    # settled at the credit P&L. Loaded once, only when such a row exists.
+    _history_raw = None
     for item in store.get("trades") or []:
         source = item.get("source") or {}
         pick = _json_clone(item.get("pick") or {})
+        _raw = IS_DEBIT_SITE and pick.get("structure") != "debit"
+        if _raw and _history_raw is None:
+            _history_raw = {d.get("date"): d for d in _frozen_history(limit=500, raw=True)}
         source_label = item.get("source_label") or source.get("kind") or "source"
         source_time = item.get("source_time")
         outcome_row = None
@@ -708,7 +719,7 @@ def _actuals_rows() -> list[dict]:
         last_marked = None
 
         if source.get("kind") == "frozen":
-            day = history_by_date.get(source.get("date"))
+            day = (_history_raw if _raw else history_by_date).get(source.get("date"))
             idx = source.get("index")
             try:
                 idx = int(idx)
@@ -753,7 +764,7 @@ def _actuals_rows() -> list[dict]:
                 _mk_actual_settled(outcome_row, pick)
 
         elif source.get("kind") == "snapshot":
-            payload, scan = _find_snapshot_scan(str(source.get("date")), str(source.get("hhmm")))
+            payload, scan = _find_snapshot_scan(str(source.get("date")), str(source.get("hhmm")), raw=_raw)
             idx = source.get("index")
             try:
                 idx = int(idx)
@@ -1494,7 +1505,7 @@ def _mk_actual_settled(outcome_row: dict, pick: dict) -> None:
     outcome_row["actual_pnl_per_contract"] = round(float(pps) * 100, 2)
 
 
-def _frozen_history(limit: int = 60) -> list[dict]:
+def _frozen_history(limit: int = 60, raw: bool = False) -> list[dict]:
     base = Path(live_config.FROZEN_DIR)
     if not base.exists():
         return []
@@ -1509,7 +1520,7 @@ def _frozen_history(limit: int = 60) -> list[dict]:
                 continue
         except ValueError:
             pass
-        payload = _read_json(fp)
+        payload = _read_json(fp, raw=raw)
         if payload and payload.get("_debit_empty"):
             continue                                  # debit site: no twins on this day
         if payload is None:
