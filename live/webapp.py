@@ -144,11 +144,10 @@ def _px(v, p):
 
 app.jinja_env.filters['px'] = _px
 
-# The green Actuals row (user 2026-11-06: 'any rows with 90+% pct light up green'): an open debit row
-# whose pct is this or more. live/win_alert.py on Mya turns a row crossing it into a Telegram alert
-# (user 2026-11-10). 80 on the mid-referenced scale (2026-11-11) is the same point as 90 on the old
-# 0-100 scale: 90% of the width from the near strike.
-ACTUALS_GREEN_PCT = 80
+# The green Actuals row (user 2026-11-06: 'any rows with 90+% pct light up green'): an open debit
+# row whose mark AS SHOWN is this much of its width or more. live/win_alert.py on Mya turns a row
+# crossing it into a Telegram alert (user 2026-11-10).
+ACTUALS_GREEN_PCT = 90
 
 
 def _pct_of_width(r: dict):
@@ -156,16 +155,13 @@ def _pct_of_width(r: dict):
     so the cell, the green row and /api/actuals/wins.json cannot disagree. Sets r['pct_basis'] ('mark'
     or 'spot') and r['pct_spot'].
 
-    Scale (user 2026-11-11: 'referenced against the mid of the strikes, not the short strike, and
-    denominator being the width/2'): (value - width/2) / (width/2). 0% = the spread worth half its
-    width (spot at the mid of the strikes), +100% = full value (spot at the far strike), -100% =
-    worthless (spot at the near strike); beyond either strike it runs past +/-100%.
-
-    IN SESSION (user 2026-11-11: 'during market hours pct based on mark'): value = the debit mark as
-    quoted, unclamped. A row closed on the site keeps its locked mark.
-    AFTER HOURS and settled rows (user 2026-11-11: 'pct to reflect the spot price not the mark'): value
-    = the spread's intrinsic AT THE SPOT SHOWN, unclamped: bull call (bull_put twin) spot - low strike;
-    bear put (bear_call twin) high strike - spot. Settled rows use the settlement close."""
+    IN SESSION (user 2026-11-11: 'during market hours pct based on mark'): the debit mark as quoted over
+    the width, unclamped, so a quote outside the width prints past 100% or under 0%. A row closed on the
+    site keeps its locked mark.
+    AFTER HOURS and settled rows (user 2026-11-11: 'pct to reflect the spot price not the mark ... past
+    the high strike beyond 100%'): the spread's value AT THE SPOT SHOWN over the width, unclamped. Bull
+    call (bull_put twin): (spot - low strike) / width; bear put (bear_call twin): (high strike - spot) /
+    width. Settled rows use the settlement close."""
     p = r.get("pick") or {}
     if not (IS_DEBIT_SITE and p.get("structure") == "debit"):
         return None
@@ -182,10 +178,9 @@ def _pct_of_width(r: dict):
     use_mark = (not settled and lm.get("current_mark") is not None
                 and (r.get("closed") or _in_session_ts(_server_now_et())))
     try:
-        half = w / 2
         if use_mark:
             r["pct_basis"] = "mark"
-            return _round_half_up((float(_px(lm["current_mark"], p)) - half) / half * 100)
+            return _round_half_up(float(_px(lm["current_mark"], p)) / w * 100)
         lt = r.get("last_track") or {}
         spot = orow.get("underlying_price") if settled else lt.get("underlying_price")
         if spot is None:
@@ -193,7 +188,7 @@ def _pct_of_width(r: dict):
         spot = _round_half_up(float(spot), 2)
         raw = (ks - spot) if p.get("spread_type") == "bull_put" else (spot - ks)   # the credit twin's value
         r["pct_basis"], r["pct_spot"] = "spot", spot
-        return _round_half_up(((w - raw) - half) / half * 100)
+        return _round_half_up((w - raw) / w * 100)
     except (KeyError, TypeError, ValueError):
         return None
 # Max win on a debit row = width - the debit AS SHOWN = the floored credit equivalent (user 2026-11-02:
