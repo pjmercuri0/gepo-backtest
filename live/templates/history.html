@@ -190,7 +190,7 @@
             {% if outcome_row %}
               <td>—</td>
             {% elif last_marked %}
-              <td>${{ "%.2f"|format(last_marked.current_mark|px(p)|fl2) }}</td>
+              <td title="{{ last_marked.mark_basis or '' }}{% if last_marked.ts %} {{ (last_marked.ts|string)[11:16] }}{% endif %}">${{ "%.2f"|format(last_marked.current_mark|px(p)|fl2) }}</td>
             {% else %}
               <td>—</td>
             {% endif %}

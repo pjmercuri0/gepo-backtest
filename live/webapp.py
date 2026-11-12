@@ -2120,7 +2120,10 @@ def snapshots():
                 if _gm is not None and pk.get("GROUND") is not None:
                     pk["ground_ok"] = float(pk["GROUND"]) >= float(_gm)
                 if pk.get("pnl") is None and not pk.get("outcome") and pk.get("expiry_close") is None:
-                    _lt, _ = _stream_overlay(pk, pk.get("live"), None, None, prefer_stream=True)
+                    # Mark = IBKR's leg mark on the debit site, quote cell stays the bag quote (user
+                    # 2026-11-12: "put mark as valuation in snap and history too").
+                    _lt, _ = _stream_overlay(pk, pk.get("live"), None, None, prefer_stream=True,
+                                             ibkr_mark=IS_DEBIT_SITE)
                     if isinstance(_lt, dict):
                         pk["live"] = _lt
                     # Row shade, History's rule: the live quote against the model floor when the stream
@@ -2220,7 +2223,8 @@ def history():
             if (_p.get("pnl") is not None or _tk in _settled
                     or not isinstance(_arr, list) or not _arr):
                 continue
-            _fresh, _ = _stream_overlay(_p, _arr[-1], None, None, prefer_stream=True)
+            _fresh, _ = _stream_overlay(_p, _arr[-1], None, None, prefer_stream=True,
+                                        ibkr_mark=IS_DEBIT_SITE)   # mark = IBKR leg mark (2026-11-12)
             if isinstance(_fresh, dict) and _fresh is not _arr[-1]:
                 _arr.append(_fresh)
             # Row shade (user 2026-10-01): white when the pick clears the quote gate, grey when not --
