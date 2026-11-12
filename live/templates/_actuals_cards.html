@@ -229,7 +229,8 @@
           {% elif outcome_row %}
             <td>—</td>
           {% elif last_marked %}
-            <td>${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</td>
+            {# Closed row (user 2026-11-12): click the mark to enter the price you really exited at. #}
+            <td>{% if row.closed %}<span class="actual-exit-edit" data-id="{{ row.id }}" data-dw="{{ _dw }}" data-current="{{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }}" title="{{ 'your exit price' if row.closed.exit is not none else 'mark locked at the close' }} — click to enter your exit price"{% if row.closed.exit is not none %} style="color:#7ec99a"{% endif %}>${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</span>{% else %}${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}{% endif %}</td>
           {% else %}
             <td>—</td>
           {% endif %}
@@ -266,7 +267,7 @@
                to the tooltip and still drives the card total. #}
             <td class="{% if row.row_pnl is not none and row.row_pnl > 0 %}pos{% elif row.row_pnl is not none and row.row_pnl < 0 %}neg{% endif %}"
                 style="text-align:right"
-                title="{{ last_marked.mark_basis }}{% if last_marked.ts %} {{ (last_marked.ts|string)[11:16] }}{% endif %}{% if p.actual_credit is defined and p.actual_credit is not none %}; your fill {{ '%.2f'|format((p.actual_credit|px(p))|rd(2)) }}{% endif %}{% if row.row_pnl is not none %}; P&amp;L ${{ '%+.0f'|format(row.row_pnl|rd) }}{% endif %}">${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</td>
+                title="{{ last_marked.mark_basis }}{% if last_marked.ts %} {{ (last_marked.ts|string)[11:16] }}{% endif %}{% if p.actual_credit is defined and p.actual_credit is not none %}; your fill {{ '%.2f'|format((p.actual_credit|px(p))|rd(2)) }}{% endif %}{% if row.row_pnl is not none %}; P&amp;L ${{ '%+.0f'|format(row.row_pnl|rd) }}{% endif %}{% if row.closed %}; click to enter your exit price{% endif %}">{% if row.closed %}<span class="actual-exit-edit" data-id="{{ row.id }}" data-dw="{{ _dw }}" data-current="{{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }}"{% if row.closed.exit is not none %} style="color:#7ec99a"{% endif %}>${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</span>{% else %}${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}{% endif %}</td>
           {% elif is_debit_site and p.structure == 'debit' and outcome_row and row.row_pnl is not none and p.actual_credit is defined and p.actual_credit is not none %}
             {# Settled debit row (user 2026-11-07: "how come these marks are $-240"): the Mark cell is what the
                spread settled at, $/sh in debit terms = your fill + the realized P&L per contract, so Mark - fill

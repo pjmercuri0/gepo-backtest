@@ -2458,7 +2458,7 @@ def _lock_closed_row(r: dict) -> None:
         lt["underlying_price"] = cl["spot"]
     if cl.get("mark") is not None:
         lt["current_mark"] = cl["mark"]
-        lt["mark_basis"] = "closed"
+        lt["mark_basis"] = "exit" if cl.get("exit") is not None else "closed"
         lt["ts"] = cl.get("at")
         r["last_marked"] = lt
     lt.pop("live_status", None)
@@ -3230,6 +3230,60 @@ def reopen_actual(trade_id: str):
     store["updated_at"] = datetime.now().isoformat(timespec="seconds")
     _atomic_write_json(_actuals_path(), store)
     return jsonify({"ok": True, "id": trade_id, "closed": None})
+
+
+@app.route("/api/actuals/<path:trade_id>/exit", methods=["POST"])
+def set_actual_exit(trade_id: str):
+    """Closed row: the price he really exited at (user 2026-11-12: "for closed trades in actuals you need
+    to let me edit the mark so i can enter my true exit price and adjust the P&L accordingly").
+    Body {"exit": 1.35} in the store's basis (the page posts width - debit for a debit row, as the fill
+    edit does) or {"exit": null} to go back to the mark locked at the click. P&L per contract =
+    (fill - exit) x 100 in credit terms, which is (exit - fill) x 100 as he reads a debit; the modelled
+    credit stands in when no fill was typed. Lives inside the trade's "closed" dict, so the Mac/Mya
+    merge carries it with the close (upload_to_mya USER_KEYS)."""
+    body = request.get_json(silent=True) or {}
+    raw = body.get("exit")
+    store = _actuals_store()
+    trade = next((t for t in store.get("trades") or [] if t.get("id") == trade_id), None)
+    if trade is None:
+        abort(404)
+    cl = trade.get("closed")
+    if not isinstance(cl, dict):
+        return jsonify({"error": "row is not closed"}), 400
+    pick = trade.get("pick") or {}
+    try:
+        w = abs(float(pick["short_strike"]) - float(pick["long_strike"]))
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "spread width unknown for this pick"}), 400
+    if raw in (None, ""):
+        if "locked_pnl_per_contract" in cl:                      # back to the mark locked at the click
+            cl["pnl_per_contract"] = cl.pop("locked_pnl_per_contract")
+            cl["mark"] = cl.pop("locked_mark", None)
+            cl["mark_basis"] = cl.pop("locked_mark_basis", None)
+        cl.pop("exit", None)
+    else:
+        try:
+            val = float(raw)
+        except (TypeError, ValueError):
+            return jsonify({"error": "exit must be numeric or null"}), 400
+        if val < 0 or val > w:
+            return jsonify({"error": f"exit must be between 0 and the width {w:g}"}), 400
+        entry = (trade.get("actual_credit") if trade.get("actual_credit") is not None else pick.get("actual_credit"))
+        if entry is None:
+            entry = pick.get("net_credit") or pick.get("entry_credit")
+        if entry is None:
+            return jsonify({"error": "no fill or modelled credit on this row"}), 400
+        if "locked_pnl_per_contract" not in cl:
+            cl["locked_pnl_per_contract"] = cl.get("pnl_per_contract")
+            cl["locked_mark"] = cl.get("mark")
+            cl["locked_mark_basis"] = cl.get("mark_basis")
+        cl["exit"] = cl["mark"] = round(val, 4)
+        cl["mark_basis"] = "exit"
+        cl["pnl_per_contract"] = round((float(entry) - val) * 100, 2)
+    store["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    _atomic_write_json(_actuals_path(), store)
+    return jsonify({"ok": True, "id": trade_id, "exit": cl.get("exit"),
+                    "pnl_per_contract": cl.get("pnl_per_contract")})
 
 
 @app.route("/api/actuals/<path:trade_id>/qty", methods=["POST"])
