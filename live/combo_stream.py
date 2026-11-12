@@ -552,7 +552,9 @@ def main() -> int:
                         c = Contract(conId=int(cid), exchange="SMART")
                         if ib.qualifyContracts(c):
                             leg_c[cid] = c
-                            leg_t[cid] = ib.reqMktData(c, "", False, False)
+                            # 221 = IBKR's mark price on the leg (user 2026-11-12: "Use it for actuals ya"):
+                            # the number the app and the statement value the position at.
+                            leg_t[cid] = ib.reqMktData(c, "221", False, False)
                     except Exception as e:
                         print(f"[combo_stream] leg subscribe failed {cid}: {e}", flush=True)
                 # Underlying spot too (2026-09-16): the page colours pin/status and shows
@@ -682,6 +684,28 @@ def main() -> int:
                              "ask": round(-(_sb - float(lt_.ask)), 4),
                              "mid": round(mid, 4),
                              "last": None, "src": "legs", "ts": ts}
+            # IBKR mark (user 2026-11-12: "Use it for actuals ya"): each leg's mark-price tick (221), the
+            # value IBKR carries the position at, combined on the credit scale beside the bag quote.
+            # Credit spread: short mark - long mark. Debit twin: width - (long mark - short mark). Clamped
+            # to [0, width]. Only annotates a key the stream already quotes; the Actuals rows read it
+            # (webapp._stream_overlay ibkr_mark=True), the other tabs keep the quote.
+            for k, lg in legs.items():
+                q = quotes.get(k)
+                if not q:
+                    continue
+                st_, lt_ = leg_t.get(lg[0]), leg_t.get(lg[1])
+                if not st_ or not lt_:
+                    continue
+                _ms, _ml = getattr(st_, "markPrice", None), getattr(lt_, "markPrice", None)
+                if not (ok(_ms) and ok(_ml) and float(_ms) > 0 and float(_ml) > 0):
+                    continue
+                _wk = widths.get(k)
+                v = (_wk - (float(_ml) - float(_ms))) if debit_k.get(k) and _wk else (float(_ms) - float(_ml))
+                if _wk:
+                    v = min(max(v, 0.0), _wk)
+                elif v < 0:
+                    continue
+                q["ibkr_mark"] = round(v, 4)
             # Raw book record, one line per tick (user 2026-10-28, "where you getting .53"): the
             # JSON is overwritten every second, so a screenshot could not be reconciled after the
             # fact. live/logs/combo_hist_YYYYMMDD.jsonl: {ts, bags: {key: [exchange, bid, ask]},
@@ -695,7 +719,9 @@ def main() -> int:
                 for k, lg in legs.items():
                     st_, lt_ = leg_t.get(lg[0]), leg_t.get(lg[1])
                     if st_ and lt_:
-                        _hl[k] = [_f(st_.bid), _f(st_.ask), _f(lt_.bid), _f(lt_.ask), _f(st_.last), _f(lt_.last)]
+                        # 7th-8th (2026-11-12): IBKR mark price per leg (tick 221).
+                        _hl[k] = [_f(st_.bid), _f(st_.ask), _f(lt_.bid), _f(lt_.ask), _f(st_.last), _f(lt_.last),
+                                  _f(getattr(st_, "markPrice", None)), _f(getattr(lt_, "markPrice", None))]
                 with open(HIST_DIR / f"combo_hist_{_now_d()}.jsonl", "a") as _hf:
                     _hf.write(json.dumps({"ts": ts, "bags": _hb, "legs": _hl}, separators=(",", ":")) + "\n")
             except Exception as e:
@@ -730,7 +756,7 @@ def main() -> int:
                     if _w and abs(q["ask"] - q["bid"]) > _w + 1e-9:     # wider than the spread: not a price
                         continue
                     last_q[k] = {"mid": q["mid"], "bid": q["bid"], "ask": q["ask"], "src": q["src"],
-                                 "ts": q["ts"], "spot": sp.get(k.split("|")[0])}
+                                 "ts": q["ts"], "spot": sp.get(k.split("|")[0]), "ibkr_mark": q.get("ibkr_mark")}
                     # Own-leg mids on the credit scale, for the after-bell hold (user 2026-11-09, 'do it'):
                     # the last complex-book tick can be a blown-out book -- NVDA 180/177.5 at 15:59:59
                     # printed 0.65/1.30 (mid 0.975) while its legs said 1.175 -- and IBKR values the

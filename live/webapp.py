@@ -872,7 +872,7 @@ def _actuals_rows() -> list[dict]:
         # quote_mark on the debit site (user 2026-11-03): the row's mark is the quote, not intrinsic.
         last_track, last_marked = _stream_overlay(
             pick, last_track, last_marked, outcome_row, prefer_stream=True,
-            quote_mark=(_stores.site() == "debit"))
+            quote_mark=(_stores.site() == "debit"), ibkr_mark=IS_DEBIT_SITE)
 
         # Actuals display basis = the IBKR credit on the pick (combo last > combo mid >
         # leg mids, i.e. quoted_credit/net_credit), NOT the modelled 0.80x mid /
@@ -1163,7 +1163,7 @@ def _in_session_ts(ts) -> bool:
 
 
 def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=False,
-                    quote_mark=None):
+                    quote_mark=None, ibkr_mark=False):
     """Live spot + mark for ONE open pick, straight off combo_stream.
 
     quote_mark: the mark is the live quote, never floored to intrinsic. None = the debit
@@ -1180,6 +1180,9 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
     Returns (last_track, last_marked) -- unchanged when there is nothing to
     overlay, so callers can assign unconditionally.
     """
+    # ibkr_mark (user 2026-11-12: "Use it for actuals ya"): the Actuals caller marks off IBKR's own
+    # mark price on the legs (combo_stream "ibkr_mark", tick 221), the value the app and the statement
+    # carry the position at, instead of the bag quote; the quote stays in the tooltip and the gate.
     if quote_mark is None:
         quote_mark = (_stores.site() == "debit")
     _out_track, _out_marked = last_track, last_marked
@@ -1311,6 +1314,13 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                 _px, _basis = _live_mid, ("own leg mids (book wider than the spread)" if _wide else "live quote")
                 live["live_quote"] = round(_live_mid, 4); live["live_quote_ts"] = _q.get("ts")
                 _am = {"ts": _q.get("ts")}
+                if ibkr_mark and _q.get("ibkr_mark") is not None:
+                    try:
+                        _ibm = float(_q["ibkr_mark"])
+                        _qd = (w - _live_mid) if pick.get("structure") == "debit" else _live_mid
+                        _px, _basis = _ibm, f"IBKR mark (legs); quote {_qd:.2f}"
+                    except (TypeError, ValueError):
+                        pass
             elif _am and not (_lq and _lq.get("mid") is not None
                               and not _in_session_ts(_am.get("ts"))):
                 # A mark_actuals mark taken OUTSIDE the session (the 16:00 scan marks at 16:01, the
