@@ -94,7 +94,7 @@
         {# Closed on the site (user 2026-11-05): greyed, P&L locked at the click, no live updates. #}
         {# Green row (user 2026-11-06: 'any rows with 90+% pct light up green, similar to how the P lights up
            yellow'): the debit site's pct cell, the mark over the width, at ACTUALS_GREEN_PCT (90) or more on
-           an open row. webapp._pct_of_width computes it once for this row, the cell below and
+           an open row in session, ACTUALS_GREEN_PCT_AH (101) after hours (user 2026-11-13). webapp._pct_of_width computes it once for this row, the cell below and
            /api/actuals/wins.json (the Telegram alert, 2026-11-10), so none of them can disagree. #}
         {% set _pct_win = row.pct_green %}
         <tr class="{% if row.ah_status == 'WINNING' and not row.closed %}ah-assign{% elif _pct_win %}pct-win{% elif _pin_row and not row.closed %}assign-watch{% endif %}{% if row.closed %} row-closed{% endif %}">

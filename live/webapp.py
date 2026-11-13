@@ -148,6 +148,18 @@ app.jinja_env.filters['px'] = _px
 # row whose mark AS SHOWN is this much of its width or more. live/win_alert.py on Mya turns a row
 # crossing it into a Telegram alert (user 2026-11-10).
 ACTUALS_GREEN_PCT = 90
+# After hours and settled rows the pct is the value at the SPOT over the width (no quote), and the row
+# only goes green once the spot is past the far strike (user 2026-11-13: 'after hours rows should only
+# go green if they are >= 101%'): 100% is the spot sitting exactly on it.
+ACTUALS_GREEN_PCT_AH = 101
+
+
+def _pct_green(r: dict) -> bool:
+    """Green (and the Telegram alert) only on a row still OPEN: not closed on the site, not settled;
+    at ACTUALS_GREEN_PCT on the in-session mark, ACTUALS_GREEN_PCT_AH on the spot-based pct."""
+    if r.get("pct") is None or r.get("closed") or (r.get("outcome_row") or {}).get("result"):
+        return False
+    return r["pct"] >= (ACTUALS_GREEN_PCT if r.get("pct_basis") == "mark" else ACTUALS_GREEN_PCT_AH)
 
 
 def _pct_of_width(r: dict):
@@ -2649,8 +2661,7 @@ def _actuals_view():
     for r in rows:
         r["pct"] = _pct_of_width(r)
         # Green (and the Telegram alert) only on a row still OPEN: not closed on the site, not settled.
-        r["pct_green"] = (r["pct"] is not None and r["pct"] >= ACTUALS_GREEN_PCT
-                          and not r.get("closed") and not (r.get("outcome_row") or {}).get("result"))
+        r["pct_green"] = _pct_green(r)
     return rows, risk, _stream
 
 
@@ -3064,7 +3075,8 @@ def actuals_wins_json():
         })
     return jsonify({"ts": datetime.now().isoformat(timespec="seconds"),
                     "stream_ts": str(_stream.get("ts") or ""), "site": _stores.site(),
-                    "green_pct": ACTUALS_GREEN_PCT, "wins": out})
+                    "green_pct": ACTUALS_GREEN_PCT, "green_pct_after_hours": ACTUALS_GREEN_PCT_AH,
+                    "wins": out})
 
 
 @app.route("/api/notifications/latest")
