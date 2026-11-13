@@ -1356,7 +1356,11 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             # Beats a mark_actuals mark taken at 16:01 and the held last in-session quote below.
             if not _in_session_ts(_server_now_et()):
                 _now_et = _server_now_et()
-                if str(pick.get("expiry_date"))[:10] <= _now_et[:10]:
+                _exp_d = str(pick.get("expiry_date"))[:10]
+                # Before the open ON expiry day the plain after-hours rule below applies (user 2026-11-13:
+                # the pre-market page marked AXP 320/317.5 at intrinsic on the 15:59:59 tick, 0.63, beside
+                # a streamed spot of 319.47); the freeze is for after the close.
+                if _exp_d < _now_et[:10] or (_exp_d == _now_et[:10] and _now_et[11:19] >= "16:00:00"):
                     # Expiry day (user 2026-11-10: "not friday ... make sure they settle 4pm friday"):
                     # the mark freezes at intrinsic on the last in-session spot, not the after-hours
                     # tick; the settler then writes the official close.
