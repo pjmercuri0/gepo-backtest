@@ -341,6 +341,7 @@ def build():
     spy_v = [p["spy"] for p in points if p["spy"] is not None]
     closed = [t for t in trades if t["outcome"] != "OPEN" and t["max_loss"] is not None]
     wag = sum(t["max_loss"] * t["qty"] * 100 for t in closed)
+    _done = [t for t in trades if t["outcome"] != "OPEN"]
     summary = {
         "window_start": days[0], "window_end": days[-1], "trading_days": len(days),
         "n_trades": len(trades), "n_open": sum(t["outcome"] == "OPEN" for t in trades),
@@ -351,6 +352,12 @@ def build():
         "strategy_yield": round(100 * sum(t["pnl"] for t in closed) / wag, 2) if wag else None,
         "best_day": max(zip(daily, days)), "worst_day": min(zip(daily, days)),
         "up_days": sum(x > 0 for x in daily), "down_days": sum(x < 0 for x in daily),
+        # Card reads up / down TRADES (user 2026-11-13): closed spreads by the sign of their P&L (USD).
+        "up_trades": sum(t["pnl"] > 0 for t in _done), "down_trades": sum(t["pnl"] < 0 for t in _done),
+        # Win / loss rate card (user 2026-11-13): closed spreads by settlement outcome (WIN past the short
+        # strike, LOSS past the long, PARTIAL between) beside the sign of their P&L.
+        "n_win": sum(t["outcome"] == "WIN" for t in _done), "n_loss": sum(t["outcome"] == "LOSS" for t in _done),
+        "n_partial": sum(t["outcome"] == "PARTIAL" for t in _done),
         "spy_final": spy_v[-1] if spy_v else None,
         "spy_total_return": round(100 * (spy_v[-1] / spy_v[0] - 1), 2) if spy_v else None,
         "spy_sharpe_dollar": _sharpe([b - a for a, b in zip(spy_v, spy_v[1:])]),

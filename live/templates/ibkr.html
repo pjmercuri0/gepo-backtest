@@ -54,9 +54,15 @@
       <div class="stat-value neg">{{ s.strategy_max_dd }}%</div>
     </div>
     <div class="stat">
-      <div class="stat-label">up / down days</div>
-      <div class="stat-value"><span class="pos">{{ s.up_days }}</span> / <span class="neg">{{ s.down_days }}</span></div>
-      <div class="subtitle">best {{ s.best_day[1][5:] }} +${{ '{:,.0f}'.format(s.best_day[0]) }} · worst {{ s.worst_day[1][5:] }} −${{ '{:,.0f}'.format(-s.worst_day[0]) }}</div>
+      <div class="stat-label">up / down trades</div>
+      <div class="stat-value"><span class="pos">{{ s.up_trades }}</span> / <span class="neg">{{ s.down_trades }}</span></div>
+      <div class="subtitle">{{ s.n_trades - s.n_open }} closed · {{ s.n_open }} open</div>
+    </div>
+    {% set _nc = s.n_trades - s.n_open %}
+    <div class="stat">
+      <div class="stat-label">win / loss rate</div>
+      <div class="stat-value"><span class="pos">{{ '{:.0f}'.format(100 * s.n_win / _nc) if _nc else '—' }}%</span> / <span class="neg">{{ '{:.0f}'.format(100 * s.n_loss / _nc) if _nc else '—' }}%</span></div>
+      <div class="subtitle">positive P&amp;L {{ '{:.0f}'.format(100 * s.up_trades / _nc) if _nc else '—' }}% · negative {{ '{:.0f}'.format(100 * s.down_trades / _nc) if _nc else '—' }}% · {{ s.n_partial }} partial</div>
     </div>
   </div>
 

@@ -249,6 +249,13 @@ def main():
         "strategy_yield": round(100 * sum(t["pnl"] for t in closed) / wag, 2) if wag else None,
         "best_day": list(max(zip(daily, days))), "worst_day": list(min(zip(daily, days))),
         "up_days": sum(x > 0 for x in daily), "down_days": sum(x < 0 for x in daily),
+        # Card reads up / down TRADES (user 2026-11-13): closed spreads by the sign of their P&L (USD).
+        "up_trades": sum(t["pnl"] > 0 for t in trades if t["outcome"] != "OPEN"),
+        "down_trades": sum(t["pnl"] < 0 for t in trades if t["outcome"] != "OPEN"),
+        # Win / loss rate card (user 2026-11-13): closed spreads by settlement outcome (WIN past the short
+        # strike, LOSS past the long, PARTIAL between) beside the sign of their P&L.
+        "n_win": sum(t["outcome"] == "WIN" for t in [t for t in trades if t["outcome"] != "OPEN"]), "n_loss": sum(t["outcome"] == "LOSS" for t in [t for t in trades if t["outcome"] != "OPEN"]),
+        "n_partial": sum(t["outcome"] == "PARTIAL" for t in [t for t in trades if t["outcome"] != "OPEN"]),
         "spy_final": spy_v[-1] if spy_v else None,
         "spy_total_return": round(100 * (spy_v[-1] / spy_v[0] - 1), 2) if spy_v else None,
         "spy_sharpe_dollar": _sharpe([b - a for a, b in zip(spy_v, spy_v[1:])]),
