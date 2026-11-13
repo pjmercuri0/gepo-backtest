@@ -65,6 +65,7 @@
     <div class="stat">
       <div class="stat-label">max drawdown</div>
       <div class="stat-value neg">{{ hd.max_dd }}%</div>
+      {% if hd.max_dd_dollar is not none %}<div class="subtitle">−${{ '{:,.0f}'.format(hd.max_dd_dollar) }} USD</div>{% endif %}
     </div>
     {% set ty = data.tally %}
     {% if ty and ty.n_closed %}

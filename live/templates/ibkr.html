@@ -52,6 +52,7 @@
     <div class="stat">
       <div class="stat-label">max drawdown</div>
       <div class="stat-value neg">{{ s.strategy_max_dd }}%</div>
+      {% if s.strategy_max_dd_dollar is not none %}<div class="subtitle">−${{ '{:,.0f}'.format(s.strategy_max_dd_dollar) }} {{ c.base_currency }}</div>{% endif %}
     </div>
     <div class="stat">
       <div class="stat-label">win / loss trades</div>

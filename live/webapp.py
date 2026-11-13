@@ -1850,9 +1850,20 @@ def _size_view(payload: dict, arm: str) -> dict:
     trades = payload.get("trades") or []
     have_kelly = bool(trades) and all(("qty_q4" in t and "qty_h2" in t) for t in trades[:50])
     arms = [a for a in _SIZE_ARMS if f"{a[2]}_final" in s and (a[0] in ("q1", "q2") or have_kelly)]
+    def _dd_dollar(series_key):
+        # Deepest peak-to-trough fall in dollars on that arm's equity points (user 2026-11-13: the max
+        # drawdown card carries the amount beside the percent).
+        peak, dd = None, 0.0
+        for p in payload.get("points") or []:
+            v = p.get(series_key)
+            if v is None:
+                continue
+            v = float(v); peak = v if peak is None else max(peak, v); dd = max(dd, peak - v)
+        return round(dd, 2)
     if "qty1_final" not in s or not arms:
         # Legacy / euro payloads: one arm only, shown as booked.
         payload["head"] = {k: s.get(f"strategy_{k}") for k in ("final", "total_return", "cagr", "yield", "sharpe_dollar", "max_dd")}
+        payload["head"]["max_dd_dollar"] = _dd_dollar("strategy")
         payload["arms"] = []; payload["arm"] = None; payload["arm_label"] = None
         return payload
     if arm not in {a[0] for a in arms}:
@@ -1884,6 +1895,7 @@ def _size_view(payload: dict, arm: str) -> dict:
     if isinstance(payload.get("config"), dict):
         payload["config"]["sizing"] = _SIZE_TEXT[arm]
     payload["head"] = {k: s.get(f"{prefix}_{k}") for k in ("final", "total_return", "cagr", "yield", "sharpe_dollar", "max_dd")}
+    payload["head"]["max_dd_dollar"] = _dd_dollar(prefix)
     def _fill(hx):   # the arm's own colour at low alpha, so the shaded area matches its line
         return "rgba(%d,%d,%d,0.10)" % tuple(int(hx[i:i + 2], 16) for i in (1, 3, 5))
     payload["arms"] = [{"key": a[0], "label": a[1], "prefix": a[2], "color": a[3], "fill": _fill(a[3]), "active": a[0] == arm,

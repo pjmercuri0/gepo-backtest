@@ -112,6 +112,14 @@ def _sharpe(xs):
     return round(m / sd * math.sqrt(252), 2) if sd > 0 else 0.0
 
 
+def _max_dd_dollar(vals):
+    """Deepest peak-to-trough fall in currency (the max drawdown card, user 2026-11-13)."""
+    peak, dd = vals[0], 0.0
+    for v in vals:
+        peak = max(peak, v); dd = max(dd, peak - v)
+    return round(dd, 2)
+
+
 def _max_dd(vals):
     peak, dd = vals[0], 0.0
     for v in vals:
@@ -246,6 +254,7 @@ def main():
         "strategy_total_return": round(100 * (navs[-1] / start_nav - 1), 2),
         "strategy_pnl": round(navs[-1] - start_nav, 2),
         "strategy_sharpe_dollar": _sharpe(daily), "strategy_max_dd": _max_dd(navs),
+        "strategy_max_dd_dollar": _max_dd_dollar(navs),
         "strategy_yield": round(100 * sum(t["pnl"] for t in closed) / wag, 2) if wag else None,
         "best_day": list(max(zip(daily, days))), "worst_day": list(min(zip(daily, days))),
         "up_days": sum(x > 0 for x in daily), "down_days": sum(x < 0 for x in daily),
