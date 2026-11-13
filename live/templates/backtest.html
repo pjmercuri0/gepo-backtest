@@ -48,10 +48,7 @@
     <div class="stat">
       <div class="stat-label">total return</div>
       <div class="stat-value {{ 'pos' if hd.total_return >= 0 else 'neg' }}">{% if hd.total_return >= 0 %}+{% endif %}{{ hd.total_return }}%</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">CAGR</div>
-      <div class="stat-value {{ 'pos' if hd.cagr >= 0 else 'neg' }}">{% if hd.cagr >= 0 %}+{% endif %}{{ hd.cagr }}%</div>
+      <div class="subtitle">{% if hd.final - c.starting_bankroll >= 0 %}+{% else %}−{% endif %}${{ '{:,.0f}'.format((hd.final - c.starting_bankroll)|abs) }} USD · CAGR {% if hd.cagr >= 0 %}+{% endif %}{{ hd.cagr }}%</div>
     </div>
     <div class="stat">
       <div class="stat-label">yield (P&amp;L / wagered)</div>
