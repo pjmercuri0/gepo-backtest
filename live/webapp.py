@@ -191,8 +191,22 @@ def _pct_of_width(r: dict):
                 and (r.get("closed") or _in_session_ts(_server_now_et())))
     try:
         if use_mark:
-            r["pct_basis"] = "mark"
-            return _round_half_up(float(_px(lm["current_mark"], p)) / w * 100)
+            # IN SESSION and closed rows (user 2026-11-13: 'pct should be % of max win if positive, and % of
+            # max loss if negative'): the row's P&L per contract over its max win (width - debit paid) when
+            # positive, over its max loss (the debit paid) when negative, so +100% is the full win and
+            # -100% the full loss, both against the fill. Outside hours stays the spot-based value below.
+            _pnl, _ = _actuals_row_pnl(r)
+            _ac = p.get("actual_credit")
+            _bc = float(_ac) if _ac is not None else credit_basis.entry_credit(p)     # credit scale = max win/sh
+            if _pnl is None or _bc is None:
+                return None
+            _bc = float(_bc)
+            _max_win, _max_loss = _bc * 100, (w - _bc) * 100
+            r["pct_basis"], r["pct_pnl"] = "mark", float(_pnl)
+            r["pct_den"], r["pct_den_name"] = (_max_win, "max win") if _pnl >= 0 else (_max_loss, "max loss")
+            if r["pct_den"] <= 0:
+                return None
+            return _round_half_up(float(_pnl) / r["pct_den"] * 100)
         lt = r.get("last_track") or {}
         spot = orow.get("underlying_price") if settled else lt.get("underlying_price")
         if spot is None:
