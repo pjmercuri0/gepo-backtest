@@ -187,8 +187,15 @@ document.addEventListener('click', e => {
       });
       if (!state) return;
       const body = tb.tBodies[0]; if (!body) return;
-      const rows = Array.from(body.rows).map((r, i) => ({ r, i, k: key(r.cells[state.col]) }));
+      // Sorting by Mark, P&L or pct keeps the closed rows at the bottom, in their own order; any
+      // other column sorts closed and open rows together (user 2026-11-13).
+      const hth = tb.tHead && tb.tHead.rows[0] && tb.tHead.rows[0].cells[state.col];
+      const hname = hth ? hth.textContent.replace(/[\u25b2\u25bc]/g, '').replace(/\s+/g, ' ').trim().toLowerCase() : '';
+      const closedLast = hname === 'mark' || hname === 'p&l' || hname === 'pct';
+      const rows = Array.from(body.rows).map((r, i) => ({ r, i, k: key(r.cells[state.col]),
+                                                          c: r.classList.contains('row-closed') ? 1 : 0 }));
       rows.sort((a, b) => {
+        if (closedLast && a.c !== b.c) return a.c - b.c;                                        // closed rows last
         if (a.k === null || b.k === null) return (a.k === null) - (b.k === null) || a.i - b.i;   // blanks last
         const c = (typeof a.k === 'number' && typeof b.k === 'number') ? a.k - b.k : String(a.k).localeCompare(String(b.k));
         return c * state.dir || a.i - b.i;
