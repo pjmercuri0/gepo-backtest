@@ -30,6 +30,9 @@ DAY = next(a for a in sys.argv[1:] if a[:2] == "20")
 # roll-forward (his fills are not the site's locked marks: 2026-11-06 the app said 7,032 against a
 # rolled 6,853) and becomes the point; the per-spread estimates stay as they are.
 NAV_OVERRIDE = float(sys.argv[sys.argv.index("--nav") + 1]) if "--nav" in sys.argv else None
+# --worthless T1,T2: spreads on these tickers expiring DAY are valued at 0 (user 2026-11-13: 'assuming
+# MDT expires worthless' before the close was known); beats the closes file for those names.
+WORTHLESS = set(sys.argv[sys.argv.index("--worthless") + 1].split(",")) if "--worthless" in sys.argv else set()
 
 
 def _leg(sym):
@@ -140,7 +143,12 @@ def main():
         if t["outcome"] != "OPEN":
             continue
         pair = by_key.get((t["ticker"], t["expiry"]), [])
-        mine = [x for x in pair if x[0] in (t["k_s"], t["k_l"])]
+        # Same right as the trade: a debit bull call (bull_put twin) is calls, a debit bear put is puts,
+        # the credit spreads the other way round. JNJ 2026-11-13 held 282.5P/280P and 282.5C/285C
+        # together, and the shared 282.5 strike matched three legs ('legs not found').
+        _pc = (("C" if t["type"] == "bull_put" else "P") if t["structure"] == "debit"
+               else ("P" if t["type"] == "bull_put" else "C"))
+        mine = [x for x in pair if x[0] in (t["k_s"], t["k_l"]) and x[1] == _pc]
         if len(mine) != 2:
             unresolved.append(f"{t['ticker']} {t['k_s']}/{t['k_l']}: legs not found in the statement"); continue
         q = t["qty"]; width = abs(t["k_s"] - t["k_l"]); pc = mine[0][1]
@@ -159,6 +167,10 @@ def main():
             cc = 0.0                     # no commission in the tentative (user 2026-11-06); the statement has the real one
             how = f"closed on site {a['at'][11:16]} at mark {a['closed_mark']:.2f}"
             t["close_debit"] = round(-debit_recv if t["structure"] == "debit" else debit_recv, 4)
+        elif t["expiry"] == DAY and t["ticker"] in WORTHLESS:
+            v6, cc, sp = 0.0, 0.0, None
+            how = "expires worthless (his call, close not yet known)"
+            t["close_debit"] = 0.0
         elif t["expiry"] == DAY:
             spx = a.get("expiry_close", sp)
             if spx is None:
