@@ -185,7 +185,23 @@ window.gepoPolled = () => { window.gepoLastOk = Date.now(); };
       resetIndicator(true);
     }
     axis = null;
+    ptrArmed = false;
   }, { passive: true });
+
+  // The banner used to stick on "release to refresh" (user 2026-11-13): iOS ends a touch it takes over
+  // (its own overscroll, a second finger, the system edge gesture) with touchcancel, not touchend,
+  // and nothing reset it. Every other way a gesture can end clears it too: the tab coming back
+  // (pageshow from the back-forward cache keeps the old DOM), a reload that never arrived, and a
+  // poll swap while nothing is touching the screen.
+  const ptrAbort = () => { if (axis === 'ptr') resetIndicator(true); axis = null; ptrArmed = false; };
+  document.addEventListener('touchcancel', ptrAbort, { passive: true });
+  window.addEventListener('pageshow', () => { resetIndicator(false); axis = null; ptrArmed = false; });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ptrAbort(); });
+  window.addEventListener('blur', ptrAbort);
+  setInterval(() => {
+    // Watchdog: a visible banner with no finger on the screen for 2s is a stuck one.
+    if (axis !== 'ptr' && indicator.style.opacity && indicator.style.opacity !== '0') resetIndicator(true);
+  }, 2000);
 })();
 </script>
 
