@@ -62,7 +62,7 @@
     <div class="stat">
       <div class="stat-label">win / loss rate</div>
       <div class="stat-value"><span class="pos">{{ '{:.0f}'.format(100 * s.n_win / _nc) if _nc else '—' }}%</span> / <span class="neg">{{ '{:.0f}'.format(100 * s.n_loss / _nc) if _nc else '—' }}%</span></div>
-      <div class="subtitle">positive P&amp;L {{ '{:.0f}'.format(100 * s.up_trades / _nc) if _nc else '—' }}% · negative {{ '{:.0f}'.format(100 * s.down_trades / _nc) if _nc else '—' }}% · {{ s.n_partial }} partial</div>
+      <div class="subtitle">positive P&amp;L {{ '{:.0f}'.format(100 * s.up_trades / _nc) if _nc else '—' }}% · negative {{ '{:.0f}'.format(100 * s.down_trades / _nc) if _nc else '—' }}%</div>
     </div>
   </div>
 
