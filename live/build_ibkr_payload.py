@@ -22,6 +22,7 @@ STMT_DIR = ROOT / "data" / "ibkr_statements"
 # short < long), written to ibkr_actual_equity_debit.json. Both payloads carry every spread in the account.
 SITE = sys.argv[sys.argv.index("--site") + 1] if "--site" in sys.argv else "credit"
 OUT = ROOT / "live" / "data" / ("ibkr_actual_equity_debit.json" if SITE == "debit" else "ibkr_actual_equity.json")
+DISPLAY_START = 10000.0      # the tab's starting bankroll, CAD (user 2026-11-13); the account opened at 5,002.79
 FIELDS = ["sec", "kind", "disc", "cat", "ccy", "sym", "dt", "qty", "tpx", "cpx", "proceeds", "comm",
           "basis", "rpl", "mtm", "code"]
 
@@ -222,6 +223,12 @@ def build():
             print(f"WARNING: NAV gap {a} end {nav[a]['end']:.2f} -> {b} start {nav[b]['start']:.2f}")
     d0 = (date.fromisoformat(days[0]) - timedelta(days=1)).isoformat()
     start_nav = nav[days[0]]["start"]
+    # The tab starts at DISPLAY_START (user 2026-11-13: 'starting to 10k not 5k'): every NAV point is the
+    # statement's NAV plus a constant offset, so the dollar P&L, the daily changes and the trades are the
+    # real ones; only the base the returns and the drawdown are measured against moves.
+    nav_off = DISPLAY_START - start_nav
+    actual_start = start_nav
+    start_nav = DISPLAY_START
 
     spreads = pair_spreads(fills, open_pos)
     # Structure from the legs alone: a credit vertical sells the strike nearer the money (puts short >
@@ -304,7 +311,7 @@ def build():
     # Points: one per session, NAV at the close (CAD); SPY scaled to the same start
     pts_dates = [d0] + days
     spy = _spy(pts_dates)
-    navs = [start_nav] + [nav[d]["end"] for d in days]
+    navs = [start_nav] + [nav[d]["end"] + nav_off for d in days]
     spy0 = spy.get(d0)
     points = [{"date": d, "strategy": round(v, 2),
                "spy": round(start_nav * spy[d] / spy0, 2) if spy0 and d in spy else None}
@@ -318,7 +325,7 @@ def build():
         wd = [d for d in days if wk(d) == w]
         tr = [t for t in trades if wk(t["closed"] or days[-1]) == w]
         tr.sort(key=lambda t: (t["entry"], t["ticker"]))
-        pre, post = nav[wd[0]]["start"], nav[wd[-1]]["end"]
+        pre, post = nav[wd[0]]["start"] + nav_off, nav[wd[-1]]["end"] + nav_off
         weeks.append({
             "label": "Week of " + date.fromisoformat(w).strftime("%b %-d, %Y"), "start": wd[0],
             "n_trades": len(tr), "n_bull_put": sum(t["type"] == "bull_put" for t in tr),
@@ -353,8 +360,10 @@ def build():
     }
     config = {
         "account": "U25707706", "base_currency": "CAD", "starting_bankroll": round(start_nav, 2),
+        "actual_start_nav": round(actual_start, 2), "nav_offset": round(nav_off, 2),
         "source": f"IBKR Daily Activity Statements, {days[0]} → {days[-1]} ({len(days)} sessions)",
-        "equity_basis": "Net Asset Value at each close, CAD, after commissions, fees and interest",
+        "equity_basis": f"Net Asset Value at each close, CAD, after commissions, fees and interest, "
+                        f"rebased to a {DISPLAY_START:,.0f} start (actual {actual_start:,.2f})",
         "trade_basis": "per spread, USD: IBKR Realized P/L on the closing fills incl. commissions; "
                        "assignments include the stock legs; open spreads at the last statement's unrealized P/L",
     }

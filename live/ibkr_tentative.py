@@ -122,6 +122,9 @@ def _max_dd(vals):
 def main():
     pay = json.load(open(OUT))
     stmt_day, legs, fx, nav_end, comm_per = last_statement()
+    # Same rebased scale as the payload (build_ibkr_payload DISPLAY_START): statement NAV + offset.
+    nav_off = float((pay.get("config") or {}).get("nav_offset") or 0.0)
+    nav_end += nav_off
     if pay["summary"]["window_end"] != stmt_day:
         sys.exit(f"payload ends {pay['summary']['window_end']}, statements end {stmt_day}: run build_ibkr_payload.py first")
     if DAY <= stmt_day:
@@ -198,7 +201,7 @@ def main():
         rolled.append((t["ticker"], t["k_s"], t["k_l"], round(v5, 2), round(v6, 2), round(pnl, 2), outcome, how))
 
     nav6_est = nav_end + mtm_usd * fx - comm_cad
-    nav6 = NAV_OVERRIDE if NAV_OVERRIDE is not None else nav6_est
+    nav6 = (NAV_OVERRIDE + nav_off) if NAV_OVERRIDE is not None else nav6_est
     # Points
     pts = pay["points"]
     spy_prev = pts[-1]["spy"]
