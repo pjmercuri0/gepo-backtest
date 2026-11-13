@@ -1925,6 +1925,19 @@ def _sized_page(template: str, data_file: str, **ctx):
         payload = _read_json(path)
         weeks_chart = []
         if payload:
+            # Same two trade cards as the IBKR tab (user 2026-11-13): settled spreads by outcome (WIN past
+            # the short strike, LOSS past the long, PARTIAL between) and by the sign of their P&L. Counts,
+            # so the sizing arm does not change them.
+            _tr = payload.get("trades") or []
+            _done = [t for t in _tr if t.get("outcome") != "OPEN"]
+            payload["tally"] = {
+                "n_win": sum(t.get("outcome") == "WIN" for t in _done),
+                "n_loss": sum(t.get("outcome") == "LOSS" for t in _done),
+                "n_partial": sum(t.get("outcome") == "PARTIAL" for t in _done),
+                "up_trades": sum((t.get("pnl") or 0) > 0 for t in _done),
+                "down_trades": sum((t.get("pnl") or 0) < 0 for t in _done),
+                "n_closed": len(_done), "n_open": len(_tr) - len(_done),
+            }
             payload["wagering"] = _wagering(payload)
             payload = _size_view(payload, arm)
             # The charts read five fields per week; shipping whole weeks put every trade in the

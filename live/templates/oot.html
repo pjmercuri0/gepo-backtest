@@ -66,6 +66,19 @@
       <div class="stat-label">max drawdown</div>
       <div class="stat-value neg">{{ hd.max_dd }}%</div>
     </div>
+    {% set ty = data.tally %}
+    {% if ty and ty.n_closed %}
+    <div class="stat">
+      <div class="stat-label">win / loss trades</div>
+      <div class="stat-value"><span class="pos">{{ ty.n_win }}</span> / <span class="neg">{{ ty.n_loss }}</span></div>
+      <div class="subtitle">{{ ty.n_partial }} partial · {{ ty.n_closed }} closed{% if ty.n_open %} · {{ ty.n_open }} open{% endif %}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">win / loss rate</div>
+      <div class="stat-value"><span class="pos">{{ '{:.0f}'.format(100 * ty.n_win / ty.n_closed) }}%</span> / <span class="neg">{{ '{:.0f}'.format(100 * ty.n_loss / ty.n_closed) }}%</span></div>
+      <div class="subtitle">positive P&amp;L {{ '{:.0f}'.format(100 * ty.up_trades / ty.n_closed) }}% · negative {{ '{:.0f}'.format(100 * ty.down_trades / ty.n_closed) }}%</div>
+    </div>
+    {% endif %}
   </div>
 
   {% if data.arms %}
