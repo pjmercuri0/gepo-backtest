@@ -38,6 +38,12 @@ a:hover { text-decoration: underline; }
 .chip-k { color: #888780; text-transform: lowercase; }
 .chip-v { color: #e8e8e8; font-weight: 500; }
 .stats { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-bottom: 24px; }
+/* Head cards of IBKR / Backtest / OOT / Plot: every card on one line, however many there are (user 2026-11-16) */
+@media (min-width: 701px) {
+  .stats.one-line { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .stats.one-line .stat { padding: 10px 10px; }
+  .stats.one-line .subtitle { font-size: 11px; margin-bottom: 0; }
+}
 .stat   { background: #1a1a1a; border: 0.5px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 12px; min-width: 0; }
 .stat-label { font-size: 10px; color: #888780; text-transform: lowercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat-value { font-size: 18px; font-weight: 600; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
