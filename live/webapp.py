@@ -613,6 +613,16 @@ def _save_actual_from_source(source: dict, pick: dict, source_label: str, source
         added = False
     else:
         # No auto-fill (user 2026-09-15): the row shows (+) until the real fill is typed.
+        # Contracts default to the last added row's (user 2026-11-16: 'default contract x for new
+        # added actuals at the last'); a row with none set means 1, as the Qty cell shows it.
+        if trades:
+            _last = max(trades, key=lambda t: str(t.get("added_at") or ""))
+            try:
+                _lq = int(_last.get("qty") or 1)
+            except (TypeError, ValueError):
+                _lq = 1
+            if _lq > 1:
+                row["qty"] = _lq
         trades.append(row)
         added = True
     store["trades"] = trades
