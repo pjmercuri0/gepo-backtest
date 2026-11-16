@@ -32,7 +32,7 @@ if str(ROOT) not in sys.path:
 import config as backtest_config
 import spreads
 import ground
-from live import live_config
+from live import live_config, market_hours
 from live.regime import current_regime
 from live.preflight import PreflightError, run as run_preflight
 from live.provenance import config_hash, git_sha, ranked_provenance
@@ -1206,8 +1206,10 @@ def main() -> int:
     # The live tab's end-of-day board: the last 15:xx scan at or before LIVE_BOARD_FREEZE_AT that
     # ranked anything. The site serves it once a later scan has replaced latest.json.
     _stem = snap_path.stem
-    _cut = str(getattr(live_config, "LIVE_BOARD_FREEZE_AT", "15:45")).replace(":", "")
-    if len(_stem) == 4 and _stem.isdigit() and "1500" <= _stem <= _cut and (payload.get("ticker") or []):
+    # Early-close day: the same window three hours earlier (12:00 to 12:45).
+    _day = snap_path.parent.name
+    _cut = market_hours.shift(str(getattr(live_config, "LIVE_BOARD_FREEZE_AT", "15:45")).replace(":", ""), _day)
+    if len(_stem) == 4 and _stem.isdigit() and market_hours.shift("1500", _day) <= _stem <= _cut and (payload.get("ticker") or []):
         keep_path = Path(live_config.RANKED_DIR) / "live_frozen.json"
         _atomic_write_json(keep_path, payload)
         print(f"wrote {keep_path}", flush=True)

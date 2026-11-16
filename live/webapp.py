@@ -31,6 +31,7 @@ if str(ROOT) not in sys.path:
 from live import live_config
 from live.regime import current_regime
 from live import trading_calendar
+from live import market_hours
 from live import credit_basis
 import spreads
 import ent_canon as ec
@@ -525,7 +526,7 @@ def _is_past_freeze() -> bool:
     now = datetime.now()
     if now.weekday() >= 5:  # weekend
         return False
-    hh, mm = (int(x) for x in live_config.FREEZE_AT.split(":"))
+    hh, mm = (int(x) for x in market_hours.shift(live_config.FREEZE_AT, now).split(":"))
     return now.time() >= dtime(hour=hh, minute=mm)
 
 
@@ -674,11 +675,11 @@ def _newest_scan_quote(pick: dict):
         except ValueError:
             pass
         d = _read_json(fp)
-        if d and any(_in_market_hours(sc.get("hhmm", "")) for sc in d.get("scans") or []):
+        if d and any(_in_market_hours(sc.get("hhmm", ""), fp.stem) for sc in d.get("scans") or []):
             payload, date = d, str(d.get("date") or fp.stem)
             break
     key, found = _k(pick), None
-    scans = [sc for sc in (payload or {}).get("scans") or [] if _in_market_hours(sc.get("hhmm", ""))]
+    scans = [sc for sc in (payload or {}).get("scans") or [] if _in_market_hours(sc.get("hhmm", ""), date)]
     for sc in sorted(scans, key=lambda s: s.get("hhmm", "")):
         for p in sc.get("picks") or []:
             if p.get("net_credit") is not None and _k(p) == key:
@@ -1073,6 +1074,14 @@ def _enrich_payload(payload: dict) -> None:
         _enrich_pick(pick, tracking_rows=tracking.get(pick.get("ticker")) or [])
     payload.update(_basket_totals(payload.get("top_picks") or []))
     payload["week_notice"] = trading_calendar.week_notice()
+    payload["expiry_notice"] = _expiry_notice(payload.get("ticker"))
+
+
+def _expiry_notice(rows) -> dict:
+    """Expiry day(s) of the live table's rows, on the server's ET date."""
+    today = datetime.fromisoformat(_server_now_et()).date()
+    return trading_calendar.expiry_notice(
+        [r.get("expiry_date") for r in rows or []], today)
 
 
 def _basket_totals(picks: list) -> dict:
@@ -1183,9 +1192,9 @@ def _stream_state() -> dict:
 
 
 def _in_session_ts(ts) -> bool:
-    """True when a naive local timestamp falls inside the regular session (09:30-16:00 ET)."""
-    t = str(ts or "")[11:19]
-    return "09:30:00" <= t < "16:00:00"
+    """True when a naive local timestamp falls inside that day's regular session
+    (09:30 ET to the bell: 16:00, or 13:00 on an early-close day)."""
+    return market_hours.in_session(ts)
 
 
 def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=False,
@@ -1386,7 +1395,7 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
                 # Before the open ON expiry day the plain after-hours rule below applies (user 2026-11-13:
                 # the pre-market page marked AXP 320/317.5 at intrinsic on the 15:59:59 tick, 0.63, beside
                 # a streamed spot of 319.47); the freeze is for after the close.
-                if _exp_d < _now_et[:10] or (_exp_d == _now_et[:10] and _now_et[11:19] >= "16:00:00"):
+                if _exp_d < _now_et[:10] or (_exp_d == _now_et[:10] and _now_et[11:16] >= market_hours.close_hhmm(_now_et)):
                     # Expiry day (user 2026-11-10: "not friday ... make sure they settle 4pm friday"):
                     # the mark freezes at intrinsic on the last in-session spot, not the after-hours
                     # tick; the settler then writes the official close.
@@ -2024,8 +2033,9 @@ MARKET_OPEN_HHMM  = "0930"
 MARKET_CLOSE_HHMM = "1600"
 
 
-def _in_market_hours(hhmm: str) -> bool:
-    """True for a scan fired inside the regular session, 09:30 <= t < 16:00.
+def _in_market_hours(hhmm: str, day=None) -> bool:
+    """True for a scan fired inside the regular session, 09:30 <= t < 16:00
+    (< 13:00 when ``day``, the scan's date, is an early-close day).
 
     Ad-hoc and after-hours runs (00:19, 16:00, 16:30, 20:11 are all in the
     store) are not comparable with a normal scan -- frozen quotes, no volume,
@@ -2034,7 +2044,8 @@ def _in_market_hours(hhmm: str) -> bool:
     """
     if not hhmm or len(hhmm) < 4 or not hhmm[:4].isdigit():
         return False
-    return MARKET_OPEN_HHMM <= hhmm[:4] < MARKET_CLOSE_HHMM
+    close = market_hours.shift(MARKET_CLOSE_HHMM, day) if day else MARKET_CLOSE_HHMM
+    return MARKET_OPEN_HHMM <= hhmm[:4] < close
 
 
 def _round_hhmm(hhmm: str) -> str:
@@ -2110,7 +2121,7 @@ def snapshots():
             # day cards AND the by-time aggregate. Filtered on the RAW time, not
             # the bucket: 15:45/15:46/15:55 are in-hours scans and must survive.
             # Nothing is deleted from disk.
-            kept = [sc for sc in d.get("scans", []) if _in_market_hours(sc.get("hhmm", "")) and not sc.get("_debit_empty")
+            kept = [sc for sc in d.get("scans", []) if _in_market_hours(sc.get("hhmm", ""), fp.stem) and not sc.get("_debit_empty")
                     and not (IS_DEBIT_SITE and not sc.get("picks"))]      # debit book starts 2026-11-02; no empty cards before
             if not kept:
                 continue
@@ -2598,7 +2609,7 @@ def _actuals_view():
         # which is the after-hours assignment case he wants to see. Settled P&L is untouched.
         _sts = str(_stream.get("ts") or "")
         if (r.get("outcome_row") and _spot and _sts[:10] == ddate.today().isoformat()
-                and "16:00:00" <= _sts[11:19]
+                and market_hours.close_hhmm(_sts) <= _sts[11:16]
                 and str(pk.get("expiry_date") or "")[:10] == ddate.today().isoformat()):
             try:
                 _cl = float((r.get("outcome_row") or {}).get("underlying_price"))
@@ -2997,7 +3008,7 @@ def _live_board() -> dict | None:
     ts, kts = str(payload.get("snapshot_ts") or ""), str((keep or {}).get("snapshot_ts") or "")
     if keep and kts and ts[:10] == kts[:10] and ts > kts:
         keep["frozen"] = True
-        keep["frozen_at"] = str(getattr(live_config, "LIVE_BOARD_FREEZE_AT", "15:45"))
+        keep["frozen_at"] = market_hours.shift(str(getattr(live_config, "LIVE_BOARD_FREEZE_AT", "15:45")), kts)
         return keep
     return payload
 
@@ -3036,7 +3047,7 @@ def latest_json():
         frozen = _frozen_payload_today()
         if frozen is not None:
             frozen["frozen"] = True
-            frozen.setdefault("frozen_at", live_config.FREEZE_AT)
+            frozen.setdefault("frozen_at", market_hours.shift(live_config.FREEZE_AT))
             # Override baked-in regime with the live one so the subheader
             # tracks the IBKR tick (and the chip + subheader agree).
             frozen["regime"] = current_regime()
@@ -3044,6 +3055,7 @@ def latest_json():
             _overlay_stream(frozen)
             _mark_held(frozen)
             frozen["server_now"] = _server_now_et()
+            frozen["session_close"] = market_hours.close_hhmm()
             return jsonify(frozen)
 
     payload = _live_board()
@@ -3057,7 +3069,9 @@ def latest_json():
             "ticker": [],
             "regime": current_regime(),
             "week_notice": trading_calendar.week_notice(),
+            "expiry_notice": _expiry_notice([]),
             "server_now": _server_now_et(),
+            "session_close": market_hours.close_hhmm(),
             "error": "no ranked snapshot found yet — run the fetcher + ranker",
         })
     # Always re-evaluate regime against the freshest data on disk, so the
@@ -3068,6 +3082,7 @@ def latest_json():
     _mark_held(payload)
     payload["scan_status"] = _scan_status()
     payload["server_now"] = _server_now_et()
+    payload["session_close"] = market_hours.close_hhmm()
     return jsonify(payload)
 
 

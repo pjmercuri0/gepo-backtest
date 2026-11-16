@@ -5,7 +5,7 @@
 0 16 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_parallel.sh
 1 16 * * 4,5 /Users/securio/Downloads/gepo-backtest/live/cron_expire.sh
 1,31 9-15 * * 4,5 /Users/securio/Downloads/gepo-backtest/live/cron_track_expiring.sh
-1 15 * * 4,5 /Users/securio/Downloads/gepo-backtest/live/cron_close_alert.sh
+1 12,15 * * 4,5 /Users/securio/Downloads/gepo-backtest/live/cron_close_alert.sh
 1 17 * * 1-5 /Users/securio/Downloads/gepo-backtest/live/cron_daily_bars.sh
 1 17 * * 5 /Users/securio/Downloads/gepo-backtest/live/cron_calendar_refresh.sh
 # Health: 5 min after each scan, 9:05-16:05 Mon-Fri.

@@ -69,6 +69,58 @@ def week_notice(today: datetime.date | None = None) -> dict:
     }
 
 
+from live.market_hours import EARLY_CLOSES   # 1:00 pm ET closes (options 1:15 pm)
+
+
+def upcoming_settlement_day(today: datetime.date | None = None) -> datetime.date:
+    """The next weekly settlement day on or after ``today`` (this week's, or
+    next week's once this week's has passed, e.g. on a weekend)."""
+    if today is None:
+        today = datetime.date.today()
+    settle = weekly_settlement_day(today)
+    if settle < today:
+        monday = today + datetime.timedelta(days=7 - today.weekday())
+        settle = weekly_settlement_day(monday)
+    return settle
+
+
+def expiry_notice(expiry_dates, today: datetime.date | None = None) -> dict:
+    """Expiry day(s) of the live list, for the live tab's header (user
+    2026-11-16: write the expiry day, highlight it when it is not a Friday).
+
+    ``expiry_dates`` are the rows' own expiry dates (ISO strings, from the
+    option chain). Dates still to come are reported as-is, ``source`` "rows".
+    When the list is empty or already expired (frozen board before the next
+    scan), the upcoming weekly settlement day stands in, ``source`` "calendar".
+    """
+    if today is None:
+        today = datetime.date.today()
+    live = set()
+    for e in expiry_dates or []:
+        try:
+            d = datetime.date.fromisoformat(str(e)[:10])
+        except ValueError:
+            continue
+        if d >= today:
+            live.add(d)
+    source = "rows" if live else "calendar"
+    if not live:
+        live = {upcoming_settlement_day(today)}
+    out = []
+    for d in sorted(live):
+        friday = d + datetime.timedelta(days=(4 - d.weekday()))
+        out.append({
+            "date": d.isoformat(),
+            "weekday": d.strftime("%A"),
+            "is_friday": d.weekday() == 4,
+            "friday_holiday": d.weekday() != 4 and pd.Timestamp(friday) in _NYSE_HOLIDAY_SET,
+            "nominal_friday": friday.isoformat(),
+            "early_close": d.isoformat() in EARLY_CLOSES,
+            "days_away": (d - today).days,
+        })
+    return {"source": source, "expiries": out}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--is-settlement-day", action="store_true",

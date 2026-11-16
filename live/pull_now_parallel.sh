@@ -321,7 +321,9 @@ echo "✓ Snapshot, merge, and rankings complete"
 
 # Freeze during 15:xx. If 15:01 is blank, the 15:31 scan can replace it with
 # real picks; if 15:01 has picks, it is kept.
-if [ "$(date +%H)" = "15" ]; then
+# Early-close day (13:00 bell): the freeze hour is 12, not 15 (live/market_hours.py).
+FREEZE_HOUR="$("${GEPO_PYTHON:-python3}" -m live.market_hours --shift-hour 15 2>/dev/null || echo 15)"
+if [ "$(date +%-H)" = "$FREEZE_HOUR" ]; then
     "${GEPO_PYTHON:-python3}" -m live.freeze_snapshot 2>&1 | sed "s/^/  /"
 fi
 

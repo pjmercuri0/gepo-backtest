@@ -12,7 +12,7 @@
 
 <div id="spy-live"></div>
 
-<div id="holiday-banner"></div>
+<div id="expiry-banner"></div>
 
 <div id="stale-banner"></div>
 
@@ -504,9 +504,12 @@ function etMs(ts) {
   const t = String(ts);
   return Date.parse((t.length <= 10 ? t + "T00:00:00" : t.slice(0, 19)) + "Z");
 }
+let _closeMin = 16 * 60;                              // today's bell, minutes ET; 13:00 on an early close
 function noteServerNow(data) {
   const ms = etMs(data && data.server_now);
   if (!isNaN(ms)) _srvNow = { ms, at: performance.now() };
+  const c = String((data && data.session_close) || "").split(":");
+  if (c.length === 2 && !isNaN(+c[0]) && !isNaN(+c[1])) _closeMin = +c[0] * 60 + +c[1];
 }
 function serverNowMs() {
   return _srvNow ? _srvNow.ms + (performance.now() - _srvNow.at) : NaN;
@@ -515,7 +518,7 @@ function ageMinutes(ts) {
   return (serverNowMs() - etMs(ts)) / 60000;   // NaN until the server clock arrives
 }
 
-// Returns true if it's currently a weekday between 9:30 and 16:00 ET, by the server clock.
+// Returns true if it's currently a weekday between 9:30 ET and today's bell, by the server clock.
 function marketOpenNow() {
   const ms = serverNowMs();
   if (isNaN(ms)) return false;
@@ -523,7 +526,7 @@ function marketOpenNow() {
   const dow = now.getUTCDay();                        // 0 = Sun ... 6 = Sat
   if (dow === 0 || dow === 6) return false;
   const mins = now.getUTCHours() * 60 + now.getUTCMinutes();
-  return mins >= 9*60 + 30 && mins <= 16*60;          // 9:30 ≤ now ≤ 16:00 ET
+  return mins >= 9*60 + 30 && mins <= _closeMin;      // 9:30 ≤ now ≤ the bell (16:00, or 13:00 early close)
 }
 
 // True if the live quote stream (combo_stream.json, rewritten every few
@@ -621,27 +624,42 @@ async function refresh() {
     document.getElementById("snapshot-meta").textContent =
       `snapshot: ${data.snapshot_ts}  ·  ${data.n_candidates} candidates  ·  source: ${data.snapshot_file}`;
 
+    // Expiry header (user 2026-11-16): the expiry day of this list, always shown;
+    // amber when it is not a Friday (holiday week) or the market closes early that
+    // day, so the close-out day is never assumed. Dates come from the rows' own
+    // expiry; before the first scan of a new week the calendar's next settlement day.
+    const expiryEl = document.getElementById("expiry-banner");
+    if (expiryEl) {
+      const en = data.expiry_notice;
+      const fmtD = (iso) => new Intl.DateTimeFormat("en-US",
+        { month: "short", day: "numeric", timeZone: "America/New_York" })
+        .format(new Date(iso + "T12:00:00"));
+      expiryEl.innerHTML = ((en && en.expiries) || []).map(e => {
+        const away = e.days_away === 0 ? "today" : e.days_away === 1 ? "tomorrow" : `in ${e.days_away} days`;
+        const warn = !e.is_friday || e.early_close;
+        if (!warn) {
+          return `<div class="week-card expiry-card" data-expiry="${e.date}" style="padding:12px 14px;margin-bottom:18px">
+            <span style="color:#888780;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Expiry</span>
+            &nbsp; <strong>${e.weekday}, ${fmtD(e.date)}</strong>
+            <span class="week-sub">&nbsp;·&nbsp; ${away}</span></div>`;
+        }
+        const notes = [];
+        if (!e.is_friday) {
+          notes.push((e.friday_holiday ? `Friday ${fmtD(e.nominal_friday)} is an NYSE holiday. ` : "")
+            + `Close positions by <strong>${e.weekday}</strong>, not Friday.`);
+        }
+        if (e.early_close) notes.push(`Market closes early that day: <strong>1:00 pm ET</strong> (options 1:15 pm).`);
+        return `<div class="week-card expiry-card expiry-warn" data-expiry="${e.date}" style="background:#3a2a15;border:1px solid #6b5227;padding:14px;margin-bottom:18px">
+          <div style="color:#ffce8a;font-weight:600;font-size:16px">&#9888; Expiry ${e.is_friday ? e.weekday : e.weekday.toUpperCase()}, ${fmtD(e.date)}${e.is_friday ? "" : " &mdash; not a Friday"}${e.early_close ? " &mdash; early close" : ""}
+            <span class="week-sub" style="font-weight:400">&nbsp;·&nbsp; ${away}</span></div>
+          <div class="week-sub" style="margin-top:4px">${notes.join("<br>")}</div></div>`;
+      }).join("");
+    }
+
     // Staleness banner: latest.json is only rewritten when a scan produces
     // option rows. If the newest ranking isn't from today, the picks shown are
     // stale (e.g. a holiday-shifted expiry that returned no chains) — flag it
     // so a day-old ranking is never mistaken for live.
-    // Holiday-week banner: when this week's Friday is an NYSE holiday the
-    // weekly expiry rolls back, so the closing day is not the usual Friday.
-    const holidayEl = document.getElementById("holiday-banner");
-    if (holidayEl) {
-      const wn = data.week_notice;
-      if (wn && wn.shifted) {
-        const fmt = (iso) => new Intl.DateTimeFormat("en-US",
-          { weekday: "long", month: "short", day: "numeric", timeZone: "America/New_York" })
-          .format(new Date(iso + "T12:00:00"));
-        holidayEl.innerHTML = `<div class="week-card" style="background:#3a2a15;border:1px solid #6b5227;padding:14px;margin-bottom:18px">
-          <div style="color:#ffce8a;font-weight:600">&#9888; Short week &mdash; ${fmt(wn.nominal_friday)} is an NYSE holiday</div>
-          <div class="week-sub" style="margin-top:4px">This week's weekly options expire <strong>${fmt(wn.settlement_date)}</strong>. Close positions by ${wn.settlement_weekday}, not Friday.</div></div>`;
-      } else {
-        holidayEl.innerHTML = "";
-      }
-    }
-
     const staleEl = document.getElementById("stale-banner");
     if (staleEl) {
       const todayET = data.server_now ? String(data.server_now).slice(0, 10) : null;   // server's ET date

@@ -17,6 +17,11 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+try:
+    from live import market_hours
+except ImportError:                      # run as a script on Mya: live/ is sys.path[0]
+    import market_hours
+
 HERE = Path(__file__).resolve().parent
 NOTIF = Path(os.environ.get("GEPO_NOTIF_DIR") or (HERE / "notifications"))   # env: test dir
 LEDGER = NOTIF / ".win_alerted.json"
@@ -58,7 +63,7 @@ def main() -> int:
 
     now = datetime.now(ET)
     hm = now.strftime("%H:%M")
-    if not args.force and (now.weekday() >= 5 or not ("09:30" <= hm < "16:00")):
+    if not args.force and (now.weekday() >= 5 or not ("09:30" <= hm < market_hours.close_hhmm(now))):
         return 0
 
     try:

@@ -19,6 +19,14 @@ if ! "${GEPO_PYTHON:-python3}" -m live.trading_calendar --is-settlement-day; the
   exit 0
 fi
 
+# One hour before the bell: 15:01 on a normal day, 12:01 on an early close
+# (13:00 bell). Cron fires both hours; only the right one for today runs.
+ALERT_HOUR="$("${GEPO_PYTHON:-python3}" -m live.market_hours --shift-hour 15 2>/dev/null || echo 15)"
+if [ "$(date +%-H)" != "$ALERT_HOUR" ]; then
+  echo "=== $(date '+%Y-%m-%d %H:%M:%S') close alert runs at ${ALERT_HOUR}:01 today — skip ===" >> live/logs/close_alert.log
+  exit 0
+fi
+
 /usr/bin/caffeinate -i -t 120 &
 
 LOG=live/logs/close_alert.log

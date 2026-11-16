@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from live import live_config
+from live import live_config, market_hours
 from live.ranker import rank_snapshot, _latest_snapshot
 
 
@@ -153,7 +153,7 @@ def main() -> int:
         return 0
     import config as backtest_config
     if (getattr(backtest_config, "SELECTION_MODE", "ground") == "fable"
-            and str(payload.get("frozen_at")).startswith(str(getattr(backtest_config, "FABLE_FREEZE_HHMM", "15:30")))):
+            and str(payload.get("frozen_at")).startswith(market_hours.shift(str(getattr(backtest_config, "FABLE_FREEZE_HHMM", "15:30")), payload.get("data_date") or None))):
         print("Fable frozen day is booked at its freeze-scan quotes; skipping drift.", flush=True)
         return 0
 

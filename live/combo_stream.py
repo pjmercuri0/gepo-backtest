@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from ib_insync import IB, Stock, Option, Bag, ComboLeg, Contract
-from live import debit_mode, live_config
+from live import debit_mode, live_config, market_hours
 from live.combo_quotes import COMBO_EXCHANGES, LEG_EXCHANGE, _bag_for, usable_combo
 from live.fetcher import _connect_with_retry
 
@@ -750,7 +750,7 @@ def main() -> int:
                     and _now.strftime("%H:%M") != last_pre:
                 last_pre = _now.strftime("%H:%M")
                 print(f"[combo_stream] pre-open {ts} spots {json.dumps(sp, sort_keys=True)}", flush=True)
-            if _now.weekday() < 5 and "09:30" <= _now.strftime("%H:%M") < "16:00":
+            if _now.weekday() < 5 and "09:30" <= _now.strftime("%H:%M") < market_hours.close_hhmm(_now):
                 for k, q in quotes.items():
                     _w = widths.get(k)
                     if _w and abs(q["ask"] - q["bid"]) > _w + 1e-9:     # wider than the spread: not a price

@@ -22,7 +22,7 @@ from pathlib import Path
 import pandas as pd
 
 import spreads
-from live import live_config
+from live import live_config, market_hours
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -147,9 +147,10 @@ def maybe_freeze(latest_path: Path | None = None, now: datetime | None = None) -
     # Any other 15:xx scan is ignored.
     import config as backtest_config
     if getattr(backtest_config, "SELECTION_MODE", "ground") == "fable":
-        want = str(getattr(backtest_config, "FABLE_FREEZE_HHMM", "15:30"))
+        # Early-close day (13:00 bell): the same scans three hours earlier, 12:15 then 12:30, 12:45.
+        want = market_hours.shift(str(getattr(backtest_config, "FABLE_FREEZE_HHMM", "15:30")), now)
         _tu = getattr(backtest_config, "FABLE_TOPUP_HHMM", "15:45")
-        topups = [str(_tu)] if isinstance(_tu, str) else [str(x) for x in _tu]
+        topups = [market_hours.shift(t, now) for t in ([str(_tu)] if isinstance(_tu, str) else [str(x) for x in _tu])]
         topup = next((t for t in topups if latest_hhmm[:4] == t[:4]), None)
         cap = int(getattr(backtest_config, "FABLE_TOP_N", 5))
         ex_at = str((existing or {}).get("frozen_at") or "")

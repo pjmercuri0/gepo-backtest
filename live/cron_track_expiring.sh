@@ -14,6 +14,12 @@ if ! "${GEPO_PYTHON:-python3}" -m live.trading_calendar --is-settlement-day; the
   exit 0
 fi
 
+# Early-close day: the bell is 13:00, so the 13:01-15:31 firings have no live quotes.
+if "${GEPO_PYTHON:-python3}" -m live.market_hours --after-close; then
+  echo "=== $(date '+%Y-%m-%d %H:%M:%S') after the bell — skip ===" >> live/logs/track_expiring.log
+  exit 0
+fi
+
 # Keep Mac awake for 3 minutes so cron actually fires + IB fetch completes
 # even if the system was sleeping when the cron schedule hit.
 /usr/bin/caffeinate -i -t 180 &

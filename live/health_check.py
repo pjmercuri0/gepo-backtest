@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from live import live_config
+from live import live_config, market_hours
 
 
 SPY_PATH         = Path(live_config.RANKED_DIR) / "spy_intraday.json"
@@ -54,7 +54,9 @@ MARKET_CLOSE = dtime(hour=16, minute=5)
 def _in_market_hours(now: datetime) -> bool:
     if now.weekday() >= 5:           # 5=Sat, 6=Sun
         return False
-    return MARKET_OPEN <= now.time() <= MARKET_CLOSE
+    # Early-close day: the window ends five minutes after the 13:00 bell instead.
+    close = dtime.fromisoformat(market_hours.shift(MARKET_CLOSE.strftime("%H:%M"), now))
+    return MARKET_OPEN <= now.time() <= close
 
 
 def _spy_mtime() -> datetime | None:

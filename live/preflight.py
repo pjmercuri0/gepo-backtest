@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from live import live_config
+from live import live_config, market_hours
 from live.provenance import manifest_path, read_manifest
 
 
@@ -53,9 +53,11 @@ def _now_et(now: datetime | None = None) -> datetime:
     return now.astimezone(ET) if now.tzinfo else now.replace(tzinfo=ET)
 
 
-def _market_window() -> tuple[dtime, dtime]:
+def _market_window(day=None) -> tuple[dtime, dtime]:
+    """Scan window for ``day`` (default today, ET). On an early-close day the end
+    keeps its half hour past the bell: 13:30 instead of 16:30."""
     start = dtime.fromisoformat(live_config.FETCH_WINDOW_START)
-    end = dtime.fromisoformat(live_config.FETCH_WINDOW_END)
+    end = dtime.fromisoformat(market_hours.shift(live_config.FETCH_WINDOW_END, day))
     return start, end
 
 
@@ -137,7 +139,7 @@ def _check_paths(mode: str) -> list[Check]:
 
 
 def _check_market_session(now: datetime, allow_out_of_hours: bool) -> list[Check]:
-    start, end = _market_window()
+    start, end = _market_window(now)
     in_window = now.weekday() < 5 and start <= now.time() <= end
     return [Check(
         "market-session",
