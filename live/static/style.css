@@ -75,6 +75,8 @@ th { text-align: left; color: #888780; font-weight: 500; font-size: 11px;
 td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); white-space: nowrap; }
 tr:last-child td { border-bottom: none; }
 td.fw { font-weight: 600; }
+/* GROUND column, every tab: room on its right so the number does not run into the next column or the card edge (user 2026-11-16) */
+table th.gcol, table td.gcol { padding-right: 18px; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
 .badge-WIN     { background: rgba(29,158,117,0.15); color: #1D9E75; }
 .badge-LOSS    { background: rgba(226,75,74,0.15); color: #E24B4A; }
