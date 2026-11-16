@@ -837,7 +837,12 @@ def _actuals_rows() -> list[dict]:
                     # 14:16 scan's 1.075 leg mid (user 2026-10-20). The scan refreshes
                     # marks and outcomes only.
                     _saved = {k: pick[k] for k in _ACTUAL_SAVED_CREDIT_KEYS if pick.get(k) is not None}
+                    # The scan's own quote, kept beside the saved credit: a Snap + stores the BOOKED credit
+                    # in quoted_credit (snap_booked), which left 'fills vs quoted' comparing 125 of 168
+                    # fills with the model again (user 2026-11-16).
+                    _scan_q = fresh.get("quoted_credit") or fresh.get("net_credit")
                     pick = {**pick, **_json_clone(fresh), **_saved}
+                    pick["scan_quoted_credit"] = _scan_q
                     source_time = f"{str(scan.get('hhmm', ''))[:2]}:{str(scan.get('hhmm', ''))[2:]}"
             # Snapshot-sourced trades used to render a dash for spot, mark and
             # P&L: only the frozen branch above ever set last_track/last_marked/
@@ -2494,13 +2499,22 @@ def _actuals_weeks(rows: list[dict]) -> list[dict]:
     return sorted(out, key=lambda w: w["expiry"], reverse=True)
 
 
+FILL_STATS_RECENT = 20      # fills in the 'last N' ratio on the Actuals header (user 2026-11-16)
+
+
 def _fill_stats(rows: list[dict]) -> dict:
     """Your fills against the model and the IBKR quote (D_ent canon, 2026-09-13). This is the
     number that decides the live selection basis: if fill/quoted runs under ~0.95 for a couple of
-    weeks, the quote is inflated and LIVE_SELECTION_CREDIT should go back to "model"."""
-    import statistics
-    fm, fq, below = [], [], 0
-    for r in rows:
+    weeks, the quote is inflated and LIVE_SELECTION_CREDIT should go back to "model".
+
+    Each ratio is a ratio of sums at 1x (user 2026-11-11: 'max win actual divided by max win model
+    1x'), given twice (user 2026-11-16: 'it doesnt really change much when i enter'): over the last
+    FILL_STATS_RECENT fills entered, where one entry moves it, and over every fill. Each count is
+    the number of fills that ratio is made of -- 26 of 168 rows carry no model credit.
+    Quoted = the scan's own quote for a Snap + (whose quoted_credit is the booked credit), else the
+    quote the row was saved at."""
+    fm, fq, below, n = [], [], 0, 0
+    for r in sorted(rows, key=lambda x: str(x.get("added_at") or "")):
         p = r.get("pick") or {}
         a = p.get("actual_credit")
         if a is None:
@@ -2509,19 +2523,23 @@ def _fill_stats(rows: list[dict]) -> dict:
             a = float(a)
         except (TypeError, ValueError):
             continue
-        mc = p.get("model_credit"); qc = p.get("quoted_credit") or p.get("net_credit")
+        n += 1
+        mc = p.get("model_credit")
+        if p.get("credit_source") == "snap_booked":
+            qc = p.get("scan_quoted_credit")
+        else:
+            qc = p.get("quoted_credit") or p.get("net_credit")
         if mc: fm.append((a, float(mc)))
         if qc: fq.append((a, float(qc)))
         tg = p.get("credit_targets") or {}
         if tg.get("min_credit") is not None and a < float(tg["min_credit"]): below += 1
-    # Ratio of sums at 1x (user 2026-11-11: 'max win actual divided by max win model 1x'): every fill
-    # moves it. The median it replaced sat at 1.005 through the last rows he entered. Each pair is
-    # (actual max win, model max win) per share, one contract per row.
     _ratio = lambda pairs: round(sum(x for x, _ in pairs) / sum(m for _, m in pairs), 3) \
         if pairs and sum(m for _, m in pairs) > 0 else None
-    return {"n_fills": len(fq), "n_model": len(fm),
-            "fill_over_model": _ratio(fm),
-            "fill_over_quoted": _ratio(fq),
+    k = FILL_STATS_RECENT
+    return {"n_fills": n, "n_model": len(fm), "n_quoted": len(fq),
+            "recent_n_model": min(k, len(fm)), "recent_n_quoted": min(k, len(fq)),
+            "fill_over_model": _ratio(fm), "fill_over_model_recent": _ratio(fm[-k:]),
+            "fill_over_quoted": _ratio(fq), "fill_over_quoted_recent": _ratio(fq[-k:]),
             "below_min": below}
 
 

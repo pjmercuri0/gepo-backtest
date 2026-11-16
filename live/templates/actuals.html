@@ -6,9 +6,12 @@
 <div class="subtitle">Trades you added from Live, History or Snapshots.</div>
 {% if fill_stats and fill_stats.n_fills %}
 <div class="subtitle" title="sum of your recorded fills' max win (1 contract each) divided by the sum of the model's max win, and by the IBKR quote's. If fill / quoted stays under ~0.95, the quote the ranker selects on is inflated: set LIVE_SELECTION_CREDIT back to model.">
-  fills vs model: <strong>{{ fill_stats.fill_over_model if fill_stats.fill_over_model is not none else '—' }}×</strong>
-  &middot; fills vs quoted: <strong>{{ fill_stats.fill_over_quoted if fill_stats.fill_over_quoted is not none else '—' }}×</strong>
-  &middot; {{ fill_stats.n_fills }} fills, {{ fill_stats.below_min }} below min
+  {% set fs = fill_stats %}
+  fills vs model: <strong>{{ fs.fill_over_model_recent if fs.fill_over_model_recent is not none else '—' }}×</strong> last {{ fs.recent_n_model }}
+  &middot; {{ fs.fill_over_model if fs.fill_over_model is not none else '—' }}× all {{ fs.n_model }}<br>
+  fills vs quoted: <strong>{{ fs.fill_over_quoted_recent if fs.fill_over_quoted_recent is not none else '—' }}×</strong> last {{ fs.recent_n_quoted }}
+  &middot; {{ fs.fill_over_quoted if fs.fill_over_quoted is not none else '—' }}× all {{ fs.n_quoted }}<br>
+  {{ fs.n_fills }} fills, {{ fs.below_min }} below min
 </div>
 {% endif %}
 
