@@ -54,6 +54,25 @@ def fetch_bars(names: list[str], today: pd.Timestamp, sleep: float) -> pd.DataFr
                     intr = [x for x in intr if pd.Timestamp(x.date).tz_localize(None).normalize() == today]
                     if intr:   # only today's OPEN enters today's gap
                         b.append({'ticker': s, 'date': today, 'open': intr[0].open, 'high': intr[0].high, 'low': intr[0].low, 'close': intr[-1].close})
+                if b and b[-1]['date'] != today and c.primaryExchange and c.primaryExchange != 'SMART':
+                    # SMART history stale: the missing days come from the name's own listing exchange (user 2026-11-17:
+                    # 'use the respective exchange'). GM that day -- its listing moved NYSE -> NASDAQ, SMART daily bars
+                    # stopped at 11-13 and SMART intraday returned nothing, while the exchange itself had both days.
+                    time.sleep(sleep)
+                    pc = Stock(s, c.primaryExchange, 'USD'); pc.conId = c.conId
+                    last = b[-1]['date']
+                    pd_ = ib.reqHistoricalData(pc, endDateTime='', durationStr='10 D', barSizeSetting='1 day',
+                                               whatToShow='TRADES', useRTH=True, formatDate=1)
+                    b += [{'ticker': s, 'date': pd.Timestamp(x.date).normalize(), 'open': x.open, 'high': x.high, 'low': x.low, 'close': x.close}
+                          for x in pd_ if pd.Timestamp(x.date).normalize() > last]
+                    if b[-1]['date'] != today:
+                        time.sleep(sleep)
+                        intr = ib.reqHistoricalData(pc, endDateTime='', durationStr='1 D', barSizeSetting='30 mins',
+                                                    whatToShow='TRADES', useRTH=True, formatDate=1)
+                        intr = [x for x in intr if pd.Timestamp(x.date).tz_localize(None).normalize() == today]
+                        if intr:
+                            b.append({'ticker': s, 'date': today, 'open': intr[0].open, 'high': intr[0].high, 'low': intr[0].low, 'close': intr[-1].close})
+                    print(f'    {s}: SMART stale at {last.date()}, filled from {c.primaryExchange} to {b[-1]["date"].date()}', flush=True)
                 rows += b
                 print(f'{i:>3}/{len(names)} {s:<6} {len(b)} bars, last {b[-1]["date"].date() if b else "-"}', flush=True)
             except Exception as e:
