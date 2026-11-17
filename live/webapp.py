@@ -149,9 +149,9 @@ app.jinja_env.filters['px'] = _px
 # row whose mark AS SHOWN is this much of its width or more. live/win_alert.py on Mya turns a row
 # crossing it into a Telegram alert (user 2026-11-10).
 ACTUALS_GREEN_PCT = 90
-# After hours and settled rows the pct is the value at the SPOT over the width (no quote), and the row
-# only goes green once the spot is past the far strike (user 2026-11-13: 'after hours rows should only
-# go green if they are >= 101%'): 100% is the spot sitting exactly on it.
+# After hours and settled rows the pct is where the SPOT sits against the spread's midpoint (no quote),
+# and the row only goes green once the spot is past the short strike (user 2026-11-13: 'after hours rows
+# should only go green if they are >= 101%'): 100% is the spot sitting exactly on it.
 ACTUALS_GREEN_PCT_AH = 101
 
 
@@ -171,10 +171,10 @@ def _pct_of_width(r: dict):
     IN SESSION (user 2026-11-11: 'during market hours pct based on mark'): the debit mark as quoted over
     the width, unclamped, so a quote outside the width prints past 100% or under 0%. A row closed on the
     site keeps its locked mark.
-    AFTER HOURS and settled rows (user 2026-11-11: 'pct to reflect the spot price not the mark ... past
-    the high strike beyond 100%'): the spread's value AT THE SPOT SHOWN over the width, unclamped. Bull
-    call (bull_put twin): (spot - low strike) / width; bear put (bear_call twin): (high strike - spot) /
-    width. Settled rows use the settlement close."""
+    AFTER HOURS and settled rows (user 2026-11-11: 'pct to reflect the spot price not the mark'; user
+    2026-11-17: relative to the midpoint of the spread): where THE SPOT SHOWN sits between the strikes,
+    unclamped: +100% at the short strike, 0% at the midpoint, -100% at the long strike, past either
+    beyond. Settled rows use the settlement close."""
     p = r.get("pick") or {}
     if not (IS_DEBIT_SITE and p.get("structure") == "debit"):
         return None
@@ -215,7 +215,10 @@ def _pct_of_width(r: dict):
         spot = _round_half_up(float(spot), 2)
         raw = (ks - spot) if p.get("spread_type") == "bull_put" else (spot - ks)   # the credit twin's value
         r["pct_basis"], r["pct_spot"] = "spot", spot
-        return _round_half_up((w - raw) / w * 100)
+        # Against the MIDPOINT of the spread (user 2026-11-17: '100% is the short strike. can go over 100%
+        # when it passes. -100% is the long strike, and similarly can go below -100%'): 0% is the spot
+        # halfway between the strikes, unclamped both ways.
+        return _round_half_up((w / 2 - raw) / (w / 2) * 100)
     except (KeyError, TypeError, ValueError):
         return None
 # Max win on a debit row = width - the debit AS SHOWN = the floored credit equivalent (user 2026-11-02:
