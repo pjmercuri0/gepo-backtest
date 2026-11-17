@@ -193,9 +193,9 @@
           <td>{% if t.credit is not none %}${{ '%.3f'|format(t.credit) }}{% else %}—{% endif %}</td>
           <td>{% if t.max_loss is not none %}${{ '%.3f'|format(t.max_loss) }}{% else %}—{% endif %}</td>
           <td style="text-align:right">{{ t.qty }}×</td>
-          <td style="color:#888780">{% if t.closed %}{{ t.closed[5:] }}{% if t.assigned %} <span title="assigned / exercised">(A)</span>{% endif %}{% else %}open{% endif %}</td>
+          <td style="color:#888780">{% if t.closed %}{{ t.closed[5:] }}{% if t.assigned %} <span>(A)</span>{% endif %}{% else %}open{% endif %}</td>
           <td>{% if t.spot is not none %}${{ '%.2f'|format(t.spot) }}{% else %}—{% endif %}</td>
-          <td>{% if t.outcome == 'OPEN' %}<span class="badge" style="background:rgba(136,135,128,0.15);color:#b4b2a9" title="held at the last statement: unrealized P/L">OPEN</span>{% else %}<span class="badge badge-{{ t.outcome }}">{{ t.outcome }}</span>{% endif %}</td>
+          <td>{% if t.outcome == 'OPEN' %}<span class="badge" style="background:rgba(136,135,128,0.15);color:#b4b2a9">OPEN</span>{% else %}<span class="badge badge-{{ t.outcome }}">{{ t.outcome }}</span>{% endif %}</td>
           <td class="fw {{ 'pos' if t.pnl > 0 else ('neg' if t.pnl < 0 else '') }}" style="text-align:right">{% if t.pnl >= 0 %}+{% endif %}${{ '%.2f'|format(t.pnl) }}</td>
         </tr>
         {% endfor %}

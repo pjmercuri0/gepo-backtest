@@ -40,7 +40,7 @@
   <a href="{{ url_for('oot') }}"      class="{% if request.endpoint == 'oot'          %}active{% endif %}">oot</a>
   <a href="{{ url_for('backtest') }}" class="{% if request.endpoint == 'backtest'     %}active{% endif %}">backtest</a>
   {# qr and api are off the bar (user 2026-10-23); /qr and /api/latest.json still answer by URL. #}
-  <span id="poll-health" style="display:none;margin-left:auto;align-self:center;font-size:11px;color:#e05d5d" title="seconds since this page last got fresh numbers from the server"></span>
+  <span id="poll-health" style="display:none;margin-left:auto;align-self:center;font-size:11px;color:#e05d5d"></span>
 </div>
 <script>
 // Every tab polls the SERVER for its numbers (user 2026-11-10: "update the quotes and p&l at the

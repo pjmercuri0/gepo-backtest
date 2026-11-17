@@ -17,7 +17,7 @@
         {# Same columns, same order as History (user 2026-10-15). #}
         <th>Actual</th>
         <th>Rank</th><th>Ticker</th>
-        <th>Spot</th><th>Strikes</th><th>Qty</th><th title="live quote when the stream holds the spread, else the quoted mid at the scan; P&amp;L is booked at {{ "%.2f"|format(fill_mult) if fill_mult else "canon" }} x model">{% if is_debit_site %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th><th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair (fair = smile-fit model credit, else fair(delta, DTE)).">{% if is_debit_site %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th><th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th>Ratio</th><th class="gcol" style="text-align:right" title="GROUND, in basis points">GROUND (bps)</th>
+        <th>Spot</th><th>Strikes</th><th>Qty</th><th>{% if is_debit_site %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th><th>{% if is_debit_site %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th><th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th>Ratio</th><th class="gcol" style="text-align:right">GROUND (bps)</th>
         <th>Δ short</th><th>DTE</th>
         <th>Status</th><th>Mark</th><th style="text-align:right">P&amp;L</th>
       </tr></thead>
@@ -33,16 +33,16 @@
         {% set _openrow = (p.pnl is none and not p.outcome and p.expiry_close is none) %}
         {% set _nq = (not _openrow and p.qualified is defined and p.qualified is false) or (_openrow and p.ground_ok is defined and p.ground_ok is false) %}
         {% set _dim = _nq or (_openrow and p.gate_ok is defined and not p.gate_ok) %}
-        <tr{% if _pin %} class="assign-watch{% if _dim %} hist-dim{% endif %}" title="PIN risk: spot inside the strikes — short assigned, long expires worthless, shares delivered"{% elif _dim %} class="hist-dim" title="{{ ('GROUND under the floor -- cannot qualify' if _openrow else 'did not qualify at the scan -- kept for the record') if _nq else 'quote below model -- not fillable right now' }}"{% endif %}>
-          <td>{% set _hc = held_cmp(p) %}<button class="actuals-add{% if _hc == 'same' %} held-add{% elif _hc == 'better' %} held-better{% elif _hc == 'worse' %} held-worse{% endif %}" data-url="{{ url_for('add_actual_from_snapshot', date=d.date, hhmm=scan.hhmm, index=(p._idx if p._idx is defined else loop.index0)) }}" title="{% if _hc == 'same' %}already in Actuals — IBKR will refuse a second order on the same option{% elif _hc == 'better' %}same name and side you hold, strike away from the move{% elif _hc == 'worse' %}same name and side you hold, strike has followed the stock{% else %}add this pick to actuals{% endif %}">+</button></td>
+        <tr{% if _pin %} class="assign-watch{% if _dim %} hist-dim{% endif %}"{% elif _dim %} class="hist-dim"{% endif %}>
+          <td>{% set _hc = held_cmp(p) %}<button class="actuals-add{% if _hc == 'same' %} held-add{% elif _hc == 'better' %} held-better{% elif _hc == 'worse' %} held-worse{% endif %}" data-url="{{ url_for('add_actual_from_snapshot', date=d.date, hhmm=scan.hhmm, index=(p._idx if p._idx is defined else loop.index0)) }}">+</button></td>
           <td>{{ loop.index }}</td>
-          <td class="fw" title="expires {{ (p.expiry_date or '')[:10] }}">{{ p.ticker }}
+          <td class="fw">{{ p.ticker }}
             {% if p.structure == 'debit' %}
-              <span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="{{ 'bull-call debit' if p.spread_type == 'bull_put' else 'bear-put debit' }}">{{ '▲ CD' if p.spread_type == 'bull_put' else '▼ PD' }}</span>
+              <span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px">{{ '▲ CD' if p.spread_type == 'bull_put' else '▼ PD' }}</span>
             {% elif p.spread_type == 'bull_put' %}
-              <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="bull-put">▲ BP</span>
+              <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px">▲ BP</span>
             {% else %}
-              <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="bear-call">▼ BC</span>
+              <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px">▼ BC</span>
             {% endif %}
           </td>
           {# Spot: the expiry close once settled, else the live spot. #}
@@ -52,9 +52,9 @@
           {# Credit and min / target: the same cells as History (user 2026-10-07) -- the live quote with
              its dot when the stream holds the spread on a credible book, else the quoted mid at the scan. #}
           {% set _open = p.pnl is none and not p.outcome and p.expiry_close is none %}
-          {% if _open and p.live and p.live.live_quote is defined and p.live.live_quote is not none %}<td title="LIVE quote ({{ p.live.live_quote_ts }}); scan quote ${{ ('%.2f' % p.net_credit) if p.net_credit is not none else '—' }}; booked at ${{ '%.2f' % (p.entry_credit|px(p)|fl2) }}">${{ "%.2f"|format(p.live.live_quote|px(p)|fl2) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span></td>{% elif _open and p.cur_quote is defined %}<td title="newest scan quote ({{ p.cur_quote_hhmm[:2] }}:{{ p.cur_quote_hhmm[2:] }}, no live quote); this scan quote ${{ ('%.2f' % p.net_credit) if p.net_credit is not none else '—' }}; booked at ${{ '%.2f' % (p.entry_credit|px(p)|fl2) }}">${{ "%.2f"|format(p.cur_quote|px(p)|fl2) }}</td>{% elif p.net_credit is none %}<td title="no debit twin quote at this scan (credit side qualified)">—</td>{% else %}<td title="quoted mid at the scan (no live quote); booked at ${{ '%.2f' % (p.entry_credit|px(p)|fl2) }}">${{ "%.2f"|format(p.net_credit|px(p)|fl2) }}</td>{% endif %}
+          {% if _open and p.live and p.live.live_quote is defined and p.live.live_quote is not none %}<td>${{ "%.2f"|format(p.live.live_quote|px(p)|fl2) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span></td>{% elif _open and p.cur_quote is defined %}<td>${{ "%.2f"|format(p.cur_quote|px(p)|fl2) }}</td>{% elif p.net_credit is none %}<td>—</td>{% else %}<td>${{ "%.2f"|format(p.net_credit|px(p)|fl2) }}</td>{% endif %}
           {% set tg = p.credit_targets %}
-          {% if tg and tg.min_credit is defined %}<td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }})">{% if p.structure == 'debit' %}<span style="color:#7ec99a">${{ "%.2f"|format(tg.target_hi_credit|px(p)) }}–${{ "%.2f"|format(tg.target_lo_credit|px(p)) }}</span><span style="opacity:0.6"> / </span><span style="color:#c9a227" title="max debit = width − min credit">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span>{% else %}<span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>{% endif %}</td>{% else %}<td>—</td>{% endif %}
+          {% if tg and tg.min_credit is defined %}<td class="fw">{% if p.structure == 'debit' %}<span style="color:#7ec99a">${{ "%.2f"|format(tg.target_hi_credit|px(p)) }}–${{ "%.2f"|format(tg.target_lo_credit|px(p)) }}</span><span style="opacity:0.6"> / </span><span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span>{% else %}<span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>{% endif %}</td>{% else %}<td>—</td>{% endif %}
           {# Max-loss and ratio on the booked basis, as History: width minus the booked credit. On the debit
              site the max win is width minus the debit AS SHOWN in the cell to the left (user 2026-11-02:
              'you have to do width - the rounded debit'). #}
@@ -73,10 +73,10 @@
           <td class="fw gcol" style="text-align:right">{{ "%.2f"|format((p.GROUND * 10000)|rd(2)) if p.GROUND is not none else '—' }}</td>
           <td>{{ "%.2f"|format(p.short_delta|rd(2)) if p.short_delta is not none else '—' }}</td>
           <td>{{ p.DTE if p.DTE is not none else '—' }}</td>
-          <td>{% if p.outcome %}<span class="badge badge-{{ p.outcome }}" title="{{ p.outcome }}">{{ p.outcome[0] }}</span>
-              {% elif p.live and p.live.live_status %}<span class="badge {% if p.live.live_status == 'WINNING' %}badge-WIN{% elif p.live.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}" title="{{ p.live.live_status }}">{{ p.live.live_status[0] }}</span><span class="live-dot" style="margin-left:6px;margin-right:0"></span>
+          <td>{% if p.outcome %}<span class="badge badge-{{ p.outcome }}">{{ p.outcome[0] }}</span>
+              {% elif p.live and p.live.live_status %}<span class="badge {% if p.live.live_status == 'WINNING' %}badge-WIN{% elif p.live.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}">{{ p.live.live_status[0] }}</span><span class="live-dot" style="margin-left:6px;margin-right:0"></span>
               {% else %}<span style="color:#888780">open</span>{% endif %}</td>
-          <td>{% if p.outcome or p.expiry_close is not none %}—{% elif p.live and p.live.current_mark is not none %}<span title="{{ p.live.mark_basis or '' }}{% if p.live.ts %} {{ (p.live.ts|string)[11:16] }}{% endif %}">${{ "%.2f"|format(p.live.current_mark|px(p)|fl2) }}</span>{% else %}<span style="color:#888780">—</span>{% endif %}</td>
+          <td>{% if p.outcome or p.expiry_close is not none %}—{% elif p.live and p.live.current_mark is not none %}<span>${{ "%.2f"|format(p.live.current_mark|px(p)|fl2) }}</span>{% else %}<span style="color:#888780">—</span>{% endif %}</td>
           {# realized P&L once settled, otherwise the unrealized mark-to-market #}
           {% set shown_pnl = p.pnl if p.pnl is not none else (p.live.unrealized_pnl_per_contract if p.live else none) %}
           <td class="{{ 'pos' if shown_pnl is not none and shown_pnl > 0 else ('neg' if shown_pnl is not none and shown_pnl < 0 else '') }}" style="text-align:right">

@@ -37,14 +37,14 @@
         <th>Strikes</th>
         <th>Δ</th>
         <th>DTE</th>
-        <th title="IBKR quoted credit (combo mid, else leg mids) — the live selection basis; model credit in the card">{% if is_debit_site %}Debit{% else %}Credit{% endif %} ($/sh)</th>
-        <th title="min 1.00× model credit (= execution gate), target 1.04–1.10×">{% if is_debit_site %}Target / Max debit{% else %}Min / Target{% endif %}</th>
+        <th>{% if is_debit_site %}Debit{% else %}Credit{% endif %} ($/sh)</th>
+        <th>{% if is_debit_site %}Target / Max debit{% else %}Min / Target{% endif %}</th>
         <th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th>
         <th>Ratio</th>
-        <th title="P_real above (realized-move belief, used in G); Q_bs below (market law, D_ent reference)">real: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">bs below</span></th>
+        <th>real: p / r₀ / q<br><span style="opacity:0.7;font-weight:400">bs below</span></th>
         <th>Kelly EV</th>
         <th>exp(k·D_ent)</th>
-        <th class="gcol" style="text-align:right" title="GROUND, in basis points">Γᵢ (bps)</th>
+        <th class="gcol" style="text-align:right">Γᵢ (bps)</th>
       </tr>
     </thead>
     <tbody id="ranked-tbody"><tr><td colspan="14" style="color:#888780;text-align:center;padding:24px">loading…</td></tr></tbody>
@@ -175,14 +175,14 @@ function bestCell(p) {
   if (!p.best_book || !p.best_src) return "";
   const own = isDebit(p) ? "debit" : "credit";
   if (p.best_book === "tie" || p.best_book === own)
-    return ` <span style="font-size:10px;color:#7ec99a" title="this book pays the most right now (${p.best_src})">★</span>`;
+    return ` <span style="font-size:10px;color:#7ec99a">★</span>`;
   return "";
 }
 // Green flashing dot beside any price that is a live stream quote (user 2026-11-02): the row's
 // credit_source is stream_mid only when combo_stream holds that bag right now.
 function liveDot(p) {
   return p && p.credit_source === "stream_mid"
-    ? ` <span class="live-dot" style="display:inline-block;vertical-align:middle;margin-left:4px" title="live stream quote${p.quote_ts ? " " + String(p.quote_ts).slice(11, 19) : ""}"></span>` : "";
+    ? ` <span class="live-dot" style="display:inline-block;vertical-align:middle;margin-left:4px"></span>` : "";
 }
 function strikesOf(p) {
   const a = Number(p.short_strike), b = Number(p.long_strike);
@@ -242,14 +242,14 @@ function tgtCell(p) {
   if (!t || t.min_credit == null) return "—";
   // above_min: the IBKR credit on the table clears the min (execution gate, part of "qualified").
   const gate = p.above_min == null ? "" : (p.above_min
-    ? ` <span class="pos" title="IBKR credit ≥ min">✓</span>`
-    : ` <span class="neg" title="IBKR credit below min — not qualified">✗</span>`);
+    ? ` <span class="pos">✓</span>`
+    : ` <span class="neg">✗</span>`);
   // Union gate (2026-11-02): fair value cleared on the other book only -- say so beside the check.
   const _other = isDebit(p) ? "credit" : "debit";
   const via = "";   // each site gates on its own book (user 2026-11-02); gate_via is informational only
   if (isDebit(p)) {    // max debit = width - min; the target band flips (cheapest debit = richest credit)
     // Target first, max on the right (user 2026-11-02: 'target debit / max with max on the right').
-    return `<span style="color:#7ec99a">${pxCell(p, t.target_hi_credit)}–${pxCell(p, t.target_lo_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#c9a227" title="max debit = width − min credit">${pxCell(p, t.min_credit)}</span>${gate}${via}`;
+    return `<span style="color:#7ec99a">${pxCell(p, t.target_hi_credit)}–${pxCell(p, t.target_lo_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#c9a227">${pxCell(p, t.min_credit)}</span>${gate}${via}`;
   }
   return `<span style="color:#c9a227">${fmtMoney(t.min_credit)}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${fmtMoney(t.target_lo_credit)}–${fmtMoney(t.target_hi_credit)}</span>${gate}${via}`;
 }
@@ -330,13 +330,13 @@ function renderTopPicks(picks, maxGround, kVal) {
       <div class="table-scroll"><table>
         <thead><tr>
           <th>spot</th><th>short Δ</th><th>long Δ</th><th>IV</th>
-          <th title="IBKR credit — combo last, else combo mid (narrow book), else leg mids — the live selection basis">quoted ($/sh)</th>
-          <th title="smile-fit model credit: what the spread is worth on the fitted surface (basis for min / target)">model ($/sh)</th>
-          <th title="min 1.00×model = fair value = execution gate; target 1.04–1.10×model">min / target</th>
+          <th>quoted ($/sh)</th>
+          <th>model ($/sh)</th>
+          <th>min / target</th>
           <th>{% if is_debit_site %}max-win ($/sh){% else %}max-loss ($/sh){% endif %}</th><th>ratio</th>
-          <th title="P_real: realized-move belief at the strikes (used in G)">real: p / r₀ / q</th>
-          <th title="Q_bs: market law at the fitted IVs (D_ent reference)">bs: p̂ / r̂₀ / q̂</th>
-          <th>G</th><th>Kelly EV</th><th title="D_ent = ln3 − H(Q_bs)">D_ent</th><th>exp(k·D_ent)</th><th class="gcol" style="text-align:right" title="GROUND, in basis points">Γᵢ (bps)</th>
+          <th>real: p / r₀ / q</th>
+          <th>bs: p̂ / r̂₀ / q̂</th>
+          <th>G</th><th>Kelly EV</th><th>D_ent</th><th>exp(k·D_ent)</th><th class="gcol" style="text-align:right">Γᵢ (bps)</th>
         </tr></thead>
         <tbody><tr>
           <td>${fmtMoney(p.entry_price)}</td>
@@ -385,8 +385,8 @@ function renderRanked(rows, maxGround, kVal) {
     // Held = the + is painted blue (user 2026-09-15); row text stays white / grey.
     const rowClass = isPrimary ? "" : " unqualified";
     return `<tr class="ranked-row${rowClass}">
-      <td class="rank-cell"><button class="actuals-add${r.held_cmp === "same" ? " held-add" : r.held_cmp === "better" ? " held-better" : r.held_cmp === "worse" ? " held-worse" : ""}" data-url="/api/actuals/from_live/${i}" title="${r.held_cmp === "same" ? "already in Actuals — IBKR will refuse a second order on the same option" : r.held_cmp === "better" ? "same name and side you hold, strike away from the move" : r.held_cmp === "worse" ? "same name and side you hold, strike has followed the stock — selling into the move" : "add this pick to actuals"}">+</button> ${i+1}</td>
-      <td class="fw"><span class="${dirClass(r.spread_type)}" title="${dirLabel(r.spread_type, r.structure)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> ${r.ticker}${oiWarning(r)}</td>
+      <td class="rank-cell"><button class="actuals-add${r.held_cmp === "same" ? " held-add" : r.held_cmp === "better" ? " held-better" : r.held_cmp === "worse" ? " held-worse" : ""}" data-url="/api/actuals/from_live/${i}">+</button> ${i+1}</td>
+      <td class="fw"><span class="${dirClass(r.spread_type)}">${r.spread_type === "bull_put" ? "▲" : r.spread_type === "bear_call" ? "▼" : ""}</span> ${r.ticker}${oiWarning(r)}</td>
       <td>${r.entry_price != null ? fmtMoney(r.entry_price) : "—"}</td>
       <td>${strikesOf(r)}</td>
       <td>${fmtNum(r.short_delta, 2)}</td>
@@ -787,7 +787,7 @@ async function refresh() {
     // script flags scan_status.json at start and clears it at exit; the webapp ages it out.
     if (data.scan_status && data.scan_status.scanning) {
       txt.insertAdjacentHTML("beforeend",
-        ` <span class="badge badge-LIVE" style="vertical-align:middle" title="scan started ${String(data.scan_status.started || "").slice(11, 19)}">scanning</span>`);
+        ` <span class="badge badge-LIVE" style="vertical-align:middle">scanning</span>`);
     }
   } catch (e) {
     document.getElementById("snapshot-meta").textContent = "error: " + e.message;

@@ -82,7 +82,7 @@
         <thead><tr>
           <th>Actual</th>
           <th>Rank</th><th>Ticker</th>
-          <th>Spot</th><th>Strikes</th><th>Qty</th><th title="quoted mid at the scan; P&amp;L is booked at {{ book_mult }} x model">{% if is_debit_site %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th><th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair (fair = smile-fit model credit, else fair(delta, DTE)).">{% if is_debit_site %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th><th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th>Ratio</th><th class="gcol" style="text-align:right" title="GROUND, in basis points">GROUND (bps)</th>
+          <th>Spot</th><th>Strikes</th><th>Qty</th><th>{% if is_debit_site %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th><th>{% if is_debit_site %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th><th>{% if is_debit_site %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th>Ratio</th><th class="gcol" style="text-align:right">GROUND (bps)</th>
           <th>Δ short</th><th>DTE</th>
           <th>Status</th><th>Mark</th><th style="text-align:right">P&amp;L</th>
         </tr></thead>
@@ -111,19 +111,19 @@
           {% set _pin = pin_open(p, (last_track.underlying_price if last_track and last_track.underlying_price else none), outcome_row is not none) %}
           {% set _hcrow = held_cmp(p) %}
           {% set _dim = (outcome_row is none and _hcrow != 'same' and p.gate_ok is defined and not p.gate_ok) %}
-          <tr{% if _pin %} class="assign-watch{% if _dim %} hist-dim{% endif %}" title="PIN risk: spot inside {{ p.long_strike }}-{{ p.short_strike }} — short assigned, long expires worthless, shares delivered"{% elif _dim %} class="hist-dim" title="quote below model (or no credible book) -- not fillable right now"{% endif %}>
-            <td>{% set _hc = held_cmp(p) %}<button class="actuals-add{% if _hc == 'same' %} held-add{% elif _hc == 'better' %} held-better{% elif _hc == 'worse' %} held-worse{% endif %}" data-url="{{ url_for('add_actual_from_frozen', date=day.date, index=loop.index0) }}" title="{% if _hc == 'same' %}already in Actuals — IBKR will refuse a second order on the same option{% elif _hc == 'better' %}same name and side you hold, strike away from the move{% elif _hc == 'worse' %}same name and side you hold, strike has followed the stock{% else %}add this pick to actuals{% endif %}">+</button></td>
+          <tr{% if _pin %} class="assign-watch{% if _dim %} hist-dim{% endif %}"{% elif _dim %} class="hist-dim"{% endif %}>
+            <td>{% set _hc = held_cmp(p) %}<button class="actuals-add{% if _hc == 'same' %} held-add{% elif _hc == 'better' %} held-better{% elif _hc == 'worse' %} held-worse{% endif %}" data-url="{{ url_for('add_actual_from_frozen', date=day.date, index=loop.index0) }}">+</button></td>
             <td>{{ loop.index }}</td>
             <td class="fw">{{ tk }}
-              {% if p.freeze_added_at %}<span style="font-size:10px;color:#e8b366;margin-left:6px" title="added from later freeze snapshot">+{{ p.freeze_added_at }}</span>{% endif %}
+              {% if p.freeze_added_at %}<span style="font-size:10px;color:#e8b366;margin-left:6px">+{{ p.freeze_added_at }}</span>{% endif %}
               {%- set sv = p.short_volume|default(none) -%}
               {%- set lv = p.long_volume|default(none) -%}
               {% if p.structure == 'debit' %}
-                <span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="{{ 'bull-call debit: bought lower-strike call, sold higher-strike call' if p.spread_type == 'bull_put' else 'bear-put debit: bought higher-strike put, sold lower-strike put' }}">{{ '▲ CD' if p.spread_type == 'bull_put' else '▼ PD' }}</span>
+                <span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px">{{ '▲ CD' if p.spread_type == 'bull_put' else '▼ PD' }}</span>
               {% elif p.spread_type == 'bull_put' %}
-                <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="bull-put: sold higher-strike put, bought lower-strike put">▲ BP</span>
+                <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px">▲ BP</span>
               {% elif p.spread_type == 'bear_call' %}
-                <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px" title="bear-call: sold lower-strike call, bought higher-strike call">▼ BC</span>
+                <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600;letter-spacing:0.5px">▼ BC</span>
               {% endif %}
             </td>
 
@@ -157,10 +157,10 @@
               {% set mm_l = _bk.max_loss %}
               {# Credit always green: bright #7ec99a if actual >= target, dull #5b9474 if worse. #}
               {# Credit cell (user 2026-09-30): the QUOTED mid at the scan; booking, max-loss and P&L stay on the booked canon x model (= mm_c). #}
-              {% if last_track and last_track.live_quote is defined and last_track.live_quote is not none and outcome_row is none %}<td title="LIVE quote ({{ last_track.live_quote_ts }}); scan quote ${{ "%.2f"|format((p.net_credit or mm_c)|rd(2)) }}; booked at ${{ "%.2f"|format(mm_c|rd(2)) }} ({{ book_mult }} x model)">${{ "%.2f"|format(last_track.live_quote|px(p)|fl2) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span> {% else %}<td title="quoted mid at the scan (no live quote); booked at ${{ "%.2f"|format(mm_c|rd(2)) }} ({{ book_mult }} x model)">${{ "%.2f"|format((p.net_credit if p.net_credit is defined and p.net_credit is not none else mm_c)|px(p)|fl2) }} {% endif %}{% if p.actual_credit is defined and p.actual_credit is not none %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-dw="{{ _dw }}" data-current="{{ "%.2f"|format(p.actual_credit|px(p)|fl2) }}" style="color:{% if (p.actual_credit | rd(2)) < (mm_c | rd(2)) %}#5b9474{% else %}#7ec99a{% endif %};cursor:pointer;border-bottom:1px dotted currentColor" title="click to edit actual fill{{ ' (debit paid)' if _dw }}">(${{ "%.2f"|format(p.actual_credit|px(p)|fl2) }})</span>{% else %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-dw="{{ _dw }}" data-current="" style="color:#666;cursor:pointer;border-bottom:1px dotted #666" title="click to record actual fill">(+)</span>{% endif %}</td>
+              {% if last_track and last_track.live_quote is defined and last_track.live_quote is not none and outcome_row is none %}<td>${{ "%.2f"|format(last_track.live_quote|px(p)|fl2) }}<span class="live-dot" style="margin-left:5px;margin-right:0"></span> {% else %}<td>${{ "%.2f"|format((p.net_credit if p.net_credit is defined and p.net_credit is not none else mm_c)|px(p)|fl2) }} {% endif %}{% if p.actual_credit is defined and p.actual_credit is not none %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-dw="{{ _dw }}" data-current="{{ "%.2f"|format(p.actual_credit|px(p)|fl2) }}" style="color:{% if (p.actual_credit | rd(2)) < (mm_c | rd(2)) %}#5b9474{% else %}#7ec99a{% endif %};cursor:pointer;border-bottom:1px dotted currentColor">(${{ "%.2f"|format(p.actual_credit|px(p)|fl2) }})</span>{% else %}<span class="actual-edit" data-date="{{ day.date }}" data-ticker="{{ tk }}" data-dw="{{ _dw }}" data-current="" style="color:#666;cursor:pointer;border-bottom:1px dotted #666">(+)</span>{% endif %}</td>
               {# Max-loss always red: bright #ff6b6b if actual <= target (less risk), dull #c46868 if actual > target. #}
               {% set tg = p.credit_targets %}
-              {% if tg and tg.min_credit is defined %}<td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }})">{% if p.structure == 'debit' %}<span style="color:#7ec99a">${{ "%.2f"|format(tg.target_hi_credit|px(p)) }}–${{ "%.2f"|format(tg.target_lo_credit|px(p)) }}</span><span style="opacity:0.6"> / </span><span style="color:#c9a227" title="max debit = width − min credit">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span>{% else %}<span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>{% endif %}</td>{% else %}<td>—</td>{% endif %}
+              {% if tg and tg.min_credit is defined %}<td class="fw">{% if p.structure == 'debit' %}<span style="color:#7ec99a">${{ "%.2f"|format(tg.target_hi_credit|px(p)) }}–${{ "%.2f"|format(tg.target_lo_credit|px(p)) }}</span><span style="opacity:0.6"> / </span><span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span>{% else %}<span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span><span style="opacity:0.6"> / </span><span style="color:#7ec99a">${{ "%.2f"|format(tg.target_lo_credit) }}–${{ "%.2f"|format(tg.target_hi_credit) }}</span>{% endif %}</td>{% else %}<td>—</td>{% endif %}
               {% set _sc = last_track.live_quote if (last_track and last_track.live_quote is defined and last_track.live_quote is not none and outcome_row is none) else (p.net_credit if p.net_credit is defined and p.net_credit is not none else mm_c) %}{% set _wd = ((p.short_strike|float) - (p.long_strike|float))|abs %}{% set _shown = (_sc|px(p))|rd(2) %}{% set _other = (_wd - _shown)|rd(2) %}{% set _mw = _shown if p.structure != 'debit' else _other %}{% set _mlx = _other if p.structure != 'debit' else _shown %}{% if p.structure == 'debit' %}<td>${{ "%.2f"|format(_other) }}{% if p.actual_credit is defined and p.actual_credit is not none %} <span style="color:#7ec99a">(${{ "%.2f"|format((_wd - ((p.actual_credit|px(p))|rd(2)))|rd(2)) }})</span>{% endif %}</td>{% else %}<td>${{ "%.2f"|format(_mlx) }}{% if p.actual_max_loss is defined and p.actual_max_loss is not none %} <span style="color:{% if (p.actual_max_loss | rd(2)) > _mlx %}#c46868{% else %}#ff6b6b{% endif %}">(${{ "%.2f"|format(p.actual_max_loss|rd(2)) }})</span>{% endif %}</td>{% endif %}
               {# Ratio always green: bright #7ec99a if actual >= target, dull #5b9474 if worse. #}
               <td>{% if _mlx > 0 %}{{ "%.2f"|format((_mw / _mlx)|rd(2)) }}{% else %}—{% endif %}{% if p.actual_credit is defined and p.actual_credit is not none and p.actual_max_loss is defined and p.actual_max_loss is not none and (p.actual_max_loss | rd(2)) > 0 and (mm_l | rd(2)) > 0 %}{% set ar = ((p.actual_credit | rd(2)) / (p.actual_max_loss | rd(2))) | rd(2) %}{% set tr = ((mm_c | rd(2)) / (mm_l | rd(2))) | rd(2) %} <span style="color:{% if ar < tr %}#5b9474{% else %}#7ec99a{% endif %}">({{ "%.2f"|format(ar) }})</span>{% endif %}</td>
@@ -176,11 +176,11 @@
             {# Status column — W/L/P (first letter of WIN/WINNING, LOSS/LOSING,
                PARTIAL). Live picks also get a pulsing dot. #}
             {% if outcome_row and outcome_row.result %}
-              <td><span class="badge {% if outcome_row.result == 'WIN' %}badge-WIN{% elif outcome_row.result == 'LOSS' %}badge-LOSS{% elif outcome_row.result == 'PARTIAL' %}badge-PARTIAL{% else %}badge-FROZEN{% endif %}" title="{{ outcome_row.result }}">{{ outcome_row.result[0] }}</span></td>
+              <td><span class="badge {% if outcome_row.result == 'WIN' %}badge-WIN{% elif outcome_row.result == 'LOSS' %}badge-LOSS{% elif outcome_row.result == 'PARTIAL' %}badge-PARTIAL{% else %}badge-FROZEN{% endif %}">{{ outcome_row.result[0] }}</span></td>
             {% elif last_track and last_track.live_status %}
-              <td><span class="badge {% if last_track.live_status == 'WINNING' %}badge-WIN{% elif last_track.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}" title="{{ last_track.live_status }}">{{ last_track.live_status[0] }}</span><span class="live-dot" style="margin-left:6px;margin-right:0" title="live — settles at 16:01"></span></td>
+              <td><span class="badge {% if last_track.live_status == 'WINNING' %}badge-WIN{% elif last_track.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}">{{ last_track.live_status[0] }}</span><span class="live-dot" style="margin-left:6px;margin-right:0"></span></td>
             {% elif last_track %}
-              <td><span style="color:#888780" title="LIVE">·</span><span class="live-dot" style="margin-left:6px;margin-right:0"></span></td>
+              <td><span style="color:#888780">·</span><span class="live-dot" style="margin-left:6px;margin-right:0"></span></td>
             {% else %}
               <td><span style="color:#666">—</span></td>
             {% endif %}
@@ -190,7 +190,7 @@
             {% if outcome_row %}
               <td>—</td>
             {% elif last_marked %}
-              <td title="{{ last_marked.mark_basis or '' }}{% if last_marked.ts %} {{ (last_marked.ts|string)[11:16] }}{% endif %}">${{ "%.2f"|format(last_marked.current_mark|px(p)|fl2) }}</td>
+              <td>${{ "%.2f"|format(last_marked.current_mark|px(p)|fl2) }}</td>
             {% else %}
               <td>—</td>
             {% endif %}

@@ -5,7 +5,7 @@
 <h1>Actuals</h1>
 <div class="subtitle">Trades you added from Live, History or Snapshots.</div>
 {% if fill_stats and fill_stats.n_fills %}
-<div class="subtitle" title="sum of your recorded fills' max win (1 contract each) divided by the sum of the model's max win, and by the IBKR quote's. If fill / quoted stays under ~0.95, the quote the ranker selects on is inflated: set LIVE_SELECTION_CREDIT back to model.">
+<div class="subtitle">
   {% set fs = fill_stats %}
   {# All fills, not a last-20 window (user 2026-11-16: 'its not last 20 i want it all'). #}
   fills vs model: <strong>{{ fs.fill_over_model if fs.fill_over_model is not none else '—' }}×</strong> ({{ fs.n_model }} fills)

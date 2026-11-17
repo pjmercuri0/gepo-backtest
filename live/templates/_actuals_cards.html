@@ -2,7 +2,7 @@
   {# Stamp of the streamed spots behind the open rows (user 2026-10-09). Inside the
      polled fragment so it moves with the numbers it describes. #}
   {% if stream_ts and stream_ts|length >= 19 %}
-  <div class="subtitle" id="actuals-updated" title="time of the streamed spots the open rows are marked from">updated {{ stream_ts[11:19] }} ET{% if stream_ts[:10] != today_iso %} ({{ stream_ts[:10] }}){% endif %}</div>
+  <div class="subtitle" id="actuals-updated">updated {{ stream_ts[11:19] }} ET{% if stream_ts[:10] != today_iso %} ({{ stream_ts[:10] }}){% endif %}</div>
   {% endif %}
   {# One card per expiry Friday. Every pick in a group shares an expiry, so the
      group total is the number that matters for the week: realized where the
@@ -31,10 +31,10 @@
     {% endfor %}
     <div class="week-sub">
       {{ wk.n }} trade{{ '' if wk.n == 1 else 's' }}
-      &middot; <span class="wlp-count" title="count of the Status badges below; open rows at their live badge"><span class="pos">{{ wlp.W }} W</span> / <span class="neg">{{ wlp.L }} L</span> / {{ wlp.P }} P{% if wlp.C %} / {{ wlp.C }} C{% endif %}</span>
+      &middot; <span class="wlp-count"><span class="pos">{{ wlp.W }} W</span> / <span class="neg">{{ wlp.L }} L</span> / {{ wlp.P }} P{% if wlp.C %} / {{ wlp.C }} C{% endif %}</span>
       {# Rows whose P&L cell reads above $0, over every trade in the card (user 2026-11-11; replaces the
          2026-10-09 "W + positive P"). #}
-      {% if wk.n %}&middot; <span class="wlp-rate" title="rows with P&amp;L above $0 ({{ wlp.Cp }}), over {{ wk.n }} trades">positive P&amp;L {{ '%.1f'|format(wlp.Cp / wk.n * 100) }}%</span>{% endif %}
+      {% if wk.n %}&middot; <span class="wlp-rate">positive P&amp;L {{ '%.1f'|format(wlp.Cp / wk.n * 100) }}%</span>{% endif %}
       &middot; {{ wk.settled }} settled, {{ wk.open }} open
       &middot; credit ${{ '%.0f'|format(wk.credit) }}
       &middot; risk ${{ '%.0f'|format(wk.max_loss) }}
@@ -52,9 +52,9 @@
       <thead><tr>
         <th>Date</th><th>Time</th><th>Ticker</th>
         <th>Spot</th><th>Strikes</th><th>Qty</th><th>{% if _dsite %}Debit ($/sh){% else %}Credit ($/sh){% endif %}</th>
-        <th title="Min = 1.00 x fair credit (= execution gate), target = 1.04-1.10 x fair. Fair = smile-fit model credit when the ranker priced the spread, else fair(delta, DTE).">{% if _dsite %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th>
-        <th>{% if _dsite %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th title="credit / spread width; in brackets, your fill / width">Ratio</th><th class="gcol" style="text-align:right" title="GROUND, in basis points">GROUND (bps)</th>
-        <th>Δ short</th><th>DTE</th><th>Status</th>{% if _dsite %}<th style="text-align:right" title="Mark: the quote to sell the spread now, $/sh in debit terms (streamed bag mid, else own-leg mids, else the last held quote). Dollar P&amp;L vs your fill in the tooltip.">Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right" title="(mark − your debit) × 100 × N; realized on a settled row">P&amp;L</th><th style="text-align:right" title="In session and closed rows: P&amp;L over max win when positive, over max loss when negative (+100% = full win, -100% = full loss). After hours and settled: where the spot shown sits against the midpoint of the spread, unclamped (+100% = spot at the short strike, 0% = midpoint, -100% = spot at the long strike).">pct</th>{% else %}<th>Mark</th><th title="Extrinsic: time value left on the short leg, read off the same-strike opposite side. Near zero on an ITM short leg is the early-assignment signal.">Ext</th><th style="text-align:right">P&amp;L</th>{% endif %}
+        <th>{% if _dsite %}Target / Max debit ($/sh){% else %}Min / Target ($/sh){% endif %}</th>
+        <th>{% if _dsite %}Max-Win ($/sh){% else %}Max-Loss ($/sh){% endif %}</th><th>Ratio</th><th class="gcol" style="text-align:right">GROUND (bps)</th>
+        <th>Δ short</th><th>DTE</th><th>Status</th>{% if _dsite %}<th style="text-align:right">Mark</th><th>Ext</th><th style="text-align:right">P&amp;L</th><th style="text-align:right">pct</th>{% else %}<th>Mark</th><th>Ext</th><th style="text-align:right">P&amp;L</th>{% endif %}
       </tr></thead>
       <tbody>
       {% for row in wk.rows %}
@@ -98,18 +98,18 @@
            /api/actuals/wins.json (the Telegram alert, 2026-11-10), so none of them can disagree. #}
         {% set _pct_win = row.pct_green %}
         <tr class="{% if row.ah_status == 'WINNING' and not row.closed %}ah-assign{% elif _pct_win %}pct-win{% elif _pin_row and not row.closed %}assign-watch{% endif %}{% if row.closed %} row-closed{% endif %}">
-          <td data-sort="{{ (row.date or (p.entry_date or '')[:10]) }} {{ row.source_time or '' }}" style="position:relative"><button class="actuals-remove" data-id="{{ row.id }}" data-closed="{{ '1' if row.closed else '0' }}" title="{{ 'closed ' + (row.closed.at|string)[:16] + ' -- remove or reopen' if row.closed else 'remove, or mark closed' }}">x</button>
+          <td data-sort="{{ (row.date or (p.entry_date or '')[:10]) }} {{ row.source_time or '' }}" style="position:relative"><button class="actuals-remove" data-id="{{ row.id }}" data-closed="{{ '1' if row.closed else '0' }}">x</button>
             {{ (row.date or (p.entry_date or '')[:10]) | shortdate }}</td>
           <td>{{ row.source_time or '—' }}</td>
           {# Source column dropped 2026-09-03 to save width; row.source_label is
              still produced by webapp.py and used elsewhere. #}
-          <td class="fw"{% if arisk and arisk.at_risk %} title="{{ arisk.reasons | join('; ') }}"{% elif arisk and arisk.in_pin_zone %} title="PIN risk: spot {{ arisk.spot }} inside {{ arisk.pin_zone[0] }}-{{ arisk.pin_zone[1] }} — short assigned, long expires worthless, shares delivered"{% elif arisk and arisk.extrinsic_unknown %} title="ASSIGNMENT risk: parity leg not quoting, extrinsic UNKNOWN on a short leg {{ arisk.short_itm_by }} ITM"{% elif arisk and arisk.extrinsic_watch %} title="ASSIGNMENT risk: extrinsic {{ arisk.extrinsic }} on a short leg {{ arisk.short_itm_by }} ITM"{% endif %}>{{ p.ticker }}
+          <td class="fw"{% if arisk and arisk.at_risk %}{% elif arisk and arisk.in_pin_zone %}{% elif arisk and arisk.extrinsic_unknown %}{% elif arisk and arisk.extrinsic_watch %}{% endif %}>{{ p.ticker }}
             {% if p.structure == 'debit' %}
-              <span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}" style="margin-left:6px;font-size:10px;font-weight:600" title="{{ 'bull-call debit' if p.spread_type == 'bull_put' else 'bear-put debit' }}">{{ '▲ CD' if p.spread_type == 'bull_put' else '▼ PD' }}</span>
+              <span class="{{ 'dir-bull' if p.spread_type == 'bull_put' else 'dir-bear' }}" style="margin-left:6px;font-size:10px;font-weight:600">{{ '▲ CD' if p.spread_type == 'bull_put' else '▼ PD' }}</span>
             {% elif p.spread_type == 'bull_put' %}
-              <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600" title="bull-put">▲ BP</span>
+              <span class="dir-bull" style="margin-left:6px;font-size:10px;font-weight:600">▲ BP</span>
             {% elif p.spread_type == 'bear_call' %}
-              <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600" title="bear-call">▼ BC</span>
+              <span class="dir-bear" style="margin-left:6px;font-size:10px;font-weight:600">▼ BC</span>
             {% endif %}
           </td>
           {# Spot precedence. A settled row keeps its settlement price. For an
@@ -123,14 +123,14 @@
             {% if outcome_row and outcome_row.underlying_price is defined %}
               {# After-hours spot through 19:00 ET on expiry day (user 2026-11-06); the settled
                  close stays on the tooltip. Amber when the spot has crossed a strike since the close. #}
-              ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}{% if row.ah_spot %}<span class="live-dot {% if row.ah_status == 'WINNING' %}ah-dot-assign{% elif row.ah_status == 'PARTIAL' %}ah-dot-pin{% else %}ah-dot-safe{% endif %}" style="margin-left:6px;margin-right:0" title="after hours: {% if row.ah_status == 'WINNING' %}past the short strike, assignment risk{% elif row.ah_status == 'PARTIAL' %}pinned between the strikes{% else %}safe, expires clean{% endif %}"></span>{% endif %}
+              ${{ "%.2f"|format(outcome_row.underlying_price|rd(2)) }}{% if row.ah_spot %}<span class="live-dot {% if row.ah_status == 'WINNING' %}ah-dot-assign{% elif row.ah_status == 'PARTIAL' %}ah-dot-pin{% else %}ah-dot-safe{% endif %}" style="margin-left:6px;margin-right:0"></span>{% endif %}
               {% if row.ah_spot %}
               {# Colour (user 2026-11-06): yellow once the after-hours spot is past the LONG strike (between the
                  strikes or through both), else red below the close, green above it, white at it. #}
-              <div class="ah-spot {% if row.ah_status in ('PARTIAL', 'WINNING') %}ah-past-long{% else %}ah-{{ row.ah_dir }}{% endif %}" title="after hours {{ stream_ts[11:16] }} ET, {{ row.ah_dir }} vs the close{% if row.ah_status == 'WINNING' %} -- through the SHORT strike, assignment{% elif row.ah_status == 'PARTIAL' %} -- past the long strike, between the strikes{% endif %}">AH ${{ "%.2f"|format(row.ah_spot|rd(2)) }}</div>
+              <div class="ah-spot {% if row.ah_status in ('PARTIAL', 'WINNING') %}ah-past-long{% else %}ah-{{ row.ah_dir }}{% endif %}">AH ${{ "%.2f"|format(row.ah_spot|rd(2)) }}</div>
               {% endif %}
             {% elif last_track and 'underlying_price' in last_track and last_track.underlying_price %}
-              <span{% if arisk and arisk.spot %} title="quoted {{ assign_ts }}"{% endif %}>${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}</span>
+              <span{% if arisk and arisk.spot %}{% endif %}>${{ "%.2f"|format(last_track.underlying_price|rd(2)) }}</span>
             {% elif p.entry_price is not none %}
               ${{ "%.2f"|format(p.entry_price|rd(2)) }}
             {% else %}
@@ -138,7 +138,7 @@
             {% endif %}
           </td>
           <td>{% if p.structure == 'debit' %}${{ p.long_strike|strike }} / ${{ p.short_strike|strike }}{% else %}${{ p.short_strike|strike }} / ${{ p.long_strike|strike }}{% endif %}</td>
-          <td style="color:#e8b366;font-weight:600"><span class="actual-qty-edit" data-id="{{ row.id }}" data-current="{{ p.suggested_qty or 1 }}" style="cursor:pointer;border-bottom:1px dotted currentColor" title="click to edit the number of contracts">{{ p.suggested_qty or 1 }}×</span></td>
+          <td style="color:#e8b366;font-weight:600"><span class="actual-qty-edit" data-id="{{ row.id }}" data-current="{{ p.suggested_qty or 1 }}" style="cursor:pointer;border-bottom:1px dotted currentColor">{{ p.suggested_qty or 1 }}×</span></td>
           {% if p.fill_targets %}
             {% set cr = p.fill_targets[0].credit %}
             {% set ml = p.fill_targets[0].max_loss %}
@@ -157,12 +157,10 @@
           <td>${{ "%.2f"|format(cr|px(p)|rd(2)) }}
             {% if p.actual_credit is defined and p.actual_credit is not none %}
               <span class="actual-trade-edit actual-shown" data-id="{{ row.id }}" data-dw="{{ _dw }}" data-current="{{ "%.2f"|format(p.actual_credit|px(p)|rd(2)) }}"
-                    style="color:#7ec99a"
-                    title="your actual fill{{ ' (debit paid)' if _dw }} — click to edit">(${{ "%.2f"|format(p.actual_credit|px(p)|rd(2)) }})</span>
+                    style="color:#7ec99a">(${{ "%.2f"|format(p.actual_credit|px(p)|rd(2)) }})</span>
             {% else %}
               <span class="actual-trade-edit" data-id="{{ row.id }}" data-dw="{{ _dw }}" data-current=""
-                    style="color:#666"
-                    title="click to record your actual fill">(+)</span>
+                    style="color:#666">(+)</span>
             {% endif %}
           </td>
           {# Min / target credit from the model (D_ent canon): min is 1.00x this
@@ -170,11 +168,11 @@
              the fill-grade tag was dropped 2026-09-13. IBKR quotes are untouched. #}
           {% set tg = p.credit_targets %}
           {% if tg and tg.min_credit is defined %}
-            <td class="fw" title="fair {{ tg.fair_cw }} x width ({{ tg.basis }}); breakeven ${{ '%.2f'|format(tg.breakeven_credit) }}">
+            <td class="fw">
               {% if p.structure == 'debit' %}
               <span style="color:#7ec99a">${{ "%.2f"|format(tg.target_hi_credit|px(p)) }}–${{ "%.2f"|format(tg.target_lo_credit|px(p)) }}</span>
               <span style="opacity:0.6"> / </span>
-              <span style="color:#c9a227" title="max debit = width − min credit">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span>
+              <span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit|px(p)) }}</span>
               {% else %}
               <span style="color:#c9a227">${{ "%.2f"|format(tg.min_credit) }}</span>
               <span style="opacity:0.6"> / </span>
@@ -202,13 +200,13 @@
           <td>{% if p.short_delta is defined and p.short_delta is not none %}{{ "%.2f"|format(p.short_delta|rd(2)) }}{% else %}—{% endif %}</td>
           <td>{{ p.DTE if p.DTE is not none else '—' }}</td>
           {% if row.closed %}
-            <td><span class="badge badge-CLOSED" title="closed {{ (row.closed.at|string)[:16] }}; P&amp;L locked">C</span></td>
+            <td><span class="badge badge-CLOSED">C</span></td>
           {% elif outcome_row and outcome_row.result %}
-            <td><span class="badge {% if outcome_row.result == 'WIN' %}badge-WIN{% elif outcome_row.result == 'LOSS' %}badge-LOSS{% elif outcome_row.result == 'PARTIAL' %}badge-PARTIAL{% else %}badge-FROZEN{% endif %}" title="{{ outcome_row.result }}">{{ outcome_row.result[0] }}</span></td>
+            <td><span class="badge {% if outcome_row.result == 'WIN' %}badge-WIN{% elif outcome_row.result == 'LOSS' %}badge-LOSS{% elif outcome_row.result == 'PARTIAL' %}badge-PARTIAL{% else %}badge-FROZEN{% endif %}">{{ outcome_row.result[0] }}</span></td>
           {% elif p.outcome %}
-            <td><span class="badge badge-{{ p.outcome }}" title="{{ p.outcome }}">{{ p.outcome[0] }}</span></td>
+            <td><span class="badge badge-{{ p.outcome }}">{{ p.outcome[0] }}</span></td>
           {% elif last_track and last_track.live_status %}
-            <td><span class="badge {% if last_track.live_status == 'WINNING' %}badge-WIN{% elif last_track.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}" title="{{ last_track.live_status }}">{{ last_track.live_status[0] }}</span><span class="live-dot" style="margin-left:6px;margin-right:0"></span></td>
+            <td><span class="badge {% if last_track.live_status == 'WINNING' %}badge-WIN{% elif last_track.live_status == 'LOSING' %}badge-LOSS{% else %}badge-PARTIAL{% endif %}">{{ last_track.live_status[0] }}</span><span class="live-dot" style="margin-left:6px;margin-right:0"></span></td>
           {% else %}
             <td><span style="color:#888780">open</span></td>
           {% endif %}
@@ -222,9 +220,9 @@
                zero (user 2026-11-17: 'make the pct red and green and white too'). #}
             {% set _pw = ((p.short_strike|float) - (p.long_strike|float))|abs %}
             {% if row.pct is not none and row.pct_basis == 'mark' %}
-              <td class="{% if row.pct > 0 %}pos{% elif row.pct < 0 %}neg{% endif %}" style="text-align:right" title="P&amp;L ${{ '%+.0f'|format(row.pct_pnl) }} per contract over {{ row.pct_den_name }} ${{ '%.0f'|format(row.pct_den) }} (in session, off the mark; +100% = full win, -100% = full loss)">{{ "%.0f"|format(row.pct) }}%</td>
+              <td class="{% if row.pct > 0 %}pos{% elif row.pct < 0 %}neg{% endif %}" style="text-align:right">{{ "%.0f"|format(row.pct) }}%</td>
             {% elif row.pct is not none %}
-              <td class="{% if row.pct > 0 %}pos{% elif row.pct < 0 %}neg{% endif %}" style="text-align:right" title="spot ${{ '%.2f'|format(row.pct_spot) }} against strikes ${{ p.long_strike|strike }} / ${{ p.short_strike|strike }}: against the midpoint; +100% = spot at the short strike ${{ p.short_strike|strike }}, -100% = spot at the long strike ${{ p.long_strike|strike }} (after hours / settled)">{{ "%.0f"|format(row.pct) }}%</td>
+              <td class="{% if row.pct > 0 %}pos{% elif row.pct < 0 %}neg{% endif %}" style="text-align:right">{{ "%.0f"|format(row.pct) }}%</td>
             {% else %}
               <td style="text-align:right">—</td>
             {% endif %}
@@ -232,7 +230,7 @@
             <td>—</td>
           {% elif last_marked %}
             {# Closed row (user 2026-11-12): click the mark to enter the price you really exited at. #}
-            <td>{% if row.closed %}<span class="actual-exit-edit" data-id="{{ row.id }}" data-dw="{{ _dw }}" data-current="{{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }}" title="{{ 'your exit price' if row.closed.exit is not none else 'mark locked at the close' }} — click to enter your exit price"{% if row.closed.exit is not none %} style="color:#7ec99a"{% endif %}>${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</span>{% else %}${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}{% endif %}</td>
+            <td>{% if row.closed %}<span class="actual-exit-edit" data-id="{{ row.id }}" data-dw="{{ _dw }}" data-current="{{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }}"{% if row.closed.exit is not none %} style="color:#7ec99a"{% endif %}>${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</span>{% else %}${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}{% endif %}</td>
           {% else %}
             <td>—</td>
           {% endif %}
@@ -247,10 +245,9 @@
           {% if outcome_row %}
             <td>—</td>
           {% elif arisk and arisk.extrinsic is not none %}
-            <td class="fw{% if arisk.extrinsic_watch %} neg{% endif %}"
-                title="short leg {{ arisk.short_itm_by }} ITM">${{ "%.2f"|format(arisk.extrinsic|rd(2)) }}</td>
+            <td class="fw{% if arisk.extrinsic_watch %} neg{% endif %}">${{ "%.2f"|format(arisk.extrinsic|rd(2)) }}</td>
           {% elif arisk and arisk.extrinsic_unknown %}
-            <td class="fw neg" title="no quote on the parity leg — extrinsic unknown, short leg {{ arisk.short_itm_by }} ITM">n/a</td>
+            <td class="fw neg">n/a</td>
           {% else %}
             <td>—</td>
           {% endif %}
@@ -268,20 +265,17 @@
                quote to sell"): the cell is the quote itself, $/sh in debit terms; the dollar P&L moves
                to the tooltip and still drives the card total. #}
             <td class="{% if row.row_pnl is not none and row.row_pnl > 0 %}pos{% elif row.row_pnl is not none and row.row_pnl < 0 %}neg{% endif %}"
-                style="text-align:right"
-                title="{{ last_marked.mark_basis }}{% if last_marked.ts %} {{ (last_marked.ts|string)[11:16] }}{% endif %}{% if p.actual_credit is defined and p.actual_credit is not none %}; your fill {{ '%.2f'|format((p.actual_credit|px(p))|rd(2)) }}{% endif %}{% if row.row_pnl is not none %}; P&amp;L ${{ '%+.0f'|format(row.row_pnl|rd) }}{% endif %}{% if row.closed %}; click to enter your exit price{% endif %}">{% if row.closed %}<span class="actual-exit-edit" data-id="{{ row.id }}" data-dw="{{ _dw }}" data-current="{{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }}"{% if row.closed.exit is not none %} style="color:#7ec99a"{% endif %}>${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</span>{% else %}${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}{% endif %}</td>
+                style="text-align:right">{% if row.closed %}<span class="actual-exit-edit" data-id="{{ row.id }}" data-dw="{{ _dw }}" data-current="{{ '%.2f'|format(last_marked.current_mark|px(p)|rd(2)) }}"{% if row.closed.exit is not none %} style="color:#7ec99a"{% endif %}>${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}</span>{% else %}${{ "%.2f"|format(last_marked.current_mark|px(p)|rd(2)) }}{% endif %}</td>
           {% elif is_debit_site and p.structure == 'debit' and outcome_row and row.row_pnl is not none and p.actual_credit is defined and p.actual_credit is not none %}
             {# Settled debit row (user 2026-11-07: "how come these marks are $-240"): the Mark cell is what the
                spread settled at, $/sh in debit terms = your fill + the realized P&L per contract, so Mark - fill
                is the P&L column. A worthless expiry reads $0.00, a full win reads the width. #}
             {% set _sm = ((p.actual_credit|px(p))|float) + (row.row_pnl|float) / 100 / (p.suggested_qty or 1) %}
             <td class="fw {% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}"
-                style="text-align:right"
-                title="settled at ${{ '%.2f'|format(_sm|rd(2)) }} on the {{ (outcome_row.underlying_price|rd(2)) if outcome_row.underlying_price is not none else '' }} close; your fill {{ '%.2f'|format((p.actual_credit|px(p))|rd(2)) }}; P&amp;L ${{ '%+.0f'|format(row.row_pnl|rd) }}">${{ "%.2f"|format(_sm|rd(2)) }}</td>
+                style="text-align:right">${{ "%.2f"|format(_sm|rd(2)) }}</td>
           {% elif row.row_pnl is not none %}
             <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}"
-                style="text-align:right"
-                title="{{ 'closed, locked' if row.closed else ('realized' if row.row_pnl_realized else 'marked') }}{% if p.actual_credit is defined and p.actual_credit is not none %} against your fill {{ p.actual_credit }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
+                style="text-align:right">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
           {% else %}
             <td style="text-align:right">—</td>
           {% endif %}
@@ -290,8 +284,7 @@
             {# Debit site's trailing P&L column (user 2026-11-03: "can you fit a p&l column?"): the same
                row_pnl the card total sums, in dollars. #}
             {% if row.row_pnl is not none %}
-            <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}" style="text-align:right"
-                title="{{ 'closed, locked' if row.closed else ('realized' if row.row_pnl_realized else 'marked') }}{% if p.actual_credit is defined and p.actual_credit is not none %} against your fill {{ '%.2f'|format((p.actual_credit|px(p))|rd(2)) }}{% endif %}">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
+            <td class="{% if row.row_pnl_realized %}fw {% endif %}{% if row.row_pnl > 0 %}pos{% elif row.row_pnl < 0 %}neg{% endif %}" style="text-align:right">${{ "%+.0f"|format(row.row_pnl|rd) }}</td>
             {% else %}
             <td style="text-align:right">—</td>
             {% endif %}
