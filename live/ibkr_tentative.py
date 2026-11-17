@@ -13,7 +13,7 @@ NAV = last NAV + sum(value change, USD) x the last statement's USD/CAD rate, no 
 Everything it adds is labelled tentative in config.source and under payload["tentative"];
 re-running build_ibkr_payload.py with the real statement replaces it entirely.
 
-Usage: ibkr_tentative.py YYYY-MM-DD [--site debit] [--nav <NLV in CAD from the IBKR app>]
+Usage: ibkr_tentative.py YYYY-MM-DD [--site debit] [--nav <NLV in CAD from the IBKR app>] [--from-ibkr]
 """
 import csv, json, math, sys
 from collections import defaultdict
@@ -33,6 +33,37 @@ NAV_OVERRIDE = float(sys.argv[sys.argv.index("--nav") + 1]) if "--nav" in sys.ar
 # --worthless T1,T2: spreads on these tickers expiring DAY are valued at 0 (user 2026-11-13: 'assuming
 # MDT expires worthless' before the close was known); beats the closes file for those names.
 WORTHLESS = set(sys.argv[sys.argv.index("--worthless") + 1].split(",")) if "--worthless" in sys.argv else set()
+# --from-ibkr: read the account itself (read-only API) -- Net Liquidation in CAD becomes the point, every
+# open spread is valued at IBKR's mark, and spreads IBKR holds beyond the last statement are added as
+# opened DAY at their fill (user 2026-11-17: 'pull whatever you need from ibkr'; KO was 4 at IBKR, 2 on
+# the tab: 'its whatever ibkr says').
+FROM_IBKR = "--from-ibkr" in sys.argv
+
+
+def ibkr_live():
+    """(NLV CAD, {(ticker, expiry, right): {strike: {qty, value}}}, {(ticker, expiry, right, strike): [(side, shares, price, commission)]})."""
+    from ib_insync import IB, ExecutionFilter
+    from live import live_config as lc
+    ib = IB(); ib.connect(lc.IB_HOST, lc.IB_PORT, clientId=184, readonly=True, timeout=lc.IB_CONNECT_TIMEOUT)
+    try:
+        ib.sleep(3)
+        nlv = next(float(v.value) for v in ib.accountSummary() if v.tag == "NetLiquidation" and v.currency == "CAD")
+        legs = defaultdict(dict)
+        for x in ib.portfolio():
+            c = x.contract
+            if c.secType == "OPT" and x.position:
+                e = c.lastTradeDateOrContractMonth
+                legs[(c.symbol, f"{e[:4]}-{e[4:6]}-{e[6:8]}", c.right)][float(c.strike)] = {"qty": float(x.position), "value": float(x.marketValue)}
+        ex = defaultdict(list)
+        for f in ib.reqExecutions(ExecutionFilter()):
+            c = f.contract
+            if c.secType == "OPT":
+                e = c.lastTradeDateOrContractMonth
+                ex[(c.symbol, f"{e[:4]}-{e[4:6]}-{e[6:8]}", c.right, float(c.strike))].append(
+                    (f.execution.side, float(f.execution.shares), float(f.execution.price), float(f.commissionReport.commission or 0.0)))
+        return nlv, legs, ex
+    finally:
+        ib.disconnect()
 
 
 def _leg(sym):
@@ -150,16 +181,59 @@ def main():
 
     mtm_usd = comm_cad = 0.0
     rolled, unresolved = [], []
+    live_legs, n_new, n_marked = {}, 0, 0
+    if FROM_IBKR:
+        global NAV_OVERRIDE
+        nlv, live_legs, execs = ibkr_live()
+        if NAV_OVERRIDE is None:
+            NAV_OVERRIDE = nlv
+        for (u, exp, pc), ks in sorted(live_legs.items()):
+            if len(ks) != 2:
+                unresolved.append(f"{u} {exp} {pc}: {len(ks)} legs at IBKR, not paired"); continue
+            (ka, la), (kb, lb) = ks.items()
+            if la["qty"] + lb["qty"] != 0:
+                unresolved.append(f"{u} {exp} {pc}: uneven legs at IBKR"); continue
+            k_s, k_l = (ka, kb) if la["qty"] < 0 else (kb, ka)
+            structure = "debit" if ((pc == "C" and k_s > k_l) or (pc == "P" and k_s < k_l)) else "credit"
+            typ = (("bull_put" if pc == "P" else "bear_call") if structure == "credit"
+                   else ("bear_call" if pc == "P" else "bull_put"))
+            held = sum(t["qty"] for t in pay["trades"] if t["outcome"] == "OPEN" and t["ticker"] == u
+                       and t["expiry"] == exp and t["k_s"] == k_s and t["k_l"] == k_l and t["structure"] == structure)
+            extra = int(abs(la["qty"]) - held)
+            if extra <= 0:
+                continue
+            fs, fl = execs.get((u, exp, pc, k_s), []), execs.get((u, exp, pc, k_l), [])
+            ns, nl = sum(x[1] for x in fs if x[0] == "SLD"), sum(x[1] for x in fl if x[0] == "BOT")
+            if ns != extra or nl != extra:
+                unresolved.append(f"{u} {k_s}/{k_l}: IBKR holds {extra} more than the statement, today's fills do not explain them"); continue
+            px_s = sum(x[1] * x[2] for x in fs if x[0] == "SLD") / ns
+            px_l = sum(x[1] * x[2] for x in fl if x[0] == "BOT") / nl
+            width = abs(k_s - k_l); net = px_s - px_l                      # + credit received, - debit paid
+            credit = (width + net) if structure == "debit" else net       # credit scale, as the builder
+            pay["trades"].append({
+                "entry": DAY, "dow": date.fromisoformat(DAY).strftime("%a"), "ticker": u, "structure": structure, "type": typ,
+                "k_s": k_s, "k_l": k_l, "expiry": exp, "credit": round(credit, 4), "max_loss": round(width - credit, 4),
+                "close_debit": None, "qty": extra, "pnl": 0.0, "outcome": "OPEN", "assigned": False, "spot": None, "closed": None,
+                "_basis": -net * 100 * extra + sum(x[3] for x in fs + fl), "tentative": "opened today, from IBKR fills"})
+            n_new += 1
     for t in pay["trades"]:
         if t["outcome"] != "OPEN":
             continue
         pair = by_key.get((t["ticker"], t["expiry"]), [])
+        _new_basis = t.pop("_basis", None)
         # Same right as the trade: a debit bull call (bull_put twin) is calls, a debit bear put is puts,
         # the credit spreads the other way round. JNJ 2026-11-13 held 282.5P/280P and 282.5C/285C
         # together, and the shared 282.5 strike matched three legs ('legs not found').
         _pc = (("C" if t["type"] == "bull_put" else "P") if t["structure"] == "debit"
                else ("P" if t["type"] == "bull_put" else "C"))
         mine = [x for x in pair if x[0] in (t["k_s"], t["k_l"]) and x[1] == _pc]
+        lv = live_legs.get((t["ticker"], t["expiry"], _pc)) or {}
+        if _new_basis is not None:
+            # Opened today: no statement legs yet. P&L = IBKR's value now less the fills and their commissions.
+            if t["k_s"] in lv and t["k_l"] in lv:
+                per = (lv[t["k_s"]]["value"] + lv[t["k_l"]]["value"]) / abs(lv[t["k_s"]]["qty"])
+                t["pnl"] = round(per * t["qty"] - _new_basis, 2); n_marked += 1
+            continue
         if len(mine) != 2:
             unresolved.append(f"{t['ticker']} {t['k_s']}/{t['k_l']}: legs not found in the statement"); continue
         q = t["qty"]; width = abs(t["k_s"] - t["k_l"]); pc = mine[0][1]
@@ -193,6 +267,11 @@ def main():
             how = f"expired at {spx:.2f}"
             t["close_debit"] = round(-v6 / 100 / q, 4) if t["structure"] == "debit" else round(v6 / 100 / q, 4)
             sp = spx
+        elif t["k_s"] in lv and t["k_l"] in lv:
+            # Still open at IBKR: the row's unrealized P&L at IBKR's mark, against the statement's cost basis.
+            per = (lv[t["k_s"]]["value"] + lv[t["k_l"]]["value"]) / abs(lv[t["k_s"]]["qty"])
+            t["pnl"] = round(per * q - basis, 2); t["tentative"] = "open, at IBKR's mark"; n_marked += 1
+            continue
         else:
             unresolved.append(f"{t['ticker']} {t['k_s']}/{t['k_l']}: still open, no site action"); continue
         mtm_usd += v6 - v5
@@ -287,6 +366,8 @@ def main():
     print(f"{OUT.name}: {stmt_day} NAV {nav_end:.2f} -> {DAY} TENTATIVE {nav6:.2f} "
           f"(rolled {nav6_est:.2f}: MTM {mtm_usd:+.2f} USD x {fx} = {mtm_usd * fx:+.2f} CAD, comm -{comm_cad:.2f} CAD"
           + (f"; app NLV {NAV_OVERRIDE:.2f} used" if NAV_OVERRIDE is not None else "") + ")")
+    if FROM_IBKR:
+        print(f"  from IBKR: NLV {NAV_OVERRIDE:.2f} CAD, {n_new} spreads opened {DAY} added, {n_marked} open rows at IBKR's mark")
     for r in rolled:
         print("  %-5s %7.1f/%-7.1f v5 %8.2f -> v6 %8.2f  pnl %8.2f  %-7s %s" % r)
     for u in unresolved:
