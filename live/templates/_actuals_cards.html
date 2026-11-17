@@ -218,12 +218,13 @@
           {% if is_debit_site and p.structure == 'debit' %}
             {# pct on the debit site (user 2026-11-11: 'pct to reflect the spot price not the mark'): the
                spot shown against the spread's midpoint after hours, +100% short strike / -100% long strike,
-               unclamped (user 2026-11-17; webapp._pct_of_width). #}
+               unclamped (user 2026-11-17; webapp._pct_of_width). Green above zero, red below, plain at
+               zero (user 2026-11-17: 'make the pct red and green and white too'). #}
             {% set _pw = ((p.short_strike|float) - (p.long_strike|float))|abs %}
             {% if row.pct is not none and row.pct_basis == 'mark' %}
-              <td style="text-align:right" title="P&amp;L ${{ '%+.0f'|format(row.pct_pnl) }} per contract over {{ row.pct_den_name }} ${{ '%.0f'|format(row.pct_den) }} (in session, off the mark; +100% = full win, -100% = full loss)">{{ "%.0f"|format(row.pct) }}%</td>
+              <td class="{% if row.pct > 0 %}pos{% elif row.pct < 0 %}neg{% endif %}" style="text-align:right" title="P&amp;L ${{ '%+.0f'|format(row.pct_pnl) }} per contract over {{ row.pct_den_name }} ${{ '%.0f'|format(row.pct_den) }} (in session, off the mark; +100% = full win, -100% = full loss)">{{ "%.0f"|format(row.pct) }}%</td>
             {% elif row.pct is not none %}
-              <td style="text-align:right" title="spot ${{ '%.2f'|format(row.pct_spot) }} against strikes ${{ p.long_strike|strike }} / ${{ p.short_strike|strike }}: against the midpoint; +100% = spot at the short strike ${{ p.short_strike|strike }}, -100% = spot at the long strike ${{ p.long_strike|strike }} (after hours / settled)">{{ "%.0f"|format(row.pct) }}%</td>
+              <td class="{% if row.pct > 0 %}pos{% elif row.pct < 0 %}neg{% endif %}" style="text-align:right" title="spot ${{ '%.2f'|format(row.pct_spot) }} against strikes ${{ p.long_strike|strike }} / ${{ p.short_strike|strike }}: against the midpoint; +100% = spot at the short strike ${{ p.short_strike|strike }}, -100% = spot at the long strike ${{ p.long_strike|strike }} (after hours / settled)">{{ "%.0f"|format(row.pct) }}%</td>
             {% else %}
               <td style="text-align:right">—</td>
             {% endif %}
