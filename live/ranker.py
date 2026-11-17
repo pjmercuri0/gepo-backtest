@@ -567,6 +567,14 @@ def rank_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     # `GROUND >= thr` is False for NaN. Rows with NO close history are still
     # dropped: without P_real there is nothing to show at all.
     ranked = scored[scored["p"].notna()].copy()
+    # Gap-less names are hidden (user 2026-11-17: 'you should hide the gap-less names'): once today's gap
+    # feed has stored gaps, a name it has none for is scored with zero drift, which is not the canon's
+    # GROUND, and it could never qualify -- so it leaves the list. Before the feed has run (the 09:30
+    # scan) every name is gap-less and the list stays, under the page's zero-drift warning.
+    _gap_ok = ranked["own_gap_available"].astype(bool)
+    if _gap_ok.any() and not _gap_ok.all():
+        print(f"  hidden, no own gap today: {sorted(ranked.loc[~_gap_ok, 'ticker'].unique())}", flush=True)
+        ranked = ranked[_gap_ok].copy()
 
     # One direction per ticker (2026-06-10): bull_put and bear_call on the same
     # name are contradictory bets; keep only the better-GROUND one.
