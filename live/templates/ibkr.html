@@ -115,7 +115,7 @@
         },
         scales: {
           x: { ticks: { color: '#888780', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: 'rgba(80,80,80,0.2)' } },
-          y: { ticks: { color: '#888780', callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(80,80,80,0.2)' } }
+          y: { beginAtZero: true, ticks: { color: '#888780', callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(80,80,80,0.2)' } }
         }
       }
     });
