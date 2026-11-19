@@ -245,9 +245,16 @@ tr.assignment-risk td:first-child::before {
     /* Instagram's bar (user 2026-11-19: 'copy what instagram does', after the black bar with a bright
        glass rim 'looks bad'): solid black, one even hairline
        edge, a soft drop shadow, and the current tab as a lighter grey capsule. */
-    background: #000; /* solid black, his call twice (user 2026-11-19: 'black background though') */
-    border: 1px solid rgba(255,255,255,0.32); border-radius: 28px; /* 0.09 vanished on black (user 2026-11-19: 'you lost the border') */
-    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    /* solid black inside a glass rim (user 2026-11-19: 'black background though', then 'it should be
+       "glass" border not just a solid line'): a 1px edge lit along the top and bottom and dim round the
+       ends, as he described it, with a soft sheen just inside the top edge. */
+    background: linear-gradient(#000, #000) padding-box,
+                linear-gradient(180deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.20) 22%,
+                                rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.18) 78%,
+                                rgba(255,255,255,0.42) 100%) border-box;
+    border: 1px solid transparent; border-radius: 28px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45), inset 0 1px 6px rgba(255,255,255,0.10),
+                inset 0 -1px 4px rgba(255,255,255,0.05);
     font-size: 12.5px; white-space: nowrap;
   }
   .nav a { flex: 1 1 auto; margin: 0; padding: 0 2px; height: 44px; line-height: 44px; text-align: center;
