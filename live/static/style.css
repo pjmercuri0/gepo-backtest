@@ -237,9 +237,9 @@ tr.assignment-risk td:first-child::before {
 @media (max-width: 700px) {
   .nav {
     top: auto; left: 12px; right: 12px;
-    /* 21px up on an iPhone (34px inset), half the first try's 42 (user 2026-11-19: 'reduce the distance
-       from bottom by about half'); still above the home indicator. 8px where there is no inset. */
-    bottom: max(8px, calc(env(safe-area-inset-bottom, 0px) - 13px));
+    /* 25px up on an iPhone (34px inset): 42 at first, then 21, then his 'let's go to 25px' (user
+       2026-11-19); above the home indicator. 8px where there is no inset. */
+    bottom: max(8px, calc(env(safe-area-inset-bottom, 0px) - 9px));
     height: 50px; padding: 0 6px;
     display: flex; align-items: center; justify-content: space-between;
     background: rgba(30,30,32,0.82);
@@ -255,7 +255,7 @@ tr.assignment-risk td:first-child::before {
   .nav #poll-health { position: absolute; right: 10px; bottom: 100%; margin: 0 0 6px 0 !important;
                       background: rgba(15,15,15,0.9); padding: 2px 8px; border-radius: 8px; }
   #page-content { top: env(safe-area-inset-top, 0px);
-                  padding-bottom: calc(74px + max(8px, calc(env(safe-area-inset-bottom, 0px) - 13px))); }
+                  padding-bottom: calc(74px + max(8px, calc(env(safe-area-inset-bottom, 0px) - 9px))); }
 }
 /* Unqualified ranked rows: kept fully opaque per user pref 2026-06-02.
    Distinction is via text color only (slightly muted but still readable). */
