@@ -2035,6 +2035,58 @@ def ibkr():
     return render_template("ibkr.html", data=payload, week_limit=week_limit, weeks_chart=weeks_chart)
 
 
+def _cal_months(points):
+    """Month grids for the Cal tab from the IBKR payload's NAV points: one dict per month, newest first.
+    A day's figure is that close's NAV less the previous close's; Saturday carries the NAV so far."""
+    import calendar as _calendar
+    pts = [(ddate.fromisoformat(p["date"]), float(p["strategy"]), bool(p.get("tentative")))
+           for p in (points or []) if p.get("strategy") is not None]
+    if len(pts) < 2:
+        return []
+    by_month = {}
+    for (d0, v0, _), (d1, v1, tent) in zip(pts, pts[1:]):
+        m = by_month.setdefault((d1.year, d1.month), {"start": v0, "start_day": d0, "days": {}})
+        m["days"][d1.day] = (round(v1 - v0, 2), tent)
+        m["end"], m["end_day"], m["end_tentative"] = v1, d1, tent
+    last_day = pts[-1][0]
+    out = []
+    for (y, mo), m in sorted(by_month.items(), reverse=True):
+        lead = (ddate(y, mo, 1).weekday() + 1) % 7                 # Sunday-first column of the 1st
+        ndays = _calendar.monthrange(y, mo)[1]
+        nav, cells = m["start"], []
+        for i in range(-lead, ndays + (-(lead + ndays) % 7)):
+            day = i + 1
+            if day < 1 or day > ndays:
+                cells.append(None); continue
+            d = ddate(y, mo, day)
+            chg = m["days"].get(day)
+            if chg:
+                nav += chg[0]
+            sat = d.weekday() == 5
+            cells.append({"day": day, "pnl": chg[0] if chg else None, "tentative": bool(chg and chg[1]),
+                          "start": m["start"] if day == 1 else None,
+                          # the week's total once the week has begun (no totals on weeks still ahead)
+                          "total": nav if sat and (d - last_day).days < 7 else None})
+        chg = m["end"] - m["start"]
+        out.append({"name": ddate(y, mo, 1).strftime("%B"), "year": y, "cells": cells,
+                    "start": m["start"], "start_label": m["start_day"].strftime("%b %-d"),
+                    "end": m["end"], "end_label": m["end_day"].strftime("%b %-d"),
+                    "end_tentative": m["end_tentative"], "change": chg,
+                    "change_pct": 100 * chg / m["start"] if m["start"] else None,
+                    "complete": (y, mo) != (last_day.year, last_day.month)})
+    return out
+
+
+@app.route("/cal")
+def cal():
+    """Month P&L calendars (user 2026-11-19: 'add one tab called cal ... all calendar artifacts up to
+    date'): the whiteboard month grid of his claude.ai calendar artifacts, drawn from the IBKR
+    payload's daily NAV points so it follows every statement and tentative point by itself."""
+    payload = _read_json(_data_path(_stores.IBKR[_stores.site()])) or {}
+    return render_template("cal.html", months=_cal_months(payload.get("points")),
+                           currency=(payload.get("config") or {}).get("base_currency") or "CAD")
+
+
 @app.route("/qr")
 def qr():
     default_site = ("https://gepo-euro-backtest.peter.cloudmallinc.com/"

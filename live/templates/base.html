@@ -37,6 +37,7 @@
   <a href="{{ url_for('ibkr') }}"     class="{% if request.endpoint == 'ibkr'         %}active{% endif %}">ibkr</a>
   <a href="{{ url_for('oot') }}"      class="{% if request.endpoint == 'oot'          %}active{% endif %}">oot</a>
   <a href="{{ url_for('backtest') }}" class="{% if request.endpoint == 'backtest'     %}active{% endif %}">backtest</a>
+  <a href="{{ url_for('cal') }}"      class="{% if request.endpoint == 'cal'          %}active{% endif %}">cal</a>
   {# qr and api are off the bar (user 2026-10-23); /qr and /api/latest.json still answer by URL. #}
   {# history and plot are off the bar for now (user 2026-11-19: 'hide history and plot tabs for now'); /history and /plot still answer by URL. #}
   <span id="poll-health" style="display:none;margin-left:auto;align-self:center;font-size:11px;color:#e05d5d"></span>
