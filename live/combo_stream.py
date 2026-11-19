@@ -341,6 +341,11 @@ def main() -> int:
         ib.reqMarketDataType(live_config.IB_MKT_DATA_TYPE)
         print(f"[combo_stream] connected, client {CLIENT_ID}, max {MAX_BAGS} bags", flush=True)
         last_reload = 0.0
+        # 5-minute levels (user 2026-11-19: 'refresh the target and max debit every 5 minutes and freeze
+        # it every 5 minutes instead of the snap freeze. to protect me from crazy last minute moves'):
+        # each spread's IBKR mark as it stood at the last :00/:05/:10... boundary, or when the stream
+        # first held it inside the current 5 minutes. The pages take the target band and max debit from it.
+        mark5, mark5_bucket = {}, None
         last_pub = 0.0
         last_pre = ""
         # Last IN-SESSION quote per spread (user 2026-10-06). After the bell the quotes stop and the
@@ -706,6 +711,14 @@ def main() -> int:
                 elif v < 0:
                     continue
                 q["ibkr_mark"] = round(v, 4)
+            _b5 = ts[:14] + f"{(int(ts[14:16]) // 5) * 5:02d}"
+            if _b5 != mark5_bucket:
+                mark5, mark5_bucket = {}, _b5
+            for k, q in quotes.items():
+                if k not in mark5 and q.get("ibkr_mark") is not None:
+                    mark5[k] = (q["ibkr_mark"], ts)
+                if k in mark5:
+                    q["mark5"], q["mark5_ts"] = mark5[k]
             # Raw book record, one line per tick (user 2026-10-28, "where you getting .53"): the
             # JSON is overwritten every second, so a screenshot could not be reconciled after the
             # fact. live/logs/combo_hist_YYYYMMDD.jsonl: {ts, bags: {key: [exchange, bid, ask]},

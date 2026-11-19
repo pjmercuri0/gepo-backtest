@@ -569,6 +569,18 @@ def _json_clone(obj):
     return json.loads(json.dumps(obj))
 
 
+def _mark5(pick: dict):
+    """The spread's IBKR mark as frozen by the stream at the last 5-minute boundary (combo_stream
+    "mark5"; user 2026-11-19: 'refresh the target and max debit every 5 minutes and freeze it every 5
+    minutes instead of the snap freeze. to protect me from crazy last minute moves'). None when the
+    stream does not hold the spread."""
+    try:
+        _m = ((_stream_state().get("quotes") or {}).get(_stores.qkey(pick)) or {}).get("mark5")
+        return float(_m) if _m is not None else None
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def _mark_basis(pick: dict, tg, mark):
     """The targets on the mark basis (user 2026-11-19: 'calculate model target range and max debit all
     from mark'), or tg unchanged when the canon is on the smile or the mark is not a usable price."""
@@ -586,11 +598,11 @@ def _attach_targets(pick: dict, live_mark: bool = False) -> None:
     credit when the ranker supplied one, else from the cross-sectional fair(d, DTE) formula.
     Also grades a recorded fill against them. IBKR quotes on the pick are left untouched.
 
-    Mark basis (user 2026-11-19), fixed at the snap (same day: 'target keeps changing now cuz its based
-    on mark. lets fix target and max debit at the time of snap'): the levels come from the mark stamped
-    on the row when its scan snapped (snap_mark, written by snapshot_picks), or from entry_mark on an
-    Actuals row, the stamp it was saved with. Never the moving mark. A row with neither stays on the
-    smile, flagged basis 'model_fallback' when live_mark is set (an open Snap row)."""
+    Mark basis (user 2026-11-19), never the moving mark ('target keeps changing now cuz its based on
+    mark'): an Actuals row keeps entry_mark, the mark its levels showed at the +; an open Snap row
+    (live_mark) takes the stream's 5-minute mark (_mark5), refreshed every 5 minutes and frozen in
+    between; a row the stream does not hold falls back to snap_mark, the stamp snapshot_picks wrote
+    when its scan snapped. A row with none stays on the smile, flagged basis 'model_fallback'."""
     try:
         d = pick.get("dfit_short")
         if d is None:
@@ -601,8 +613,10 @@ def _attach_targets(pick: dict, live_mark: bool = False) -> None:
                                width=float(width) if width else None,
                                model_credit=float(mc) if mc is not None else None)
         _mk = pick.get("entry_mark")
+        if _mk is None and live_mark:
+            _mk = _mark5(pick)                 # refreshed every 5 minutes, frozen in between
         if _mk is None:
-            _mk = pick.get("snap_mark")
+            _mk = pick.get("snap_mark")        # the scan's stamp, when the stream does not hold the row
         _tm = _mark_basis(pick, tg, _mk)
         if _tm is tg and live_mark and isinstance(tg, dict) and getattr(ec, "TARGET_BASIS", "model") == "mark":
             tg = {**tg, "basis": "model_fallback"}
@@ -654,8 +668,12 @@ def _save_actual_from_source(source: dict, pick: dict, source_label: str, source
     existing = next((t for t in trades if t.get("id") == trade_id), None)
     # Mark basis (user 2026-11-19): the row keeps the mark its levels were showing at the +, the
     # scan's stamp, so its target band and max debit stay the ones he entered on.
-    if getattr(ec, "TARGET_BASIS", "model") == "mark" and pick.get("snap_mark") is not None:
-        pick = {**pick, "entry_mark": pick["snap_mark"]}
+    if getattr(ec, "TARGET_BASIS", "model") == "mark":
+        _em = _mark5(pick)
+        if _em is None:
+            _em = pick.get("snap_mark")
+        if _em is not None:
+            pick = {**pick, "entry_mark": round(float(_em), 4)}
     row = {
         "id": trade_id,
         "source": source,
@@ -3022,7 +3040,8 @@ def _overlay_stream(payload: dict) -> None:
                 # Mark basis (user 2026-11-19): this row's levels, and so the check mark below, come off
                 # the IBKR mark stamped on it when the scan snapped; a row with no stamp stays on the smile.
                 if getattr(ec, "TARGET_BASIS", "model") == "mark" and isinstance(r.get("credit_targets"), dict):
-                    _tm = _mark_basis(r, r["credit_targets"], r.get("snap_mark"))   # fixed at the snap
+                    _m5 = (q or {}).get("mark5")           # refreshed every 5 minutes, frozen in between
+                    _tm = _mark_basis(r, r["credit_targets"], _m5 if _m5 is not None else r.get("snap_mark"))
                     r["credit_targets"] = _tm if _tm is not r["credit_targets"] else {**_tm, "basis": "model_fallback"}
                 # Best-book star (user 2026-11-02: 'just show star when one is the best price'): the two
                 # sites' SHOWN prices, whatever each is priced off; a tie stars both. Scan defaults here,
