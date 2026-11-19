@@ -14,6 +14,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import marshal
 import math
 import os
 import sys
@@ -321,13 +322,30 @@ def _gzip_response(resp):
     return resp
 
 
+_READ_JSON_CACHE: dict = {}     # (path, raw) -> ((mtime_ns, size, inode), marshal blob of the parsed, site-viewed file)
+
+
 def _read_json(path: Path, raw: bool = False) -> dict | None:
     """raw=True (2026-11-11): the file as written, no debit twinning, for the credit book's rows carried
     on the debit site's Actuals (user: 'backfill ... same for actuals tab'). A credit row that merged
     its source's TWIN took the twin's structure and priced as a debit (AXP 325/322.5 settled L showed
     -$2 for -$127)."""
-    if not path.exists():
+    # Parsed-file cache (user 2026-11-19: tabs slow to switch, 'especially actuals' -- the page re-parsed
+    # 331 JSON files a load). Keyed on the file's mtime and size, so a rewritten file is re-read on the
+    # next call; every caller still gets its OWN copy (they write into what they are handed), unpacked
+    # from a marshal blob, which is several times quicker than parsing the JSON text again.
+    # Only the day files (frozen/, intraday_picks/): the bulk of the reads. The books a click edits
+    # (actuals) and the per-scan boards are small, single reads, and stay read straight off disk.
+    try:
+        st = path.stat()
+    except OSError:
         return None
+    cacheable = path.parent.name in ("frozen", "intraday_picks")
+    key = (str(path), bool(raw))
+    sig = (st.st_mtime_ns, st.st_size, st.st_ino)
+    hit = _READ_JSON_CACHE.get(key) if cacheable else None
+    if hit and hit[0] == sig:
+        return marshal.loads(hit[1])
     try:
         with open(path) as f:
             d = json.load(f)
@@ -335,6 +353,11 @@ def _read_json(path: Path, raw: bool = False) -> dict | None:
         return None
     if IS_DEBIT_SITE and isinstance(d, dict) and not raw:
         _debit_view(d)
+    if cacheable:
+        try:
+            _READ_JSON_CACHE[key] = (sig, marshal.dumps(d))
+        except ValueError:
+            _READ_JSON_CACHE.pop(key, None)
     return d
 
 
@@ -715,8 +738,16 @@ def _source_time_from_frozen(payload: dict, pick: dict) -> str | None:
     return None
 
 
-def _find_snapshot_scan(date: str, hhmm: str, raw: bool = False) -> tuple[dict, dict] | tuple[None, None]:
-    payload = _read_json(Path(live_config.ROOT_DIR) / "intraday_picks" / f"{date}.json", raw=raw)
+def _find_snapshot_scan(date: str, hhmm: str, raw: bool = False, memo: dict | None = None) -> tuple[dict, dict] | tuple[None, None]:
+    """memo: a caller's own dict; a day's file is then read once for all its scans (Actuals asked for the
+    same day up to a dozen times a load). Only for callers that do not write into what comes back."""
+    fp = Path(live_config.ROOT_DIR) / "intraday_picks" / f"{date}.json"
+    if memo is None:
+        payload = _read_json(fp, raw=raw)
+    else:
+        if (date, raw) not in memo:
+            memo[(date, raw)] = _read_json(fp, raw=raw)
+        payload = memo[(date, raw)]
     if payload is None:
         return None, None
     for scan in payload.get("scans", []):
@@ -766,7 +797,11 @@ _ACTUAL_SAVED_CREDIT_KEYS = ("net_credit", "quoted_credit", "credit_source", "co
 def _actuals_rows() -> list[dict]:
     store = _actuals_store()
     rows = []
-    history_by_date = {d.get("date"): d for d in _frozen_history(limit=500)}
+    # Only the frozen days a row came from, and each snapshot day once (2026-11-19, page speed).
+    _frozen_days = {str((t.get("source") or {}).get("date")) for t in store.get("trades") or []
+                    if (t.get("source") or {}).get("kind") == "frozen"}
+    _scan_memo: dict = {}
+    history_by_date = {d.get("date"): d for d in _frozen_history(limit=500, only=_frozen_days)}
     # Debit site: the credit book's rows (structure not 'debit', the Sep-Oct history backfilled 2026-11-11)
     # read their frozen day and snapshot scan RAW, so the merge below keeps them credit spreads
     # settled at the credit P&L. Loaded once, only when such a row exists.
@@ -776,7 +811,7 @@ def _actuals_rows() -> list[dict]:
         pick = _json_clone(item.get("pick") or {})
         _raw = IS_DEBIT_SITE and pick.get("structure") != "debit"
         if _raw and _history_raw is None:
-            _history_raw = {d.get("date"): d for d in _frozen_history(limit=500, raw=True)}
+            _history_raw = {d.get("date"): d for d in _frozen_history(limit=500, raw=True, only=_frozen_days)}
         source_label = item.get("source_label") or source.get("kind") or "source"
         source_time = item.get("source_time")
         outcome_row = None
@@ -829,7 +864,7 @@ def _actuals_rows() -> list[dict]:
                 _mk_actual_settled(outcome_row, pick)
 
         elif source.get("kind") == "snapshot":
-            payload, scan = _find_snapshot_scan(str(source.get("date")), str(source.get("hhmm")), raw=_raw)
+            payload, scan = _find_snapshot_scan(str(source.get("date")), str(source.get("hhmm")), raw=_raw, memo=_scan_memo)
             idx = source.get("index")
             try:
                 idx = int(idx)
@@ -1597,12 +1632,16 @@ def _mk_actual_settled(outcome_row: dict, pick: dict) -> None:
     outcome_row["actual_pnl_per_contract"] = round(float(pps) * 100, 2)
 
 
-def _frozen_history(limit: int = 60, raw: bool = False) -> list[dict]:
+def _frozen_history(limit: int = 60, raw: bool = False, only=None) -> list[dict]:
+    """only: a set of YYYY-MM-DD; days outside it are not read (Actuals needs the handful of days its
+    rows came from, not all of them). Each day is annotated on its own, so the days returned are the same."""
     base = Path(live_config.FROZEN_DIR)
     if not base.exists():
         return []
     out = []
     for fp in sorted(base.glob("*.json"), reverse=True)[:limit]:
+        if only is not None and fp.stem not in only:
+            continue
         # Skip Friday-entry frozen files (DTE=7 to next-Friday is zero-edge
         # per daily backtest). Filtering at the history level keeps any
         # existing Friday JSON on disk for archival but hides it from UI.
