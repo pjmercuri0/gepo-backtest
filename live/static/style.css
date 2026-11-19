@@ -230,6 +230,31 @@ tr.assignment-risk td:first-child::before {
   font-weight: 600;
   border-bottom: 2px solid #4a90c2;
 }
+/* Phone: the tabs are a floating pill at the bottom of the screen, like Instagram's (user 2026-11-19:
+   'for mobile can you put the tabs at the bottom ... don't interfere with my bottom control line').
+   The pill sits wholly above the home indicator (safe-area-inset-bottom) and the page scrolls behind
+   it; the last card clears it through the content's bottom padding. Must stay after the base .nav. */
+@media (max-width: 700px) {
+  .nav {
+    top: auto; left: 12px; right: 12px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    height: 50px; padding: 0 6px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(30,30,32,0.82);
+    -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+    border: 0.5px solid rgba(255,255,255,0.12); border-radius: 25px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    font-size: 12.5px; white-space: nowrap;
+  }
+  .nav a { flex: 1 1 auto; margin: 0; padding: 0 2px; height: 38px; line-height: 38px; text-align: center;
+           color: #a8a8a2; border-radius: 19px; font-size: 12.5px; }
+  .nav a:hover { text-decoration: none; }
+  .nav a.active { color: #ffffff; border-bottom: none; background: rgba(255,255,255,0.14); }
+  .nav #poll-health { position: absolute; right: 10px; bottom: 100%; margin: 0 0 6px 0 !important;
+                      background: rgba(15,15,15,0.9); padding: 2px 8px; border-radius: 8px; }
+  #page-content { top: env(safe-area-inset-top, 0px);
+                  padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+}
 /* Unqualified ranked rows: kept fully opaque per user pref 2026-06-02.
    Distinction is via text color only (slightly muted but still readable). */
 .ranked-row.unqualified td { color: #888780; }
