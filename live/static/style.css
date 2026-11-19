@@ -243,10 +243,9 @@ tr.assignment-risk td:first-child::before {
     height: 56px; padding: 0 6px;
     display: flex; align-items: center; justify-content: space-between;
     /* Instagram's bar (user 2026-11-19: 'copy what instagram does', after the black bar with a bright
-       glass rim 'looks bad'): near-black charcoal, slightly see-through with a blur, one even hairline
+       glass rim 'looks bad'): solid black, one even hairline
        edge, a soft drop shadow, and the current tab as a lighter grey capsule. */
-    background: rgba(21,23,27,0.90);
-    -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%);
+    background: #000; /* solid black, his call twice (user 2026-11-19: 'black background though') */
     border: 1px solid rgba(255,255,255,0.09); border-radius: 28px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.45);
     font-size: 12.5px; white-space: nowrap;
