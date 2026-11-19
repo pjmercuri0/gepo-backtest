@@ -240,6 +240,9 @@ function renderParams(cfg) {
 function tgtCell(p) {
   const t = p.credit_targets;
   if (!t || t.min_credit == null) return "—";
+  // Mark basis (user 2026-11-19): levels come off IBKR's mark; a row the stream has no mark for is
+  // still on the smile and is shown dimmed.
+  if (t.basis === "model_fallback" && !p._tgtDim) { p._tgtDim = true; const h = tgtCell(p); p._tgtDim = false; return `<span style="opacity:0.5" title="no IBKR mark on this row: smile levels">${h}</span>`; }
   // above_min: the IBKR credit on the table clears the min (execution gate, part of "qualified").
   const gate = p.above_min == null ? "" : (p.above_min
     ? ` <span class="pos">✓</span>`

@@ -569,10 +569,36 @@ def _json_clone(obj):
     return json.loads(json.dumps(obj))
 
 
-def _attach_targets(pick: dict) -> None:
+def _stream_mark(pick: dict):
+    """IBKR's mark on this spread, credit scale, when the stream carries it (combo_stream "ibkr_mark")."""
+    try:
+        _q = (_stream_state().get("quotes") or {}).get(_stores.qkey(pick)) or {}
+        _m = _q.get("ibkr_mark")
+        return float(_m) if _m is not None else None
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _mark_basis(pick: dict, tg, mark):
+    """The targets on the mark basis (user 2026-11-19: 'calculate model target range and max debit all
+    from mark'), or tg unchanged when the canon is on the smile or the mark is not a usable price."""
+    if getattr(ec, "TARGET_BASIS", "model") != "mark" or mark is None:
+        return tg
+    try:
+        w = float(pick.get("spread_width") or abs(float(pick["short_strike"]) - float(pick["long_strike"])))
+    except (KeyError, TypeError, ValueError):
+        return tg
+    return ec.mark_targets(mark, w, pick.get("structure") == "debit", base=tg) or tg
+
+
+def _attach_targets(pick: dict, live_mark: bool = False) -> None:
     """D_ent canon (2026-09-13): min / target credit for the spread, from the smile-fit model
     credit when the ranker supplied one, else from the cross-sectional fair(d, DTE) formula.
-    Also grades a recorded fill against them. IBKR quotes on the pick are left untouched."""
+    Also grades a recorded fill against them. IBKR quotes on the pick are left untouched.
+
+    Mark basis (user 2026-11-19): a row carrying entry_mark, the mark saved when he pressed +, takes
+    its levels from that; live_mark=True (an open Snap row) takes them from the stream's mark now. A
+    row with neither stays on the smile, flagged basis 'model_fallback' when a live mark was asked for."""
     try:
         d = pick.get("dfit_short")
         if d is None:
@@ -582,6 +608,14 @@ def _attach_targets(pick: dict) -> None:
         tg = ec.credit_targets(abs(float(d)) if d is not None else None, pick.get("DTE"),
                                width=float(width) if width else None,
                                model_credit=float(mc) if mc is not None else None)
+        _mk = pick.get("entry_mark")
+        if _mk is None and live_mark:
+            _mk = _stream_mark(pick)
+        _tm = _mark_basis(pick, tg, _mk)
+        if _tm is tg and live_mark and isinstance(tg, dict) and getattr(ec, "TARGET_BASIS", "model") == "mark":
+            tg = {**tg, "basis": "model_fallback"}
+        else:
+            tg = _tm
         pick["credit_targets"] = tg
         pick["fill_grade"] = ec.grade_fill(pick.get("actual_credit"), float(width) if width else None, tg)
     except (TypeError, ValueError):
@@ -626,6 +660,12 @@ def _save_actual_from_source(source: dict, pick: dict, source_label: str, source
     now = datetime.now().isoformat(timespec="seconds")
     trades = store.get("trades") or []
     existing = next((t for t in trades if t.get("id") == trade_id), None)
+    # Mark basis (user 2026-11-19): the mark at the + is kept on the row, so its target band and max
+    # debit stay the ones he entered on instead of moving with the mark afterwards.
+    if getattr(ec, "TARGET_BASIS", "model") == "mark":
+        _em = _stream_mark(pick)
+        if _em is not None:
+            pick = {**pick, "entry_mark": round(_em, 4)}
     row = {
         "id": trade_id,
         "source": source,
@@ -791,7 +831,7 @@ def _live_status(spread_type: str, spot, short_strike, long_strike):
 # The quote fields a + stores on an actuals trade (see _overlay_stream). Re-reading a
 # snapshot-sourced trade must not overwrite them with the scan's own quote.
 _ACTUAL_SAVED_CREDIT_KEYS = ("net_credit", "quoted_credit", "credit_source", "combo_bid",
-                             "combo_ask", "combo_credit_mid", "quote_ts", "max_loss", "credit_ratio")
+                             "combo_ask", "combo_credit_mid", "quote_ts", "max_loss", "credit_ratio", "entry_mark")
 
 
 def _actuals_rows() -> list[dict]:
@@ -2289,7 +2329,9 @@ def snapshots():
                 # spread shows one spot, one mark, one badge and one P&L on every tab. Snap used to
                 # render whatever the last scan stored: on 2026-10-06 all 73 rows it shared with
                 # Actuals showed a different spot, and GS 902.5/900 read L at a 15-minute-old mark.
-                _attach_targets(pk)      # min / target, the same function History uses
+                # min / target; an open row's off the stream's mark (user 2026-11-19), a settled row's as it was
+                _attach_targets(pk, live_mark=(pk.get("pnl") is None and not pk.get("outcome")
+                                               and pk.get("expiry_close") is None))
                 # GROUND floor at the row's own scan, the Live tab's ground_ok (user 2026-10-14).
                 _gm = getattr(__import__("config"), "FABLE_GROUND_MIN", None)
                 if _gm is not None and pk.get("GROUND") is not None:
@@ -2987,6 +3029,11 @@ def _overlay_stream(payload: dict) -> None:
                 if qo is not None and qo.get("mid") is None:
                     qo = None
                 w = r.get("spread_width")
+                # Mark basis (user 2026-11-19): this row's levels, and so the check mark below, come off
+                # the stream's IBKR mark on its own book; a row the stream has no mark for stays on the smile.
+                if getattr(ec, "TARGET_BASIS", "model") == "mark" and isinstance(r.get("credit_targets"), dict):
+                    _tm = _mark_basis(r, r["credit_targets"], (q or {}).get("ibkr_mark"))
+                    r["credit_targets"] = _tm if _tm is not r["credit_targets"] else {**_tm, "basis": "model_fallback"}
                 # Best-book star (user 2026-11-02: 'just show star when one is the best price'): the two
                 # sites' SHOWN prices, whatever each is priced off; a tie stars both. Scan defaults here,
                 # the shown live prices overwrite them below.

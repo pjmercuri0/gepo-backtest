@@ -102,6 +102,17 @@ MULT_BREAKEVEN = 0.965
 # is where the backtest edge lives. 3dp on the ratios so no two levels round together.
 MULT_MIN, MULT_TARGET_LO, MULT_TARGET_HI = 1.00, 1.04, 1.10
 MULT_WALKAWAY = 1.00   # fair value: below this the trade is a coin flip that pays the broker (break-even ~1.03x after commission)
+# Target basis (user 2026-11-19: 'from now on I want to calculate model target range and max debit all
+# from mark'): where the stream carries IBKR's mark on the spread, the target band and the max debit /
+# min credit are multiples of that mark; a row with no mark keeps the smile levels above. "model" puts
+# every row back on the smile (the state before is tagged pre-mark-targets-20261119).
+TARGET_BASIS = "mark"
+# Debit rows are multiples of the mark DEBIT, credit rows of the mark CREDIT. They are the smile levels
+# restated on the mark (user: 'what are those percents of mark? you tell me'): over his 16 fills
+# 2026-11-12..18 the smile max debit was 1.055x the mark debit, the smile target band 0.954-1.014x, and
+# the model credit 0.948x the mark credit.
+MARK_MAX_DEBIT, MARK_TARGET_DEBIT_LO, MARK_TARGET_DEBIT_HI = 1.05, 0.95, 1.01
+MARK_MIN_CREDIT, MARK_TARGET_CREDIT_LO, MARK_TARGET_CREDIT_HI = 0.95, 0.99, 1.04
 # cross-sectional fair credit/width by delta and DTE (fit on 43,479 candidates 2020-26, med |err| 0.025)
 FAIR_COEF = (0.4022, 2.3485, -12.464, 0.0077)
 
@@ -683,6 +694,35 @@ def credit_targets(short_delta, dte, width=None, model_credit=None) -> dict:
     return out
 
 
+def mark_targets(mark_credit, width, debit: bool, base: dict | None = None) -> dict | None:
+    """credit_targets on the mark basis: the same keys, the levels taken from IBKR's mark on the spread
+    (mark_credit is on the credit scale, as combo_stream writes it: width - the mark debit for a debit
+    row). A debit row's levels are rounded on the DEBIT, the number its page shows. base = the smile
+    targets, kept for the keys the mark does not define (breakeven). None when the mark is not a price
+    strictly inside the width."""
+    try:
+        W, mc = float(width), float(mark_credit)
+    except (TypeError, ValueError):
+        return None
+    if not (W > 0 and 0 < mc < W):
+        return None
+    _r = lambda x: math.floor(float(x) * 100 + 0.5 + 1e-9) / 100
+    if debit:
+        md = W - mc
+        mn = W - min(W, _r(MARK_MAX_DEBIT * md))
+        lo = W - min(W, _r(MARK_TARGET_DEBIT_HI * md))
+        hi = W - min(W, _r(MARK_TARGET_DEBIT_LO * md))
+    else:
+        mn, lo, hi = (min(W, _r(m * mc)) for m in (MARK_MIN_CREDIT, MARK_TARGET_CREDIT_LO, MARK_TARGET_CREDIT_HI))
+    out = dict(base or {})
+    out.update({'basis': 'mark', 'mark_credit': round(mc, 4), 'width': round(W, 2), 'fair_cw': round(mc / W, 3),
+                'walkaway_cw': round(mn / W, 4), 'min_cw': round(mn / W, 4),
+                'target_lo_cw': round(lo / W, 4), 'target_hi_cw': round(hi / W, 4),
+                'min_credit': round(mn, 2), 'walkaway_credit': round(mn, 2),
+                'target_lo_credit': round(lo, 2), 'target_hi_credit': round(hi, 2)})
+    return out
+
+
 def grade_fill(actual_credit, width, targets: dict) -> str | None:
     """'below-min' | 'ok' | 'target' | 'great' for a recorded fill."""
     if actual_credit is None or not width:
@@ -704,5 +744,6 @@ CANON_LABELS = {
     'gap':       f'P_real drift = {GAP_GAMMA:g} × β_year σ × z(the stock\'s OWN opening gap, ATR units) × √DTE; no market average',
     'scoring':   'G = Kelly log-growth on P_real at the smile-fit model credit; GROUND = (e^G−1)·e^(−k·D_ent)',
     'fill':      f'{FILL_MULT:.2f}× smile-fit model credit, no commission',
-    'targets':   f'min {MULT_MIN:.2f}× model credit, target {MULT_TARGET_LO:.2f}–{MULT_TARGET_HI:.2f}×',
+    'targets':   (f'off IBKR mark: max debit {MARK_MAX_DEBIT:.2f}× mark, target {MARK_TARGET_DEBIT_LO:.2f}–{MARK_TARGET_DEBIT_HI:.2f}×; no mark: smile, min {MULT_MIN:.2f}× model credit, target {MULT_TARGET_LO:.2f}–{MULT_TARGET_HI:.2f}×'
+                  if TARGET_BASIS == 'mark' else f'min {MULT_MIN:.2f}× model credit, target {MULT_TARGET_LO:.2f}–{MULT_TARGET_HI:.2f}×'),
 }
