@@ -246,7 +246,7 @@ tr.assignment-risk td:first-child::before {
        glass rim 'looks bad'): solid black, one even hairline
        edge, a soft drop shadow, and the current tab as a lighter grey capsule. */
     background: #000; /* solid black, his call twice (user 2026-11-19: 'black background though') */
-    border: 1px solid rgba(255,255,255,0.09); border-radius: 28px;
+    border: 1px solid rgba(255,255,255,0.32); border-radius: 28px; /* 0.09 vanished on black (user 2026-11-19: 'you lost the border') */
     box-shadow: 0 8px 24px rgba(0,0,0,0.45);
     font-size: 12.5px; white-space: nowrap;
   }
