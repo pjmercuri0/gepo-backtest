@@ -32,14 +32,13 @@
 
 <div class="nav">
   <a href="{{ url_for('index') }}"    class="{% if request.endpoint == 'index'        %}active{% endif %}">live</a>
-  <a href="{{ url_for('history') }}"  class="{% if request.endpoint == 'history'      %}active{% endif %}">history</a>
   <a href="{{ url_for('snapshots') }}" class="{% if request.endpoint == 'snapshots'    %}active{% endif %}">snap</a>
   <a href="{{ url_for('actuals') }}"  class="{% if request.endpoint == 'actuals'      %}active{% endif %}">actuals</a>
-  <a href="{{ url_for('plot') }}"     class="{% if request.endpoint == 'plot'         %}active{% endif %}">plot</a>
   <a href="{{ url_for('ibkr') }}"     class="{% if request.endpoint == 'ibkr'         %}active{% endif %}">ibkr</a>
   <a href="{{ url_for('oot') }}"      class="{% if request.endpoint == 'oot'          %}active{% endif %}">oot</a>
   <a href="{{ url_for('backtest') }}" class="{% if request.endpoint == 'backtest'     %}active{% endif %}">backtest</a>
   {# qr and api are off the bar (user 2026-10-23); /qr and /api/latest.json still answer by URL. #}
+  {# history and plot are off the bar for now (user 2026-11-19: 'hide history and plot tabs for now'); /history and /plot still answer by URL. #}
   <span id="poll-health" style="display:none;margin-left:auto;align-self:center;font-size:11px;color:#e05d5d"></span>
 </div>
 <script>
@@ -90,9 +89,7 @@ window.gepoPolled = () => { window.gepoLastOk = Date.now(); };
   // sideways pan on a wide table kept tipping into a page change.
   const PAGES = [
     "{{ url_for('index') }}",
-    "{{ url_for('history') }}",
     "{{ url_for('actuals') }}",
-    "{{ url_for('plot') }}",
     "{{ url_for('ibkr') }}",
     "{{ url_for('oot') }}",
     "{{ url_for('backtest') }}"
