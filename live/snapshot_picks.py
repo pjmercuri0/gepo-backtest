@@ -64,6 +64,35 @@ PICK_FIELDS = [
 ]
 
 
+def _snap_marks(keys, wait_s: float = 30.0) -> dict:
+    """{stream key: IBKR mark on the spread, credit scale} off live/ranked/combo_stream.json, read at the
+    snap (user 2026-11-19: 'target keeps changing now cuz its based on mark. lets fix target and max
+    debit at the time of snap'). The stream reloads the board every ~20s, so a row new to this scan may
+    not be held yet: wait up to wait_s for `keys` (the Snap rows). {} at once when the stream is not
+    writing; a stale quote is never used."""
+    import time as _t
+    path = Path(live_config.RANKED_DIR) / "combo_stream.json"
+    deadline = _t.monotonic() + wait_s
+    while True:
+        out = {}
+        try:
+            st = json.loads(path.read_text())
+            now = datetime.now()
+            if abs((now - datetime.fromisoformat(str(st.get("ts")))).total_seconds()) > 30:
+                return {}
+            for k, q in (st.get("quotes") or {}).items():
+                try:
+                    if q.get("ibkr_mark") is not None and abs((now - datetime.fromisoformat(str(q.get("ts")))).total_seconds()) <= 60:
+                        out[k] = round(float(q["ibkr_mark"]), 4)
+                except (TypeError, ValueError):
+                    continue
+        except (OSError, ValueError, TypeError):
+            return {}
+        if all(k in out for k in keys) or _t.monotonic() >= deadline:
+            return out
+        _t.sleep(2)
+
+
 def capture(latest_path: Path) -> None:
     try:
         d = json.loads(latest_path.read_text())
@@ -104,9 +133,35 @@ def capture(latest_path: Path) -> None:
     if any(s.get("hhmm") == hhmm for s in payload["scans"]):
         print(f"[snapshot_picks] scan {hhmm} already captured; skip")
         return
+    # Mark basis, fixed at the snap (user 2026-11-19): the stream's mark now is stamped on each Snap row
+    # and on the live board's rows (latest.json), and every page takes the target band and max debit
+    # from that stamp. A row the stream has no mark for carries none and stays on the smile.
+    marks = {}
+    if getattr(ec, "TARGET_BASIS", "model") == "mark":
+        from live import stores as _stores
+        def _qk(r):
+            try:
+                return _stores.qkey(r)
+            except (KeyError, TypeError, ValueError):
+                return None
+        marks = _snap_marks([k for k in map(_qk, rows) if k])
+        _n = 0
+        for _lst in (d.get("ticker") or [], d.get("top_picks") or []):
+            for r in _lst:
+                _m = marks.get(_qk(r))
+                if _m is not None:
+                    r["snap_mark"] = _m; _n += 1
+        if _n:
+            _tmp = latest_path.with_suffix(".json.snapmark.tmp")
+            _tmp.write_text(json.dumps(d, indent=2))
+            _tmp.replace(latest_path)
+        print(f"[snapshot_picks] snap marks: {sum(1 for r in rows if marks.get(_qk(r)) is not None)}/{len(rows)} Snap rows, "
+              f"{sum(1 for r in d.get('ticker') or [] if r.get('snap_mark') is not None)} board rows")
     picks = []
     for r in rows:
         p = {k: r.get(k) for k in PICK_FIELDS}
+        if r.get("snap_mark") is not None:
+            p["snap_mark"] = r["snap_mark"]
         p["qualified"] = bool(r.get("qualified"))
         _mc = r.get("model_credit")
         if _mc:

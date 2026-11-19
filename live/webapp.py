@@ -569,16 +569,6 @@ def _json_clone(obj):
     return json.loads(json.dumps(obj))
 
 
-def _stream_mark(pick: dict):
-    """IBKR's mark on this spread, credit scale, when the stream carries it (combo_stream "ibkr_mark")."""
-    try:
-        _q = (_stream_state().get("quotes") or {}).get(_stores.qkey(pick)) or {}
-        _m = _q.get("ibkr_mark")
-        return float(_m) if _m is not None else None
-    except (KeyError, TypeError, ValueError):
-        return None
-
-
 def _mark_basis(pick: dict, tg, mark):
     """The targets on the mark basis (user 2026-11-19: 'calculate model target range and max debit all
     from mark'), or tg unchanged when the canon is on the smile or the mark is not a usable price."""
@@ -596,9 +586,11 @@ def _attach_targets(pick: dict, live_mark: bool = False) -> None:
     credit when the ranker supplied one, else from the cross-sectional fair(d, DTE) formula.
     Also grades a recorded fill against them. IBKR quotes on the pick are left untouched.
 
-    Mark basis (user 2026-11-19): a row carrying entry_mark, the mark saved when he pressed +, takes
-    its levels from that; live_mark=True (an open Snap row) takes them from the stream's mark now. A
-    row with neither stays on the smile, flagged basis 'model_fallback' when a live mark was asked for."""
+    Mark basis (user 2026-11-19), fixed at the snap (same day: 'target keeps changing now cuz its based
+    on mark. lets fix target and max debit at the time of snap'): the levels come from the mark stamped
+    on the row when its scan snapped (snap_mark, written by snapshot_picks), or from entry_mark on an
+    Actuals row, the stamp it was saved with. Never the moving mark. A row with neither stays on the
+    smile, flagged basis 'model_fallback' when live_mark is set (an open Snap row)."""
     try:
         d = pick.get("dfit_short")
         if d is None:
@@ -609,8 +601,8 @@ def _attach_targets(pick: dict, live_mark: bool = False) -> None:
                                width=float(width) if width else None,
                                model_credit=float(mc) if mc is not None else None)
         _mk = pick.get("entry_mark")
-        if _mk is None and live_mark:
-            _mk = _stream_mark(pick)
+        if _mk is None:
+            _mk = pick.get("snap_mark")
         _tm = _mark_basis(pick, tg, _mk)
         if _tm is tg and live_mark and isinstance(tg, dict) and getattr(ec, "TARGET_BASIS", "model") == "mark":
             tg = {**tg, "basis": "model_fallback"}
@@ -660,12 +652,10 @@ def _save_actual_from_source(source: dict, pick: dict, source_label: str, source
     now = datetime.now().isoformat(timespec="seconds")
     trades = store.get("trades") or []
     existing = next((t for t in trades if t.get("id") == trade_id), None)
-    # Mark basis (user 2026-11-19): the mark at the + is kept on the row, so its target band and max
-    # debit stay the ones he entered on instead of moving with the mark afterwards.
-    if getattr(ec, "TARGET_BASIS", "model") == "mark":
-        _em = _stream_mark(pick)
-        if _em is not None:
-            pick = {**pick, "entry_mark": round(_em, 4)}
+    # Mark basis (user 2026-11-19): the row keeps the mark its levels were showing at the +, the
+    # scan's stamp, so its target band and max debit stay the ones he entered on.
+    if getattr(ec, "TARGET_BASIS", "model") == "mark" and pick.get("snap_mark") is not None:
+        pick = {**pick, "entry_mark": pick["snap_mark"]}
     row = {
         "id": trade_id,
         "source": source,
@@ -3030,9 +3020,9 @@ def _overlay_stream(payload: dict) -> None:
                     qo = None
                 w = r.get("spread_width")
                 # Mark basis (user 2026-11-19): this row's levels, and so the check mark below, come off
-                # the stream's IBKR mark on its own book; a row the stream has no mark for stays on the smile.
+                # the IBKR mark stamped on it when the scan snapped; a row with no stamp stays on the smile.
                 if getattr(ec, "TARGET_BASIS", "model") == "mark" and isinstance(r.get("credit_targets"), dict):
-                    _tm = _mark_basis(r, r["credit_targets"], (q or {}).get("ibkr_mark"))
+                    _tm = _mark_basis(r, r["credit_targets"], r.get("snap_mark"))   # fixed at the snap
                     r["credit_targets"] = _tm if _tm is not r["credit_targets"] else {**_tm, "basis": "model_fallback"}
                 # Best-book star (user 2026-11-02: 'just show star when one is the best price'): the two
                 # sites' SHOWN prices, whatever each is priced off; a tie stars both. Scan defaults here,
