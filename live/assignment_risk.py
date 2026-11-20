@@ -82,6 +82,8 @@ def _open_positions(include_frozen: bool = False) -> list[dict]:
     store = Path(live_config.ROOT_DIR) / _stores.actuals_name("debit" if debit_mode.enabled() else "credit")
     try:
         for t in (json.loads(store.read_text()).get("trades") or []):
+            if t.get("closed"):      # he is out of it: nothing left to be assigned on
+                continue             # (2026-11-20: MDT and PEP alerted the morning after he closed them)
             add(t.get("pick") or {}, "actuals")
     except (OSError, json.JSONDecodeError):
         pass
@@ -384,6 +386,13 @@ def main() -> int:
     positions = _open_positions(include_frozen=args.include_frozen)
     if not positions:
         print("No open positions to check", flush=True)
+        # Clear today's state file, or the page keeps the rows of an earlier scan.
+        ts = datetime.now()
+        _atomic_write(ALERT_DIR / f"assignment_risk_{ts:%Y-%m-%d}.json", {
+            "type": "assignment-risk", "ts": ts.isoformat(timespec="seconds"),
+            "host": os.uname().nodename, "n_at_risk": 0, "n_watch": 0,
+            "extrinsic_threshold": float(getattr(live_config, "LIVE_ASSIGN_EXTRINSIC_ALERT", 0.10)),
+            "positions": []})
         return 0
 
     ib = IB()
