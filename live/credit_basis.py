@@ -51,6 +51,17 @@ def entry_credit(pick: dict) -> float:
         except (TypeError, ValueError):
             pass  # fall through to the quote-derived basis
 
+    # An Actuals row with no typed fill is carried at IBKR's mark at the + (entry_mark, kept by the
+    # + since 2026-11-19), the number its white debit shows (user 2026-11-23: '1x times mark for the
+    # actuals not 1x times model'). Only Actuals rows carry entry_mark; Snap and History do not.
+    em = pick.get("entry_mark")
+    if em is not None:
+        try:
+            if 0 < float(em) < width:
+                return round(float(em), 4)
+        except (TypeError, ValueError):
+            pass
+
     # Fable Canon (2026-09-30): a Fable pick books FABLE_FILL_FRAC x the quoted mid it was
     # selected on -- the basis its evidence was measured at. Rows carry "fable": True
     # (cw_fill marks the 09-30 afternoon rows written before the flag existed).

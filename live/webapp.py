@@ -1006,7 +1006,11 @@ def _actuals_rows() -> list[dict]:
         # leg mids, i.e. quoted_credit/net_credit), NOT the modelled 0.80x mid /
         # 1.08x model that History books at (user 2026-09-14: "should be mid credit or
         # last from ibkr"). The typed fill still shows beside it and drives P&L.
-        _q = pick.get("quoted_credit")
+        # ...and 1x IBKR's mark at the + where the row kept one (user 2026-11-23: 'you should be showing
+        # 1x times mark for the actuals not 1x times model. only use model when there is no mark' --
+        # 'mark at time'): entry_mark, the same mark its target band and max debit are multiples of.
+        _em = pick.get("entry_mark")
+        _q = _em if _em is not None else pick.get("quoted_credit")
         if _q is None:
             _q = pick.get("net_credit")
         _w = pick.get("spread_width") or ((pick.get("net_credit") or 0) + (pick.get("max_loss") or 0))
@@ -1014,7 +1018,7 @@ def _actuals_rows() -> list[dict]:
             _q, _w = float(_q), float(_w)
             if _q > 0 and _w > _q:
                 pick["fill_targets"] = [{"credit": round(_q, 4), "max_loss": round(_w - _q, 4)}]
-                pick["fill_basis"] = "IBKR"
+                pick["fill_basis"] = "IBKR MARK" if _em is not None else "IBKR"
         except (TypeError, ValueError):
             pass
 
