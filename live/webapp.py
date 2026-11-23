@@ -2698,11 +2698,11 @@ def _fill_stats(rows: list[dict]) -> dict:
         _side = (lambda x: _wd - float(x)) if _wd else float
         if mc and (not _wd or 0 < float(mc) < _wd): fm.append((_side(a), _side(mc)))
         if qc and (not _wd or 0 < float(qc) < _wd): fq.append((_side(a), _side(qc)))
-        # vs IBKR's mark at the + (user 2026-11-23: 'we should show credit x mark as a stat too. like 1.2
-        # better payout or whatever vs mark'): the same max win actual / max win at 1x, on entry_mark.
+        # vs IBKR's mark at the + (user 2026-11-23: 'we should show credit x mark as a stat too'), on
+        # entry_mark and on the same side as the two above ('and fill vs mark', same day).
         try:
-            if p.get("entry_mark") is not None and float(p["entry_mark"]) > 0:
-                fk.append((a, float(p["entry_mark"])))
+            if p.get("entry_mark") is not None and float(p["entry_mark"]) > 0 and (not _wd or float(p["entry_mark"]) < _wd):
+                fk.append((_side(a), _side(p["entry_mark"])))
         except (TypeError, ValueError):
             pass
         tg = p.get("credit_targets") or {}
