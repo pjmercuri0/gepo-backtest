@@ -2671,7 +2671,7 @@ def _fill_stats(rows: list[dict]) -> dict:
     the number of fills that ratio is made of -- 26 of 168 rows carry no model credit.
     Quoted = the scan's own quote for a Snap + (whose quoted_credit is the booked credit), else the
     quote the row was saved at."""
-    fm, fq, below, n = [], [], 0, 0
+    fm, fq, fk, below, n = [], [], [], 0, 0
     for r in sorted(rows, key=lambda x: str(x.get("added_at") or "")):
         p = r.get("pick") or {}
         a = p.get("actual_credit")
@@ -2689,6 +2689,13 @@ def _fill_stats(rows: list[dict]) -> dict:
             qc = p.get("quoted_credit") or p.get("net_credit")
         if mc: fm.append((a, float(mc)))
         if qc: fq.append((a, float(qc)))
+        # vs IBKR's mark at the + (user 2026-11-23: 'we should show credit x mark as a stat too. like 1.2
+        # better payout or whatever vs mark'): the same max win actual / max win at 1x, on entry_mark.
+        try:
+            if p.get("entry_mark") is not None and float(p["entry_mark"]) > 0:
+                fk.append((a, float(p["entry_mark"])))
+        except (TypeError, ValueError):
+            pass
         tg = p.get("credit_targets") or {}
         if tg.get("min_credit") is not None and a < float(tg["min_credit"]): below += 1
     _ratio = lambda pairs: round(sum(x for x, _ in pairs) / sum(m for _, m in pairs), 3) \
@@ -2698,6 +2705,7 @@ def _fill_stats(rows: list[dict]) -> dict:
             "recent_n_model": min(k, len(fm)), "recent_n_quoted": min(k, len(fq)),
             "fill_over_model": _ratio(fm), "fill_over_model_recent": _ratio(fm[-k:]),
             "fill_over_quoted": _ratio(fq), "fill_over_quoted_recent": _ratio(fq[-k:]),
+            "n_mark": len(fk), "fill_over_mark": _ratio(fk),
             "below_min": below}
 
 

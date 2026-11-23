@@ -9,7 +9,8 @@
   {% set fs = fill_stats %}
   {# All fills, not a last-20 window (user 2026-11-16: 'its not last 20 i want it all'). #}
   fills vs model: <strong>{{ fs.fill_over_model if fs.fill_over_model is not none else '—' }}×</strong> ({{ fs.n_model }} fills)
-  &middot; fills vs quoted: <strong>{{ fs.fill_over_quoted if fs.fill_over_quoted is not none else '—' }}×</strong> ({{ fs.n_quoted }} fills)
+  {% if fs.n_mark %}&middot; fills vs mark: <strong>{{ fs.fill_over_mark if fs.fill_over_mark is not none else '—' }}×</strong> ({{ fs.n_mark }} fill{{ '' if fs.n_mark == 1 else 's' }})
+  {% endif %}&middot; fills vs quoted: <strong>{{ fs.fill_over_quoted if fs.fill_over_quoted is not none else '—' }}×</strong> ({{ fs.n_quoted }} fills)
   &middot; {{ fs.n_fills }} fills, {{ fs.below_min }} below min
 </div>
 {% endif %}
