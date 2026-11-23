@@ -2642,6 +2642,13 @@ def _actuals_weeks(rows: list[dict]) -> list[dict]:
             d = datetime.strptime(wk["expiry"], "%Y-%m-%d")
             wk["expiry_dow"] = d.strftime("%a")
             wk["expiry_label"] = d.strftime("%b %-d, %Y")
+            # The closing bell that day, "4pm" or "1pm" on an early close (user 2026-11-23: 'add expiry
+            # time to actuals headers expires Nov 27 Friday 1pm').
+            try:
+                _hh, _mm = (int(x) for x in market_hours.close_hhmm(d).split(":"))
+                wk["expiry_time"] = f"{(_hh - 1) % 12 + 1}{'' if not _mm else ':%02d' % _mm}{'am' if _hh < 12 else 'pm'}"
+            except (TypeError, ValueError):
+                wk["expiry_time"] = None
         except ValueError:
             wk["expiry_dow"] = None
             wk["expiry_label"] = wk["expiry"]

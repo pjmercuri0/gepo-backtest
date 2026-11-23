@@ -10,7 +10,7 @@
   {% for wk in weeks %}
   <div class="week-card">
     <div class="week-head">
-      <div class="week-title">Expires {{ wk.expiry_label }}{% if wk.expiry_dow %} ({{ wk.expiry_dow }}){% endif %}</div>
+      <div class="week-title">Expires {{ wk.expiry_label }}{% if wk.expiry_dow %} ({{ wk.expiry_dow }}){% endif %}{% if wk.expiry_time %} {{ wk.expiry_time }}{% endif %}</div>
       <div class="week-pnl {% if wk.total is not none and wk.total > 0 %}pos{% elif wk.total is not none and wk.total < 0 %}neg{% endif %}">
         {% if wk.total is not none %}${{ '%+.0f'|format(wk.total) }}{% if wk.open %}<span class="live-dot" style="margin-left:6px"></span>{% endif %}{% else %}—{% endif %}
       </div>
