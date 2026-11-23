@@ -2687,8 +2687,17 @@ def _fill_stats(rows: list[dict]) -> dict:
             qc = p.get("scan_quoted_credit")
         else:
             qc = p.get("quoted_credit") or p.get("net_credit")
-        if mc: fm.append((a, float(mc)))
-        if qc: fq.append((a, float(qc)))
+        # Debit site (user 2026-11-23: 'flip fill vs model and fill vs quote so its the <1 version debit
+        # side'): both ratios on the debit, width - credit, so paying less than the model reads under 1.
+        _wd = None
+        if IS_DEBIT_SITE:
+            try:
+                _wd = abs(float(p["short_strike"]) - float(p["long_strike"]))
+            except (KeyError, TypeError, ValueError):
+                _wd = None
+        _side = (lambda x: _wd - float(x)) if _wd else float
+        if mc and (not _wd or 0 < float(mc) < _wd): fm.append((_side(a), _side(mc)))
+        if qc and (not _wd or 0 < float(qc) < _wd): fq.append((_side(a), _side(qc)))
         # vs IBKR's mark at the + (user 2026-11-23: 'we should show credit x mark as a stat too. like 1.2
         # better payout or whatever vs mark'): the same max win actual / max win at 1x, on entry_mark.
         try:
