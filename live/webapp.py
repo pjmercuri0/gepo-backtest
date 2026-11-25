@@ -2263,6 +2263,7 @@ def snapshots():
     show_archive = (request.args.get("archive") or "").strip() in ("1", "true", "yes")
     archived_days = 0
     all_days = []
+    agg_only_days = []      # debit site: credit-only days, in the by-time table but not the cards
     for fp in sorted(picks_dir.glob("*.json"), reverse=True):
         if stats_start and fp.stem < stats_start and not show_archive:
             archived_days += 1
@@ -2284,6 +2285,15 @@ def snapshots():
             # Nothing is deleted from disk.
             kept = [sc for sc in d.get("scans", []) if _in_market_hours(sc.get("hhmm", ""), fp.stem) and not sc.get("_debit_empty")
                     and not (IS_DEBIT_SITE and not sc.get("picks"))]      # debit book starts 2026-11-02; no empty cards before
+            _agg_only = False
+            if not kept and IS_DEBIT_SITE:
+                # A day from before the debit book (no twins on file): no card, but its picks count in
+                # the by-time table as the credit book settled them, so the table covers the same days
+                # as the credit site's (user 2026-11-25: 'add all the snap performance stats from credit
+                # site to the debit site too' -> 'Add the Oct days').
+                d = _read_json(fp, raw=True) or {}
+                kept = [sc for sc in d.get("scans", []) if _in_market_hours(sc.get("hhmm", ""), fp.stem)]
+                _agg_only = True
             if not kept:
                 continue
             # Under-floor rows kept-for-the-record before 2026-10-14 stay on disk but off the page (user:
@@ -2307,7 +2317,7 @@ def snapshots():
                 hhmm = scan.get("hhmm", "")
                 scan["hhmm_actual"] = hhmm
                 scan["hhmm_round"] = _round_hhmm(hhmm)
-            all_days.append(d)
+            (agg_only_days if _agg_only else all_days).append(d)
 
     total_days = len(all_days)
     days = all_days if limit is None else all_days[:limit]
@@ -2379,7 +2389,7 @@ def snapshots():
 
     # Aggregate settled picks by scan time-of-day, rounded to the half hour.
     by_time = {}
-    for d in all_days:
+    for d in all_days + agg_only_days:
         for scan in d.get("scans", []):
             key = scan["hhmm_round"]
             slot = by_time.setdefault(key, {
