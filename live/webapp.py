@@ -1494,7 +1494,22 @@ def _stream_overlay(pick, last_track, last_marked, outcome_row, prefer_stream=Fa
             # quotes are available"): outside 09:30-16:00 ET no option quotes exist, so the mark is
             # intrinsic at the spot the row shows (the spot streams to 18:00, then its last value).
             # Beats a mark_actuals mark taken at 16:01 and the held last in-session quote below.
-            if not _in_session_ts(_server_now_et()):
+            # MARKET HOLIDAY (user 2026-11-26, Thanksgiving, on rows marked 0.00 at intrinsic: 'These
+            # didn't expire. Show the live price now'): an Actuals row that has not reached expiry is
+            # marked at IBKR's leg mark, which the stream still receives on a closed day, not at intrinsic.
+            _hol_mark = None
+            try:
+                _now_h = _server_now_et()
+                _hm = (_st.get("ibkr_marks") or {}).get(_stores.qkey(pick)) if ibkr_mark else None
+                if (_hm and market_hours.is_holiday(_now_h[:10]) and str(_hm.get("ts"))[:10] == _now_h[:10]
+                        and str(pick.get("expiry_date"))[:10] > _now_h[:10]):
+                    _hol_mark = float(_hm["mark"])
+            except (TypeError, ValueError, KeyError):
+                _hol_mark = None
+            if _hol_mark is not None:
+                _px, _basis = _hol_mark, "IBKR mark (legs), market closed for the holiday"
+                _am = {"ts": _hm.get("ts")}
+            elif not _in_session_ts(_server_now_et()):
                 _now_et = _server_now_et()
                 _exp_d = str(pick.get("expiry_date"))[:10]
                 # Before the open ON expiry day the plain after-hours rule below applies (user 2026-11-13:

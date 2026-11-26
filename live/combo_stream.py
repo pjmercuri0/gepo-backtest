@@ -703,10 +703,12 @@ def main() -> int:
             # Credit spread: short mark - long mark. Debit twin: width - (long mark - short mark). Clamped
             # to [0, width]. Only annotates a key the stream already quotes; the Actuals rows read it
             # (webapp._stream_overlay ibkr_mark=True), the other tabs keep the quote.
+            # ibkr_marks carries the same value for EVERY held spread, quoted or not (user 2026-11-26,
+            # Thanksgiving: 'These didn't expire. Show the live price now'): on a market holiday no
+            # book quotes, but IBKR still sends the leg marks it carries the positions at.
+            ibkr_marks = {}
             for k, lg in legs.items():
                 q = quotes.get(k)
-                if not q:
-                    continue
                 st_, lt_ = leg_t.get(lg[0]), leg_t.get(lg[1])
                 if not st_ or not lt_:
                     continue
@@ -719,7 +721,9 @@ def main() -> int:
                     v = min(max(v, 0.0), _wk)
                 elif v < 0:
                     continue
-                q["ibkr_mark"] = round(v, 4)
+                ibkr_marks[k] = {"mark": round(v, 4), "ts": ts}
+                if q:
+                    q["ibkr_mark"] = round(v, 4)
             _b5 = ts[:14] + f"{(int(ts[14:16]) // 5) * 5:02d}"
             if _b5 != mark5_bucket:
                 mark5, mark5_bucket = {}, _b5
@@ -809,7 +813,8 @@ def main() -> int:
             for k in [k for k in last_q if k.rsplit("|", 1)[-1] < _today]:      # expired spreads
                 del last_q[k]
             _atomic(OUT, {"ts": ts, "connected": bool(ib.isConnected()), "n": len(quotes), "held": len(subs),
-                          "quotes": quotes, "spots": sp, "last": last_q, "spot_hold": spot_hold})
+                          "quotes": quotes, "spots": sp, "last": last_q, "spot_hold": spot_hold,
+                          "ibkr_marks": ibkr_marks})
             last_pub = _publish(last_pub)
     except KeyboardInterrupt:
         pass
