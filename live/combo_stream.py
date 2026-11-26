@@ -356,7 +356,7 @@ def main() -> int:
             last_q = dict((json.loads(OUT.read_text()).get("last") or {}))
         except (OSError, ValueError, AttributeError):
             last_q = {}
-        # Last IN-SESSION spot per symbol, carried in the file the same way. Outside the session a
+        # Last TRADED spot per symbol (after-hours trades included), carried in the file the same way. Outside the session a
         # fresh subscription can carry no last trade, and IBKR's close tick is the close BEFORE the
         # last session: on Thanksgiving 2026-11-26 the page showed 11-24's closes (IBM 235.62 against
         # 243.47 at 11-25 15:59:59) and marked every Actuals row at intrinsic on them. The held spot
@@ -767,8 +767,9 @@ def main() -> int:
             for sym, (_c, t) in spots.items():
                 if t.last is not None and t.last == t.last and t.last != 0:
                     v = t.last
-                    if _in_sess:
-                        spot_hold[sym] = {"px": round(float(v), 4), "ts": ts}
+                    # every real trade, after-hours ones too (user 2026-11-26: Actuals should show
+                    # 'the prices right now', i.e. the latest trade, not the 16:00 close)
+                    spot_hold[sym] = {"px": round(float(v), 4), "ts": ts}
                 elif sym in spot_hold:
                     v = spot_hold[sym].get("px")
                 else:
