@@ -763,7 +763,8 @@ def main() -> int:
                     and _now.strftime("%H:%M") != last_pre:
                 last_pre = _now.strftime("%H:%M")
                 print(f"[combo_stream] pre-open {ts} spots {json.dumps(sp, sort_keys=True)}", flush=True)
-            if _now.weekday() < 5 and "09:30" <= _now.strftime("%H:%M") < market_hours.close_hhmm(_now):
+            if _now.weekday() < 5 and not market_hours.is_holiday(_now) \
+                    and "09:30" <= _now.strftime("%H:%M") < market_hours.close_hhmm(_now):
                 for k, q in quotes.items():
                     _w = widths.get(k)
                     if _w and abs(q["ask"] - q["bid"]) > _w + 1e-9:     # wider than the spread: not a price

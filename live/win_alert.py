@@ -63,7 +63,7 @@ def main() -> int:
 
     now = datetime.now(ET)
     hm = now.strftime("%H:%M")
-    if not args.force and (now.weekday() >= 5 or not ("09:30" <= hm < market_hours.close_hhmm(now))):
+    if not args.force and (now.weekday() >= 5 or market_hours.is_holiday(now) or not ("09:30" <= hm < market_hours.close_hhmm(now))):
         return 0
 
     try:

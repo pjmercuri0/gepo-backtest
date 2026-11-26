@@ -54,6 +54,8 @@ MARKET_CLOSE = dtime(hour=16, minute=5)
 def _in_market_hours(now: datetime) -> bool:
     if now.weekday() >= 5:           # 5=Sat, 6=Sun
         return False
+    if market_hours.is_holiday(now): # full-close holiday: no ticks to go stale (2026-11-26)
+        return False
     # Early-close day: the window ends five minutes after the 13:00 bell instead.
     close = dtime.fromisoformat(market_hours.shift(MARKET_CLOSE.strftime("%H:%M"), now))
     return MARKET_OPEN <= now.time() <= close

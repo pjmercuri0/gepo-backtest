@@ -13,6 +13,7 @@ CLI (run from the repo root):
     python3 -m live.market_hours --shift 15:15    # 15:15 or 12:15
     python3 -m live.market_hours --shift-hour 15  # 15 or 12
     python3 -m live.market_hours --after-close    # exit 0 once the bell has rung
+    python3 -m live.market_hours --is-holiday     # exit 0 on a full-close holiday
 """
 from __future__ import annotations
 
@@ -25,6 +26,18 @@ ET = ZoneInfo("America/New_York")
 
 # Source: nyse.com/markets/hours-calendars, read 2026-11-16. Add each new year.
 EARLY_CLOSES = {"2026-11-27", "2026-12-24", "2027-11-26"}
+
+# Full-close days: no session at all, so every "in session" test is false and the
+# off-hours rules apply all day (user 2026-11-26, Thanksgiving: 'add market holidays to
+# the health check and to the actuals tab marks since this is off hours').
+# Source: nyse.com/markets/hours-calendars, read 2026-11-16. Add each new year, and keep
+# in step with spreads.NYSE_HOLIDAYS (pandas, so it cannot be imported here).
+HOLIDAYS = {
+    "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25",
+    "2026-06-19", "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
+    "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31",
+    "2027-06-18", "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
+}
 
 OPEN_HHMM = "09:30"
 NORMAL_CLOSE_HHMM = "16:00"
@@ -44,6 +57,11 @@ def _iso(day=None) -> str:
 
 def is_early_close(day=None) -> bool:
     return _iso(day) in EARLY_CLOSES
+
+
+def is_holiday(day=None) -> bool:
+    """True on an NYSE full-close holiday (default today, ET)."""
+    return _iso(day) in HOLIDAYS
 
 
 def close_hhmm(day=None) -> str:
@@ -67,9 +85,11 @@ def shift(hhmm: str, day=None) -> str:
 
 def in_session(ts) -> bool:
     """True when a naive ET timestamp ("YYYY-MM-DDTHH:MM:SS") is inside that
-    day's regular session, 09:30 <= t < the bell."""
+    day's regular session, 09:30 <= t < the bell. Never on a full-close holiday."""
     s = str(ts or "")
     t = s[11:19]
+    if is_holiday(s[:10]):
+        return False
     return bool(t) and f"{OPEN_HHMM}:00" <= t < f"{close_hhmm(s[:10])}:00"
 
 
@@ -84,7 +104,10 @@ if __name__ == "__main__":
     ap.add_argument("--shift")
     ap.add_argument("--shift-hour", type=int)
     ap.add_argument("--after-close", action="store_true")
+    ap.add_argument("--is-holiday", action="store_true")
     a = ap.parse_args()
+    if a.is_holiday:
+        sys.exit(0 if is_holiday() else 1)
     if a.after_close:
         sys.exit(0 if after_close() else 1)
     if a.shift:
