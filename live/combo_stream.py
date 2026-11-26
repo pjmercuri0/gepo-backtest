@@ -356,6 +356,15 @@ def main() -> int:
             last_q = dict((json.loads(OUT.read_text()).get("last") or {}))
         except (OSError, ValueError, AttributeError):
             last_q = {}
+        # Last IN-SESSION spot per symbol, carried in the file the same way. Outside the session a
+        # fresh subscription can carry no last trade, and IBKR's close tick is the close BEFORE the
+        # last session: on Thanksgiving 2026-11-26 the page showed 11-24's closes (IBM 235.62 against
+        # 243.47 at 11-25 15:59:59) and marked every Actuals row at intrinsic on them. The held spot
+        # goes ahead of that close tick.
+        try:
+            spot_hold = dict((json.loads(OUT.read_text()).get("spot_hold") or {}))
+        except (OSError, ValueError, AttributeError):
+            spot_hold = {}
         while True:
             # Exit on a dropped IB socket instead of running on disconnected: the
             # 2026-09-29 overnight Gateway drop left this loop writing a fresh ts with no
@@ -752,19 +761,27 @@ def main() -> int:
                 except Exception as e:
                     print(f"[combo_stream] exchange swap failed {k}: {e}", flush=True)
             sp = {}
+            _now = datetime.now()
+            _in_sess = (_now.weekday() < 5 and not market_hours.is_holiday(_now)
+                        and "09:30" <= _now.strftime("%H:%M") < market_hours.close_hhmm(_now))
             for sym, (_c, t) in spots.items():
-                v = t.last if (t.last is not None and t.last == t.last and t.last != 0) else t.close
+                if t.last is not None and t.last == t.last and t.last != 0:
+                    v = t.last
+                    if _in_sess:
+                        spot_hold[sym] = {"px": round(float(v), 4), "ts": ts}
+                elif sym in spot_hold:
+                    v = spot_hold[sym].get("px")
+                else:
+                    v = t.close
                 if v is not None and v == v and v != 0:
                     sp[sym] = round(float(v), 4)
-            _now = datetime.now()
             # Pre-open spot record, once a minute (user 2026-10-21): the file is overwritten every
             # second, so nothing showed whether held names moved at 09:01/09:15.
             if _now.weekday() < 5 and "09:00" <= _now.strftime("%H:%M") < "09:30" \
                     and _now.strftime("%H:%M") != last_pre:
                 last_pre = _now.strftime("%H:%M")
                 print(f"[combo_stream] pre-open {ts} spots {json.dumps(sp, sort_keys=True)}", flush=True)
-            if _now.weekday() < 5 and not market_hours.is_holiday(_now) \
-                    and "09:30" <= _now.strftime("%H:%M") < market_hours.close_hhmm(_now):
+            if _in_sess:
                 for k, q in quotes.items():
                     _w = widths.get(k)
                     if _w and abs(q["ask"] - q["bid"]) > _w + 1e-9:     # wider than the spread: not a price
@@ -791,7 +808,7 @@ def main() -> int:
             for k in [k for k in last_q if k.rsplit("|", 1)[-1] < _today]:      # expired spreads
                 del last_q[k]
             _atomic(OUT, {"ts": ts, "connected": bool(ib.isConnected()), "n": len(quotes), "held": len(subs),
-                          "quotes": quotes, "spots": sp, "last": last_q})
+                          "quotes": quotes, "spots": sp, "last": last_q, "spot_hold": spot_hold})
             last_pub = _publish(last_pub)
     except KeyboardInterrupt:
         pass
